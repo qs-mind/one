@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from qsone import copy
-from qsone.calc import ENGINE_VERSION
+from qsone.calc import ENGINE_VERSION, graph
 from qsone.calc.errors import CalcError
 from qsone.calc.evaluate import Evaluation, evaluate
 from qsone.calc.formula import names, parse
@@ -56,11 +56,6 @@ class Outcome:
     defaults_used: dict  # {"round": {...}} and/or {"from_item": [...]}
     notes: list[dict]  # {en, ar}
     steps: list[dict]  # a preview that is not for_each: the first 20 steps
-
-
-def why_stale(conn, calc_id: str) -> list[dict]:
-    """Why a calculation is out of date. A stub until the recalculation graph replaces it."""
-    return []
 
 
 # Calculating.
@@ -507,7 +502,7 @@ def _explain_calculation(conn, calc_id: str, page: int, per_page: int) -> dict:
     steps = calc["trace"]["steps"]
     pages = max(1, math.ceil(max(len(inputs), len(steps)) / per_page))
     start = (page - 1) * per_page
-    because = why_stale(conn, calc_id)
+    because = graph.why_stale(conn, calc_id)
     return {
         "id": calc["id"],
         "formula": calc["formula"],
