@@ -69,4 +69,43 @@ CREATE TRIGGER items_no_delete BEFORE DELETE ON items
   BEGIN SELECT RAISE(ABORT, 'Items are never deleted'); END;
 """
 
-MIGRATIONS: list[str] = [SCHEMA_1]
+# The QS Calc Engine. A calculation, like a number, changes in one way only: it is marked
+# valid_until when a newer version replaces it. Its inputs are never edited or deleted.
+SCHEMA_2 = """
+CREATE TABLE calculations (
+  id TEXT PRIMARY KEY,
+  formula TEXT NOT NULL,
+  request TEXT NOT NULL CHECK (json_valid(request)),
+  value TEXT NOT NULL, unit TEXT NOT NULL,
+  exact INTEGER NOT NULL CHECK (exact IN (0, 1)),
+  trace TEXT NOT NULL CHECK (json_valid(trace)),
+  engine INTEGER NOT NULL,
+  output TEXT NOT NULL REFERENCES numbers(id),
+  recorded_at TEXT NOT NULL, recorded_by TEXT NOT NULL,
+  replaces TEXT REFERENCES calculations(id), reason TEXT, valid_until TEXT,
+  CHECK (replaces IS NULL OR length(trim(reason)) > 0));
+CREATE INDEX calculations_output ON calculations(output);
+CREATE TABLE calc_inputs (
+  calc_id TEXT NOT NULL REFERENCES calculations(id),
+  name TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  number_id TEXT NOT NULL REFERENCES numbers(id),
+  PRIMARY KEY (calc_id, name, seq));
+CREATE INDEX calc_inputs_number ON calc_inputs(number_id);
+CREATE TRIGGER calculations_no_delete BEFORE DELETE ON calculations
+  BEGIN SELECT RAISE(ABORT, 'Calculations are never deleted'); END;
+CREATE TRIGGER calculations_only_valid_until BEFORE UPDATE ON calculations
+  WHEN OLD.valid_until IS NOT NULL OR NEW.valid_until IS NULL
+    OR NEW.id IS NOT OLD.id OR NEW.formula IS NOT OLD.formula OR NEW.request IS NOT OLD.request
+    OR NEW.value IS NOT OLD.value OR NEW.unit IS NOT OLD.unit OR NEW.exact IS NOT OLD.exact
+    OR NEW.trace IS NOT OLD.trace OR NEW.engine IS NOT OLD.engine OR NEW.output IS NOT OLD.output
+    OR NEW.recorded_at IS NOT OLD.recorded_at OR NEW.recorded_by IS NOT OLD.recorded_by
+    OR NEW.replaces IS NOT OLD.replaces OR NEW.reason IS NOT OLD.reason
+  BEGIN SELECT RAISE(ABORT, 'Calculations are replaced by a new version'); END;
+CREATE TRIGGER calc_inputs_no_update BEFORE UPDATE ON calc_inputs
+  BEGIN SELECT RAISE(ABORT, 'Calculation inputs are never edited'); END;
+CREATE TRIGGER calc_inputs_no_delete BEFORE DELETE ON calc_inputs
+  BEGIN SELECT RAISE(ABORT, 'Calculation inputs are never deleted'); END;
+"""
+
+MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2]
