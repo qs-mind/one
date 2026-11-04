@@ -199,7 +199,7 @@ def placeholders(s: str) -> set[str]:
 
 def test_every_calc_text_is_a_pair_with_the_same_placeholders():
     texts = {k: v for k, v in vars(copy).items() if k.startswith("CALC_")}
-    assert len(texts) == 41
+    assert len(texts) == 45
     for key, text in texts.items():
         assert set(text) == {"en", "ar"} and all(text.values()), key
         assert placeholders(text["en"]) == placeholders(text["ar"]), key

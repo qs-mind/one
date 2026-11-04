@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
 from qsone import chat, copy, keys, models, projects, settings
+from qsone.calc import routes as calc_routes
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
 from qsone.records.project import RecordsError
@@ -80,6 +81,7 @@ def create_app(
     app.state.meaning = service
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
+    app.include_router(calc_routes.router(registry))
 
     @app.exception_handler(RecordsError)
     async def records_error(request: Request, exc: RecordsError) -> JSONResponse:

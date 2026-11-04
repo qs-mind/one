@@ -452,6 +452,27 @@ CALC_REQUEST_SHAPE = {
     "ar": "الطلب ناقص عند «{field}». ابعته كده: {example}.",
 }
 
+# The tools for agents: what each one does, in the engineer's words.
+CALC_TOOL_CALCULATE = {
+    "en": "Calculates a number exactly and saves it with its formula and sources.",
+    "ar": "بيحسب الرقم بالظبط ويحفظه بمعادلته ومصادره.",
+}
+
+CALC_TOOL_DEFINE_UNIT = {
+    "en": "Defines a project unit, like a bag of 50 kg, with its source.",
+    "ar": "بيعرّف وحدة للمشروع، زي شيكارة 50 كجم، بمصدرها.",
+}
+
+CALC_TOOL_EXPLAIN = {
+    "en": "Shows where a number comes from: its formula, inputs, sources and dates.",
+    "ar": "بيوضّح الرقم جاي منين: معادلته ومدخلاته ومصادره وتواريخها.",
+}
+
+CALC_TOOL_RECALCULATE = {
+    "en": "Lists the numbers out of date after a correction, and recalculates them in order.",
+    "ar": "بيعرض الأرقام اللي محتاجة إعادة حساب بعد تصحيح، ويحسبها تاني بالترتيب.",
+}
+
 # Notes: facts about a result, not refusals.
 CALC_NOTE_INEXACT = {
     "en": "The result is not exact before rounding: a division or conversion does not end.",
