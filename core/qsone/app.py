@@ -15,7 +15,7 @@ from starlette.responses import Response
 
 from qsone import chat, copy, keys, models, projects
 from qsone.calc import routes as calc_routes
-from qsone.engine import roles
+from qsone.engine import mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
 from qsone.engine.types import ModelChoice
 from qsone.meaning import routes as meaning_routes
@@ -68,11 +68,13 @@ def create_app(
     folder = data_dir if data_dir is not None else projects.default_data_dir()
     registry = projects.Projects(folder)
     service = meaning(registry) if meaning else Meaning(registry, Path(folder) / "models")
+    mcp = mcp_server.McpGate()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         service.start()
-        yield
+        async with mcp.running():
+            yield
         service.stop()
         registry.close_all()
 
@@ -85,6 +87,8 @@ def create_app(
     )
     app.state.projects = registry
     app.state.meaning = service
+    app.state.mcp = mcp
+    app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
     app.include_router(calc_routes.router(registry))
