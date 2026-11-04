@@ -118,7 +118,7 @@ def test_a_schema_1_project_upgrades_with_its_numbers(tmp_path, monkeypatch):
     rec = Records.open(folder)
     try:
         with rec.read() as c:
-            assert c.execute("PRAGMA user_version").fetchone()[0] == 2
+            assert c.execute("PRAGMA user_version").fetchone()[0] == len(schema.MIGRATIONS)
             assert c.execute("SELECT id, value FROM numbers").fetchall() == [(n, "100")]
             assert c.execute("SELECT count(*) FROM calculations").fetchone()[0] == 0
     finally:
