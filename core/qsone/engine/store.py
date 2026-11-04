@@ -1,4 +1,5 @@
-"""The engine's durable state, inside one encrypted Records file (schema migration 3).
+"""The engine's durable state, inside one encrypted Records file (schema migration 3; migration 4
+renamed its Deliverable drafts table to `deliverable_drafts`).
 
 `Store` keeps a chat's Briefs, each agent run's Checkpoint (its message history), stored
 results of deferred tool calls, approvals, writes already made, the team's messages,
@@ -428,7 +429,7 @@ class Store:
     def save_deliverable(self, brief_id: str, run_id: str, draft: DeliverableDraft) -> None:
         with self.rec.write(ENGINE) as c:
             c.execute(
-                "INSERT INTO deliverables(id, brief_id, run_id, draft, replaces, created_at)"
+                "INSERT INTO deliverable_drafts(id, brief_id, run_id, draft, replaces, created_at)"
                 " VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     draft.id,
@@ -444,7 +445,7 @@ class Store:
         """Raises `LookupError` for an unknown id."""
         with self.rec.read() as c:
             row = c.execute(
-                "SELECT draft FROM deliverables WHERE id = ?", (deliverable_id,)
+                "SELECT draft FROM deliverable_drafts WHERE id = ?", (deliverable_id,)
             ).fetchone()
         if row is None:
             raise LookupError(deliverable_id)
@@ -454,9 +455,9 @@ class Store:
         """The Brief's latest drafts (none replaces them) that have no Review yet, oldest first."""
         with self.rec.read() as c:
             rows = c.execute(
-                "SELECT d.draft FROM deliverables d WHERE d.brief_id = ?"
+                "SELECT d.draft FROM deliverable_drafts d WHERE d.brief_id = ?"
                 " AND NOT EXISTS (SELECT 1 FROM reviews v WHERE v.deliverable_id = d.id)"
-                " AND NOT EXISTS (SELECT 1 FROM deliverables n WHERE n.replaces = d.id)"
+                " AND NOT EXISTS (SELECT 1 FROM deliverable_drafts n WHERE n.replaces = d.id)"
                 " ORDER BY d.created_at, d.rowid",
                 (brief_id,),
             ).fetchall()
@@ -500,7 +501,7 @@ class Store:
         with self.rec.read() as c:
             rows = c.execute(
                 "WITH RECURSIVE chain(id) AS (SELECT ? UNION"
-                " SELECT d.replaces FROM deliverables d JOIN chain ON d.id = chain.id"
+                " SELECT d.replaces FROM deliverable_drafts d JOIN chain ON d.id = chain.id"
                 " WHERE d.replaces IS NOT NULL)"
                 " SELECT code, comments, checker, same_provider, round FROM reviews"
                 " WHERE deliverable_id IN (SELECT id FROM chain) ORDER BY at, rowid",

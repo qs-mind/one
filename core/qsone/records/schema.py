@@ -170,4 +170,99 @@ CREATE TRIGGER brief_writes_no_update BEFORE UPDATE ON brief_writes
   BEGIN SELECT RAISE(ABORT, 'A remembered write is never edited'); END;
 """
 
-MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3]
+# Deliverables and review (Plan 6). Plan 4's Deliverable drafts (an agent's answer as the
+# Checking QS sees it) keep their rows and Reviews under a name that says what they are, so
+# `deliverables` names the Deliverable itself: a Sheet or a Document, its parts (rows and
+# blocks, never deleted), Suggested changes, Saved versions, Revisions, checks, comments, Fill
+# Plans and Review reports. A Saved version is rebuilt from the parts, the audit trail and the
+# ledger as of its time; a Revision keeps a frozen snapshot with its SHA-256.
+SCHEMA_4 = """
+ALTER TABLE deliverables RENAME TO deliverable_drafts;
+DROP INDEX deliverables_brief;
+CREATE INDEX deliverable_drafts_brief ON deliverable_drafts(brief_id, created_at);
+CREATE TABLE deliverables (
+  id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('sheet','document')),
+  variant TEXT NOT NULL, title TEXT NOT NULL,
+  language TEXT NOT NULL CHECK (language IN ('ar','en')),
+  template TEXT NOT NULL CHECK (json_valid(template)),
+  total_item_id TEXT REFERENCES items(id),
+  desk TEXT CHECK (desk IS NULL OR json_valid(desk)), off_desk INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE parts (
+  rowid_ INTEGER PRIMARY KEY, id TEXT NOT NULL,
+  deliverable_id TEXT NOT NULL REFERENCES deliverables(id),
+  seq REAL NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('section','item','block')),
+  item_id TEXT REFERENCES items(id), node TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(node)),
+  version INTEGER NOT NULL, valid_from TEXT NOT NULL, valid_until TEXT,
+  removed INTEGER NOT NULL DEFAULT 0);
+CREATE UNIQUE INDEX parts_current ON parts(id) WHERE valid_until IS NULL;
+CREATE INDEX parts_deliverable ON parts(deliverable_id, valid_from);
+CREATE TABLE changes (
+  id TEXT PRIMARY KEY, deliverable_id TEXT NOT NULL REFERENCES deliverables(id),
+  op TEXT NOT NULL CHECK (json_valid(op)), reason TEXT, author TEXT NOT NULL,
+  comment_id TEXT, status TEXT NOT NULL CHECK (status IN ('pending','accepted','rejected','stale')),
+  created_at TEXT NOT NULL, decided_at TEXT, decided_by TEXT, version_n INTEGER);
+CREATE INDEX changes_pending ON changes(deliverable_id) WHERE status = 'pending';
+CREATE TABLE versions (deliverable_id TEXT NOT NULL REFERENCES deliverables(id),
+  n INTEGER NOT NULL, at TEXT NOT NULL, by TEXT NOT NULL,
+  changes TEXT NOT NULL CHECK (json_valid(changes)),
+  PRIMARY KEY (deliverable_id, n));
+CREATE TABLE revisions (deliverable_id TEXT NOT NULL REFERENCES deliverables(id),
+  no INTEGER NOT NULL, version_n INTEGER NOT NULL, issued_at TEXT NOT NULL, issued_by TEXT NOT NULL,
+  signed_off INTEGER NOT NULL DEFAULT 0, snapshot BLOB NOT NULL, sha256 TEXT NOT NULL,
+  PRIMARY KEY (deliverable_id, no));
+CREATE TABLE checks (id TEXT PRIMARY KEY, deliverable_id TEXT NOT NULL REFERENCES deliverables(id),
+  version_n INTEGER NOT NULL, code TEXT NOT NULL CHECK (code IN ('A','B','C')),
+  checker TEXT NOT NULL, same_provider INTEGER NOT NULL, summary TEXT, at TEXT NOT NULL);
+CREATE TABLE comments (
+  id TEXT PRIMARY KEY, deliverable_id TEXT NOT NULL REFERENCES deliverables(id),
+  parent_id TEXT REFERENCES comments(id), kind TEXT NOT NULL CHECK (kind IN ('note','review')),
+  anchor TEXT NOT NULL CHECK (json_valid(anchor)), body TEXT NOT NULL, author TEXT NOT NULL,
+  code TEXT CHECK (code IS NULL OR code IN ('B','C')), check_id TEXT REFERENCES checks(id),
+  status TEXT NOT NULL CHECK (status IN ('open','closed')), version_n INTEGER NOT NULL,
+  created_at TEXT NOT NULL, closed_at TEXT, closed_by TEXT, fix_asked_at TEXT);
+CREATE INDEX comments_deliverable ON comments(deliverable_id, status);
+CREATE TABLE fill_plans (id TEXT PRIMARY KEY,
+  deliverable_id TEXT NOT NULL REFERENCES deliverables(id),
+  file_id TEXT NOT NULL REFERENCES files(id), plan TEXT NOT NULL CHECK (json_valid(plan)),
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL);
+CREATE TABLE review_reports (deliverable_id TEXT NOT NULL, revision_no INTEGER NOT NULL,
+  body BLOB NOT NULL, at TEXT NOT NULL, PRIMARY KEY (deliverable_id, revision_no));
+-- Guardrails inside the file: versions, revisions, checks, review_reports never change or go;
+-- parts change only by valid_until; changes and comments are never deleted.
+CREATE TRIGGER parts_no_delete BEFORE DELETE ON parts
+  BEGIN SELECT RAISE(ABORT, 'Parts are never deleted'); END;
+CREATE TRIGGER parts_only_valid_until BEFORE UPDATE ON parts
+  WHEN OLD.valid_until IS NOT NULL OR NEW.valid_until IS NULL OR NEW.node IS NOT OLD.node
+    OR NEW.seq IS NOT OLD.seq OR NEW.id IS NOT OLD.id OR NEW.version IS NOT OLD.version
+    OR NEW.removed IS NOT OLD.removed OR NEW.item_id IS NOT OLD.item_id
+    OR NEW.rowid_ IS NOT OLD.rowid_ OR NEW.deliverable_id IS NOT OLD.deliverable_id
+    OR NEW.kind IS NOT OLD.kind OR NEW.valid_from IS NOT OLD.valid_from
+  BEGIN SELECT RAISE(ABORT, 'A part changes by a new row version'); END;
+CREATE TRIGGER versions_no_update BEFORE UPDATE ON versions
+  BEGIN SELECT RAISE(ABORT, 'Saved versions are never edited'); END;
+CREATE TRIGGER versions_no_delete BEFORE DELETE ON versions
+  BEGIN SELECT RAISE(ABORT, 'Saved versions are never deleted'); END;
+CREATE TRIGGER revisions_no_update BEFORE UPDATE ON revisions
+  BEGIN SELECT RAISE(ABORT, 'Revisions are never edited'); END;
+CREATE TRIGGER revisions_no_delete BEFORE DELETE ON revisions
+  BEGIN SELECT RAISE(ABORT, 'Revisions are never deleted'); END;
+CREATE TRIGGER checks_no_update BEFORE UPDATE ON checks
+  BEGIN SELECT RAISE(ABORT, 'Checks are never edited'); END;
+CREATE TRIGGER checks_no_delete BEFORE DELETE ON checks
+  BEGIN SELECT RAISE(ABORT, 'Checks are never deleted'); END;
+CREATE TRIGGER review_reports_no_update BEFORE UPDATE ON review_reports
+  BEGIN SELECT RAISE(ABORT, 'Review reports are never edited'); END;
+CREATE TRIGGER review_reports_no_delete BEFORE DELETE ON review_reports
+  BEGIN SELECT RAISE(ABORT, 'Review reports are never deleted'); END;
+CREATE TRIGGER changes_no_delete BEFORE DELETE ON changes
+  BEGIN SELECT RAISE(ABORT, 'Suggested changes are never deleted'); END;
+CREATE TRIGGER comments_no_delete BEFORE DELETE ON comments
+  BEGIN SELECT RAISE(ABORT, 'Comments are never deleted'); END;
+CREATE TRIGGER deliverables_no_delete BEFORE DELETE ON deliverables
+  BEGIN SELECT RAISE(ABORT, 'Deliverables are never deleted'); END;
+CREATE TRIGGER fill_plans_no_delete BEFORE DELETE ON fill_plans
+  BEGIN SELECT RAISE(ABORT, 'Fill Plans are never deleted'); END;
+"""
+
+MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4]

@@ -37,6 +37,8 @@ dependencies = [
   "numpy",
   "truststore",
   "httpx",  # the model download
+  "python-docx",  # Word export (Plan 6); brings lxml (BSD-3-Clause)
+  "typst",  # PDF export (Plan 6): typst-py, Apache-2.0, abi3 wheels for every CI system
 ]
 
 [project.optional-dependencies]
