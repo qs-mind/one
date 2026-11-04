@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "QS Mind One core: local agent server for the desktop app"
 license = "LicenseRef-FSL-1.1-ALv2"
 requires-python = ">=3.12,<3.13"
+# Licences: permissive only (MIT, BSD, Apache-2.0, zlib, public domain), plus MPL-2.0 for
+# unmodified packages: tqdm (MPL-2.0 AND MIT) comes in via tokenizers -> huggingface-hub,
+# and nothing imports it.
 dependencies = [
   "pydantic-ai-slim[anthropic]",
   "anthropic",
@@ -20,6 +23,11 @@ dependencies = [
   "openpyxl",
   "xlrd",
   "platformdirs",
+  # Search by meaning. onnxruntime ships no Intel Mac wheel: there, search is by words only.
+  "onnxruntime ; sys_platform != 'darwin' or platform_machine == 'arm64'",
+  "tokenizers",
+  "numpy",
+  "truststore",
 ]
 
 [project.optional-dependencies]

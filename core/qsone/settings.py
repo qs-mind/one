@@ -9,12 +9,16 @@ APP_ID = "app.qsmind.one"  # the desktop's identifier (desktop/tauri.conf.json)
 
 
 def data_dir() -> Path:
-    """The folder Tauri calls the app data folder; QSONE_DATA_DIR overrides it (tests)."""
+    """The folder Tauri calls the app local data folder; QSONE_DATA_DIR overrides it (tests).
+
+    On Windows it is under Local, never Roaming, so settings, projects and the search models
+    never sync with a roaming office profile.
+    """
     override = os.environ.get("QSONE_DATA_DIR")
     if override:
         return Path(override)
     if sys.platform == "win32":
-        base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
     elif sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support"
     else:
