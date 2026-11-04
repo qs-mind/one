@@ -3,7 +3,7 @@
 import logging
 
 import keyring
-from keyring.errors import KeyringError
+from keyring.errors import KeyringError, PasswordDeleteError
 
 SERVICE = "QS Mind One"
 log = logging.getLogger(__name__)
@@ -20,3 +20,11 @@ def get_key(provider: str) -> str | None:
 def set_key(provider: str, value: str) -> None:
     """Raises `keyring.errors.KeyringError` when the system key store is not available."""
     keyring.set_password(SERVICE, provider, value)
+
+
+def delete_key(provider: str) -> None:
+    """Raises `keyring.errors.KeyringError` when the system key store is not available."""
+    try:
+        keyring.delete_password(SERVICE, provider)
+    except PasswordDeleteError:
+        pass  # there was no key

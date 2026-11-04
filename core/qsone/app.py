@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 import anthropic
+import httpx2
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -12,8 +13,11 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import chat, copy, keys, models, projects, settings
+from qsone import chat, copy, keys, models, projects
 from qsone.calc import routes as calc_routes
+from qsone.engine import roles
+from qsone.engine import routes as engine_routes
+from qsone.engine.types import ModelChoice
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
 from qsone.records.project import RecordsError
@@ -40,6 +44,7 @@ def create_app(
     models_lister: models.ModelLister | None = None,
     data_dir: Path | None = None,
     meaning: Callable[[projects.Projects], Meaning] | None = None,
+    ai_http: httpx2.AsyncClient | None = None,
 ) -> FastAPI:
     """Build the core app. Every route needs `Authorization: Bearer <secret>`.
 
@@ -48,7 +53,8 @@ def create_app(
     a fake, so no test calls Anthropic. Projects live in `data_dir/projects/` (default: the app
     data folder); they are all closed when the app stops. `meaning` builds the search-by-meaning
     service for the app's projects (default: the real models in `<data folder>/models`); tests
-    inject sample specs, a fake hub and test doubles.
+    inject sample specs, a fake hub and test doubles. `ai_http` reaches the AI providers for the
+    AI settings (default: each provider's own client); tests inject a fake transport.
     """
     expected = f"Bearer {secret}".encode()
     model_factory = model_factory or chat.default_model
@@ -82,6 +88,7 @@ def create_app(
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
     app.include_router(calc_routes.router(registry))
+    app.include_router(engine_routes.settings_router(ai_http))
 
     @app.exception_handler(RecordsError)
     async def records_error(request: Request, exc: RecordsError) -> JSONResponse:
@@ -132,7 +139,7 @@ def create_app(
     @app.put("/settings/model")
     def choose_lead_model(body: ModelIn) -> JSONResponse:
         try:
-            settings.save("lead_model", body.id)
+            roles.choose("lead", ModelChoice("anthropic", body.id))
         except OSError:
             return JSONResponse({"error": copy.MODEL_NOT_SAVED}, status_code=503)
         return JSONResponse({"id": body.id})
