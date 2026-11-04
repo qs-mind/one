@@ -86,6 +86,22 @@ def test_lead_instructions_are_short():
     assert len(chat.LEAD_INSTRUCTIONS.split()) <= 80
 
 
+def test_the_lead_qs_knows_which_model_it_is():
+    seen: list[str] = []
+
+    async def note_instructions(messages, info: AgentInfo):
+        seen.append(info.instructions or "")
+        yield "ok"
+
+    client = fake(note_instructions)
+    client.post("/chat", json=ui_message("which model are you?"), headers=AUTH)
+    client.put("/settings/model", json={"id": "claude-fable-5-1"}, headers=AUTH)
+    client.post("/chat", json=ui_message("and now?"), headers=AUTH)
+    assert chat.LEAD_INSTRUCTIONS in seen[0]
+    assert chat.LEAD_MODEL in seen[0]  # the default until the engineer picks one
+    assert "claude-fable-5-1" in seen[1] and chat.LEAD_MODEL not in seen[1]  # read at request time
+
+
 class SlowModel:
     """Streams one word, then waits a long time, as a model would mid-reply."""
 
