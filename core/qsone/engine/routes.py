@@ -1,7 +1,9 @@
 """The engine's HTTP routes. Settings part (Plan 4 Task 3): AI Connectors, the Model Data Sheet,
-the model for each role, and entered prices. Spending Caps and what was spent (Task 6). Money
-goes out as exact decimal text."""
+the model for each role, and entered prices. Spending Caps and what was spent (Task 6). The
+engineer's own Claude Code (Task 5). Money goes out as exact decimal text."""
 
+from collections.abc import Sequence
+from dataclasses import asdict
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -15,7 +17,7 @@ from starlette.responses import Response
 
 from qsone import copy, keys, settings
 from qsone.engine import cards, connectors, costs, general, roles
-from qsone.engine.connectors import standard
+from qsone.engine.connectors import claude_code, standard
 from qsone.engine.store import CostBook
 from qsone.engine.types import ModelCard, ModelChoice, Role, Text
 from qsone.records.project import FILE_NAME
@@ -54,6 +56,17 @@ class CapsIn(BaseModel):
     month: Any = None
     budget_above: Any = None
     subscription_stops: StrictBool | None = None
+
+
+class ClaudeCodeIn(BaseModel):
+    """`keep_copy` is optional: whether Claude Code keeps its own copy of each conversation
+    (founder question 3); left out, it stays as it was (on by default)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str | None = Field(max_length=1000)
+    on: StrictBool
+    keep_copy: StrictBool | None = None
 
 
 def _money(value: Decimal | None) -> str | None:
@@ -95,12 +108,15 @@ def _roles_json(chosen: dict[Role, ModelChoice]) -> dict:
     return {role: _choice_json(choice) for role, choice in chosen.items()}
 
 
-def settings_router(http_client: httpx2.AsyncClient | None = None) -> APIRouter:
-    """`http_client` reaches the AI providers; tests inject a fake one."""
+def settings_router(
+    http_client: httpx2.AsyncClient | None = None, *, claude_command: Sequence[str] = ()
+) -> APIRouter:
+    """`http_client` reaches the AI providers; tests inject a fake one. `claude_command`
+    replaces the Claude Code executable; tests run the fake `claude`."""
     router = APIRouter()
 
     def found() -> list[connectors.Connector]:
-        return connectors.connectors(http_client=http_client)
+        return connectors.connectors(http_client=http_client, claude_command=claude_command)
 
     async def sheet() -> list[ModelCard]:
         return (await cards.listed(found()))[0]
@@ -163,6 +179,21 @@ def settings_router(http_client: httpx2.AsyncClient | None = None) -> APIRouter:
             answer = {"error": copy.NUMBER_NOT_EXACT, "field": refused.field}
             return JSONResponse(answer, status_code=422)
         return JSONResponse(card_json(cards.priced(card)))
+
+    @router.get("/settings/ai/claude-code")
+    async def claude_code_status() -> dict:
+        """The engineer's Check: free, and only when asked."""
+        found = await claude_code.status(claude_code.saved()["path"], command_prefix=claude_command)
+        return asdict(found) | {"models": list(found.models)}
+
+    @router.put("/settings/ai/claude-code")
+    def save_claude_code(body: ClaudeCodeIn) -> JSONResponse:
+        try:
+            entry = claude_code.save(path=body.path, on=body.on, keep_copy=body.keep_copy)
+        except OSError:
+            return JSONResponse({}, status_code=503)  # the screen says it in its own words
+        notice = copy.CLAUDE_CODE_COPY if entry["on"] and entry["keep_copy"] else None
+        return JSONResponse(entry | {"notice": notice})
 
     def caps_answer(value: costs.Caps) -> dict:
         return {"caps": costs.caps_json(value), "recommended": costs.caps_json(costs.RECOMMENDED)}

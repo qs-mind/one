@@ -3,7 +3,8 @@
 - A *model* connector gives a PydanticAI `Model`, and One runs the agent loop: the Native Link
   (Anthropic, `native_anthropic.py`) and the Standard Link (OpenAI-compatible, `standard.py`).
 - An *agent* connector runs its own loop over One's tools through MCP: the Subscription Link
-  (the engineer's own Claude Code, Task 5).
+  (the engineer's own Claude Code, `claude_code.py`), listed while settings.json
+  "ai.claude_code.on" is true.
 
 Keys live only in the key store, under the connector's id ("anthropic", "standard:<id>").
 """
@@ -82,17 +83,27 @@ class AgentConnector(Protocol):
 Connector = ModelConnector | AgentConnector
 
 
-def connectors(*, http_client: httpx2.AsyncClient | None = None) -> list[Connector]:
+def connectors(
+    *, http_client: httpx2.AsyncClient | None = None, claude_command: Sequence[str] = ()
+) -> list[Connector]:
     """Every connector the engineer has set up, from settings.json "ai" and the key store.
 
     The Native Link is always listed, so the screen can offer its key; without one it lists no
     models. `http_client` reaches the providers (tests inject a fake; it is never closed here).
+    `claude_command` replaces the Claude Code executable (tests: the fake `claude`).
     """
-    from qsone.engine.connectors import standard
+    from qsone.engine.connectors import claude_code, standard
     from qsone.engine.connectors.native_anthropic import NativeLink
 
     found: list[Connector] = [NativeLink(http_client=http_client)]
     found += standard.links(http_client=http_client)
+    saved = claude_code.saved()
+    if saved["on"]:
+        found.append(
+            claude_code.ClaudeCodeConnector(
+                saved["path"], command_prefix=claude_command, keep_copy=saved["keep_copy"]
+            )
+        )
     return found
 
 
