@@ -210,14 +210,258 @@ MODEL_NOT_SAVED = {
 
 
 # ---------------------------------------------------------------------------------------------
+# Agent engine (Plan 4). Keep these texts together, in this block.
+# {placeholders} are filled by `fill` from real data; a value may itself be an {en, ar} pair.
+# Money is shown in USD with 2 decimals and Western digits.
+# ---------------------------------------------------------------------------------------------
+
+# "AI" / «الذكاء الاصطناعي» is the header button that opens AI settings (Task 9 of Plan 4 adds
+# it to ui/src/i18n.ts). Until then the reply without a key stays NO_KEY.
+NO_AI = {
+    "en": (
+        "No AI is connected yet. Press “AI” at the top and add a Claude key, another AI "
+        "provider, or your own Claude Code, then send your message again."
+    ),
+    "ar": (
+        "لسه مفيش ذكاء اصطناعي متوصّل. دوس على «الذكاء الاصطناعي» فوق وضيف مفتاح Claude، "
+        "أو مزوّد تاني، أو Claude Code بتاعك، وبعدين ابعت رسالتك تاني."
+    ),
+}
+
+# Model errors for any AI Connector; KEY_REFUSED and the others above stay for the Native Link.
+AI_KEY_REFUSED = {
+    "en": "The {provider} key was refused. Check it in “AI” at the top, or add a new one.",
+    "ar": "مفتاح {provider} اترفض. راجعه من «الذكاء الاصطناعي» فوق، أو ضيف مفتاح جديد.",
+}
+
+AI_NO_CONNECTION = {
+    "en": "Could not reach {provider}. Check the internet connection, then try again.",
+    "ar": "مقدرناش نوصل لـ {provider}. اتأكد إن النت شغال وجرّب تاني.",
+}
+
+AI_BUSY = {
+    "en": "{provider} is busy right now. Try again in a minute.",
+    "ar": "في ضغط على {provider} دلوقتي. جرّب تاني كمان دقيقة.",
+}
+
+AI_FAILED = {
+    "en": "The work stopped because of a problem with {provider}. The work so far is saved.",
+    "ar": "الشغل وقف بسبب مشكلة في {provider}. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
+}
+
+# When a model does not answer. {role} is a ROLE_* pair; prices are USD per million tokens.
+FALLBACK_MOVED = {
+    "en": "{old} is not answering, so the {role} moved to {new}, at the same price or cheaper.",
+    "ar": "{old} مش بيرد، فـ{role} اتنقل على {new}، بنفس السعر أو أرخص.",
+}
+
+FALLBACK_COSTLIER = {
+    "en": (
+        "{old} is not answering, and no model of the same price or cheaper is set up. "
+        "Use {new} at {price_in} USD in and {price_out} USD out per million tokens?"
+    ),
+    "ar": (
+        "{old} مش بيرد، ومفيش نموذج بنفس السعر أو أرخص متظبط. "
+        "نستخدم {new} بـ {price_in} دولار للداخل و{price_out} دولار للخارج لكل مليون توكن؟"
+    ),
+}
+
+WAITING_INTERNET = {
+    "en": "No internet. The work is saved, and it continues by itself when the connection is back.",
+    "ar": "مفيش نت. الشغل محفوظ، وهيكمّل لوحده لما النت يرجع.",
+}
+
+# Spending Caps. {scope_name} is a SCOPE_* pair; {spent} and {cap} are USD amounts.
+CAP_PAUSED = {
+    "en": (
+        "One paused at 80% of the Spending Cap for {scope_name}: {spent} of {cap} USD spent. "
+        "Continue up to the cap, raise the cap, or stop with a report?"
+    ),
+    "ar": (
+        "One وقّف عند 80% من سقف الصرف بتاع {scope_name}: اتصرف {spent} من {cap} دولار. "
+        "نكمّل لحد السقف، ولا نرفع السقف، ولا نقف بتقرير؟"
+    ),
+}
+
+CAP_STOPPED = {
+    "en": (
+        "The Spending Cap for {scope_name} is reached: {spent} of {cap} USD. "
+        "Nothing more will be spent, and the work so far is saved."
+    ),
+    "ar": (
+        "وصلنا لسقف الصرف بتاع {scope_name}: {spent} من {cap} دولار. "
+        "مش هيتصرف حاجة تاني، والشغل اللي اتعمل لحد دلوقتي محفوظ."
+    ),
+}
+
+SCOPE_BRIEF = {"en": "this Brief", "ar": "التكليف ده"}
+
+SCOPE_DAY = {"en": "today", "ar": "النهارده"}
+
+SCOPE_MONTH = {"en": "this month", "ar": "الشهر ده"}
+
+EQUIVALENT_COST = {
+    "en": "Equivalent cost on your Claude subscription (not billed per use).",
+    "ar": "تكلفة مكافئة على اشتراك Claude بتاعك (مش بتتحاسب على كل استخدام).",
+}
+
+PRICE_UNKNOWN = {
+    "en": (
+        "One does not know the price of {model}, so the Spending Cap cannot protect you. "
+        "Enter its price in “AI” at the top, or mark it as running on this computer."
+    ),
+    "ar": (
+        "One مش عارف سعر {model}، فسقف الصرف مش هيقدر يحميك. "
+        "اكتب سعره في «الذكاء الاصطناعي» فوق، أو علّم عليه إنه شغال على الجهاز ده."
+    ),
+}
+
+# The Brief Budget. {basis} is BASIS_MEASURED or BASIS_ASSUMED.
+BUDGET_ASK = {
+    "en": (
+        "This Brief should cost about {usd} USD and take about {minutes} minutes ({basis}). Start?"
+    ),
+    "ar": "التكليف ده متوقع يكلّف حوالي {usd} دولار وياخد حوالي {minutes} دقيقة ({basis}). نبدأ؟",
+}
+
+BASIS_MEASURED = {
+    "en": "measured from {n} past requests in this project",
+    "ar": "محسوب من {n} طلب فات في المشروع ده",
+}
+
+BASIS_ASSUMED = {
+    "en": "assumed until measured: 20,000 tokens in and 1,500 out per request",
+    "ar": "تقدير لحد ما يتقاس: 20,000 توكن داخل و1,500 خارج لكل طلب",
+}
+
+# Approvals. {agent} is the agent's name; {action} its Progress Line words.
+ASK_OUTSIDE = {
+    "en": "{agent}: {action}. This leaves this computer. Allow it?",
+    "ar": "{agent}: {action}. ده هيطلع برّه الجهاز ده. نسمح بيه؟",
+}
+
+ASK_ONLINE = {
+    "en": (
+        "{agent}: {action}. This goes online after reading project files, "
+        "and text in files can hide instructions. Allow it?"
+    ),
+    "ar": (
+        "{agent}: {action}. ده هيدخل على النت بعد ما قرا ملفات المشروع، "
+        "والنص اللي في الملفات ممكن يكون مستخبي فيه أوامر. نسمح بيه؟"
+    ),
+}
+
+CONTINUE_BRIEF = {
+    "en": "This Brief stopped at: {step}. Continue it?",
+    "ar": "التكليف ده وقف عند: {step}. نكمّله؟",
+}
+
+STOPPED = {
+    "en": "Stopped. The work so far is saved.",
+    "ar": "وقفنا. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
+}
+
+DESK_SAVE = {
+    "en": "Keep “{desk}” as a Draft Desk for next time?",
+    "ar": "نحتفظ بـ«{desk}» كقسم مسودة للمرة الجاية؟",
+}
+
+DISAGREEMENT = {
+    "en": (
+        "After two rounds, the Checking QS and {agent} still disagree. "
+        "Both views and their evidence are below; you decide."
+    ),
+    "ar": "بعد جولتين، مهندس المراجعة و{agent} لسه مختلفين. الرأيين ودليل كل واحد تحت؛ القرار ليك.",
+}
+
+SAME_PROVIDER = {
+    "en": (
+        "Same-provider check: the Checking QS also runs on {provider}. "
+        "Add a second AI provider for a stronger check."
+    ),
+    "ar": (
+        "مراجعة من نفس الشركة: مهندس المراجعة شغال برضه على {provider}. "
+        "ضيف مزوّد ذكاء اصطناعي تاني عشان المراجعة تبقى أقوى."
+    ),
+}
+
+NO_SOURCE = {
+    "en": "Some numbers have no source yet; they are marked.",
+    "ar": "في أرقام لسه ملهاش مصدر؛ متعلّم عليها.",
+}
+
+# The Subscription Link: the engineer's own Claude Code.
+CLAUDE_CODE_MISSING = {
+    "en": (
+        "Claude Code was not found on this computer. "
+        "Install it from https://code.claude.com/docs/en/setup, or pick its file."
+    ),
+    "ar": (
+        "Claude Code مش موجود على الجهاز ده. "
+        "نزّله من https://code.claude.com/docs/en/setup، أو اختار الملف بتاعه."
+    ),
+}
+
+CLAUDE_CODE_TOO_OLD = {
+    "en": "Your Claude Code lacks options One needs. Update it, then check again.",
+    "ar": "Claude Code اللي عندك ناقصه اختيارات One محتاجها. حدّثه وبعدين افحص تاني.",
+}
+
+CLAUDE_CODE_SHIM = {
+    "en": (
+        "This is the npm claude.cmd, which One cannot run safely. "
+        "Install the native Claude Code, then pick it."
+    ),
+    "ar": (
+        "ده claude.cmd بتاع npm، وOne مش هيقدر يشغّله بأمان. نزّل Claude Code الأصلي وبعدين اختاره."
+    ),
+}
+
+CLAUDE_CODE_SIGNED_OUT = {
+    "en": "Claude Code is signed out. Open Claude Code once and sign in, then try again.",
+    "ar": "Claude Code مش مسجّل دخول. افتح Claude Code مرة وسجّل دخول، وبعدين جرّب تاني.",
+}
+
+CLAUDE_CODE_LIMIT = {
+    "en": (
+        "Your Claude subscription's limit is reached for now. "
+        "One waits, or moves the role to another model you have."
+    ),
+    "ar": "اشتراك Claude بتاعك وصل لحدّه دلوقتي. One هيستنى، أو هينقل الدور لنموذج تاني عندك.",
+}
+
+CLAUDE_CODE_COPY = {
+    "en": (
+        "Claude Code keeps its own copy of each conversation on this computer, "
+        "outside One's encrypted files."
+    ),
+    "ar": "Claude Code بيحتفظ بنسخة خاصة بيه من كل محادثة على الجهاز ده، برّه ملفات One المتشفّرة.",
+}
+
+# The roles whose model the engineer picks (glossary names).
+ROLE_LEAD = {"en": "Lead QS", "ar": "كبير مهندسي الكميات"}
+
+ROLE_CHECKER = {"en": "Checking QS", "ar": "مهندس المراجعة"}
+
+ROLE_SPECIALIST = {"en": "Specialists", "ar": "المهندسين المتخصصين"}
+
+ROLE_QUICK = {"en": "Quick answers", "ar": "الإجابات السريعة"}
+
+
+# ---------------------------------------------------------------------------------------------
 # QS Calc Engine (Plan 3). Keep these texts together, in this block.
 # Texts with values use {name} placeholders filled by `fill`; literal braces are doubled.
 # ---------------------------------------------------------------------------------------------
 
 
 def fill(text: dict[str, str], /, **values) -> dict[str, str]:
-    """Both languages of `text` with its {placeholders} filled from `values`."""
-    return {lang: s.format(**values) for lang, s in text.items()}
+    """Both languages of `text` with its {placeholders} filled from `values`.
+
+    A value that is itself an {en, ar} pair gives each language its own words."""
+    return {
+        lang: s.format(**{k: v[lang] if isinstance(v, dict) else v for k, v in values.items()})
+        for lang, s in text.items()
+    }
 
 
 # The formula.
