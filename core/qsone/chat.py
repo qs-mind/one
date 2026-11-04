@@ -1,14 +1,24 @@
 """POST /chat: the Lead QS, served the official PydanticAI way (AI SDK UI message stream)."""
 
-from collections.abc import Callable
+import json
+import logging
+from collections.abc import AsyncIterator, Callable
 
 import pydantic_ai
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import (
+    ModelAuthenticationError,
+    ModelConnectionError,
+    ModelRateLimitError,
+    ModelRequestTimeout,
+    ModelUnavailableError,
+)
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
-from pydantic_ai.ui.vercel_ai import VercelAIAdapter
+from pydantic_ai.ui.vercel_ai import VercelAIAdapter, VercelAIEventStream
+from pydantic_ai.ui.vercel_ai.response_types import BaseChunk
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -31,6 +41,8 @@ pydantic_ai.BANNER_ENABLED = False  # keep core.log to our own lines
 
 lead_agent = Agent(name="lead-qs", instructions=LEAD_INSTRUCTIONS)
 
+log = logging.getLogger("qsone.chat")
+
 
 def default_model() -> Model | None:
     """The Lead QS model with the engineer's own key, or None when no key is saved."""
@@ -44,9 +56,38 @@ async def _say_no_key(messages, info: AgentInfo):
     yield f"{copy.NO_KEY['ar']}\n\n{copy.NO_KEY['en']}"
 
 
+def plain_error(error: Exception) -> dict[str, str]:
+    """The {en, ar} text the engineer sees for a model error."""
+    if isinstance(error, ModelAuthenticationError):
+        return copy.KEY_REFUSED
+    if isinstance(error, ModelConnectionError | ModelRequestTimeout):
+        return copy.NO_CONNECTION
+    if isinstance(error, ModelRateLimitError | ModelUnavailableError):
+        return copy.CLAUDE_BUSY
+    return copy.MODEL_FAILED
+
+
+class _PlainErrorStream(VercelAIEventStream):
+    async def on_error(self, error: Exception) -> AsyncIterator[BaseChunk]:
+        # The provider's own words go to core.log; the stream carries a plain {en, ar} pair as JSON.
+        log.warning("The model failed: %s", error, exc_info=error)
+        plain = Exception(json.dumps(plain_error(error), ensure_ascii=False))
+        async for chunk in super().on_error(plain):
+            yield chunk
+
+
+class _Adapter(VercelAIAdapter):
+    def build_event_stream(self) -> _PlainErrorStream:
+        return _PlainErrorStream(
+            self.run_input,
+            accept=self.accept,
+            sdk_version=self.sdk_version,
+            server_message_id=self.server_message_id,
+            manage_system_prompt=self.manage_system_prompt,
+        )
+
+
 async def respond(request: Request, model_factory: ModelFactory) -> Response:
     # Without a key, answer in plain words through the same stream, so the screen shows a reply.
     model = model_factory() or FunctionModel(stream_function=_say_no_key)
-    return await VercelAIAdapter.dispatch_request(
-        request, agent=lead_agent, model=model, sdk_version=6
-    )
+    return await _Adapter.dispatch_request(request, agent=lead_agent, model=model, sdk_version=6)

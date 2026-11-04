@@ -2,10 +2,21 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState } from "react";
-import { language, setLanguage, t, useLanguage } from "../i18n";
+import { language, pick, setLanguage, t, type Text, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
+
+// The core sends a model error as an {en, ar} pair in the error text; any other failure gets the plain line.
+function errorLine(error: Error): string {
+  try {
+    const text = JSON.parse(error.message) as Partial<Text>;
+    if (typeof text.en === "string" && typeof text.ar === "string") return pick(text as Text);
+  } catch {
+    // not from the core
+  }
+  return t("chatError");
+}
 
 export function Chat() {
   const lang = useLanguage();
@@ -85,7 +96,7 @@ export function Chat() {
               {status === "submitted" && <li className="text-slate">{t("thinking")}</li>}
               {error && (
                 <li role="alert" className="text-copper">
-                  {t("chatError")}
+                  {errorLine(error)}
                 </li>
               )}
             </ol>

@@ -92,6 +92,22 @@ describe("Chat", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(texts.chatError.ar);
   });
 
+  it("shows the core's plain {en, ar} line when the model fails, in the engineer's language", async () => {
+    const refused = {
+      en: "The Claude key was refused. Check it, or add a new one.",
+      ar: "مفتاح Claude اترفض. راجعه، أو ضيف مفتاح جديد.",
+    };
+    const failed = [...reply.slice(0, 2), { type: "error", errorText: JSON.stringify(refused) }];
+    core({ chat: () => new Response(stream(failed), { headers: uiStream }) });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.type(await screen.findByRole("textbox"), "hello{enter}");
+    expect(await screen.findByRole("alert")).toHaveTextContent(refused.ar);
+
+    await user.click(screen.getByRole("button", { name: texts.otherLanguage.ar }));
+    expect(screen.getByRole("alert")).toHaveTextContent(refused.en);
+  });
+
   it("no key: shows the add-key screen in both languages", async () => {
     core({ keySet: false });
     const { unmount } = render(<Chat />);
