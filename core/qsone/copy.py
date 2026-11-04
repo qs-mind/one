@@ -351,6 +351,49 @@ ASK_ONLINE = {
     ),
 }
 
+# Progress Line words of the tools. {tool} is a tool's name; the other values come from its call.
+TOOL_WORKING = {"en": "Using {tool}", "ar": "بيستخدم {tool}"}
+
+TOOL_SEARCH_RECORDS = {
+    "en": "Searching the project files for «{query}»",
+    "ar": "بيدوّر في ملفات المشروع على «{query}»",
+}
+
+TOOL_READ_CHUNK = {
+    "en": "Reading a passage of the project files",
+    "ar": "بيقرا جزء من ملفات المشروع",
+}
+
+TOOL_FIND_ITEMS = {
+    "en": "Looking up items in the Source Ledger",
+    "ar": "بيدوّر على بنود في سجل المصادر",
+}
+
+TOOL_LEDGER_NUMBERS = {
+    "en": "Reading the numbers of item {item}",
+    "ar": "بيقرا أرقام البند {item}",
+}
+
+TOOL_ADD_SOURCE = {
+    "en": "Adding the source «{title}» to the Source Ledger",
+    "ar": "بيضيف المصدر «{title}» لسجل المصادر",
+}
+
+TOOL_ADD_ITEM = {
+    "en": "Adding an item to the Source Ledger",
+    "ar": "بيضيف بند لسجل المصادر",
+}
+
+TOOL_RECORD_NUMBER = {
+    "en": "Recording the {name} of item {item}, with its source",
+    "ar": "بيسجّل {name} البند {item} بمصدره",
+}
+
+TOOL_CORRECT_NUMBER = {
+    "en": "Correcting a number, keeping the old one",
+    "ar": "بيصحّح رقم، والرقم القديم محفوظ",
+}
+
 CONTINUE_BRIEF = {
     "en": "This Brief stopped at: {step}. Continue it?",
     "ar": "التكليف ده وقف عند: {step}. نكمّله؟",
