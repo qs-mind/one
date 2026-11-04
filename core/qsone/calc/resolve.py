@@ -219,7 +219,7 @@ def current_number(conn, item_id: str, name: str, *, field: str | None = None) -
 def _current(conn, item_id: str, name: str) -> list[dict]:
     cursor = conn.execute(
         f"SELECT {_NUMBER_COLUMNS} FROM numbers WHERE item_id = ? AND name = ?"
-        " AND valid_until IS NULL ORDER BY recorded_at, id",
+        " AND valid_until IS NULL ORDER BY recorded_at, rowid",
         (item_id, name),
     )
     columns = [d[0] for d in cursor.description]

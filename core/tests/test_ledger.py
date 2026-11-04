@@ -330,3 +330,20 @@ def test_a_source_is_recorded_with_its_audit_row(rec, source):
         rec, kind="spec", title="المواصفات - عينة", locator={"page": 12}, actor="engineer"
     )
     assert history(rec, page)[0]["after"]["locator"] == {"page": 12}
+
+
+def test_numbers_saved_in_the_same_tick_keep_their_order(rec, item, source):
+    # Windows clocks tick coarsely, so two numbers can share a time; save order breaks the tie.
+    rec.clock = lambda: "2026-11-04T08:00:00.000000+00:00"
+    names = [f"factor_{n}" for n in range(12)]
+    for name in names:
+        record_number(
+            rec,
+            item_id=item,
+            name=name,
+            value="1",
+            source_id=source,
+            dated="2026-11-02",
+            actor="engineer",
+        )
+    assert [n.name for n in numbers(rec, item)] == names

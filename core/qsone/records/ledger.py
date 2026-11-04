@@ -437,7 +437,7 @@ def numbers(rec: Records, item_id: str, *, as_of: str | None = None) -> list[Num
         args = (item_id, moment, moment)
         sql += " AND recorded_at <= ? AND (valid_until IS NULL OR valid_until > ?)"
     with rec.read() as conn:
-        rows = conn.execute(sql + " ORDER BY recorded_at, id", args).fetchall()
+        rows = conn.execute(sql + " ORDER BY recorded_at, rowid", args).fetchall()
     return [Number(*r[:3], Decimal(r[3]), *r[4:]) for r in rows]
 
 

@@ -132,7 +132,7 @@ def _members_now(conn, spec: dict, skip_missing: bool) -> list[tuple[str, str, l
     found: dict[str, list[str]] = {}
     rows = conn.execute(
         "SELECT item_id, id FROM numbers WHERE name = ? AND valid_until IS NULL"
-        " ORDER BY recorded_at, id",
+        " ORDER BY recorded_at, rowid",
         (spec["name"],),
     )
     for item_id, number_id in rows:
