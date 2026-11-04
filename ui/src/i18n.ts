@@ -30,6 +30,16 @@ export const texts = {
     ar: "محرك ون لا يعمل، لذلك لا تعمل المحادثة. سجله موجود هنا:",
   },
   retry: { en: "Retry", ar: "إعادة المحاولة" },
+  model: { en: "Model", ar: "النموذج" },
+  modelTitle: { en: "Choose the Lead QS model", ar: "اختر نموذج كبير مهندسي الكميات" },
+  modelsLoading: { en: "Loading the models your key can use…", ar: "جارٍ تحميل النماذج المتاحة لمفتاحك…" },
+  modelsNoKey: {
+    en: "Add your Claude key first from “Claude key” at the top.",
+    ar: "أضف مفتاح Claude أولًا من «مفتاح Claude» في الأعلى.",
+  },
+  modelsFailed: { en: "The models could not be loaded. Try again.", ar: "تعذّر تحميل النماذج. حاول مرة أخرى." },
+  modelInUse: { en: "In use", ar: "قيد الاستخدام" },
+  modelNotSaved: { en: "The model was not saved. Try again.", ar: "لم يُحفظ النموذج. حاول مرة أخرى." },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";

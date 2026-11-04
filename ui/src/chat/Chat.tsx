@@ -4,6 +4,8 @@ import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { language, pick, setLanguage, t, type Text, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
+import { ModelPanel, useModel } from "../settings/Model";
+import { Reply } from "./Reply";
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
@@ -18,12 +20,18 @@ function errorLine(error: Error): string {
   return t("chatError");
 }
 
+function textOf(parts: { type: string; text?: string }[]): string {
+  return parts.map((part) => (part.type === "text" ? part.text : "")).join("");
+}
+
 export function Chat() {
   const lang = useLanguage();
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
   const [draft, setDraft] = useState("");
   const [keySet, setKeySet] = useState<boolean>();
   const [keyOpen, setKeyOpen] = useState(false);
+  const model = useModel(keySet);
+  const [modelOpen, setModelOpen] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const busy = status === "submitted" || status === "streaming";
 
@@ -49,11 +57,27 @@ export function Chat() {
     void sendMessage({ text });
   }
 
+  function toggleModels() {
+    const state = model.list.state;
+    if (!modelOpen && (state === "idle" || state === "no-key" || state === "failed")) void model.load();
+    setModelOpen(!modelOpen);
+  }
+
   return (
     <div className="flex h-dvh flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-stone px-4 py-2">
         <span className="font-semibold">{t("appName")}</span>
         <div className="flex items-center gap-4 text-slate">
+          <button
+            type="button"
+            dir="auto"
+            title={t("modelTitle")}
+            aria-expanded={modelOpen}
+            onClick={toggleModels}
+            className="hover:text-ink"
+          >
+            {model.name ?? t("model")}
+          </button>
           <button type="button" onClick={() => setKeyOpen(true)} className="hover:text-ink">
             {t("aiKey")}
           </button>
@@ -78,6 +102,8 @@ export function Chat() {
         />
       )}
 
+      {modelOpen && <ModelPanel model={model} onClose={() => setModelOpen(false)} />}
+
       {keySet !== false && (
         <>
           <div ref={list} className="flex-1 overflow-y-auto px-4 py-4">
@@ -88,9 +114,13 @@ export function Chat() {
                   key={message.id}
                   className={message.role === "user" ? "max-w-[85%] self-end rounded-lg bg-stone px-3 py-2" : ""}
                 >
-                  <p dir="auto" className="whitespace-pre-wrap">
-                    {message.parts.map((part) => (part.type === "text" ? part.text : "")).join("")}
-                  </p>
+                  {message.role === "user" ? (
+                    <p dir="auto" className="whitespace-pre-wrap">
+                      {textOf(message.parts)}
+                    </p>
+                  ) : (
+                    <Reply text={textOf(message.parts)} />
+                  )}
                 </li>
               ))}
               {status === "submitted" && <li className="text-slate">{t("thinking")}</li>}

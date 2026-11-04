@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../i18n";
@@ -33,11 +33,30 @@ function stream(chunks: object[], signal?: AbortSignal | null, end = true) {
 
 type Chats = (init: RequestInit) => Response | Promise<Response>;
 
-function core({ keySet = true, chat }: { keySet?: boolean; chat?: Chats } = {}) {
+const modelList = [
+  { id: "claude-fable-5-1", name: "Claude Fable 5.1" },
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5" },
+];
+
+function core({
+  keySet = true,
+  chat,
+  models = () => Response.json(modelList),
+  saveModel,
+}: { keySet?: boolean; chat?: Chats; models?: () => Response | Promise<Response>; saveModel?: () => Response } = {}) {
+  let model = "claude-opus-5-5";
   const fetch = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = String(input);
-    if (url === "/api/settings/ai-key" && (init.method ?? "GET") === "GET") return Response.json({ set: keySet });
-    if (url === "/api/settings/ai-key" && init.method === "PUT") return Response.json({ set: true });
+    const method = init.method ?? "GET";
+    if (url === "/api/settings/ai-key" && method === "GET") return Response.json({ set: keySet });
+    if (url === "/api/settings/ai-key" && method === "PUT") return Response.json({ set: true });
+    if (url === "/api/settings/models") return models();
+    if (url === "/api/settings/model" && method === "GET") return Response.json({ id: model });
+    if (url === "/api/settings/model" && method === "PUT") {
+      if (saveModel) return saveModel();
+      model = (JSON.parse(String(init.body)) as { id: string }).id;
+      return Response.json({ id: model });
+    }
     if (url === "/api/chat" && chat) return chat(init);
     return new Response("not found", { status: 404 });
   });
@@ -143,5 +162,109 @@ describe("Chat", () => {
     await user.click(screen.getByRole("button", { name: texts.otherLanguage.ar }));
     expect(document.documentElement.dir).toBe("ltr");
     expect(await screen.findByRole("button", { name: texts.send.en })).toBeInTheDocument();
+  });
+
+  it("shows the reply's Markdown, not its marks; the engineer's own message stays plain", async () => {
+    const bold = [...reply.slice(0, 3), { type: "text-delta", id: "t1", delta: "The **total** is known." }, ...reply.slice(5)];
+    core({ chat: () => new Response(stream(bold), { headers: uiStream }) });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.type(await screen.findByRole("textbox"), "**as typed**{enter}");
+
+    expect((await screen.findByText("total")).tagName).toBe("STRONG");
+    expect(screen.getByText("**as typed**")).toBeInTheDocument();
+  });
+});
+
+describe("Model", () => {
+  const panel = () => screen.getByRole("region", { name: texts.modelTitle.ar });
+
+  it("the header shows the model in use; its panel lists the key's models with that one marked", async () => {
+    core();
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: "Claude Opus 5.5" }));
+
+    const choices = within(panel()).getAllByRole("button", { name: /Claude/ });
+    expect(choices.map((choice) => choice.textContent)).toEqual([
+      expect.stringContaining("Claude Fable 5.1"),
+      expect.stringContaining("Claude Opus 5.5"),
+    ]);
+    expect(choices[1]).toHaveAttribute("aria-current", "true");
+    expect(choices[1]).toHaveTextContent(texts.modelInUse.ar);
+    expect(choices[0]).not.toHaveAttribute("aria-current");
+  });
+
+  it("choosing a model saves it in the core, closes the panel and names it in the header", async () => {
+    const fetch = core();
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: "Claude Opus 5.5" }));
+    await user.click(within(panel()).getByRole("button", { name: /Claude Fable 5.1/ }));
+
+    expect(await screen.findByRole("button", { name: "Claude Fable 5.1" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: texts.modelTitle.ar })).not.toBeInTheDocument();
+    const put = fetch.mock.calls.find(([url, init]) => url === "/api/settings/model" && init?.method === "PUT")!;
+    expect(JSON.parse(String(put[1]!.body))).toEqual({ id: "claude-fable-5-1" });
+  });
+
+  it("works from the keyboard", async () => {
+    const fetch = core();
+    const user = userEvent.setup();
+    render(<Chat />);
+    await screen.findByRole("button", { name: "Claude Opus 5.5" });
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Claude Opus 5.5" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(within(panel()).getByRole("button", { name: /Claude Opus 5.5/ })).toHaveFocus());
+    await user.keyboard("{Shift>}{Tab}{/Shift}{Enter}");
+
+    expect(await screen.findByRole("button", { name: "Claude Fable 5.1" })).toBeInTheDocument();
+    expect(fetch.mock.calls.some(([url, init]) => url === "/api/settings/model" && init?.method === "PUT")).toBe(true);
+  });
+
+  it("says it is loading while the list comes", async () => {
+    let answer: (response: Response) => void = () => undefined;
+    core({ models: () => new Promise<Response>((resolve) => (answer = resolve)) });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: "claude-opus-5-5" })); // the name comes with the list
+
+    expect(within(panel()).getByText(texts.modelsLoading.ar)).toBeInTheDocument();
+    answer(Response.json(modelList));
+    expect(await within(panel()).findByRole("button", { name: /Claude Fable 5.1/ })).toBeInTheDocument();
+  });
+
+  it("no key: says to add the key first", async () => {
+    core({ keySet: false, models: () => Response.json({ error: { en: "no key", ar: "مفيش مفتاح" } }, { status: 409 }) });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: "claude-opus-5-5" }));
+    expect(await within(panel()).findByText(texts.modelsNoKey.ar)).toBeInTheDocument();
+  });
+
+  it("shows the core's plain line when the list fails, and Retry tries again", async () => {
+    const busy = { en: "Claude is busy right now.", ar: "في ضغط على Claude دلوقتي." };
+    let calls = 0; // fails when the app starts and when the panel opens, then works
+    core({ models: () => (++calls <= 2 ? Response.json({ error: busy }, { status: 502 }) : Response.json(modelList)) });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: "claude-opus-5-5" }));
+
+    expect(await within(panel()).findByRole("alert")).toHaveTextContent(busy.ar);
+    await user.click(within(panel()).getByRole("button", { name: texts.retry.ar }));
+    expect(await within(panel()).findByRole("button", { name: /Claude Fable 5.1/ })).toBeInTheDocument();
+  });
+
+  it("a choice the core could not save keeps the panel open with a plain line", async () => {
+    core({ saveModel: () => new Response("boom", { status: 500 }) });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: "Claude Opus 5.5" }));
+    await user.click(within(panel()).getByRole("button", { name: /Claude Fable 5.1/ }));
+
+    expect(await within(panel()).findByRole("alert")).toHaveTextContent(texts.modelNotSaved.ar);
+    expect(screen.getByRole("button", { name: "Claude Opus 5.5" })).toBeInTheDocument();
   });
 });

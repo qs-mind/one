@@ -22,9 +22,9 @@ from pydantic_ai.ui.vercel_ai.response_types import BaseChunk
 from starlette.requests import Request
 from starlette.responses import Response
 
-from qsone import copy, keys
+from qsone import copy, keys, settings
 
-# The model choice is the founder's: claude-opus-5-5 now, claude-fable-5-1 is the alternative.
+# The default; the engineer picks another from the header (PUT /settings/model).
 LEAD_MODEL = "claude-opus-5-5"
 
 LEAD_INSTRUCTIONS = (
@@ -44,12 +44,18 @@ lead_agent = Agent(name="lead-qs", instructions=LEAD_INSTRUCTIONS)
 log = logging.getLogger("qsone.chat")
 
 
+def lead_model_id() -> str:
+    """The model the engineer chose, or LEAD_MODEL."""
+    chosen = settings.load().get("lead_model")
+    return chosen if isinstance(chosen, str) and chosen else LEAD_MODEL
+
+
 def default_model() -> Model | None:
     """The Lead QS model with the engineer's own key, or None when no key is saved."""
     key = keys.get_key("anthropic")
     if key is None:
         return None
-    return AnthropicModel(LEAD_MODEL, provider=AnthropicProvider(api_key=key))
+    return AnthropicModel(lead_model_id(), provider=AnthropicProvider(api_key=key))
 
 
 async def _say_no_key(messages, info: AgentInfo):

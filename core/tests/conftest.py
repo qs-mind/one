@@ -31,6 +31,14 @@ def memory_keyring():
     keyring.set_keyring(previous)
 
 
+@pytest.fixture(autouse=True)
+def data_dir(tmp_path, monkeypatch):
+    """Settings go to a temporary folder, never to the machine's app data folder."""
+    folder = tmp_path / "data"
+    monkeypatch.setenv("QSONE_DATA_DIR", str(folder))
+    return folder
+
+
 SECRET = "s3cret"
 AUTH = {"Authorization": f"Bearer {SECRET}"}
 

@@ -39,3 +39,14 @@ MODEL_FAILED = {
     "en": "The reply stopped because of a problem with Claude. Try again.",
     "ar": "الرد وقف بسبب مشكلة في Claude. جرّب تاني.",
 }
+
+# The Lead QS model list and choice (GET /settings/models, PUT /settings/model).
+MODELS_FAILED = {
+    "en": "The models could not be loaded because of a problem with Claude. Try again.",
+    "ar": "مقدرناش نجيب النماذج بسبب مشكلة في Claude. جرّب تاني.",
+}
+
+MODEL_NOT_SAVED = {
+    "en": "The model choice was not saved on this computer. Try again.",
+    "ar": "اختيار النموذج ماتحفظش على الجهاز ده. جرّب تاني.",
+}

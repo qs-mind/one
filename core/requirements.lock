@@ -5,7 +5,9 @@ annotated-doc==0.0.5
 annotated-types==0.8.0
     # via pydantic
 anthropic==2.4.0
-    # via pydantic-ai-slim
+    # via
+    #   qsone (pyproject.toml)
+    #   pydantic-ai-slim
 anyio==4.16.0
     # via
     #   anthropic
