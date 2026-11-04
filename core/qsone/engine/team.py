@@ -133,7 +133,7 @@ def _maker(store: Store, deliverable_id: str) -> dict:
     """The agent run that made the Deliverable."""
     with store.rec.read() as c:
         (run_id,) = c.execute(
-            "SELECT run_id FROM deliverables WHERE id = ?", (deliverable_id,)
+            "SELECT run_id FROM deliverable_drafts WHERE id = ?", (deliverable_id,)
         ).fetchone()
     return store.run(run_id)
 
@@ -591,7 +591,7 @@ def _is_settled(store: Store, deliverable_id: str) -> bool:
         return bool(
             c.execute(
                 "SELECT EXISTS (SELECT 1 FROM reviews WHERE deliverable_id = ?)"
-                " OR EXISTS (SELECT 1 FROM deliverables WHERE replaces = ?)",
+                " OR EXISTS (SELECT 1 FROM deliverable_drafts WHERE replaces = ?)",
                 (deliverable_id, deliverable_id),
             ).fetchone()[0]
         )
