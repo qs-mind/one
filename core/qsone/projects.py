@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from qsone import copy, settings
+from qsone.meaning.service import Meaning, ModelFailed
 from qsone.records import files, search
 from qsone.records.project import FILE_NAME, Records, RecordsError
 
@@ -59,6 +60,11 @@ class Projects:
         with self._lock:
             self._open[project_id] = rec
             return {**self._remember(rec), "open": True}
+
+    def opened(self) -> list[tuple[str, Records]]:
+        """The open projects, a snapshot."""
+        with self._lock:
+            return [(pid, rec) for pid, rec in self._open.items() if rec.is_open]
 
     def list(self) -> list[dict]:
         """Newest first; a project that cannot be read is listed after them, with its `error`."""
@@ -131,13 +137,34 @@ class ProjectIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class RerankIn(BaseModel):
+    q: str = Field(min_length=1, max_length=1000)
+    chunk_ids: list[int] = Field(min_length=1, max_length=search.RERANK_TOP)
+
+
 def _file(info: files.FileInfo) -> dict:
     """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair."""
     return asdict(info) | {"note": getattr(copy, info.note) if info.note else None}
 
 
-def router(projects: Projects) -> APIRouter:
+def _hit(h: search.Hit) -> dict:
+    return {
+        "chunk_id": h.chunk_id,
+        "file_id": h.file_id,
+        "file_name": h.file_name,
+        "locator": h.locator,
+        "text": h.text,
+        "score": h.score,
+    }
+
+
+def router(projects: Projects, meaning: Meaning | None = None) -> APIRouter:
+    """With `meaning`, search uses the search models once they are ready."""
     r = APIRouter()
+
+    def wake() -> None:
+        if meaning is not None:
+            meaning.wake()
 
     @r.get("/projects")
     def list_projects() -> dict:
@@ -149,7 +176,9 @@ def router(projects: Projects) -> APIRouter:
 
     @r.post("/projects/{project_id}/open")
     def open_project(project_id: str) -> dict:
-        return projects.open(project_id)
+        opened = projects.open(project_id)
+        wake()
+        return opened
 
     @r.post("/projects/{project_id}/close")
     def close_project(project_id: str) -> dict:
@@ -180,6 +209,7 @@ def router(projects: Projects) -> APIRouter:
                 raise RecordsError(copy.FILE_TOO_BIG, status=413)
             parts.append(part)
         info = await run_in_threadpool(files.add_file, rec, name, b"".join(parts), actor=ACTOR)
+        wake()  # embedding happens in the background; the upload never waits for it
         return JSONResponse(_file(info), status_code=200 if info.duplicate else 201)
 
     @r.get("/projects/{project_id}/search")
@@ -190,20 +220,36 @@ def router(projects: Projects) -> APIRouter:
         mode: search.Mode = "auto",
         k: Annotated[int, Query(ge=1, le=50)] = 10,
     ) -> dict:
-        found = search.search(projects.get(project_id), q, also=also or (), mode=mode, k=k)
+        rec = projects.get(project_id)
+        embedder = meaning.embedder() if meaning is not None else None
+        try:
+            found = search.search(rec, q, also=also or (), mode=mode, k=k, embedder=embedder)
+        except ModelFailed:  # the state now says why; words still work
+            found = search.search(rec, q, also=also or (), mode=mode, k=k)
+        rerank = found.mode == "hybrid" and meaning is not None and meaning.reranker() is not None
         return {
             "mode": found.mode,
             "note": copy.SEARCH_WORDS_ONLY if found.mode == "words" else None,
-            "results": [
-                {
-                    "file_id": h.file_id,
-                    "file_name": h.file_name,
-                    "locator": h.locator,
-                    "text": h.text,
-                    "score": h.score,
-                }
-                for h in found.hits
-            ],
+            "rerank": rerank,
+            "results": [_hit(h) for h in found.hits],
         }
+
+    @r.post("/projects/{project_id}/rerank")
+    def rerank_project(project_id: str, body: RerankIn) -> dict:
+        """The second step of a search: these chunks, reordered by the reranker."""
+        rec = projects.get(project_id)
+        reranker = meaning.reranker() if meaning is not None else None
+        if reranker is None:
+            raise RecordsError(copy.MEANING_NOT_READY)
+        should_stop = meaning.rerank_turn(project_id)
+        try:
+            hits = search.rerank_hits(
+                rec, body.q, body.chunk_ids, reranker, should_stop=should_stop
+            )
+        except search.Superseded:
+            raise RecordsError(copy.SEARCH_SUPERSEDED) from None
+        except ModelFailed:
+            raise RecordsError(copy.MEANING_NOT_READY) from None
+        return {"results": [_hit(h) for h in hits]}
 
     return r
