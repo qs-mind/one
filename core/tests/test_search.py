@@ -175,5 +175,16 @@ def test_empty_query_gives_no_hits(boq):
 def test_looks_exact():
     assert looks_exact("03/02") and looks_exact("٥١٩٣ م.ط") and looks_exact('"خيش مقطرن"')
     assert looks_exact("«خيش مقطرن»")
+    assert looks_exact("14.2") and looks_exact("12") and looks_exact('"1"')
     assert not looks_exact("bored piles 60 cm diameter with load tests")
     assert not looks_exact("خرسانة مسلحة")
+    assert not looks_exact("1") and not looks_exact("١") and not looks_exact("خرسانة 1")
+
+
+def test_a_lone_digit_finds_nothing(rec):
+    # A page full of numbers is not an answer to "1": a lone digit is too common to search on.
+    add_file(rec, "عينة.txt", "عدد 1 مفتاح 16 أمبير 1 أوتوماتيك".encode(), actor="engineer")
+    assert search(rec, "1").hits == [] and search(rec, "١").hits == []
+    assert search(rec, "1").mode == "words"
+    assert search(rec, "مفتاح 1").hits  # the word still finds it
+    assert search(rec, '"1"').mode == "exact" and search(rec, '"1"').hits  # quoted: asked for

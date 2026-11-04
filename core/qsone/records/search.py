@@ -59,12 +59,19 @@ _DIGIT = re.compile(r"\d")  # any decimal digit, Arabic-Indic too
 
 
 def looks_exact(query: str) -> bool:
-    """In quotes, or three words or fewer with a digit in one of them."""
+    """In quotes, or three words or fewer, one of them a code or number: a digit and at least
+    two characters ("12", "03/02", "14.2"). A lone digit is no code."""
     s = query.strip()
     if len(s) >= 2 and _QUOTES.get(s[0]) == s[-1]:
         return True
     words = s.split()
-    return 0 < len(words) <= 3 and any(_DIGIT.search(w) for w in words)
+    return 0 < len(words) <= 3 and any(len(w) >= 2 and _DIGIT.search(w) for w in words)
+
+
+def _useful(norm: str) -> str:
+    """The normalised words without lone digits: "1" is on every page of numbers, so it finds
+    nothing worth showing."""
+    return " ".join(w for w in norm.split() if not (len(w) == 1 and w.isdigit()))
 
 
 def rrf(lists: list[list[int]], k: int = 60) -> list[tuple[int, float]]:
@@ -211,6 +218,7 @@ def search(
             if scored or mode == "exact":
                 return Result("exact", _hits(conn, scored, {i: ("words",) for i, _ in scored}))
 
+    norms = [_useful(n) for n in norms]
     vectors = []
     if embedder is not None:
         with rec.read() as conn:
