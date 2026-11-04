@@ -108,6 +108,9 @@ def test_mixed_lengths_add():
     e = run("a + b", "m", a=("1500", "mm"), b=("2", "m"))
     assert e.value == Decimal("3.50") and e.steps[-1]["factor"] == "1000"
     assert run("a + b", "m", a=("1", "م"), b=("2", "M")).steps[-1].get("factor") is None
+    # the same unit with its terms in another order converts nothing, so no factor is shown
+    e = run("c * p + r", "EGP/m3", c=("350", "kg/m3"), p=("3000", "EGP/t"), r=("1", "EGP/m3"))
+    assert e.value == Decimal("1051.00") and "factor" not in e.steps[-1]
 
 
 def test_exchange_rate():
