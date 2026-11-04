@@ -1,0 +1,21 @@
+{
+  "kind": "sheet",
+  "version": 1,
+  "column_kinds": {
+    "text": ["code", "field:<key>", "number:<name>.unit"],
+    "number": ["number:<name>"],
+    "calc": ["number:<name>, with calc {formula of this row's numbers, unit currency_of:<name>}"]
+  },
+  "default_columns": [
+    {"key": "code", "label": {"en": "Item", "ar": "البند"}, "from": "code", "frozen": true, "edit": false, "width": 70},
+    {"key": "description", "label": {"en": "Description", "ar": "بيان الأعمال"}, "from": "field:description", "wrap": true, "edit": true, "width": 420},
+    {"key": "unit", "label": {"en": "Unit", "ar": "الوحدة"}, "from": "number:quantity.unit", "edit": false, "width": 60},
+    {"key": "quantity", "label": {"en": "Qty", "ar": "الكمية"}, "from": "number:quantity", "edit": true, "empty_from": "field:quantity_note", "width": 90},
+    {"key": "rate", "label": {"en": "Rate", "ar": "الفئة"}, "from": "number:rate", "edit": true, "width": 110},
+    {"key": "amount", "label": {"en": "Amount", "ar": "الإجمالي"}, "from": "number:amount", "edit": false, "width": 130,
+     "calc": {"formula": "quantity * rate", "unit": "currency_of:rate"},
+     "total": {"formula": "sum(amount)", "unit": "currency_of:rate"}}
+  ],
+  "ops": ["set_number", "set_field", "add_item_row", "add_section", "set_section_title", "remove_row", "move_row", "set_columns"],
+  "anchors": ["cell", "range", "row", "deliverable"]
+}
