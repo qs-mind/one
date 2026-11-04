@@ -155,6 +155,17 @@ describe("Chat", () => {
     expect(JSON.parse(String(put[1]!.body))).toEqual({ provider: "anthropic", value: "sk-ant-test" });
   });
 
+  it("replacing the key opens its panel beside the chat, which stays", async () => {
+    core();
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: texts.aiKey.ar }));
+    expect(screen.getByRole("heading", { name: texts.aiKeyTitle.ar })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: texts.message.ar })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: texts.close.ar }));
+    expect(screen.queryByRole("heading", { name: texts.aiKeyTitle.ar })).not.toBeInTheDocument();
+  });
+
   it("switches the language from the header", async () => {
     core();
     const user = userEvent.setup();

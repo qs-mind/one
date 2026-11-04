@@ -252,6 +252,17 @@ describe("RecordsPanel", () => {
     await waitFor(() => expect(screen.queryByRole("region", { name: texts.records.ar })).not.toBeInTheDocument());
   });
 
+  it("opens in its own column beside the chat; the message box stays, and Tab reaches the panel first", async () => {
+    core();
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(screen.getByRole("button", { name: texts.records.ar }));
+    const records = screen.getByRole("region", { name: texts.records.ar });
+    const box = screen.getByRole("textbox", { name: texts.message.ar });
+    expect(within(records.parentElement!).queryByRole("textbox", { name: texts.message.ar })).toBeNull();
+    expect(records.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("every new label exists in both languages", async () => {
     core();
     panel();
