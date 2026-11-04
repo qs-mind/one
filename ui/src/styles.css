@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
-/* QS Mind colours only. Kumbh Sans for Latin; it has no Arabic, so Arabic letters fall to IBM Plex Sans Arabic
-   (open licence; Thmanyah files never go in this public repo). */
+/* QS Mind colours only. Kumbh Sans for Latin; it has no Arabic, so Arabic letters fall to Zain (open licence;
+   Thmanyah files never go in this public repo). WebKitGTK 2.54, the Linux app's engine, misplaces a mark that ends
+   a word, such as the tanween in «حالياً»: it lifts the whole word by the mark's offset. Zain draws that tanween
+   where it belongs (offset near zero) and its dots are part of each letter; IBM Plex Sans Arabic lifted the word. */
 @theme {
   --color-*: initial;
   --color-ink: #0e0f12;
@@ -9,7 +11,7 @@
   --color-paper: #f9f8f4;
   --color-slate: #6e6a64;
   --color-copper: #a6491b;
-  --font-sans: "Kumbh Sans Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-sans: "Kumbh Sans Variable", "Zain", system-ui, sans-serif;
 }
 
 @layer base {

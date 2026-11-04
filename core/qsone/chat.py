@@ -50,6 +50,12 @@ def lead_model_id() -> str:
     return chosen if isinstance(chosen, str) and chosen else LEAD_MODEL
 
 
+@lead_agent.instructions
+def _model_in_use() -> str:
+    """Read at each request, so the Lead QS can say which model the engineer chose."""
+    return f"You run on the model {lead_model_id()}; say so when asked which model you are."
+
+
 def default_model() -> Model | None:
     """The Lead QS model with the engineer's own key, or None when no key is saved."""
     key = keys.get_key("anthropic")

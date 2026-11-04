@@ -109,7 +109,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
         event.preventDefault(); // the window must not open the file itself
         void add(Array.from(event.dataTransfer.files));
       }}
-      className="max-h-[60dvh] overflow-y-auto border-b border-stone px-4 py-4"
+      className="border-b border-stone px-4 py-4"
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-3">
         <div className="flex items-center justify-between gap-4">
