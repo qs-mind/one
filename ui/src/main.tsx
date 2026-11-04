@@ -1,6 +1,6 @@
 import "@fontsource-variable/kumbh-sans";
-import "@fontsource/ibm-plex-sans-arabic/400.css";
-import "@fontsource/ibm-plex-sans-arabic/600.css";
+import "@fontsource/zain/arabic-400.css";
+import "@fontsource/zain/arabic-700.css";
 import "./styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
