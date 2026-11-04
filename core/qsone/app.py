@@ -1,4 +1,7 @@
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal
 
 import anthropic
@@ -9,7 +12,8 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import chat, copy, keys, models, settings
+from qsone import chat, copy, keys, models, projects, settings
+from qsone.records.project import RecordsError
 
 Provider = Literal["anthropic"]
 
@@ -31,12 +35,14 @@ def create_app(
     secret: str,
     model_factory: chat.ModelFactory | None = None,
     models_lister: models.ModelLister | None = None,
+    data_dir: Path | None = None,
 ) -> FastAPI:
     """Build the core app. Every route needs `Authorization: Bearer <secret>`.
 
     `model_factory` gives the Lead QS model (None when no key is saved); tests inject a
     PydanticAI `FunctionModel`. `models_lister` lists the models a key can use; tests inject
-    a fake, so no test calls Anthropic.
+    a fake, so no test calls Anthropic. Projects live in `data_dir/projects/` (default: the app
+    data folder); they are all closed when the app stops.
     """
     expected = f"Bearer {secret}".encode()
     model_factory = model_factory or chat.default_model
@@ -47,9 +53,26 @@ def create_app(
         if not secrets.compare_digest(given, expected):
             raise HTTPException(status_code=401)
 
+    registry = projects.Projects(data_dir if data_dir is not None else projects.default_data_dir())
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        registry.close_all()
+
     app = FastAPI(
-        dependencies=[Depends(check_secret)], docs_url=None, redoc_url=None, openapi_url=None
+        dependencies=[Depends(check_secret)],
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
     )
+    app.state.projects = registry
+    app.include_router(projects.router(registry))
+
+    @app.exception_handler(RecordsError)
+    async def records_error(request: Request, exc: RecordsError) -> JSONResponse:
+        return JSONResponse({"error": exc.text}, status_code=exc.status)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
