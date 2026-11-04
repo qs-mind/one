@@ -65,6 +65,10 @@ def test_calls_and_text():
 def test_errors_name_the_place():
     e = refused("a * (b + c")
     assert e.key == "CALC_UNEXPECTED" and e.values["at"] == 10
+    # The text counts characters as a person does, from 1.
+    e = refused("a ! b")
+    assert e.values["at"] == 2 and e.text["en"].startswith("At character 3,")
+    assert e.text["ar"].startswith("عند الحرف 3،") and str(e).startswith("At character 3,")
 
 
 @pytest.mark.parametrize(
