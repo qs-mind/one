@@ -23,7 +23,7 @@ from qsone.calc.spec import (
 )
 from qsone.records import db, ledger, schema
 from qsone.records.project import Records, RecordsError
-from tests.calc_samples import add, sample_project, source_id
+from tests.calc_samples import SOURCES, add, sample_project, source_id
 
 CALC = (
     "INSERT INTO calculations (id, formula, request, value, unit, exact, trace, engine, output,"
@@ -314,7 +314,7 @@ def test_the_sample_project(tmp_path):
         with rec.read() as c:
             titles = [r[0] for r in c.execute("SELECT title FROM sources ORDER BY title")]
             fields = c.execute("SELECT fields FROM items WHERE id = ?", (section,)).fetchone()[0]
-        assert all("عينة" in t for t in titles) and len(titles) == 5
+        assert all("عينة" in t for t in titles) and len(titles) == len(SOURCES)
         assert json.loads(fields) == {"description": "خرسانة - عينة"}
     finally:
         rec.close()

@@ -357,7 +357,7 @@ class _Run:
         if live:
             r_value = right.value * factor
             value = left.value + r_value if node.op == "+" else left.value - r_value
-        shown = factor if not (left.zero or right.zero) and left.unit != right.unit else None
+        shown = factor if not (left.zero or right.zero) and factor != 1 else None
         return _V(value, unit, zero=left.zero and right.zero), shown
 
     def common(self, node: Node, left: _V, right: _V) -> tuple[Unit, Decimal]:
