@@ -9,9 +9,9 @@ import json
 import re
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal
 
 from qsone.calc.errors import CalcError
+from qsone.calc.evaluate import Input, Quantity
 from qsone.calc.spec import (
     CalcRequest,
     Constant,
@@ -33,22 +33,6 @@ _CODES = 20  # item codes listed in a missing-number refusal
 
 _ITEM_COLUMNS = "id, kind, code, fields"
 _NUMBER_COLUMNS = "id, item_id, name, value, unit, currency, source_id, dated, valid_until"
-
-
-# The shapes evaluate() reads (Task 4 defines them in evaluate.py with the same fields; when it
-# merges, these two become `from qsone.calc.evaluate import Input, Quantity`).
-@dataclass(frozen=True)
-class Quantity:
-    value: Decimal
-    unit: Unit
-
-
-@dataclass(frozen=True)
-class Input:
-    name: str
-    values: tuple[Quantity, ...]  # one, or many for a list
-    is_list: bool
-    origin: Literal["ledger", "constant"]
 
 
 @dataclass(frozen=True)
