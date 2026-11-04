@@ -342,6 +342,17 @@ CALC_UNIT_FACTOR = {
     "ar": 'الوحدة لازم تساوي أكتر من صفر من وحدة تانية، زي `"equals": "50 kg"`.',
 }
 
+CALC_UNIT_CASE = {
+    "en": (
+        "«{symbol}» is already defined as «{existing}»: units that differ only in upper and "
+        "lower case are one unit. Send «{existing}» with a `reason` to correct it."
+    ),
+    "ar": (
+        "«{symbol}» متعرّفة قبل كده باسم «{existing}»: الوحدات اللي فرقها في الحروف الكبيرة "
+        "والصغيرة بس وحدة واحدة. ابعت «{existing}» مع `reason` عشان تصححها."
+    ),
+}
+
 # Inputs.
 CALC_CONSTANT_UNIT = {
     "en": (

@@ -96,7 +96,7 @@ def test_search_takes_also_mode_and_k(client, project):
     r = client.get(
         f"/projects/{project}/search", params={"q": "05/09", "mode": "exact"}, headers=AUTH
     )
-    assert r.json() == {"mode": "exact", "note": None, "results": []}
+    assert r.json() == {"mode": "exact", "note": None, "rerank": False, "results": []}
 
 
 def test_same_bytes_and_new_versions(client, project):

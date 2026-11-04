@@ -28,10 +28,11 @@ dependencies = [
   "tokenizers",
   "numpy",
   "truststore",
+  "httpx",  # the model download
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx", "ruff", "xlwt"]
+dev = ["pytest", "ruff", "xlwt"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["qsone"]
