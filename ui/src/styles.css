@@ -24,4 +24,9 @@
   button:not(:disabled) {
     cursor: pointer;
   }
+  /* WebKit's own style gives li "text-align: match-parent", which fixes the side from the list's direction and
+     passes it down, so an Arabic reply inside an English page sat on the left. Each block aligns to its own start. */
+  li {
+    text-align: start;
+  }
 }
