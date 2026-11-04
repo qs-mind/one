@@ -138,3 +138,14 @@ ALREADY_CORRECTED = {
     "en": "This number was already corrected. Correct the newest entry instead.",
     "ar": "الرقم ده اتصحح قبل كده. صحّح آخر قيمة بدل منه.",
 }
+
+# The Lead QS model list and choice (GET /settings/models, PUT /settings/model).
+MODELS_FAILED = {
+    "en": "The models could not be loaded because of a problem with Claude. Try again.",
+    "ar": "مقدرناش نجيب النماذج بسبب مشكلة في Claude. جرّب تاني.",
+}
+
+MODEL_NOT_SAVED = {
+    "en": "The model choice was not saved on this computer. Try again.",
+    "ar": "اختيار النموذج ماتحفظش على الجهاز ده. جرّب تاني.",
+}
