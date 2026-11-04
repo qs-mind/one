@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* QS Mind colours only. Kumbh Sans for Latin; it has no Arabic, so Arabic letters fall to IBM Plex Sans Arabic
+   (open licence; Thmanyah files never go in this public repo). */
+@theme {
+  --color-*: initial;
+  --color-ink: #0e0f12;
+  --color-stone: #f2eee7;
+  --color-paper: #f9f8f4;
+  --color-slate: #6e6a64;
+  --color-copper: #a6491b;
+  --font-sans: "Kumbh Sans Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
