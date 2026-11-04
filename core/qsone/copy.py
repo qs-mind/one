@@ -294,6 +294,26 @@ CAP_STOPPED = {
     ),
 }
 
+CAP_TITLE = {"en": "Spending Cap", "ar": "سقف الصرف"}
+
+CAPS_NOT_SAVED = {
+    "en": "The Spending Caps were not saved on this computer. Try again.",
+    "ar": "سقوف الصرف ماتحفظتش على الجهاز ده. جرّب تاني.",
+}
+
+# The Claude subscription is not billed per use: at 80% One only says so, unless the engineer
+# turned on stopping it too.
+CAP_EQUIVALENT = {
+    "en": (
+        "Equivalent cost on your Claude subscription has reached {spent} of the Spending Cap "
+        "for {scope_name}, {cap} USD. It is not billed per use, so One carries on."
+    ),
+    "ar": (
+        "التكلفة المكافئة على اشتراك Claude بتاعك وصلت {spent} من سقف الصرف بتاع {scope_name}، "
+        "{cap} دولار. الاشتراك مش بيتحاسب على كل استخدام، فـOne هيكمّل."
+    ),
+}
+
 SCOPE_BRIEF = {"en": "this Brief", "ar": "التكليف ده"}
 
 SCOPE_DAY = {"en": "today", "ar": "النهارده"}
@@ -308,11 +328,13 @@ EQUIVALENT_COST = {
 PRICE_UNKNOWN = {
     "en": (
         "One does not know the price of {model}, so the Spending Cap cannot protect you. "
-        "Enter its price in “AI” at the top, or mark it as running on this computer."
+        "Enter its price in “AI” at the top, or mark it as running on this computer. "
+        "Use it anyway in this Brief?"
     ),
     "ar": (
         "One مش عارف سعر {model}، فسقف الصرف مش هيقدر يحميك. "
-        "اكتب سعره في «الذكاء الاصطناعي» فوق، أو علّم عليه إنه شغال على الجهاز ده."
+        "اكتب سعره في «الذكاء الاصطناعي» فوق، أو علّم عليه إنه شغال على الجهاز ده. "
+        "نستخدمه برضه في التكليف ده؟"
     ),
 }
 

@@ -1,19 +1,24 @@
 """The engine's HTTP routes. Settings part (Plan 4 Task 3): AI Connectors, the Model Data Sheet,
-the model for each role, and entered prices. Money goes out as exact decimal text."""
+the model for each role, and entered prices. Spending Caps and what was spent (Task 6). Money
+goes out as exact decimal text."""
 
+from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import httpx2
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from keyring.errors import KeyringError
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from starlette.responses import Response
 
-from qsone import copy, keys
-from qsone.engine import cards, connectors, roles
+from qsone import copy, keys, settings
+from qsone.engine import cards, connectors, costs, general, roles
 from qsone.engine.connectors import standard
+from qsone.engine.store import CostBook
 from qsone.engine.types import ModelCard, ModelChoice, Role, Text
+from qsone.records.project import FILE_NAME
 
 
 class ChoiceIn(BaseModel):
@@ -36,6 +41,19 @@ class PriceIn(BaseModel):
     model: str = Field(min_length=1, max_length=200)
     price_in: str = Field(alias="in", max_length=40)
     price_out: str = Field(alias="out", max_length=40)
+
+
+class CapsIn(BaseModel):
+    """Only the caps given change. Amounts are checked as exact decimal text in `costs`, so a
+    JSON number is refused with the same words as any other inexact number."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    brief: Any = None
+    day: Any = None
+    month: Any = None
+    budget_above: Any = None
+    subscription_stops: StrictBool | None = None
 
 
 def _money(value: Decimal | None) -> str | None:
@@ -145,5 +163,37 @@ def settings_router(http_client: httpx2.AsyncClient | None = None) -> APIRouter:
             answer = {"error": copy.NUMBER_NOT_EXACT, "field": refused.field}
             return JSONResponse(answer, status_code=422)
         return JSONResponse(card_json(cards.priced(card)))
+
+    def caps_answer(value: costs.Caps) -> dict:
+        return {"caps": costs.caps_json(value), "recommended": costs.caps_json(costs.RECOMMENDED)}
+
+    @router.get("/settings/ai/caps")
+    def spending_caps() -> dict:
+        return caps_answer(costs.caps())
+
+    @router.put("/settings/ai/caps")
+    def save_caps(body: CapsIn) -> JSONResponse:
+        changes = {name: getattr(body, name) for name in body.model_fields_set}
+        try:
+            saved = costs.save_caps(changes)
+        except costs.CapNotExact as refused:
+            answer = {"error": copy.NUMBER_NOT_EXACT, "field": refused.field}
+            return JSONResponse(answer, status_code=422)
+        except OSError:
+            return JSONResponse({"error": copy.CAPS_NOT_SAVED}, status_code=503)
+        return JSONResponse(caps_answer(saved))
+
+    @router.get("/costs")
+    def spent(brief_id: str | None = None) -> dict:
+        # Opened for this answer only, and never created by it; the Brief Runner (Task 8) may
+        # hand its own open cost book here instead.
+        data = settings.data_dir()
+        if not (data / general.FOLDER / FILE_NAME).is_file():
+            return costs.summary(None, brief_id=brief_id, now=datetime.now(UTC))
+        rec = general.open_engineer_records(data)
+        try:
+            return costs.summary(CostBook(rec), brief_id=brief_id, now=datetime.now(UTC))
+        finally:
+            rec.close()
 
     return router
