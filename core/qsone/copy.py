@@ -455,6 +455,67 @@ NO_SOURCE = {
     "ar": "في أرقام لسه ملهاش مصدر؛ متعلّم عليها.",
 }
 
+# The team (Plan 4, Task 7). {name} and {desk} are {en, ar} pairs; {title} is a Deliverable's.
+BUDGET_TITLE = {"en": "Brief Budget", "ar": "ميزانية التكليف"}
+
+BUDGET_UNKNOWN = {
+    "en": (
+        "One cannot tell what this Brief will cost: a model in its plan has no known price. "
+        "It should take about {minutes} minutes. Start?"
+    ),
+    "ar": (
+        "One مش عارف التكليف ده هيكلّف كام: في نموذج في الخطة سعره مش معروف. "
+        "متوقع ياخد حوالي {minutes} دقيقة. نبدأ؟"
+    ),
+}
+
+DESK_TITLE = {"en": "Draft Desk", "ar": "قسم مسودة"}
+
+DISAGREEMENT_TITLE = {"en": "The Checking QS disagrees", "ar": "مهندس المراجعة مش موافق"}
+
+DISAGREEMENT_CHECKER = {
+    "en": "Checking QS, round {round}, Code {code}:",
+    "ar": "مهندس المراجعة، الجولة {round}، كود {code}:",
+}
+
+DISAGREEMENT_MAKER = {
+    "en": "{agent}'s Deliverable, as it stands:",
+    "ar": "المُخرَج بتاع {agent} زي ما هو:",
+}
+
+DISAGREEMENT_ASK = {
+    "en": "Keep the Deliverable as it is? “No” sends it back to be fixed as the Checking QS says.",
+    "ar": "نسيب المُخرَج زي ما هو؟ «لأ» يرجّعه يتصلّح زي ما مهندس المراجعة قال.",
+}
+
+TOOL_PLAN_BRIEF = {"en": "Planning the Brief", "ar": "بيخطّط للتكليف"}
+
+TOOL_BUILD_SPECIALIST = {
+    "en": "Building a specialist: {name}",
+    "ar": "بيجهّز مهندس متخصص: {name}",
+}
+
+TOOL_DELEGATE = {"en": "Handing work to a specialist", "ar": "بيسلّم شغل لمهندس متخصص"}
+
+TOOL_SEND_MESSAGE = {"en": "Sending a message to the team", "ar": "بيبعت رسالة للفريق"}
+
+TOOL_MAKE_DELIVERABLE = {
+    "en": "Making the Deliverable «{title}»",
+    "ar": "بيعمل المُخرَج «{title}»",
+}
+
+TOOL_SUBMIT_FOR_CHECK = {
+    "en": "Sending a Deliverable to the Checking QS",
+    "ar": "بيبعت مُخرَج لمهندس المراجعة",
+}
+
+TOOL_SAVE_DESK = {
+    "en": "Offering to keep the Desk «{desk}»",
+    "ar": "بيعرض نحتفظ بالقسم «{desk}»",
+}
+
+TOOL_USE_DESK = {"en": "Opening a saved Desk", "ar": "بيفتح قسم محفوظ"}
+
 # The Subscription Link: the engineer's own Claude Code.
 CLAUDE_CODE_MISSING = {
     "en": (
