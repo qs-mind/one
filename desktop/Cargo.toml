@@ -1,0 +1,15 @@
+[package]
+name = "qs-mind-one"
+version = "0.0.0"
+description = "QS Mind One desktop window"
+edition = "2024"
+license-file = "../LICENSE.md"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"  # a second One focuses the first instead of opening another window
+tauri-plugin-window-state = "2"  # remembers the window's size and position
