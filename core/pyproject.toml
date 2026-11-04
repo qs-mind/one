@@ -10,10 +10,18 @@ license = "LicenseRef-FSL-1.1-ALv2"
 requires-python = ">=3.12,<3.13"
 # Licences: permissive only (MIT, BSD, Apache-2.0, zlib, public domain), plus MPL-2.0 for
 # unmodified packages: tqdm (MPL-2.0 AND MIT) comes in via tokenizers -> huggingface-hub,
-# and nothing imports it.
+# and nothing imports it. On Windows only, mcp needs pywin32 (PSF-2.0, permissive, like Python
+# itself).
 dependencies = [
   "pydantic-ai-slim[anthropic]",
   "anthropic",
+  "openai",  # the Standard Link: any OpenAI-compatible provider
+  "mcp",  # One's tools served to the engineer's own Claude Code
+  # mcp needs cryptography (through pyjwt), whose wheels for Intel Macs stop at 48.
+  # Elsewhere keep the newer one that the key store already used on Linux.
+  "cryptography<49 ; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+  "cryptography>=50 ; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+  "genai-prices",  # the Model Data Sheet's prices and their source
   "fastapi",
   "uvicorn",
   "keyring",
@@ -39,6 +47,9 @@ packages = ["qsone"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not live'"
+markers = ["live: real AI, off by default"]
+anyio_mode = "auto"  # `async def` tests run on asyncio (anyio's own pytest plugin)
 
 [tool.ruff]
 line-length = 100
