@@ -214,6 +214,8 @@ describe("Model", () => {
     render(<Chat />);
     await screen.findByRole("button", { name: "Claude Opus 5.5" });
 
+    await user.tab(); // Projects
+    await user.tab(); // Project Records
     await user.tab();
     expect(screen.getByRole("button", { name: "Claude Opus 5.5" })).toHaveFocus();
     await user.keyboard("{Enter}");

@@ -3,6 +3,9 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { language, pick, setLanguage, t, type Text, useLanguage } from "../i18n";
+import { restoreProject, useProject } from "../records/project";
+import { ProjectPicker } from "../records/ProjectPicker";
+import { RecordsPanel } from "../records/RecordsPanel";
 import { AiKey } from "../settings/AiKey";
 import { ModelPanel, useModel } from "../settings/Model";
 import { Reply } from "./Reply";
@@ -32,6 +35,9 @@ export function Chat() {
   const [keyOpen, setKeyOpen] = useState(false);
   const model = useModel(keySet);
   const [modelOpen, setModelOpen] = useState(false);
+  const project = useProject();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [recordsOpen, setRecordsOpen] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const busy = status === "submitted" || status === "streaming";
 
@@ -44,6 +50,11 @@ export function Chat() {
     return () => {
       live = false;
     };
+  }, []);
+
+  useEffect(() => {
+    // a remembered project that no longer opens is forgotten, and the picker shows
+    void restoreProject().then((result) => result === "failed" && setPickerOpen(true));
   }, []);
 
   useEffect(() => {
@@ -66,7 +77,27 @@ export function Chat() {
   return (
     <div className="flex h-dvh flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-stone px-4 py-2">
-        <span className="font-semibold">{t("appName")}</span>
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="font-semibold">{t("appName")}</span>
+          <button
+            type="button"
+            dir="auto"
+            title={t("projects")}
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen(!pickerOpen)}
+            className="max-w-48 truncate hover:text-copper"
+          >
+            {project?.name ?? t("projects")}
+          </button>
+          <button
+            type="button"
+            aria-expanded={recordsOpen}
+            onClick={() => setRecordsOpen(!recordsOpen)}
+            className="text-slate hover:text-ink"
+          >
+            {t("records")}
+          </button>
+        </div>
         <div className="flex items-center gap-4 text-slate">
           <button
             type="button"
@@ -103,6 +134,10 @@ export function Chat() {
       )}
 
       {modelOpen && <ModelPanel model={model} onClose={() => setModelOpen(false)} />}
+
+      {pickerOpen && <ProjectPicker onClose={() => setPickerOpen(false)} />}
+
+      {recordsOpen && <RecordsPanel onClose={() => setRecordsOpen(false)} onPickProject={() => setPickerOpen(true)} />}
 
       {keySet !== false && (
         <>
