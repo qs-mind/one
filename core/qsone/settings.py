@@ -41,8 +41,31 @@ def load() -> dict:
 
 def save(name: str, value: object) -> None:
     """Raises `OSError` when the file cannot be written."""
+    _write(load() | {name: value})
+
+
+def remove(name: str) -> None:
+    """Raises `OSError` when the file cannot be written."""
+    saved = load()
+    if name in saved:
+        del saved[name]
+        _write(saved)
+
+
+def _write(values: dict) -> None:
     path = _file()
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(load() | {name: value}, ensure_ascii=False), encoding="utf-8")
+    temporary.write_text(json.dumps(values, ensure_ascii=False), encoding="utf-8")
     temporary.replace(path)  # a crash mid-write never leaves half a file
+
+
+def ai() -> dict:
+    """The "ai" part: Standard Link entries, the model for each role, and entered prices."""
+    saved = load().get("ai")
+    return saved if isinstance(saved, dict) else {}
+
+
+def save_ai(part: str, value: object) -> None:
+    """Raises `OSError` when the file cannot be written."""
+    save("ai", ai() | {part: value})

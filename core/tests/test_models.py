@@ -150,7 +150,8 @@ def test_chosen_model_is_saved_in_the_settings_file(data_dir):
     assert client.get("/settings/model", headers=AUTH).json() == {"id": "claude-fable-5-1"}
 
     saved = json.loads((data_dir / "settings.json").read_text(encoding="utf-8"))
-    assert saved == {"lead_model": "claude-fable-5-1"}
+    lead = {"connector": "anthropic", "model": "claude-fable-5-1"}  # the Lead QS's role (Plan 4)
+    assert saved == {"ai": {"roles": {"lead": lead}}}
 
 
 def test_the_next_message_uses_the_chosen_model():
