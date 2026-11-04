@@ -77,7 +77,7 @@ MAX_CHARS, MAX_DEPTH, MAX_NODES = 4000, 50, 2000
 MAX_TEXT = 64
 
 # The same usage lines for the Arabic text, so it holds no English words.
-_USAGE_AR = {
+USAGE_AR = {
     "sum": "sum(قايمة)",
     "count": "count(قايمة)",
     "avg": "avg(قايمة)",
@@ -217,14 +217,15 @@ def _children(node: Node) -> tuple[Node, ...]:
 
 
 def _refuse(key: str, at: int, **values) -> CalcError:
-    """A refusal of the formula. A value given as {en, ar} fills each text in its own language."""
+    """A refusal of the formula. A value given as {en, ar} fills each text in its own language.
+    `at` counts from 0 in `values`; the text shows at + 1, the character a person counts."""
 
     def said_in(lang: str) -> dict:
         return {k: v[lang] if isinstance(v, dict) else v for k, v in values.items()}
 
-    error = CalcError(key, field="formula", at=at, **said_in("en"))
+    error = CalcError(key, field="formula", at=at + 1, **said_in("en"))
     error.text = {
-        lang: text.format(field="formula", at=at, **said_in(lang))
+        lang: text.format(field="formula", at=at + 1, **said_in(lang))
         for lang, text in vars(copy)[key].items()
     }
     error.values = {"at": at, **values}
@@ -469,5 +470,5 @@ class _Parser:
 
     @staticmethod
     def usage(name: _Token) -> CalcError:
-        usage = {"en": FUNCTIONS[name.value], "ar": _USAGE_AR[name.value]}
+        usage = {"en": FUNCTIONS[name.value], "ar": USAGE_AR[name.value]}
         return _refuse("CALC_USAGE", name.start, fn=name.value, usage=usage)
