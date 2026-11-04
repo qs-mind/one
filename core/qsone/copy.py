@@ -56,6 +56,17 @@ PROJECT_KEY_MISSING = {
     "ar": "مفتاح المشروع مش موجود في مخزن المفاتيح في الجهاز، فمش هينفع يتفتح.",
 }
 
+PROJECT_KEY_STORE_DOWN = {
+    "en": (
+        "The system key store is not available, so One cannot use the project's key. "
+        "Unlock it or turn it on, then try again."
+    ),
+    "ar": (
+        "مخزن المفاتيح في الجهاز مش متاح، فـ One مش قادر يوصل لمفتاح المشروع. "
+        "افتحه أو شغّله وجرّب تاني."
+    ),
+}
+
 PROJECT_DAMAGED = {
     "en": (
         "The project file cannot be read (it is damaged, or the key does not match). "

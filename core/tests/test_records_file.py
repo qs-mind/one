@@ -3,6 +3,7 @@
 import hashlib
 import json
 
+import keyring
 import pytest
 from keyring.errors import KeyringError
 
@@ -67,6 +68,23 @@ def test_missing_key_says_so(tmp_path, memory_keyring):
     with pytest.raises(RecordsError) as e:
         Records.open(tmp_path / "p")
     assert e.value.text == copy.PROJECT_KEY_MISSING
+
+
+def test_key_store_down_on_open_says_so(tmp_path, memory_keyring, failing_keyring):
+    keyring.set_keyring(memory_keyring)
+    Records.create(tmp_path / "p", name="x", actor="engineer").close()
+    keyring.set_keyring(failing_keyring)
+    with pytest.raises(RecordsError) as e:
+        Records.open(tmp_path / "p")
+    assert e.value.text == copy.PROJECT_KEY_STORE_DOWN and e.value.status == 503
+    assert copy.PROJECT_KEY_STORE_DOWN != copy.PROJECT_KEY_MISSING
+
+
+def test_is_open_follows_close(tmp_path):
+    rec = Records.create(tmp_path / "p", name="x", actor="engineer")
+    assert rec.is_open
+    rec.close()
+    assert not rec.is_open
 
 
 def test_wrong_key_or_damage_says_so(tmp_path, memory_keyring):

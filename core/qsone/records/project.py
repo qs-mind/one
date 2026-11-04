@@ -85,14 +85,14 @@ class Records:
 
     @classmethod
     def open(cls, folder: Path) -> "Records":
-        """Raises `RecordsError`: NOT_FOUND, KEY_MISSING, DAMAGED or TOO_NEW."""
+        """Raises `RecordsError`: NOT_FOUND, KEY_STORE_DOWN, KEY_MISSING, DAMAGED or TOO_NEW."""
         path = folder / FILE_NAME
         if not path.is_file():
             raise RecordsError(copy.PROJECT_NOT_FOUND, status=404)
         try:
             key = vault.get_key(folder.name)
         except KeyringError:
-            key = None
+            raise RecordsError(copy.PROJECT_KEY_STORE_DOWN, status=503) from None
         if key is None:
             raise RecordsError(copy.PROJECT_KEY_MISSING)
         try:
@@ -188,6 +188,11 @@ class Records:
                 if conn.in_transaction:
                     conn.execute("ROLLBACK")
                 raise
+
+    @property
+    def is_open(self) -> bool:
+        """False after `close`, which `read` and `write` also do when they find damage."""
+        return self._conn is not None
 
     def close(self) -> None:
         """Safe to call twice."""
