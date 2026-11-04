@@ -78,6 +78,10 @@ def test_no_key_reply_names_the_key_button():
     assert "Settings" not in copy.NO_KEY["en"] and "الإعدادات" not in copy.NO_KEY["ar"]
 
 
+def test_lead_model_is_one_constant():
+    assert chat.LEAD_MODEL == "claude-opus-5-5"
+
+
 def test_lead_instructions_are_short():
     assert len(chat.LEAD_INSTRUCTIONS.split()) <= 80
 

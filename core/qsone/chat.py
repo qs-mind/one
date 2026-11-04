@@ -24,8 +24,8 @@ from starlette.responses import Response
 
 from qsone import copy, keys
 
-# Anthropic's most capable widely released model (claude-api model list, 2026-10-06).
-LEAD_MODEL = "claude-fable-5-1"
+# The model choice is the founder's: claude-opus-5-5 now, claude-fable-5-1 is the alternative.
+LEAD_MODEL = "claude-opus-5-5"
 
 LEAD_INSTRUCTIONS = (
     "You are the Lead QS in QS Mind One: a senior quantity surveyor for construction cost work "
