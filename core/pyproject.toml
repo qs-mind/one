@@ -13,10 +13,16 @@ dependencies = [
   "fastapi",
   "uvicorn",
   "keyring",
+  "sqlcipher3-wheels",
+  "sqlite-vec",
+  "pypdfium2",
+  "openpyxl",
+  "xlrd",
+  "platformdirs",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx", "ruff"]
+dev = ["pytest", "httpx", "ruff", "xlwt"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["qsone"]

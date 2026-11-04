@@ -28,6 +28,8 @@ cryptography==50.0.2 ; sys_platform == 'linux'
     # via secretstorage
 docstring-parser==0.18.0
     # via anthropic
+et-xmlfile==2.0.0
+    # via openpyxl
 fastapi==0.162.0
     # via qsone (pyproject.toml)
 genai-prices==0.2.1
@@ -79,6 +81,8 @@ more-itertools==11.2.1
     # via
     #   jaraco-classes
     #   jaraco-functools
+openpyxl==3.1.5
+    # via qsone (pyproject.toml)
 opentelemetry-api==1.45.2
     # via
     #   anthropic
@@ -86,6 +90,8 @@ opentelemetry-api==1.45.2
     #   pydantic-ai-slim
 packaging==26.3
     # via pytest
+platformdirs==4.14.5
+    # via qsone (pyproject.toml)
 pluggy==1.7.0
     # via pytest
 pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy' and sys_platform == 'linux'
@@ -105,6 +111,8 @@ pydantic-graph==2.66.0
     # via pydantic-ai-slim
 pygments==2.21.0
     # via pytest
+pypdfium2==5.14.0
+    # via qsone (pyproject.toml)
 pytest==9.2.0
     # via qsone (pyproject.toml)
 pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
@@ -115,6 +123,10 @@ secretstorage==3.5.0 ; sys_platform == 'linux'
     # via keyring
 sniffio==1.3.1
     # via anthropic
+sqlcipher3-wheels==0.5.7
+    # via qsone (pyproject.toml)
+sqlite-vec==0.1.9
+    # via qsone (pyproject.toml)
 starlette==1.10.0
     # via fastapi
 truststore==0.10.5 ; sys_platform != 'emscripten'
@@ -139,4 +151,8 @@ typing-inspection==0.4.5
     #   pydantic-ai-slim
     #   pydantic-graph
 uvicorn==0.54.0
+    # via qsone (pyproject.toml)
+xlrd==2.0.2
+    # via qsone (pyproject.toml)
+xlwt==1.3.0
     # via qsone (pyproject.toml)
