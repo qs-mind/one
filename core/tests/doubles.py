@@ -1,6 +1,7 @@
 """Test doubles for the search interfaces. Not product code: the real models come in Plan 2b."""
 
 import math
+import threading
 
 # Concepts named in both languages, one axis each. A small constant axis keeps vectors non-zero.
 CONCEPTS = [
@@ -44,3 +45,28 @@ class PreferReranker:
 
     def rerank(self, query: str, texts: list[str]) -> list[float]:
         return [1.0 if self.word in t else 0.0 for t in texts]
+
+
+class GateEmbedder(ConceptEmbedder):
+    """Holds each batch of `embed_documents` until the test releases it, and counts batches."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.entered = 0  # batches that arrived
+        self.passed = 0  # batches let through
+        self._allowed: float = 0
+        self._cond = threading.Condition()
+
+    def release(self, batches: float = float("inf")) -> None:
+        """Lets `batches` more batches through (all of them by default)."""
+        with self._cond:
+            self._allowed += batches
+            self._cond.notify_all()
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        with self._cond:
+            self.entered += 1
+            self._cond.wait_for(lambda: self._allowed > 0, timeout=10)  # never hangs a test run
+            self._allowed -= 1
+            self.passed += 1
+        return super().embed_documents(texts)
