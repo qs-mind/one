@@ -43,6 +43,7 @@ class Records:
         self.clock: Callable[[], str] = utc_now
         self._conn: db.Connection | None = conn
         self._lock = threading.RLock()
+        self._depth = 0  # how many `write` blocks are open; only the lock's holder changes it
 
     @classmethod
     def create(cls, folder: Path, *, name: str, actor: str) -> "Records":
@@ -169,25 +170,61 @@ class Records:
     def write(self, actor: str) -> Iterator[db.Connection]:
         """One transaction: commits when the block ends, rolls back if it raises.
 
-        Write the audit rows for the change inside the same block, with this actor."""
+        Write the audit rows for the change inside the same block, with this actor. A `write`
+        inside another on the same thread joins it through `SAVEPOINT w<depth>`: when the inner
+        block raises, only its own work is rolled back; nothing is kept until the outer block
+        commits. The inner block's audit rows carry its own actor."""
         if not actor.strip():
             raise ValueError("every change needs an actor")
         with self._lock:
             conn = self._connection()
+            if self._depth:
+                yield from self._savepoint(conn)
+                return
             conn.execute("BEGIN IMMEDIATE")
+            self._depth = 1
             try:
                 yield conn
                 conn.execute("COMMIT")
             except db.DatabaseError as e:
                 if type(e) is not db.DatabaseError:
-                    if conn.in_transaction:
-                        conn.execute("ROLLBACK")
+                    self._rollback(conn)
                     raise
                 raise self._damaged() from e
             except BaseException:
-                if conn.in_transaction:
-                    conn.execute("ROLLBACK")
+                self._rollback(conn)
                 raise
+            finally:
+                self._depth = 0
+
+    def _savepoint(self, conn: db.Connection) -> Iterator[db.Connection]:
+        """The inner `write`: under the lock, inside the outer transaction."""
+        depth = self._depth
+        name = f"w{depth}"
+        conn.execute(f"SAVEPOINT {name}")
+        self._depth = depth + 1
+        try:
+            yield conn
+            conn.execute(f"RELEASE {name}")
+        except db.DatabaseError as e:
+            if type(e) is not db.DatabaseError:
+                self._undo_savepoint(conn, name)
+                raise
+            raise self._damaged() from e
+        except BaseException:
+            self._undo_savepoint(conn, name)
+            raise
+        finally:
+            self._depth = depth
+
+    def _undo_savepoint(self, conn: db.Connection, name: str) -> None:
+        if self._conn is not None and conn.in_transaction:
+            conn.execute(f"ROLLBACK TO {name}")
+            conn.execute(f"RELEASE {name}")
+
+    def _rollback(self, conn: db.Connection) -> None:
+        if self._conn is not None and conn.in_transaction:  # damage found inside closes it
+            conn.execute("ROLLBACK")
 
     @property
     def is_open(self) -> bool:

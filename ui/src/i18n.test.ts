@@ -31,4 +31,22 @@ describe("i18n", () => {
       expect(text.ar.trim()).not.toBe("");
     }
   });
+
+  it("every text has the same {placeholders} in both languages", () => {
+    const names = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+    for (const [key, text] of Object.entries(texts)) {
+      expect(names(text.ar), key).toEqual(names(text.en));
+    }
+  });
+
+  it("has the Deliverables labels in their groups (Plan 6)", () => {
+    const keys = Object.keys(texts);
+    for (const group of ["sheet", "doc", "review", "export", "fill", "status"]) {
+      expect(keys.filter((k) => k.startsWith(group)).length, group).toBeGreaterThan(1);
+    }
+    expect(texts.deliverables).toEqual({ en: "Project Index", ar: "فهرس المشروع" });
+    expect(texts.reviewRecordsMoved.ar).toBe("تحديث من سجلات المشروع");
+    expect(texts.exportDraftMark.ar).toBe("مسودة — غير معتمد");
+    expect(texts.sheetSample.ar).toContain("بيانات تجريبية");
+  });
 });

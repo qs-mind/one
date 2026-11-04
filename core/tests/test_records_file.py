@@ -8,8 +8,12 @@ import pytest
 from keyring.errors import KeyringError
 
 from qsone import copy
-from qsone.records import audit, db, schema
+from qsone.calc.engine import calculate
+from qsone.calc.spec import CalcRequest
+from qsone.engine.store import Store
+from qsone.records import audit, db, ledger, schema
 from qsone.records.project import Records, RecordsError
+from tests.calc_samples import add, sample_project
 
 ITEM = (
     "insert into items(id,kind,code,fields,created_at,created_by,updated_at,updated_by)"
@@ -322,3 +326,198 @@ def test_create_never_reuses_a_folder(tmp_path, memory_keyring):
     rec = Records.open(tmp_path / "p")
     assert rec.meta()["name"] == "x"
     rec.close()
+
+
+# Plan 6: nested writes, the Deliverables migration and its Guardrails ----------------------
+
+PLAN_4_DRAFT = {
+    "id": "d1",
+    "kind": "table",
+    "title": "مسودة - عينة",
+    "body": "",
+    "rows": [],
+    "sources": [],
+    "replaces": None,
+    "off_desk": False,
+}
+
+
+def test_a_plan_4_file_upgrades_and_keeps_its_drafts(tmp_path, monkeypatch):
+    monkeypatch.setattr(schema, "MIGRATIONS", schema.MIGRATIONS[:3])
+    rec = Records.create(tmp_path / "p", name="x", actor="engineer")
+    with rec.write("engineer") as c:
+        c.execute(ITEM, ("i1", "03/02", "{}"))
+        c.execute(
+            "insert into deliverables(id,brief_id,run_id,draft,replaces,created_at)"
+            " values ('d1','b1','r1',?,null,'t')",
+            (json.dumps(PLAN_4_DRAFT, ensure_ascii=False),),
+        )
+        c.execute(
+            "insert into reviews(id,deliverable_id,round,code,comments,checker,same_provider,at)"
+            " values ('v1','d1',1,'B','[]','{\"connector\":\"anthropic\",\"model\":\"m\"}',0,'t')"
+        )
+    rec.close()
+    monkeypatch.undo()
+    rec = Records.open(tmp_path / "p")
+    try:
+        with rec.read() as c:
+            assert c.execute("PRAGMA user_version").fetchone()[0] == len(schema.MIGRATIONS)
+            assert c.execute("select code from items").fetchall() == [("03/02",)]
+            columns = {row[1] for row in c.execute("PRAGMA table_info(deliverables)")}
+            assert {"kind", "variant", "language", "template", "total_item_id"} <= columns
+            assert c.execute("PRAGMA foreign_key_check").fetchall() == []
+        # Plan 4's drafts keep their rows and their Reviews, under their own table.
+        store = Store(rec, project_id=rec.id)
+        assert store.deliverable("d1").title == "مسودة - عينة"
+        assert [r.code for r in store.reviews("d1")] == ["B"]
+    finally:
+        rec.close()
+
+
+def test_nested_write_is_one_transaction(rec):
+    with pytest.raises(RuntimeError), rec.write("engineer"):
+        ledger.add_item(rec, kind="boq_item", actor="engineer")  # its own write joins ours
+        raise RuntimeError
+    with rec.read() as c:
+        assert c.execute("select count(*) from items").fetchone()[0] == 0
+        assert c.execute("select count(*) from audit where table_name = 'items'").fetchone()[0] == 0
+
+
+def test_an_inner_write_that_raises_rolls_back_alone(rec):
+    with rec.write("engineer") as c:
+        c.execute(ITEM, ("i1", "1-1", "{}"))
+        with pytest.raises(ValueError), rec.write("estimator") as inner:
+            inner.execute(ITEM, ("i2", "1-2", "{}"))
+            with rec.write("lead_qs") as deeper:  # two levels down
+                deeper.execute(ITEM, ("i3", "1-3", "{}"))
+            raise ValueError("stop")
+        c.execute(ITEM, ("i4", "1-4", "{}"))
+    with rec.read() as c:
+        assert [r[0] for r in c.execute("select id from items order by id")] == ["i1", "i4"]
+        assert not c.in_transaction
+    with rec.write("engineer") as c:  # the next write starts its own transaction
+        c.execute(ITEM, ("i5", "1-5", "{}"))
+
+
+def test_inner_write_needs_its_own_actor(rec):
+    with pytest.raises(ValueError), rec.write("engineer"), rec.write(" "):
+        pass
+
+
+def test_a_saved_calculation_joins_the_outer_write(tmp_path):
+    rec = sample_project(tmp_path)
+    try:
+        item = add(
+            rec,
+            "03/02",
+            quantity=("120", "m3", None, "boq"),
+            rate=("39850.50", "m3", "EGP", "quote"),
+        )
+        req = CalcRequest(
+            formula="quantity * rate",
+            item=item,
+            result={"unit": "EGP"},
+            save={"name": "amount", "reason": "calculated in «جدول الكميات - عينة»"},
+        )
+        with pytest.raises(RuntimeError), rec.write("engineer"):
+            assert calculate(rec, req, actor="engineer").results[0].value == "4782060.00"
+            raise RuntimeError  # a dry run: read the result, then roll it all back
+        with rec.read() as c:
+            amounts = "select count(*) from numbers where name = 'amount'"
+            assert c.execute(amounts).fetchone()[0] == 0
+            assert c.execute("select count(*) from calculations").fetchone()[0] == 0
+    finally:
+        rec.close()
+
+
+def _part(c, part_id="p1", deliverable_id="dl1"):
+    c.execute(
+        "insert into deliverables(id,kind,variant,title,language,template,created_at,created_by,"
+        "updated_at) values (?,'sheet','boq','جدول الكميات - عينة','ar','{}','t','e','t')",
+        (deliverable_id,),
+    )
+    c.execute(
+        "insert into parts(id,deliverable_id,seq,kind,node,version,valid_from)"
+        " values (?,?,1024,'section','{\"title\":\"أعمال الحفر\"}',1,'t1')",
+        (part_id, deliverable_id),
+    )
+
+
+def test_parts_change_only_by_valid_until(rec):
+    with rec.write("engineer") as c:
+        _part(c)
+    for sql in [
+        "update parts set node = '{}' where id = 'p1'",
+        "update parts set seq = 2048 where id = 'p1'",
+        "update parts set removed = 1 where id = 'p1'",
+        "delete from parts",
+    ]:
+        with pytest.raises(db.IntegrityError), rec.write("engineer") as c:
+            c.execute(sql)
+    with rec.write("engineer") as c:  # a new row version replaces the old one
+        c.execute("update parts set valid_until = 't2' where id = 'p1'")
+        c.execute(
+            "insert into parts(id,deliverable_id,seq,kind,node,version,valid_from)"
+            " values ('p1','dl1',1024,'section','{\"title\":\"أعمال الحفر - معدلة\"}',2,'t2')"
+        )
+    with pytest.raises(db.IntegrityError), rec.write("engineer") as c:
+        c.execute("update parts set valid_until = 't3' where id = 'p1' and version = 1")
+    with pytest.raises(db.IntegrityError), rec.write("engineer") as c:  # one current row per id
+        c.execute(
+            "insert into parts(id,deliverable_id,seq,kind,node,version,valid_from)"
+            " values ('p1','dl1',1024,'section','{}',3,'t3')"
+        )
+    with rec.read() as c:
+        rows = c.execute("select version, valid_until from parts order by version").fetchall()
+        assert rows == [(1, "t2"), (2, None)]
+
+
+def test_deliverable_history_is_append_only(rec):
+    with rec.write("engineer") as c:
+        _part(c)
+        c.execute(
+            "insert into versions(deliverable_id,n,at,by,changes) values ('dl1',1,'t','e','[]')"
+        )
+        c.execute(
+            "insert into revisions(deliverable_id,no,version_n,issued_at,issued_by,signed_off,"
+            "snapshot,sha256) values ('dl1',1,1,'t','engineer',1,x'00','aa')"
+        )
+        c.execute(
+            "insert into checks(id,deliverable_id,version_n,code,checker,same_provider,at)"
+            " values ('k1','dl1',1,'B','m',0,'t')"
+        )
+        c.execute(
+            "insert into review_reports(deliverable_id,revision_no,body,at)"
+            " values ('dl1',1,x'00','t')"
+        )
+        c.execute(
+            "insert into changes(id,deliverable_id,op,author,status,created_at)"
+            " values ('c1','dl1','{\"op\":\"set_field\"}','lead_qs','pending','t')"
+        )
+        c.execute(
+            "insert into comments(id,deliverable_id,kind,anchor,body,author,status,version_n,"
+            "created_at) values ('m1','dl1','review','{\"type\":\"deliverable\"}','راجع - عينة',"
+            "'engineer','open',1,'t')"
+        )
+        c.execute(
+            "insert into files(id,name,kind,size,sha256,status,added_at,added_by)"
+            " values ('f1','عينة.xlsx','xlsx',1,'aa','read','t','e')"
+        )
+        c.execute(
+            "insert into fill_plans(id,deliverable_id,file_id,plan,created_at,created_by)"
+            " values ('fp1','dl1','f1','{}','t','lead_qs')"
+        )
+    frozen = ["versions", "revisions", "checks", "review_reports"]
+    kept = ["changes", "comments", "deliverables", "fill_plans"]
+    refused = [f"update {t} set at = 'x'" for t in ["versions", "checks", "review_reports"]]
+    refused += ["update revisions set signed_off = 0"]
+    refused += [f"delete from {t}" for t in frozen + kept]
+    for sql in refused:
+        with pytest.raises(db.IntegrityError), rec.write("engineer") as c:
+            c.execute(sql)
+    with rec.write("engineer") as c:  # changes, comments and the Deliverable itself move on
+        c.execute("update changes set status = 'accepted', version_n = 2 where id = 'c1'")
+        c.execute("update comments set status = 'closed' where id = 'm1'")
+        c.execute("update deliverables set updated_at = 't2' where id = 'dl1'")
+    with pytest.raises(db.IntegrityError), rec.write("engineer") as c:
+        c.execute("update changes set status = 'gone' where id = 'c1'")
