@@ -1,8 +1,9 @@
 // Project Records for the open project: drop or add files, see what One could read in each, and search them.
 // Files go to the core one at a time as their raw bytes; the page never sends a file path.
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { pick, t, type Text, texts, useLanguage } from "../i18n";
+import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { coreLine } from "../settings/Model";
+import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
 
 type FileInfo = {
@@ -13,8 +14,20 @@ type FileInfo = {
   replaces: string | null;
   duplicate?: boolean;
 };
-type Hit = { file_id: string; file_name: string; locator: Record<string, string | number>; text: string };
-type Found = { state: "found"; note: Text | null; results: Hit[] } | { state: "failed"; line: Text };
+type Hit = {
+  chunk_id?: number;
+  file_id: string;
+  file_name: string;
+  locator: Record<string, string | number>;
+  text: string;
+};
+type Found =
+  | { state: "found"; note: Text | null; results: Hit[]; reordering: boolean }
+  | { state: "failed"; line: Text };
+
+// Search asks the core for its top 30 and shows 10 at once; the reranker then reorders those 30 by meaning.
+const ASKED = 30;
+const SHOWN = 10;
 
 const statusText: Record<FileInfo["status"], Text> = {
   read: texts.fileRead,
@@ -22,10 +35,6 @@ const statusText: Record<FileInfo["status"], Text> = {
   stored: texts.fileStored,
   unreadable: texts.fileUnreadable,
 };
-
-function fill(template: string, values: Record<string, string | number | undefined>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key]));
-}
 
 /** Where a result sits in its file: «صفحة 3», "Sheet BOQ, row 23". */
 function where({ page, sheet, row, line }: Hit["locator"]): string | undefined {
@@ -48,6 +57,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState<Found>();
+  const turn = useRef<AbortController>(undefined); // the latest search; a newer one aborts its reordering
   const id = project?.id;
 
   useEffect(() => {
@@ -65,6 +75,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
     })();
     return () => {
       live = false;
+      turn.current?.abort();
     };
   }, [id]);
 
@@ -93,12 +104,43 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
     event.preventDefault();
     const q = query.trim();
     if (!id || !q) return;
+    turn.current?.abort();
+    const mine = new AbortController();
+    turn.current = mine;
     setSearching(true);
-    const response = await fetch(`/api/projects/${id}/search?q=${encodeURIComponent(q)}`).catch(() => undefined);
-    if (response?.ok)
-      setFound({ state: "found", ...((await response.json()) as { note: Text | null; results: Hit[] }) });
-    else setFound({ state: "failed", line: await coreLine(response, texts.searchFailed) });
+    const response = await fetch(`/api/projects/${id}/search?q=${encodeURIComponent(q)}&k=${ASKED}`).catch(
+      () => undefined,
+    );
     setSearching(false);
+    if (mine.signal.aborted) return; // the panel closed or another project opened meanwhile
+    if (!response?.ok) {
+      setFound({ state: "failed", line: await coreLine(response, texts.searchFailed) });
+      return;
+    }
+    const body = (await response.json()) as { note: Text | null; results: Hit[]; rerank?: boolean };
+    const chunkIds = body.results.flatMap((hit) => (hit.chunk_id === undefined ? [] : [hit.chunk_id]));
+    const reordering = body.rerank === true && chunkIds.length > 1;
+    setFound({ state: "found", note: body.note, results: body.results.slice(0, SHOWN), reordering });
+    if (reordering) await rerank(id, q, chunkIds, mine.signal);
+  }
+
+  // The second step. On any failure, a 409 included, the first list stays and no error is shown.
+  async function rerank(projectId: string, q: string, chunkIds: number[], signal: AbortSignal) {
+    const response = await fetch(`/api/projects/${projectId}/rerank`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ q, chunk_ids: chunkIds }),
+      signal,
+    }).catch(() => undefined);
+    const body = response?.ok
+      ? ((await response.json().catch(() => undefined)) as { results: Hit[] } | undefined)
+      : undefined;
+    if (signal.aborted) return;
+    setFound((now) =>
+      now?.state === "found"
+        ? { ...now, results: body ? body.results.slice(0, SHOWN) : now.results, reordering: false }
+        : now,
+    );
   }
 
   return (
@@ -158,6 +200,8 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
                 </p>
               )}
             </div>
+
+            <MeaningStatus projectId={project.id} />
 
             {problems.length > 0 && (
               <div role="alert" className="flex flex-col gap-1 text-copper">
@@ -224,6 +268,11 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
             {found?.state === "found" && (
               <div className="flex flex-col gap-2">
                 {found.note && <p className="text-slate">{pick(found.note)}</p>}
+                {found.reordering && (
+                  <p role="status" className="text-slate">
+                    {t("reordering")}
+                  </p>
+                )}
                 {found.results.length === 0 && <p>{t("noResults")}</p>}
                 <ol className="flex flex-col gap-2">
                   {found.results.map((hit, index) => (

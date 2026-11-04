@@ -57,6 +57,27 @@ const upload: Route = (url) => {
 const posts = (fetch: ReturnType<typeof core>) =>
   fetch.mock.calls.filter(([url, init]) => String(url).startsWith(`${files}?`) && init?.method === "POST");
 
+const searchRoute = `GET /api/projects/${school.id}/search`;
+const rerankRoute = `POST /api/projects/${school.id}/rerank`;
+
+// One search result as the core sends it, with the chunk id the rerank route takes back.
+function hit(n: number) {
+  return {
+    chunk_id: n,
+    file_id: "f1",
+    file_name: boqName,
+    locator: { sheet: "BOQ", row: n + 2 },
+    text: `بند ${n} - عينة`,
+    score: 1 / (n + 1),
+  };
+}
+const thirty = Array.from({ length: 30 }, (_, n) => hit(n));
+
+const reranks = (fetch: ReturnType<typeof core>) =>
+  fetch.mock.calls.filter(
+    ([url, init]) => String(url) === `/api/projects/${school.id}/rerank` && init?.method === "POST",
+  );
+
 function panel() {
   return render(<RecordsPanel onClose={() => undefined} onPickProject={() => undefined} />);
 }
@@ -207,7 +228,7 @@ describe("RecordsPanel", () => {
     expect(screen.getByText("03/02 | خرسانة")).toHaveAttribute("dir", "auto");
     expect(screen.getByText("مواصفات - عينة.pdf")).toHaveAttribute("dir", "auto");
     const search = fetch.mock.calls.find(([url]) => String(url).includes("/search"))!;
-    expect(search[0]).toBe(`/api/projects/${school.id}/search?q=${encodeURIComponent("03/02")}`);
+    expect(search[0]).toBe(`/api/projects/${school.id}/search?q=${encodeURIComponent("03/02")}&k=30`);
 
     setLanguage("en");
     expect(await screen.findByText("Page 3")).toBeInTheDocument();
@@ -226,6 +247,114 @@ describe("RecordsPanel", () => {
 
     expect(await screen.findByText(wordsOnly.ar)).toBeInTheDocument();
     expect(screen.getByText(texts.noResults.ar)).toBeInTheDocument();
+  });
+
+  it("shows the search model's state under the drop area", async () => {
+    core({
+      "GET /api/meaning": () =>
+        Response.json({
+          model: { state: "off", done_bytes: 0, total_bytes: 1_173_349_509, reason: null },
+          indexing: { paused: false, projects: {} },
+        }),
+    });
+    panel();
+    const line = await screen.findByText(texts.meaningOff.ar.replace("{size}", "1.2 GB"));
+    const drop = screen.getByText(texts.dropHere.ar);
+    expect(drop.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: texts.meaningDownload.ar })).toBeInTheDocument();
+  });
+
+  it("shows hybrid results at once, then the reranked order", async () => {
+    let reranked!: (response: Response) => void;
+    const fetch = core({
+      [searchRoute]: () => Response.json({ mode: "hybrid", rerank: true, note: null, results: thirty }),
+      [rerankRoute]: () => new Promise<Response>((resolve) => (reranked = resolve)),
+    });
+    const user = userEvent.setup();
+    panel();
+    await user.type(screen.getByRole("searchbox", { name: texts.search.ar }), "عزل الرطوبة للأساسات{enter}");
+
+    expect(await screen.findByText("بند 0 - عينة")).toBeInTheDocument();
+    expect(screen.getByText("بند 9 - عينة")).toBeInTheDocument();
+    expect(screen.queryByText("بند 10 - عينة")).not.toBeInTheDocument();
+    expect(await screen.findByText(texts.reordering.ar)).toHaveAttribute("role", "status");
+    const [, init] = reranks(fetch)[0]!;
+    expect(JSON.parse(String(init?.body))).toEqual({
+      q: "عزل الرطوبة للأساسات",
+      chunk_ids: thirty.map((h) => h.chunk_id),
+    });
+
+    reranked(Response.json({ results: [...thirty].reverse() }));
+    await waitFor(() => expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument());
+    const items = within(screen.getByRole("list")).getAllByRole("listitem");
+    expect(items).toHaveLength(10);
+    expect(items[0]).toHaveTextContent("بند 29 - عينة");
+    expect(screen.queryByText("بند 0 - عينة")).not.toBeInTheDocument();
+  });
+
+  it("keeps the first list when reranking fails", async () => {
+    const superseded = { en: "A newer search took its place.", ar: "بحث أحدث أخد مكانه." };
+    core({
+      [searchRoute]: () => Response.json({ mode: "hybrid", rerank: true, note: null, results: thirty }),
+      [rerankRoute]: () => Response.json({ error: superseded }, { status: 409 }),
+    });
+    const user = userEvent.setup();
+    panel();
+    await user.type(screen.getByRole("searchbox", { name: texts.search.ar }), "خرسانة{enter}");
+
+    await waitFor(() => expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument());
+    const items = within(screen.getByRole("list")).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("بند 0 - عينة");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(superseded.ar)).not.toBeInTheDocument();
+  });
+
+  it("a new search aborts the old reranking", async () => {
+    const fetch = core({
+      [searchRoute]: (url) =>
+        Response.json({
+          mode: "hybrid",
+          rerank: true,
+          note: null,
+          results: url.includes(encodeURIComponent("حديد")) ? [hit(100), hit(101)] : thirty,
+        }),
+      // the first rerank never answers on its own; it ends only when its request is aborted
+      [rerankRoute]: (_url, init) =>
+        reranks(fetch).length === 1
+          ? new Promise<Response>((_, reject) =>
+              init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))),
+            )
+          : Response.json({ results: [hit(101), hit(100)] }),
+    });
+    const user = userEvent.setup();
+    panel();
+    const box = screen.getByRole("searchbox", { name: texts.search.ar });
+    await user.type(box, "خرسانة{enter}");
+    await waitFor(() => expect(reranks(fetch)).toHaveLength(1));
+
+    await user.clear(box);
+    await user.type(box, "حديد{enter}");
+    await waitFor(() => expect(reranks(fetch)).toHaveLength(2));
+    expect(reranks(fetch)[0]![1]?.signal?.aborted).toBe(true);
+    await waitFor(() => expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument());
+    const items = within(screen.getByRole("list")).getAllByRole("listitem");
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining("بند 101 - عينة"),
+      expect.stringContaining("بند 100 - عينة"),
+    ]);
+  });
+
+  it("exact results are not reranked", async () => {
+    const fetch = core({
+      [searchRoute]: () => Response.json({ mode: "exact", rerank: false, note: null, results: thirty }),
+    });
+    const user = userEvent.setup();
+    panel();
+    await user.type(screen.getByRole("searchbox", { name: texts.search.ar }), "03/02{enter}");
+
+    expect(await screen.findByText("بند 0 - عينة")).toBeInTheDocument();
+    expect(reranks(fetch)).toHaveLength(0);
+    expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument();
   });
 
   it("asks to pick or create a project first when none is open", async () => {

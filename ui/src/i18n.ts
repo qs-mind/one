@@ -73,6 +73,28 @@ export const texts = {
   sheetRow: { en: "Sheet {sheet}, row {row}", ar: "ورقة {sheet}، صف {row}" },
   row: { en: "Row {row}", ar: "صف {row}" },
   line: { en: "Line {line}", ar: "سطر {line}" },
+  meaningOff: {
+    en: "Search by meaning finds the same idea in other words, in Arabic and English. It needs a one-time download of {size} from Hugging Face; then it works without internet.",
+    ar: "البحث بالمعنى يجد الفكرة نفسها بكلمات أخرى، بالعربية والإنجليزية. يحتاج إلى تنزيل لمرة واحدة بحجم {size} من Hugging Face، ثم يعمل دون إنترنت.",
+  },
+  meaningDownload: { en: "Download", ar: "تنزيل" },
+  meaningDownloading: {
+    en: "Downloading the search model: {done} of {total}",
+    ar: "جارٍ تنزيل نموذج البحث: {done} من {total}",
+  },
+  meaningStop: { en: "Stop", ar: "إيقاف" },
+  meaningStopped: { en: "The download stopped at {done} of {total}.", ar: "توقّف التنزيل عند {done} من {total}." },
+  meaningResume: { en: "Resume", ar: "استكمال" },
+  meaningChecking: { en: "Checking the downloaded files…", ar: "جارٍ فحص الملفات المنزّلة…" },
+  meaningRetry: { en: "Try again", ar: "إعادة المحاولة" },
+  meaningIndexing: {
+    en: "Preparing search by meaning: {done} of {total} parts",
+    ar: "جارٍ تجهيز البحث بالمعنى: {done} من {total} جزء",
+  },
+  meaningPause: { en: "Pause", ar: "إيقاف مؤقت" },
+  meaningPaused: { en: "Paused at {done} of {total} parts.", ar: "متوقف مؤقتًا عند {done} من {total} جزء." },
+  meaningReady: { en: "Search by meaning is on.", ar: "البحث بالمعنى يعمل." },
+  reordering: { en: "Reordering by meaning…", ar: "جارٍ إعادة الترتيب حسب المعنى…" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";
@@ -114,6 +136,11 @@ export function pick(text: Text, lang: Language = current): string {
 
 export function t(key: keyof typeof texts): string {
   return pick(texts[key]);
+}
+
+/** Puts values into a text's blanks: fill("Page {page}", { page: 3 }) is "Page 3". */
+export function fill(template: string, values: Record<string, string | number | undefined>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key]));
 }
 
 /** Re-renders the component when the language changes. */
