@@ -5,7 +5,16 @@ import pytest
 
 from qsone.records.files import add_file
 from qsone.records.project import Records
-from qsone.records.search import ensure_index, index_vectors, looks_exact, rrf, search
+from qsone.records.search import (
+    Superseded,
+    ensure_index,
+    index_vectors,
+    looks_exact,
+    rerank_hits,
+    rrf,
+    search,
+    vector_counts,
+)
 from tests.doubles import ConceptEmbedder, PreferReranker
 from tests.samples import sample_pdf, sample_xlsx
 
@@ -188,3 +197,57 @@ def test_a_lone_digit_finds_nothing(rec):
     assert search(rec, "1").mode == "words"
     assert search(rec, "مفتاح 1").hits  # the word still finds it
     assert search(rec, '"1"').mode == "exact" and search(rec, '"1"').hits  # quoted: asked for
+
+
+def test_indexing_stops_between_batches_and_resumes(boq):
+    emb = ConceptEmbedder()
+    asked = []
+    n = index_vectors(boq, emb, batch=2, should_stop=lambda: len(asked) > 0, progress=asked.append)
+    assert n == 2 and asked == [2] and vector_counts(boq, emb) == (2, 5)
+    assert index_vectors(boq, emb, batch=2) == 3 and vector_counts(boq, emb) == (5, 5)
+
+
+def test_indexing_reports_the_running_count(boq):
+    asked = []
+    index_vectors(boq, ConceptEmbedder(), batch=2, progress=asked.append)
+    assert asked == [2, 4, 5]
+
+
+def test_counts_are_zero_for_another_model(boq):
+    assert vector_counts(boq, ConceptEmbedder()) == (0, 5)  # no table yet
+    index_vectors(boq, ConceptEmbedder())
+    assert vector_counts(boq, FlatEmbedder()) == (0, 5)
+
+
+def test_rerank_hits_orders_the_given_chunks(boq):
+    ids = [h.chunk_id for h in search(boq, "خرسانة", k=30).hits]
+    hits = rerank_hits(boq, "خرسانة", ids, PreferReranker("عادية"))
+    assert hits[0].locator == {"sheet": "BOQ", "row": 2} and len(hits) == len(ids)
+    assert hits[0].score == 1.0 and all(h.found_by == () for h in hits)
+    assert [h.chunk_id for h in hits[1:]] == [
+        i for i in ids if i != hits[0].chunk_id
+    ]  # ties keep order
+
+
+def test_rerank_hits_drops_unknown_ids(boq):
+    ids = [h.chunk_id for h in search(boq, "خرسانة", k=30).hits]
+    reranker = PreferReranker("عادية")
+    assert rerank_hits(boq, "خرسانة", [999999, *ids], reranker) == rerank_hits(
+        boq, "خرسانة", ids, reranker
+    )
+    assert rerank_hits(boq, "خرسانة", [999999], reranker) == []
+
+
+def test_a_newer_rerank_stops_this_one(boq):
+    calls = []
+
+    class Counting(PreferReranker):
+        def rerank(self, q, texts):
+            calls.append(len(texts))
+            return super().rerank(q, texts)
+
+    with pytest.raises(Superseded):
+        rerank_hits(
+            boq, "خرسانة", list(range(1, 6)), Counting("x"), should_stop=lambda: len(calls) >= 1
+        )
+    assert calls == [4]

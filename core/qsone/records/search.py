@@ -8,7 +8,7 @@ and on the query side (its light stemmer is not idempotent)."""
 import json
 import re
 import struct
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from typing import Literal, Protocol
 
@@ -17,6 +17,7 @@ from qsone.records.project import Records
 
 LIST_SIZE = 50  # each words or meaning list
 RERANK_TOP = 30
+RERANK_SLICE = 4  # a newer rerank can stop an older one between slices
 ACTOR = "One"  # index upkeep changes no project data, so it writes no audit rows
 
 
@@ -35,6 +36,10 @@ class Reranker(Protocol):
 
 
 Mode = Literal["auto", "exact", "meaning"]
+
+
+class Superseded(Exception):
+    """A newer rerank asked this one to stop."""
 
 
 @dataclass(frozen=True)
@@ -113,9 +118,17 @@ def _pack(vector: list[float], dims: int) -> bytes:
     return struct.pack(f"{dims}f", *vector)
 
 
-def index_vectors(rec: Records, embedder: Embedder, batch: int = 16) -> int:
+def index_vectors(
+    rec: Records,
+    embedder: Embedder,
+    batch: int = 16,
+    *,
+    should_stop: Callable[[], bool] = lambda: False,
+    progress: Callable[[int], None] = lambda done: None,
+) -> int:
     """Embeds the chunks that have no vector yet; each batch is committed on its own, so a stopped
-    run resumes where it left off. A new model or size rebuilds the table. Returns how many."""
+    run resumes where it left off. A new model or size rebuilds the table. `should_stop` is asked
+    before each batch, `progress(done)` told after each commit. Returns how many."""
     dims = int(embedder.dims)
     with rec.write(ACTOR) as conn:
         if not _vectors_ready(conn, embedder):
@@ -127,7 +140,7 @@ def index_vectors(rec: Records, embedder: Embedder, batch: int = 16) -> int:
             rec.set_meta(conn, "embed_model", embedder.name)
             rec.set_meta(conn, "embed_dims", str(dims))
     done, last = 0, 0
-    while True:
+    while not should_stop():
         with rec.read() as conn:
             todo = conn.execute(
                 "SELECT id, text FROM chunks WHERE id > ?"
@@ -144,6 +157,18 @@ def index_vectors(rec: Records, embedder: Embedder, batch: int = 16) -> int:
             )
         done += len(todo)
         last = todo[-1][0]
+        progress(done)
+    return done
+
+
+def vector_counts(rec: Records, embedder: Embedder) -> tuple[int, int]:
+    """(chunks with a vector from this model, all chunks)."""
+    with rec.read() as conn:
+        (chunks,) = conn.execute("SELECT count(*) FROM chunks").fetchone()
+        if not _vectors_ready(conn, embedder):
+            return 0, chunks
+        (vectors,) = conn.execute("SELECT count(*) FROM chunk_vectors").fetchone()
+    return vectors, chunks
 
 
 def _words(conn, match: str, include_old: bool, limit: int) -> list[tuple[int, float]]:
@@ -184,6 +209,7 @@ def _hits(conn, scored: list[tuple[int, float]], found_by: dict[int, tuple[str, 
     return [
         Hit(i, found[i][1], found[i][2], json.loads(found[i][3]), found[i][4], score, found_by[i])
         for i, score in scored
+        if i in found
     ]
 
 
@@ -248,7 +274,32 @@ def search(
 
     if reranker is not None and hits:
         top, rest = hits[:RERANK_TOP], hits[RERANK_TOP:]
-        scores = reranker.rerank(query, [h.text for h in top])
-        order = sorted(range(len(top)), key=lambda i: -scores[i])  # stable: ties keep RRF order
-        hits = [replace(top[i], score=float(scores[i])) for i in order] + rest
+        hits = _reorder(top, reranker.rerank(query, [h.text for h in top])) + rest
     return Result(hybrid, hits[:k])
+
+
+def _reorder(hits: list[Hit], scores: Sequence[float]) -> list[Hit]:
+    """Best score first; the sort is stable, so ties keep the order they came in."""
+    order = sorted(range(len(hits)), key=lambda i: -scores[i])
+    return [replace(hits[i], score=float(scores[i])) for i in order]
+
+
+def rerank_hits(
+    rec: Records,
+    query: str,
+    chunk_ids: Sequence[int],
+    reranker: Reranker,
+    *,
+    should_stop: Callable[[], bool] = lambda: False,
+) -> list[Hit]:
+    """The given chunks of this project in reranked order; unknown ids are dropped. The reranker
+    runs on slices of `RERANK_SLICE`; `should_stop` before each slice raises `Superseded`."""
+    ids = list(dict.fromkeys(chunk_ids))
+    with rec.read() as conn:
+        hits = _hits(conn, [(i, 0.0) for i in ids], dict.fromkeys(ids, ()))
+    scores: list[float] = []
+    for start in range(0, len(hits), RERANK_SLICE):
+        if should_stop():
+            raise Superseded
+        scores += reranker.rerank(query, [h.text for h in hits[start : start + RERANK_SLICE]])
+    return _reorder(hits, scores)
