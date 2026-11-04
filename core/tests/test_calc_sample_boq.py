@@ -15,6 +15,7 @@ Hand checks, with the exchange rate at 50 and then at 48 EGP/USD:
 - escalated = amount × (0.35 + 0.65 × 132 / 120) = amount × 1.065 = 828719.10, then 804564.90.
 """
 
+import sys
 from collections.abc import Callable
 from itertools import count
 
@@ -280,6 +281,9 @@ def test_print_the_rate_trace_for_review(boq, capsys):
         if "constant" in spec:
             lines.append(f"  {name} = {spec['constant']} {spec['unit']} (stated: {spec['why']})")
     text = "\n".join(lines)
-    with capsys.disabled():  # shown with -s
-        print("\n" + text)
+    with (
+        capsys.disabled()
+    ):  # shown with -s; bytes, since a Windows console is cp1252 and has no "→"
+        sys.stdout.buffer.write(("\n" + text + "\n").encode("utf-8"))
+        sys.stdout.flush()
     assert "6484.50" in text and SOURCES["exchange_rate"] in text
