@@ -1,16 +1,29 @@
-// The chat with the Lead QS. Replies stream word by word from the core; Stop ends the reply and the request.
+// The chat with the Lead QS. Each message starts a Brief, which runs in the core whether or not this page watches it:
+// its stream shows the reply, the Progress Line, the Coordination Room, cards and Review codes as they come. A message
+// sent while the Brief runs steers it; Stop ends it. Opening a chat loads its earlier messages and joins a running Brief.
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, generateId } from "ai";
 import { useEffect, useRef, useState } from "react";
-import { language, pick, setLanguage, t, type Text, useLanguage } from "../i18n";
+import { coreLine, send } from "../core";
+import { language, pick, setLanguage, t, type Text, texts, useLanguage } from "../i18n";
 import { restoreProject, useProject } from "../records/project";
 import { ProjectPicker } from "../records/ProjectPicker";
 import { RecordsPanel } from "../records/RecordsPanel";
-import { AiKey } from "../settings/AiKey";
-import { ModelPanel, useModel } from "../settings/Model";
+import { AiSettings, useAiSettings } from "../settings/AiSettings";
+import { ApprovalCard } from "./parts/ApprovalCard";
+import { ContinueBriefs, type Unfinished } from "./parts/ContinueBriefs";
+import { CoordinationRoom } from "./parts/CoordinationRoom";
+import { CostNotice } from "./parts/CostNotice";
+import { ProgressLine } from "./parts/ProgressLine";
+import { ReviewBadge } from "./parts/ReviewBadge";
+import { activeBrief, type OneMessage, type OnePart, partsOf } from "./parts/types";
 import { Reply } from "./Reply";
 
-const transport = new DefaultChatTransport({ api: "/api/chat" });
+// Only the new message goes to the core: it keeps the chat's history with its Briefs.
+const transport = new DefaultChatTransport<OneMessage>({
+  api: "/api/chat",
+  prepareSendMessagesRequest: ({ id, messages }) => ({ body: { id, messages: messages.slice(-1) } }),
+});
 
 // The core sends a model error as an {en, ar} pair in the error text; any other failure gets the plain line.
 function errorLine(error: Error): string {
@@ -23,36 +36,71 @@ function errorLine(error: Error): string {
   return t("chatError");
 }
 
-function textOf(parts: { type: string; text?: string }[]): string {
+/** The Brief that kept the chat busy, when the core answered a new message with 409 {brief_id}. */
+function busyWith(error: Error | undefined): string | undefined {
+  try {
+    const body = JSON.parse(error?.message ?? "") as { brief_id?: unknown };
+    return typeof body.brief_id === "string" ? body.brief_id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function textOf(parts: OnePart[]): string {
   return parts.map((part) => (part.type === "text" ? part.text : "")).join("");
+}
+
+function BriefReply({ parts }: { parts: OnePart[] }) {
+  const text = textOf(parts);
+  return (
+    <div className="flex flex-col gap-3">
+      <ProgressLine items={partsOf(parts, "progress")} />
+      <CoordinationRoom messages={partsOf(parts, "team")} />
+      {text && <Reply text={text} unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)} />}
+      {partsOf(parts, "card").map((card) => (
+        <ApprovalCard key={card.id} id={card.id} card={card.data} />
+      ))}
+      {partsOf(parts, "cost").map((cost) => (
+        <CostNotice key={cost.id} cost={cost.data} />
+      ))}
+      {partsOf(parts, "review").map((review) => (
+        <ReviewBadge key={review.id} review={review.data} />
+      ))}
+    </div>
+  );
 }
 
 export function Chat() {
   const lang = useLanguage();
-  const { messages, sendMessage, status, stop, error } = useChat({ transport });
-  const [draft, setDraft] = useState("");
-  const [keySet, setKeySet] = useState<boolean>();
-  // where the key panel shows: "main" for the first key, in place of the chat; "side" when replacing it
-  const [keyOpen, setKeyOpen] = useState<false | "main" | "side">(false);
-  const model = useModel(keySet);
-  const [modelOpen, setModelOpen] = useState(false);
   const project = useProject();
+  const chatId = project?.id ?? "general";
+  const { messages, setMessages, sendMessage, status, stop, error, clearError, resumeStream } = useChat<OneMessage>({
+    id: chatId,
+    transport,
+  });
+  const [draft, setDraft] = useState("");
+  const [failed, setFailed] = useState<Text>(); // a steer or stop the core did not take
+  const [stopped, setStopped] = useState<ReadonlySet<string>>(new Set());
+  const ai = useAiSettings();
+  // where AI settings show: "main", in place of the chat when nothing is connected yet; "side" beside the chat
+  const [aiOpen, setAiOpen] = useState<false | "main" | "side">(false);
+  const [wasConnected, setWasConnected] = useState(ai.connected);
+  if (wasConnected !== ai.connected) {
+    // the first AI connected: the settings stay open to say so, with Close, and the chat opens below. Set while
+    // rendering, so the open settings are never unmounted in between.
+    setWasConnected(ai.connected);
+    if (wasConnected === false && ai.connected) setAiOpen("main");
+  }
   const [pickerOpen, setPickerOpen] = useState(false);
   const [recordsOpen, setRecordsOpen] = useState(false);
   const list = useRef<HTMLDivElement>(null);
-  const busy = status === "submitted" || status === "streaming";
-  const sideOpen = (keyOpen === "side" && keySet !== false) || modelOpen || pickerOpen || recordsOpen;
-
-  useEffect(() => {
-    let live = true;
-    fetch("/api/settings/ai-key")
-      .then((response) => (response.ok ? (response.json() as Promise<{ set?: boolean }>) : undefined))
-      .then((body) => live && body && setKeySet(body.set === true))
-      .catch(() => undefined); // the core will answer the first message with how to add a key
-    return () => {
-      live = false;
-    };
-  }, []);
+  const streaming = status === "submitted" || status === "streaming";
+  const found = activeBrief(messages);
+  const brief = found && !stopped.has(found) ? found : undefined;
+  const running = streaming || brief !== undefined;
+  const aiMain = ai.connected === false || aiOpen === "main";
+  const sideOpen = (aiOpen === "side" && !aiMain) || pickerOpen || recordsOpen;
+  const elsewhere = busyWith(error);
 
   useEffect(() => {
     // a remembered project that no longer opens is forgotten, and the picker shows
@@ -60,20 +108,81 @@ export function Chat() {
   }, []);
 
   useEffect(() => {
+    // the chat's earlier messages, then the Brief still running in it, replayed from its start (204: none)
+    let live = true;
+    fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`)
+      .then((response) => (response.ok ? (response.json() as Promise<{ messages?: OneMessage[] }>) : undefined))
+      .then((body) => {
+        if (!live || !body?.messages) return;
+        const earlier = body.messages;
+        setMessages((now) => (now.length ? now : earlier)); // never over a message sent meanwhile
+        void resumeStream();
+      })
+      .catch(() => undefined); // the chat starts empty
+    return () => {
+      live = false;
+    };
+  }, [chatId, setMessages, resumeStream]);
+
+  useEffect(() => {
+    // the chat already had a Brief running (started elsewhere): the message steers it, and the page joins its stream
+    if (!elsewhere) return;
+    clearError();
+    const last = messages.findLast((message) => message.role === "user");
+    if (!last) return;
+    setMessages((now) => now.map((m) => (m.id === last.id ? { ...m, metadata: { steering: true } } : m)));
+    void steerWith(elsewhere, textOf(last.parts)).then((ok) => ok && void resumeStream());
+  }, [elsewhere]); // runs once per refused message; the rest is read as it is then
+
+  useEffect(() => {
     list.current?.scrollTo?.({ top: list.current.scrollHeight });
   }, [messages]);
 
-  function send() {
+  async function steerWith(id: string, text: string): Promise<boolean> {
+    setFailed(undefined);
+    const response = await send(`/api/briefs/${encodeURIComponent(id)}/steer`, "POST", { text });
+    if (!response?.ok) setFailed(await coreLine(response, texts.steerFailed));
+    return response?.ok === true;
+  }
+
+  async function submit() {
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text) return;
+    if (brief) {
+      setDraft("");
+      if (await steerWith(brief, text)) {
+        const steering: OneMessage = {
+          id: generateId(),
+          role: "user",
+          parts: [{ type: "text", text }],
+          metadata: { steering: true },
+        };
+        setMessages((now) => [...now, steering]);
+      } else {
+        setDraft(text);
+      }
+      return;
+    }
+    if (streaming) return; // the Brief is starting; its id comes with its first status
     setDraft("");
+    setFailed(undefined);
     void sendMessage({ text });
   }
 
-  function toggleModels() {
-    const state = model.list.state;
-    if (!modelOpen && (state === "idle" || state === "no-key" || state === "failed")) void model.load();
-    setModelOpen(!modelOpen);
+  async function halt() {
+    const id = brief;
+    void stop(); // the stream ends here at once; the Brief itself ends only by the stop call
+    if (!id) return;
+    setStopped((now) => new Set(now).add(id));
+    const response = await send(`/api/briefs/${encodeURIComponent(id)}/stop`, "POST");
+    if (!response?.ok) {
+      setStopped((now) => new Set([...now].filter((other) => other !== id)));
+      setFailed(await coreLine(response, texts.stopFailed));
+    }
+  }
+
+  function continued(unfinished: Unfinished) {
+    if (unfinished.chat_id === chatId) void resumeStream();
   }
 
   return (
@@ -103,16 +212,11 @@ export function Chat() {
         <div className="flex items-center gap-4 text-slate">
           <button
             type="button"
-            dir="auto"
-            title={t("modelTitle")}
-            aria-expanded={modelOpen}
-            onClick={toggleModels}
+            aria-expanded={aiOpen !== false || aiMain}
+            onClick={() => setAiOpen(aiOpen === "side" ? false : "side")}
             className="hover:text-ink"
           >
-            {model.name ?? t("model")}
-          </button>
-          <button type="button" onClick={() => setKeyOpen("side")} className="hover:text-ink">
-            {t("aiKey")}
+            {t("ai")}
           </button>
           <button
             type="button"
@@ -131,10 +235,7 @@ export function Chat() {
       <div className="flex min-h-0 flex-1">
         {sideOpen && (
           <div className="w-full overflow-y-auto min-[900px]:order-last min-[900px]:w-md min-[900px]:shrink-0 min-[900px]:border-s min-[900px]:border-stone">
-            {keyOpen === "side" && keySet !== false && (
-              <AiKey onSaved={() => setKeySet(true)} onClose={() => setKeyOpen(false)} />
-            )}
-            {modelOpen && <ModelPanel model={model} onClose={() => setModelOpen(false)} />}
+            {aiOpen === "side" && !aiMain && <AiSettings ai={ai} onClose={() => setAiOpen(false)} />}
             {pickerOpen && <ProjectPicker onClose={() => setPickerOpen(false)} />}
             {recordsOpen && (
               <RecordsPanel onClose={() => setRecordsOpen(false)} onPickProject={() => setPickerOpen(true)} />
@@ -143,39 +244,41 @@ export function Chat() {
         )}
 
         <div className={`flex min-w-0 flex-1 flex-col ${sideOpen ? "max-[899px]:hidden" : ""}`}>
-          {(keySet === false || keyOpen === "main") && (
-            <AiKey
-              onSaved={() => {
-                setKeySet(true);
-                setKeyOpen("main"); // stay open to say the key was added
-              }}
-              onClose={keySet === false ? undefined : () => setKeyOpen(false)}
-            />
+          {aiMain && (
+            <div className={ai.connected === false ? "overflow-y-auto" : "max-h-[50%] shrink-0 overflow-y-auto"}>
+              <AiSettings ai={ai} onClose={ai.connected === false ? undefined : () => setAiOpen(false)} />
+            </div>
           )}
 
-          {keySet !== false && (
+          {ai.connected !== false && (
             <>
+              <ContinueBriefs onContinued={continued} />
               <div ref={list} className="flex-1 overflow-y-auto px-4 py-4">
                 <ol className="mx-auto flex max-w-2xl flex-col gap-4">
                   {messages.length === 0 && <li className="text-slate">{t("empty")}</li>}
-                  {messages.map((message) => (
-                    <li
-                      key={message.id}
-                      className={message.role === "user" ? "max-w-[85%] self-end rounded-lg bg-stone px-3 py-2" : ""}
-                    >
-                      {message.role === "user" ? (
+                  {messages.map((message) =>
+                    message.role === "user" ? (
+                      <li key={message.id} className="max-w-[85%] self-end rounded-lg bg-stone px-3 py-2">
+                        {message.metadata?.steering && <p className="text-slate">{t("steering")}</p>}
                         <p dir="auto" className="whitespace-pre-wrap">
                           {textOf(message.parts)}
                         </p>
-                      ) : (
-                        <Reply text={textOf(message.parts)} />
-                      )}
-                    </li>
-                  ))}
+                      </li>
+                    ) : (
+                      <li key={message.id}>
+                        <BriefReply parts={message.parts} />
+                      </li>
+                    ),
+                  )}
                   {status === "submitted" && <li className="text-slate">{t("thinking")}</li>}
-                  {error && (
+                  {error && !elsewhere && (
                     <li role="alert" className="text-copper">
                       {errorLine(error)}
+                    </li>
+                  )}
+                  {failed && (
+                    <li role="alert" className="text-copper">
+                      {pick(failed)}
                     </li>
                   )}
                 </ol>
@@ -184,7 +287,7 @@ export function Chat() {
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  send();
+                  void submit();
                 }}
                 className="border-t border-stone px-4 py-3"
               >
@@ -199,22 +302,21 @@ export function Chat() {
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                         event.preventDefault();
-                        send();
+                        void submit();
                       }
                     }}
                     className="flex-1 resize-none rounded-md border border-slate bg-paper px-3 py-2 outline-none focus:border-ink"
                   />
-                  {busy ? (
-                    <button type="button" onClick={() => void stop()} className="rounded-md border border-ink px-4 py-2">
+                  <button
+                    type="submit"
+                    disabled={!draft.trim() || (streaming && !brief)}
+                    className="rounded-md bg-ink px-4 py-2 text-paper disabled:opacity-40"
+                  >
+                    {t("send")}
+                  </button>
+                  {running && (
+                    <button type="button" onClick={() => void halt()} className="rounded-md border border-ink px-4 py-2">
                       {t("stop")}
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={!draft.trim()}
-                      className="rounded-md bg-ink px-4 py-2 text-paper disabled:opacity-40"
-                    >
-                      {t("send")}
                     </button>
                   )}
                 </div>
