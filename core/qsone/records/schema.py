@@ -108,4 +108,66 @@ CREATE TRIGGER calc_inputs_no_delete BEFORE DELETE ON calc_inputs
   BEGIN SELECT RAISE(ABORT, 'Calculation inputs are never deleted'); END;
 """
 
-MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2]
+# The agent engine (Plan 4): Checkpoints, approvals, writes made, the team's messages,
+# Deliverable drafts, Reviews and AI costs. In every Records file, project and Engineer Records.
+SCHEMA_3 = """
+CREATE TABLE briefs (id TEXT PRIMARY KEY, chat_id TEXT NOT NULL, text TEXT NOT NULL,
+  status TEXT NOT NULL, step TEXT CHECK (step IS NULL OR json_valid(step)),
+  read_untrusted INTEGER NOT NULL DEFAULT 0,
+  allowed TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(allowed)),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX briefs_chat ON briefs(chat_id, created_at);
+CREATE TABLE agent_runs (id TEXT PRIMARY KEY, brief_id TEXT NOT NULL REFERENCES briefs(id),
+  parent_id TEXT REFERENCES agent_runs(id), spec TEXT NOT NULL CHECK (json_valid(spec)),
+  connector TEXT NOT NULL, model TEXT NOT NULL, status TEXT NOT NULL, history BLOB,
+  session_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX agent_runs_brief ON agent_runs(brief_id, created_at);
+CREATE TABLE deferred_results (run_id TEXT NOT NULL REFERENCES agent_runs(id),
+  call_id TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY (run_id, call_id));
+CREATE TABLE approvals (id TEXT PRIMARY KEY, brief_id TEXT NOT NULL REFERENCES briefs(id),
+  run_id TEXT, call_id TEXT, card TEXT NOT NULL CHECK (json_valid(card)),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'settled', 'withdrawn')), choice TEXT,
+  asked_at TEXT NOT NULL, settled_at TEXT);
+CREATE INDEX approvals_brief ON approvals(brief_id, status);
+CREATE TABLE brief_writes (brief_id TEXT NOT NULL, key TEXT NOT NULL, result_id TEXT NOT NULL,
+  PRIMARY KEY (brief_id, key));
+CREATE TABLE team_messages (id TEXT PRIMARY KEY, brief_id TEXT NOT NULL, at TEXT NOT NULL,
+  sender TEXT NOT NULL, recipient TEXT NOT NULL, text TEXT NOT NULL);
+CREATE INDEX team_messages_brief ON team_messages(brief_id, at);
+CREATE TABLE deliverables (id TEXT PRIMARY KEY, brief_id TEXT NOT NULL, run_id TEXT NOT NULL,
+  draft TEXT NOT NULL CHECK (json_valid(draft)), replaces TEXT REFERENCES deliverables(id),
+  created_at TEXT NOT NULL);
+CREATE INDEX deliverables_brief ON deliverables(brief_id, created_at);
+CREATE TABLE reviews (id TEXT PRIMARY KEY,
+  deliverable_id TEXT NOT NULL REFERENCES deliverables(id), round INTEGER NOT NULL,
+  code TEXT NOT NULL CHECK (code IN ('A', 'B', 'C')), comments TEXT NOT NULL,
+  checker TEXT NOT NULL, same_provider INTEGER NOT NULL, at TEXT NOT NULL);
+CREATE INDEX reviews_deliverable ON reviews(deliverable_id);
+CREATE TABLE ai_costs (id INTEGER PRIMARY KEY, at TEXT NOT NULL, local_day TEXT NOT NULL,
+  brief_id TEXT NOT NULL, project_id TEXT, run_id TEXT NOT NULL, role TEXT NOT NULL,
+  connector TEXT NOT NULL, model TEXT NOT NULL, input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL, usd TEXT, equivalent INTEGER NOT NULL DEFAULT 0,
+  basis TEXT NOT NULL);
+CREATE INDEX ai_costs_day ON ai_costs(local_day);
+CREATE INDEX ai_costs_brief ON ai_costs(brief_id);
+-- ai_costs, reviews, team_messages: no UPDATE, no DELETE.
+-- deferred_results, brief_writes: no UPDATE.
+CREATE TRIGGER ai_costs_no_update BEFORE UPDATE ON ai_costs
+  BEGIN SELECT RAISE(ABORT, 'AI costs are never edited'); END;
+CREATE TRIGGER ai_costs_no_delete BEFORE DELETE ON ai_costs
+  BEGIN SELECT RAISE(ABORT, 'AI costs are never deleted'); END;
+CREATE TRIGGER reviews_no_update BEFORE UPDATE ON reviews
+  BEGIN SELECT RAISE(ABORT, 'Reviews are never edited'); END;
+CREATE TRIGGER reviews_no_delete BEFORE DELETE ON reviews
+  BEGIN SELECT RAISE(ABORT, 'Reviews are never deleted'); END;
+CREATE TRIGGER team_messages_no_update BEFORE UPDATE ON team_messages
+  BEGIN SELECT RAISE(ABORT, 'Team messages are never edited'); END;
+CREATE TRIGGER team_messages_no_delete BEFORE DELETE ON team_messages
+  BEGIN SELECT RAISE(ABORT, 'Team messages are never deleted'); END;
+CREATE TRIGGER deferred_results_no_update BEFORE UPDATE ON deferred_results
+  BEGIN SELECT RAISE(ABORT, 'A stored tool result is never edited'); END;
+CREATE TRIGGER brief_writes_no_update BEFORE UPDATE ON brief_writes
+  BEGIN SELECT RAISE(ABORT, 'A remembered write is never edited'); END;
+"""
+
+MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3]

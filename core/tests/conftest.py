@@ -184,12 +184,10 @@ def rec(data_dir):
 
 @pytest.fixture
 def general(data_dir):
-    """An open Engineer Records file at `<data>/engineer/`, closed after the test.
+    """An open Engineer Records file at `<data>/engineer/`, closed after the test."""
+    from qsone.engine.general import open_engineer_records
 
-    Task 2 of Plan 4 makes this `engine.general.open_engineer_records(data_dir)`."""
-    from qsone.records.project import Records
-
-    engineer = Records.create(data_dir / "engineer", name="Engineer Records", actor="engineer")
+    engineer = open_engineer_records(data_dir)
     yield engineer
     engineer.close()
 
