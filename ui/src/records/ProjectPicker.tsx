@@ -2,7 +2,7 @@
 // one it cannot read is listed with the reason, never hidden.
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
-import { coreLine } from "../settings/Model";
+import { coreLine } from "../core";
 import { type Project, switchProject, useProject } from "./project";
 
 type Listed = (Project & { open: boolean }) | { id: string; error: Text };

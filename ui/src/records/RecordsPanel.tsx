@@ -2,7 +2,7 @@
 // Files go to the core one at a time as their raw bytes; the page never sends a file path.
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
-import { coreLine } from "../settings/Model";
+import { coreLine } from "../core";
 import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
 

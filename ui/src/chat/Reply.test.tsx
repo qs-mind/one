@@ -1,6 +1,9 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { setLanguage, texts } from "../i18n";
 import { Reply } from "./Reply";
+
+beforeEach(() => setLanguage("ar"));
 
 describe("Reply", () => {
   it("shows bold, lists and code instead of raw marks", () => {
@@ -20,6 +23,27 @@ describe("Reply", () => {
       expect(screen.getByText(text)).toHaveAttribute("dir", "auto");
     }
     expect(screen.getByRole("list")).toHaveAttribute("dir", "auto");
+  });
+
+  it("marks each number with no source, as a whole number only, and says so", () => {
+    const { container } = render(
+      <Reply
+        text={"Rate 39,850.50 EGP for 120 m3, total **7,500 EGP**; 17,500 elsewhere.\n\n| Total |\n|---|\n| 7,500 |"}
+        unsourced={["7,500"]}
+      />,
+    );
+    const marks = [...container.querySelectorAll("mark")];
+    expect(marks.map((mark) => mark.textContent)).toEqual(["7,500", "7,500"]);
+    expect(marks[0]).toHaveAttribute("title", texts.noSource.ar);
+    expect(marks[0]!.closest("strong")).not.toBeNull(); // inside the bold, which stays bold
+    expect(container).toHaveTextContent("17,500 elsewhere"); // not marked inside a longer number
+    expect(screen.getByText(texts.noSourceNote.ar)).toBeInTheDocument();
+  });
+
+  it("marks nothing and adds no note when every number has a source", () => {
+    const { container } = render(<Reply text={"Total 7,500 EGP"} unsourced={[]} />);
+    expect(container.querySelector("mark")).toBeNull();
+    expect(screen.queryByText(texts.noSourceNote.ar)).not.toBeInTheDocument();
   });
 
   it("never renders raw HTML", () => {
