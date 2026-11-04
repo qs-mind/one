@@ -9,7 +9,7 @@ type List =
   | { state: "failed"; line: Text };
 
 // The core sends a failure as {error: {en, ar}}; anything else gets the screen's own line.
-async function coreLine(response: Response | undefined, fallback: Text): Promise<Text> {
+export async function coreLine(response: Response | undefined, fallback: Text): Promise<Text> {
   const body = (await response?.json().catch(() => undefined)) as { error?: Partial<Text> } | undefined;
   const line = body?.error;
   return typeof line?.en === "string" && typeof line.ar === "string" ? (line as Text) : fallback;
