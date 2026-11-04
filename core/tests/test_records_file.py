@@ -149,7 +149,7 @@ def test_migration_upgrades_and_keeps_data(tmp_path, monkeypatch):
     )
     rec = Records.open(tmp_path / "p")
     with rec.read() as c:
-        assert c.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert c.execute("PRAGMA user_version").fetchone()[0] == len(schema.MIGRATIONS)
         assert c.execute("select code, zone from items").fetchall() == [("03/02", None)]
     rec.close()
 
@@ -165,7 +165,7 @@ def test_a_failed_migration_changes_nothing(tmp_path, monkeypatch):
     monkeypatch.undo()
     rec = Records.open(tmp_path / "p")
     with rec.read() as c:
-        assert c.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert c.execute("PRAGMA user_version").fetchone()[0] == len(schema.MIGRATIONS)
         columns = [row[1] for row in c.execute("PRAGMA table_info(items)")]
         assert "zone" not in columns
     rec.close()

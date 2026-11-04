@@ -109,19 +109,24 @@ def _dump(value: dict) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def add_source(
-    rec: Records,
+# The four writers below run inside a transaction the caller holds (`rec.write(actor)`), so a
+# calculation can write its source, its number and its own rows together. Each makes the same
+# checks and audit rows as the `rec`-level function that wraps it.
+
+
+def write_source(
+    conn,
     *,
+    at: str,
+    actor: str,
     kind: str,
     title: str,
-    actor: str,
     file_id: str | None = None,
     locator: dict | None = None,
     url: str | None = None,
     dated: str | None = None,
 ) -> str:
     source_id = uuid4().hex
-    at = rec.clock()
     row = {
         "id": source_id,
         "kind": kind,
@@ -133,26 +138,24 @@ def add_source(
         "recorded_at": at,
         "recorded_by": actor,
     }
-    with rec.write(actor) as conn:
-        _insert(conn, "sources", {**row, "locator": _dump(row["locator"])})
-        audit.record(
-            conn,
-            at=at,
-            actor=actor,
-            action="create",
-            table="sources",
-            row_id=source_id,
-            before=None,
-            after=row,
-        )
+    _insert(conn, "sources", {**row, "locator": _dump(row["locator"])})
+    audit.record(
+        conn,
+        at=at,
+        actor=actor,
+        action="create",
+        table="sources",
+        row_id=source_id,
+        before=None,
+        after=row,
+    )
     return source_id
 
 
-def add_item(
-    rec: Records, *, kind: str, actor: str, code: str | None = None, fields: dict | None = None
+def write_item(
+    conn, *, at: str, actor: str, kind: str, code: str | None = None, fields: dict | None = None
 ) -> str:
     item_id = uuid4().hex
-    at = rec.clock()
     row = {
         "id": item_id,
         "kind": kind,
@@ -164,19 +167,50 @@ def add_item(
         "updated_at": at,
         "updated_by": actor,
     }
-    with rec.write(actor) as conn:
-        _insert(conn, "items", {**row, "fields": _dump(row["fields"])})
-        audit.record(
-            conn,
-            at=at,
-            actor=actor,
-            action="create",
-            table="items",
-            row_id=item_id,
-            before=None,
-            after=row,
-        )
+    _insert(conn, "items", {**row, "fields": _dump(row["fields"])})
+    audit.record(
+        conn,
+        at=at,
+        actor=actor,
+        action="create",
+        table="items",
+        row_id=item_id,
+        before=None,
+        after=row,
+    )
     return item_id
+
+
+def add_source(
+    rec: Records,
+    *,
+    kind: str,
+    title: str,
+    actor: str,
+    file_id: str | None = None,
+    locator: dict | None = None,
+    url: str | None = None,
+    dated: str | None = None,
+) -> str:
+    with rec.write(actor) as conn:
+        return write_source(
+            conn,
+            at=rec.clock(),
+            actor=actor,
+            kind=kind,
+            title=title,
+            file_id=file_id,
+            locator=locator,
+            url=url,
+            dated=dated,
+        )
+
+
+def add_item(
+    rec: Records, *, kind: str, actor: str, code: str | None = None, fields: dict | None = None
+) -> str:
+    with rec.write(actor) as conn:
+        return write_item(conn, at=rec.clock(), actor=actor, kind=kind, code=code, fields=fields)
 
 
 def update_item(rec: Records, item_id: str, *, fields: dict, actor: str) -> int:
@@ -211,21 +245,21 @@ def update_item(rec: Records, item_id: str, *, fields: dict, actor: str) -> int:
     return version
 
 
-def record_number(
-    rec: Records,
+def write_number(
+    conn,
     *,
+    at: str,
+    actor: str,
     item_id: str,
     name: str,
     value: str | Decimal | int,
     source_id: str,
     dated: str,
-    actor: str,
     unit: str | None = None,
     currency: str | None = None,
 ) -> str:
     text, unit, currency = _checked(name, value, unit, currency, dated)
     number_id = uuid4().hex
-    at = rec.clock()
     row = {
         "id": number_id,
         "item_id": item_id,
@@ -241,20 +275,115 @@ def record_number(
         "reason": None,
         "valid_until": None,
     }
-    with rec.write(actor) as conn:
-        _need_source(conn, source_id)
-        _insert(conn, "numbers", row)
-        audit.record(
-            conn,
-            at=at,
-            actor=actor,
-            action="create",
-            table="numbers",
-            row_id=number_id,
-            before=None,
-            after=row,
-        )
+    _need_source(conn, source_id)
+    _insert(conn, "numbers", row)
+    audit.record(
+        conn,
+        at=at,
+        actor=actor,
+        action="create",
+        table="numbers",
+        row_id=number_id,
+        before=None,
+        after=row,
+    )
     return number_id
+
+
+def write_correction(
+    conn,
+    number_id: str,
+    *,
+    at: str,
+    actor: str,
+    value,
+    reason: str,
+    source_id: str,
+    dated: str,
+    unit: str | None = None,
+    currency: str | None = None,
+) -> str:
+    """A new entry replaces a current number; the old one is kept, marked `valid_until`.
+
+    Unit and currency default to the old entry's."""
+    if not (reason or "").strip():
+        raise _refuse(copy.CORRECTION_NEEDS_REASON, "reason")
+    new_id = uuid4().hex
+    old = _row(conn, "numbers", number_id)
+    if old is None or old["valid_until"] is not None:
+        raise RecordsError(copy.ALREADY_CORRECTED, status=422, field="number_id")
+    text, unit, currency = _checked(
+        old["name"],
+        value,
+        old["unit"] if unit is None else unit,
+        old["currency"] if currency is None else currency,
+        dated,
+    )
+    _need_source(conn, source_id)
+    row = {
+        **old,
+        "id": new_id,
+        "value": text,
+        "unit": unit,
+        "currency": currency,
+        "source_id": source_id,
+        "dated": dated,
+        "recorded_at": at,
+        "recorded_by": actor,
+        "replaces": number_id,
+        "reason": reason,
+        "valid_until": None,
+    }
+    _insert(conn, "numbers", row)
+    conn.execute("UPDATE numbers SET valid_until = ? WHERE id = ?", (at, number_id))
+    audit.record(
+        conn,
+        at=at,
+        actor=actor,
+        action="correct",
+        table="numbers",
+        row_id=number_id,
+        before=old,
+        after={**old, "valid_until": at},
+    )
+    audit.record(
+        conn,
+        at=at,
+        actor=actor,
+        action="create",
+        table="numbers",
+        row_id=new_id,
+        before=None,
+        after=row,
+    )
+    return new_id
+
+
+def record_number(
+    rec: Records,
+    *,
+    item_id: str,
+    name: str,
+    value: str | Decimal | int,
+    source_id: str,
+    dated: str,
+    actor: str,
+    unit: str | None = None,
+    currency: str | None = None,
+) -> str:
+    with rec.write(actor) as conn:
+        return write_number(
+            conn,
+            at=rec.clock(),
+            actor=actor,
+            item_id=item_id,
+            name=name,
+            value=value,
+            source_id=source_id,
+            dated=dated,
+            unit=unit,
+            currency=currency,
+        )
 
 
 def correct_number(
@@ -272,59 +401,19 @@ def correct_number(
     """A new entry replaces a current number; the old one is kept, marked `valid_until`.
 
     Unit and currency default to the old entry's."""
-    if not (reason or "").strip():
-        raise _refuse(copy.CORRECTION_NEEDS_REASON, "reason")
-    new_id = uuid4().hex
-    at = rec.clock()
     with rec.write(actor) as conn:
-        old = _row(conn, "numbers", number_id)
-        if old is None or old["valid_until"] is not None:
-            raise RecordsError(copy.ALREADY_CORRECTED, status=422, field="number_id")
-        text, unit, currency = _checked(
-            old["name"],
-            value,
-            old["unit"] if unit is None else unit,
-            old["currency"] if currency is None else currency,
-            dated,
-        )
-        _need_source(conn, source_id)
-        row = {
-            **old,
-            "id": new_id,
-            "value": text,
-            "unit": unit,
-            "currency": currency,
-            "source_id": source_id,
-            "dated": dated,
-            "recorded_at": at,
-            "recorded_by": actor,
-            "replaces": number_id,
-            "reason": reason,
-            "valid_until": None,
-        }
-        _insert(conn, "numbers", row)
-        conn.execute("UPDATE numbers SET valid_until = ? WHERE id = ?", (at, number_id))
-        audit.record(
+        return write_correction(
             conn,
-            at=at,
+            number_id,
+            at=rec.clock(),
             actor=actor,
-            action="correct",
-            table="numbers",
-            row_id=number_id,
-            before=old,
-            after={**old, "valid_until": at},
+            value=value,
+            reason=reason,
+            source_id=source_id,
+            dated=dated,
+            unit=unit,
+            currency=currency,
         )
-        audit.record(
-            conn,
-            at=at,
-            actor=actor,
-            action="create",
-            table="numbers",
-            row_id=new_id,
-            before=None,
-            after=row,
-        )
-    return new_id
 
 
 def _moment(as_of: str) -> str:
