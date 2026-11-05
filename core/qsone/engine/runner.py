@@ -1455,6 +1455,10 @@ class Engine:
         """Plan 7's `ActivityEvent`s for the project, as they come."""
         return activity.subscribe(project_id)
 
+    def waiting(self, project_id: str) -> int:
+        """How many cards wait for the engineer in the project's running Briefs."""
+        return sum(len(b.waiting) for b in self._in(project_id))
+
 
 def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
     """A Brief as events again, from what is stored: the Lead's words, the Coordination Room,
