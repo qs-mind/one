@@ -8,6 +8,8 @@ import { AiKey } from "./AiKey";
 
 export type Role = "lead" | "checker" | "specialist" | "quick";
 export type Choice = { connector: string; model: string };
+/** How hard the Lead QS thinks; picked in the message box. */
+export type Effort = "low" | "medium" | "high";
 export type ModelCard = Choice & {
   name: string;
   provider: string;
@@ -19,6 +21,8 @@ export type ModelCard = Choice & {
   price_source: string | null;
   on_device: boolean;
   subscription: boolean;
+  efforts?: Effort[]; // the levels it accepts; none: the message box shows no effort
+  effort_default?: Effort | null; // its provider's own level when none is sent, when known
 };
 export type ConnectorInfo = {
   id: string; // "anthropic" | "standard:<id>" | "claude-code"
@@ -35,6 +39,7 @@ type Settings = {
   sheet: ModelCard[];
   roles: Roles;
   defaults: Roles;
+  effort?: Effort | null; // the message box's last effort; none: the provider's own
   key_store?: "system" | "file"; // "file": this computer has no key store, so the core keeps keys in a file
 };
 type Loaded = { state: "loading" | "failed" } | { state: "ready"; settings: Settings };
@@ -46,7 +51,7 @@ const field = "rounded-md border border-slate bg-paper px-3 py-2 outline-none fo
 const primary = "rounded-md bg-ink px-4 py-2 text-paper disabled:opacity-40";
 
 /** One select value per model: the same model always gives the same text. */
-const keyOf = (choice: Choice) => JSON.stringify({ connector: choice.connector, model: choice.model });
+export const keyOf = (choice: Choice) => JSON.stringify({ connector: choice.connector, model: choice.model });
 
 /** Something can answer a Brief: a saved key, a Standard Link (a local one has no key) or Claude Code. */
 function anyConnected(connectors: ConnectorInfo[]): boolean {
@@ -72,8 +77,21 @@ export function useAiSettings() {
     setLoaded((now) => (now.state === "ready" ? { state: "ready", settings: { ...now.settings, roles } } : now));
   }, []);
 
+  /** The message box's pick for the next Brief: the Lead QS's model and effort. Shown here at once (`picked` is what
+   * the box sends); the core saves them when a message goes with them. Until then the core's own choice stands. */
+  const [picked, setPicked] = useState<{ lead?: Choice; effort?: Effort }>({});
+  const pick = useCallback((next: { lead?: Choice; effort?: Effort }) => {
+    setPicked((now) => ({ ...now, ...next }));
+    setLoaded((now) => {
+      if (now.state !== "ready") return now;
+      const { roles, effort } = now.settings;
+      const lead = next.lead ? { ...roles, lead: next.lead } : roles;
+      return { state: "ready", settings: { ...now.settings, roles: lead, effort: next.effort ?? effort } };
+    });
+  }, []);
+
   const connected = loaded.state === "ready" ? anyConnected(loaded.settings.connectors) : undefined;
-  return { loaded, load, setRoles, connected };
+  return { loaded, load, setRoles, pick, picked, connected };
 }
 
 export type Ai = ReturnType<typeof useAiSettings>;

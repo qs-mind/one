@@ -26,6 +26,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models.function import AgentInfo
+from pydantic_ai.profiles import ModelProfile
 
 from qsone import copy
 from qsone.engine.types import ModelCard, ModelChoice
@@ -41,6 +42,7 @@ _ARABIC = re.compile(r"[؀-ۿ]")
 _LATIN = re.compile(r"[A-Za-z]")
 _FILE = re.compile(r"file:([0-9a-f]{32}) \| ([^|]+?) \| (\w+)")
 _NEXT_IMPORT = re.compile(r"Next: boq_import (\{.*\})")
+_MODEL = re.compile(r"You run on the model ([\w.:-]+)")
 
 
 # What the brain sees -------------------------------------------------------------------------
@@ -57,6 +59,8 @@ class Seen:
     scenario: str
     done: dict[str, tuple[str, bool]]  # step -> (result text, ok)
     used: dict[str, str] = field(default_factory=dict)  # step -> the tool it called
+    model: str = ""  # the model it runs as, from One's own instructions
+    effort: str | None = None  # the `thinking` setting One sent, if any
 
 
 def _text(content) -> str:
@@ -95,7 +99,12 @@ def read(messages: list, info: AgentInfo) -> Seen:
     found = _KEYWORD.search(brief)
     scenario = found.group(1) if found and found.group(1) in SCENARIOS else "full"
     tools = {t.name for t in info.function_tools}
-    return Seen(tools, brief, language(brief), scenario, done, used)
+    model = _MODEL.search(info.instructions or "")
+    effort = info.model_request_parameters.thinking  # PydanticAI moves `thinking` here
+    seen = Seen(tools, brief, language(brief), scenario, done, used)
+    seen.model = model.group(1) if model else ""
+    seen.effort = effort if isinstance(effort, str) else None
+    return seen
 
 
 def _call(step: str, tool: str, args: dict) -> Step:
@@ -370,9 +379,11 @@ def lead(seen: Seen) -> Step:
         return _say(
             _words(
                 seen,
-                "(bench reply, not a real AI) Hello from the QS Mind One test bench.",
+                "(bench reply, not a real AI) Hello from the QS Mind One test bench. "
+                f"Model: {seen.model}. Effort: {seen.effort or 'default'}.",
                 "(رد تجريبي من منصة الاختبار، وليس ذكاء اصطناعي حقيقي) أهلا من منصة اختبار "
-                "كيو إس مايند وان.",
+                f"كيو إس مايند وان. الموديل: {seen.model}. عمق التفكير: "
+                f"{seen.effort or 'الافتراضي'}.",
             )
         )
     return _say(_report(seen))
@@ -454,6 +465,7 @@ class BenchModel(Scripted):
 
     def __init__(self, model_name: str) -> None:
         super().__init__([], model_name=model_name)
+        self._profile = ModelProfile(supports_thinking=True)  # else PydanticAI drops `thinking`
 
     async def _next(self, messages: list, info: AgentInfo) -> Step:
         self.calls += 1
@@ -486,6 +498,8 @@ class BenchConnector:
     models: tuple[tuple[str, str, str, str], ...]  # (id, name, price in, price out)
     kind: str = "model"
     on_device: bool = False
+    # the bench's own effort levels and default, per model id, so the walks can pick and cycle
+    efforts: dict[str, tuple[tuple[str, ...], str | None]] = field(default_factory=dict)
 
     async def cards(self) -> list[ModelCard]:
         return [
@@ -499,6 +513,8 @@ class BenchConnector:
                 price_in=Decimal(price_in),
                 price_out=Decimal(price_out),
                 price_source=PRICE_SOURCE,
+                efforts=self.efforts.get(model, ((), None))[0],
+                effort_default=self.efforts.get(model, ((), None))[1],
             )
             for model, name, price_in, price_out in self.models
         ]
@@ -507,8 +523,13 @@ class BenchConnector:
         return BenchModel(model_id)
 
 
+EFFORTS = ("low", "medium", "high")
+
+
 def connectors() -> list[BenchConnector]:
-    """Two connectors of two providers, so the Checking QS is not a Same-provider check."""
+    """Two connectors of two providers, so the Checking QS is not a Same-provider check. The
+    lead model takes an effort with a known default (as Claude's "high"), the specialist one
+    with none known, and the checker none at all (the message box hides the effort)."""
     return [
         BenchConnector(
             "bench",
@@ -518,6 +539,7 @@ def connectors() -> list[BenchConnector]:
                 ("bench-lead", "Bench lead (fake AI)", "1", "5"),
                 ("bench-specialist", "Bench specialist (fake AI)", "0.5", "2"),
             ),
+            efforts={"bench-lead": (EFFORTS, "high"), "bench-specialist": (EFFORTS, None)},
         ),
         BenchConnector(
             "bench-check",

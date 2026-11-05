@@ -72,6 +72,8 @@ class TeamSetup:
     sheet: tuple[ModelCard, ...]  # the Model Data Sheet, priced
     roles: dict[Role, ModelChoice]  # `roles.chosen(sheet)`
     measured: tuple[int, int, int] | None = None  # `CostBook.tokens_per_request(project)`
+    # the same at the Lead QS's effort in this Brief, for the Lead's lines of the Brief Budget
+    lead_measured: tuple[int, int, int] | None | Literal["same"] = "same"
 
 
 def _setup(ctx: ToolContext) -> TeamSetup:
@@ -213,7 +215,9 @@ async def _plan_brief(ctx: ToolContext, args: PlanArgs) -> str:
     items = [{"tier": s.tier, "requests": s.requests} for s in args.steps]
     items.append({"tier": "lead", "requests": len(args.steps) + 1})  # a hand-over each, an end
     items.append({"tier": "checker", "requests": len(args.deliverables)})
-    budget = brief_budget(items, list(setup.sheet), setup.roles, setup.measured)
+    budget = brief_budget(
+        items, list(setup.sheet), setup.roles, setup.measured, setup.lead_measured
+    )
     if budget.usd is None or budget.usd > caps().budget_above:
         detail = (
             copy.fill(copy.BUDGET_UNKNOWN, minutes=budget.minutes)

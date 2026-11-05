@@ -14,11 +14,11 @@ from pydantic_ai.providers.anthropic import AnthropicProvider
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
-from qsone import copy, keys
+from qsone import copy, keys, settings
 from qsone.engine import roles, selection
 from qsone.engine.runner import BriefBusy, Engine, NoAI, reply_id
 from qsone.engine.stream import HEADERS, ui_stream
-from qsone.engine.types import TextDelta
+from qsone.engine.types import EFFORTS, Effort, ModelChoice, TextDelta
 
 # The default; the engineer picks another from the header (PUT /settings/model).
 LEAD_MODEL = roles.LEAD_MODEL
@@ -63,10 +63,42 @@ def _last_text(body: dict) -> str:
     return ""
 
 
+def _picked(body: dict) -> tuple[ModelChoice | None, Effort | None]:
+    """The Lead QS's model `{connector, model}` and `effort` picked in the message box; each is
+    None when left out. Raises `ValueError` for one that is not of that shape."""
+    model, effort = body.get("model"), body.get("effort")
+    lead = None
+    if model is not None:
+        if not (
+            isinstance(model, dict)
+            and isinstance(model.get("connector"), str)
+            and isinstance(model.get("model"), str)
+        ):
+            raise ValueError("model")
+        lead = ModelChoice(model["connector"], model["model"])
+    if effort is not None and effort not in EFFORTS:
+        raise ValueError("effort")
+    return lead, effort
+
+
+def remember(lead: ModelChoice | None, effort: Effort | None) -> None:
+    """The message box's last pick, for the next time: the model as the Lead QS's role (the one
+    AI settings show), the effort in settings.json "ai.effort". Not saved: the same next time."""
+    try:
+        if lead is not None:
+            roles.choose("lead", lead)
+        if effort is not None:
+            settings.save_ai("effort", effort)
+    except OSError:
+        log.warning("The message box's model and effort were not saved")
+
+
 async def respond(request: Request, engine: Engine) -> Response:
-    """The AI SDK body `{id: chat id, messages, selection?}`: only the last user message is used.
-    The chat id is a project id or "general"; `selection` is what the engineer selected on the
-    canvas (Plan 7, up to 20 items). 409 with `{"brief_id"}` while the chat has a Brief."""
+    """The AI SDK body `{id: chat id, messages, selection?, model?, effort?}`: only the last user
+    message is used. The chat id is a project id or "general"; `selection` is what the engineer
+    selected on the canvas (Plan 7, up to 20 items); `model` `{connector, model}` and `effort`
+    ("low", "medium", "high") are the Lead QS's for this Brief, picked in the message box, and
+    remembered for the next. 409 with `{"brief_id"}` while the chat has a Brief."""
     try:
         body = json.loads(await request.body())
     except ValueError:
@@ -81,10 +113,17 @@ async def respond(request: Request, engine: Engine) -> Response:
         answer = {"error": copy.CHAT_BAD_SELECTION, "field": "selection"}
         return JSONResponse(answer, status_code=422)
     try:
-        brief_id = await engine.start_brief(chat_id, text, selection=chosen)
+        lead, effort = _picked(body)
+    except ValueError as bad:
+        return JSONResponse({"error": copy.CHAT_MODEL_GONE, "field": str(bad)}, status_code=422)
+    try:
+        brief_id = await engine.start_brief(
+            chat_id, text, selection=chosen, lead=lead, effort=effort
+        )
     except BriefBusy as busy:
         return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
     except NoAI as none:
         # No Brief: the plain reply comes through the same stream, so the screen shows it.
         return stream(_say(none.text), uuid4().hex)
+    remember(lead, effort)
     return stream(engine.events(brief_id), reply_id(brief_id))

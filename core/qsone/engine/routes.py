@@ -18,10 +18,10 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from starlette.responses import Response, StreamingResponse
 
-from qsone import copy, keys, keystore
+from qsone import copy, keys, keystore, settings
 from qsone.engine import cards, connectors, costs, roles
 from qsone.engine.connectors import claude_code, standard
-from qsone.engine.types import BadAnswer, ModelCard, ModelChoice, Role, Text, answer_value
+from qsone.engine.types import EFFORTS, BadAnswer, ModelCard, ModelChoice, Role, Text, answer_value
 
 
 class ChoiceIn(BaseModel):
@@ -90,6 +90,8 @@ def card_json(card: ModelCard) -> dict:
         "price_source": card.price_source,
         "on_device": card.on_device,
         "subscription": card.subscription,
+        "efforts": list(card.efforts),  # none: the message box shows no effort for it
+        "effort_default": card.effort_default,
     }
 
 
@@ -103,6 +105,11 @@ def _connector_json(connector: connectors.Connector, error: Text | None) -> dict
         "key_set": keys.get_key(connector.id) is not None,
         "error": error,  # why its models could not be listed just now, or None
     }
+
+
+def _effort() -> str | None:
+    saved = settings.ai().get("effort")
+    return saved if saved in EFFORTS else None
 
 
 def _roles_json(chosen: dict[Role, ModelChoice]) -> dict:
@@ -131,6 +138,7 @@ def settings_router(
             "sheet": [card_json(c) for c in listed],
             "roles": _roles_json(roles.chosen(listed)),
             "defaults": _roles_json(roles.defaults(listed)),
+            "effort": _effort(),  # the message box's last effort, or None (the provider's own)
             "key_store": keystore.kind(),  # "file" when this computer has no key store
         }
 

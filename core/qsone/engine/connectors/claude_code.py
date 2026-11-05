@@ -44,7 +44,17 @@ from qsone.engine.cards import GENAI
 from qsone.engine.mcp_server import NAME as MCP_NAME
 from qsone.engine.mcp_server import McpGate
 from qsone.engine.tools import REGISTRY
-from qsone.engine.types import AgentSpec, Event, ModelCard, ModelChoice, Progress, Text, TextDelta
+from qsone.engine.types import (
+    EFFORTS,
+    AgentSpec,
+    Effort,
+    Event,
+    ModelCard,
+    ModelChoice,
+    Progress,
+    Text,
+    TextDelta,
+)
 
 log = logging.getLogger("qsone.engine.claude_code")
 
@@ -143,6 +153,7 @@ class AgentJob:
     tools: tuple[str, ...]
     cwd: Path  # <data>/claude-work/<run id>/, the same folder again for --resume
     resume: str | None  # a session id
+    effort: Effort | None = None  # --effort; None lets Claude Code choose
 
 
 @dataclass(frozen=True)
@@ -275,6 +286,13 @@ def model_aliases(help_text: str) -> tuple[str, ...]:
         if _OPTION.fullmatch(quoted) and quoted not in aliases:
             aliases.append(quoted)
     return tuple(aliases)
+
+
+def effort_levels(help_text: str) -> tuple[Effort, ...]:
+    """The levels of One's own (low, medium, high) that --effort's help lists; none when this
+    Claude Code has no --effort."""
+    about = _about(help_text, "--effort")
+    return tuple(level for level in EFFORTS if re.search(rf"\b{level}\b", about))
 
 
 def compatible(help_text: str) -> bool:
@@ -670,6 +688,7 @@ class ClaudeCodeConnector:
         if ready is None:
             return []
         found = []
+        efforts = effort_levels(ready[1])  # its own default level is not said
         for alias in model_aliases(ready[1]):
             priced = _priced_as(alias)
             found.append(
@@ -684,6 +703,7 @@ class ClaudeCodeConnector:
                     price_out=priced[2] if priced else None,
                     price_source=priced[3] if priced else None,
                     subscription=True,
+                    efforts=efforts,
                 )
             )
         return found
@@ -773,6 +793,8 @@ class ClaudeCodeConnector:
             if not _OPTION.fullmatch(job.model):
                 raise _Refused("the model id is not a plain name")
             argv += ["--model", job.model]
+        if job.effort is not None and job.effort in effort_levels(help_text):
+            argv += ["--effort", job.effort]
         if not self.keep_copy:
             argv.append("--no-session-persistence")
         elif resume is not None:

@@ -146,6 +146,65 @@ describe("CommandBar", () => {
     expect(await box()).toHaveFocus();
   });
 
+  it("rests as a pill and opens on focus: the model and effort show only then; Escape folds it", async () => {
+    core();
+    const user = userEvent.setup();
+    render(<App />);
+    const field = await box();
+    const composer = field.closest("[data-composer]")!;
+    expect(composer).not.toHaveAttribute("data-open");
+    await user.click(field);
+    expect(composer).toHaveAttribute("data-open");
+    const model = await screen.findByRole("button", { name: fill(texts.modelChip.ar, { name: "Claude Opus 5.5" }) });
+    expect(model).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(composer).not.toHaveAttribute("data-open");
+    expect(field).toHaveFocus(); // folded, not left
+    await user.type(field, "x");
+    expect(composer).toHaveAttribute("data-open");
+  });
+
+  it("the effort moves straight to the next level on each click, with no list, and goes with the message", async () => {
+    const fetch = core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await box());
+    const level = (now: string, next: string) =>
+      fill(texts.effortChip.ar, { level: texts[`effort${now}` as "efforthigh"].ar, next: texts[`effort${next}` as "effortlow"].ar });
+    // Claude's own default is High: shown, but nothing is sent until the engineer picks
+    await user.click(await screen.findByRole("button", { name: level("high", "low") }));
+    expect(screen.queryByRole("menu")).toBeNull();
+    await user.click(screen.getByRole("button", { name: level("low", "medium") }));
+    expect(screen.getByRole("button", { name: level("medium", "high") })).toBeInTheDocument();
+    await user.type(await box(), "سعّر{enter}");
+    await waitFor(() => expect(calls(fetch, "POST", "/api/chat")).toHaveLength(1));
+    const body = bodyOf(calls(fetch, "POST", "/api/chat")[0]![1]);
+    expect(body.effort).toBe("medium");
+    expect(body.model).toBeUndefined(); // not picked: the core's own choice stands
+  });
+
+  it("the model card lists the models from the core; a pick goes with the message, and a model with no effort hides it", async () => {
+    const fetch = core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await box());
+    await user.click(await screen.findByRole("button", { name: fill(texts.modelChip.ar, { name: "Claude Opus 5.5" }) }));
+    const menu = await screen.findByRole("menu", { name: texts.models.ar });
+    const items = within(menu).getAllByRole("menuitemradio");
+    expect(items.map((item) => item.textContent)).toEqual(["Claude Opus 5.5", "Claude Haiku (sample)"]);
+    expect(items[0]).toHaveAttribute("aria-checked", "true");
+    expect(items[0]).toHaveFocus();
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.getByRole("button", { name: fill(texts.modelChip.ar, { name: "Claude Haiku (sample)" }) })).toHaveFocus();
+    expect(screen.queryByRole("button", { name: /^عمق التفكير/ })).toBeNull();
+    await user.type(await box(), "سعّر{enter}");
+    await waitFor(() => expect(calls(fetch, "POST", "/api/chat")).toHaveLength(1));
+    const body = bodyOf(calls(fetch, "POST", "/api/chat")[0]![1]);
+    expect(body.model).toEqual({ connector: "anthropic", model: "claude-haiku-sample" });
+    expect(body.effort).toBeUndefined();
+  });
+
   it("typing in Arabic while composing (IME) does not send on Enter", async () => {
     const fetch = core();
     render(<App />);

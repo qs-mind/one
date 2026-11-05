@@ -250,9 +250,11 @@ class Spending:
         cache_read: int = 0,
         cache_write: int = 0,
         reported_usd: Decimal | None = None,
+        effort: str | None = None,
     ) -> Decimal | None:
         """Records one model response and gives its cost: the Model Data Sheet's price, or
-        Claude Code's reported cost; None when the price is unknown (recorded as unknown)."""
+        Claude Code's reported cost; None when the price is unknown (recorded as unknown).
+        `effort` is the one it was sent with, recorded with it."""
         if card.on_device:
             usd, basis = Decimal(0), cards.ON_DEVICE
         elif card.subscription and reported_usd is not None:
@@ -278,6 +280,7 @@ class Spending:
             equivalent=card.subscription,
             basis=basis,
             at=self.clock(),
+            effort=effort,
         )
         return usd
 
@@ -324,6 +327,7 @@ class CostedModel(WrapperModel):
         run_id: str,
         role: Role,
         card: ModelCard,
+        effort: str | None = None,
     ):
         super().__init__(wrapped)
         self.spending = spending
@@ -333,6 +337,7 @@ class CostedModel(WrapperModel):
         self.run_id = run_id
         self.role = role
         self.card = card
+        self.effort = effort  # the run's own `thinking` setting, recorded with each cost
 
     async def _before(self) -> None:
         await self.spending.before_request(self.host, brief_id=self.brief_id, card=self.card)
@@ -348,6 +353,7 @@ class CostedModel(WrapperModel):
             output_tokens=usage.output_tokens,
             cache_read=usage.cache_read_tokens,
             cache_write=usage.cache_write_tokens,
+            effort=self.effort,
         )
 
     async def request(self, messages, model_settings, model_request_parameters):
@@ -418,20 +424,21 @@ def brief_budget(
     sheet: list[ModelCard],
     roles: dict[Role, ModelChoice],
     measured: tuple[int, int, int] | None,
+    lead_measured: tuple[int, int, int] | None | Literal["same"] = "same",
 ) -> Budget:
     """The expected cost and time of a Brief's plan. Plan items are {"tier": Role, "requests":
-    int}; `measured` is `CostBook.tokens_per_request` for this project. Each request costs the
-    tier's model price for the measured (or assumed) tokens per request, and takes 20 s."""
-    if measured is None:
-        (tokens_in, tokens_out), basis = ASSUMED_TOKENS, copy.BASIS_ASSUMED
-    else:
-        tokens_in, tokens_out, n = measured
-        basis = copy.fill(copy.BASIS_MEASURED, n=n)
+    int}; `measured` is `CostBook.tokens_per_request` for this project, and `lead_measured` the
+    same at the Lead QS's effort in this Brief ("same": `measured`), since each effort thinks
+    for its own length. Each request costs the tier's model price for the measured (or assumed)
+    tokens per request, and takes 20 s. The basis is measured only when every tier's is."""
+    lead_measured = measured if lead_measured == "same" else lead_measured
     by_choice = {card.choice: card for card in sheet}
     usd: Decimal | None = Decimal(0)
     requests = 0
     for item in plan:
         requests += item["requests"]
+        found = lead_measured if item["tier"] == "lead" else measured
+        tokens_in, tokens_out = ASSUMED_TOKENS if found is None else found[:2]
         card = by_choice.get(roles.get(item["tier"]))
         each = (
             None
@@ -439,4 +446,9 @@ def brief_budget(
             else cards.cost(card, input_tokens=tokens_in, output_tokens=tokens_out)
         )
         usd = None if usd is None or each is None else usd + item["requests"] * each
+    if measured is None or lead_measured is None:
+        basis = copy.BASIS_ASSUMED
+    else:
+        n = measured[2] + (0 if lead_measured is measured else lead_measured[2])
+        basis = copy.fill(copy.BASIS_MEASURED, n=n)
     return Budget(usd, math.ceil(requests * SECONDS_PER_REQUEST / 60), basis)

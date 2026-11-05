@@ -4,14 +4,17 @@ import { t, useLanguage } from "../i18n";
 import { ChatBody, type ChatBodyProps } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 
-export function GeneralChat(props: Omit<ChatBodyProps, "label" | "projectId" | "onOpenDeliverable">) {
+export function GeneralChat({
+  onConnectAi,
+  ...props
+}: Omit<ChatBodyProps, "label" | "projectId" | "onOpenDeliverable"> & { onConnectAi?: (from: HTMLElement) => void }) {
   useLanguage();
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <div data-region="chat" tabIndex={-1} className="mx-auto flex min-h-0 w-full max-w-[46rem] flex-1 flex-col px-1 pt-6">
         <ChatBody {...props} label={t("generalChat")} />
       </div>
-      {props.ai.connected !== false && <CommandBar chat={props.chat} />}
+      {props.ai.connected !== false && <CommandBar chat={props.chat} ai={props.ai} onConnectAi={onConnectAi} />}
     </main>
   );
 }

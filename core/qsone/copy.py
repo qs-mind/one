@@ -728,6 +728,11 @@ BRIEF_NOT_FOUND = {
     "ar": "التكليف ده مش على الجهاز ده، أو خلص خلاص.",
 }
 
+CHAT_MODEL_GONE = {
+    "en": "The model picked in the message box is no longer there. Pick another and send again.",
+    "ar": "الموديل اللي اخترته في مربع الرسالة مابقاش متاح. اختار غيره وابعت تاني.",
+}
+
 CHAT_EMPTY = {
     "en": "The message is empty. Write what you need, then send it.",
     "ar": "الرسالة فاضية. اكتب اللي محتاجه وابعتها.",

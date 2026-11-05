@@ -12,6 +12,10 @@ from typing import Literal, Protocol, runtime_checkable
 
 Text = dict[str, str]  # {"en": ..., "ar": ...}
 Role = Literal["lead", "checker", "specialist", "quick"]
+# How hard the Lead QS thinks, as the engineer picks it in the message box; sent as PydanticAI's
+# unified `thinking` setting (Claude Code: `--effort`). Only the levels a model accepts are offered.
+Effort = Literal["low", "medium", "high"]
+EFFORTS: tuple[Effort, ...] = ("low", "medium", "high")
 Risk = Literal["read", "write", "online", "outside"]
 BriefState = Literal[
     "queued",
@@ -53,6 +57,8 @@ class ModelCard:
     price_source: str | None  # "genai-prices 0.2.1: https://…" | "engineer, 2026-11-05"
     on_device: bool = False
     subscription: bool = False
+    efforts: tuple[Effort, ...] = ()  # the effort levels it accepts; none: no effort to pick
+    effort_default: Effort | None = None  # the provider's own level when none is sent, if known
 
 
 @dataclass(frozen=True)

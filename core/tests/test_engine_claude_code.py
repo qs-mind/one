@@ -226,6 +226,16 @@ async def test_model_and_prompt_fallback_flags(log, work):
     assert run["files"]["--append-system-prompt-file"] == INSTRUCTIONS
 
 
+async def test_the_message_boxs_effort_is_passed_only_when_this_claude_takes_it(log, work):
+    await link(["init", "result"], log).run(job(work, effort="low"), lambda e: None)
+    no_effort = link(["init", "result"], log, drop=("--effort",))
+    await no_effort.run(job(work, effort="low"), lambda e: None)
+    taken, older = read_fake_log(log)
+    assert after(taken["argv"], "--effort") == "low"
+    assert "--effort" not in older["argv"]
+    assert [c.efforts for c in await link([], log).cards()][0] == ("low", "medium", "high")
+
+
 async def test_unsafe_model_or_session_is_refused(log, work):
     for fields in ({"model": "--dangerously-skip-permissions"}, {"resume": "not-a-session"}):
         out = await link(["init", "result"], log).run(job(work, **fields), lambda e: None)

@@ -339,4 +339,20 @@ ALTER TABLE briefs ADD COLUMN selection TEXT CHECK (selection IS NULL OR json_va
 # only, as its name is. NULL for a file added on its own.
 FOLDERS_SQL = "ALTER TABLE files ADD COLUMN folder TEXT"
 
-MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4, TOOLS_SQL, CANVAS_SQL, FOLDERS_SQL]
+# The Lead QS's effort, picked in the message box: kept with its Brief (NULL: the provider's own),
+# and with each AI cost, so the Brief Budget measures each effort's tokens apart.
+EFFORT_SQL = """
+ALTER TABLE briefs ADD COLUMN effort TEXT CHECK (effort IN ('low', 'medium', 'high'));
+ALTER TABLE ai_costs ADD COLUMN effort TEXT
+"""
+
+MIGRATIONS: list[str] = [
+    SCHEMA_1,
+    SCHEMA_2,
+    SCHEMA_3,
+    SCHEMA_4,
+    TOOLS_SQL,
+    CANVAS_SQL,
+    FOLDERS_SQL,
+    EFFORT_SQL,
+]
