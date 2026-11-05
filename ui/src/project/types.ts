@@ -130,7 +130,8 @@ export interface ViewerHandle {
 export interface ViewerProps {
   projectId: string;
   deliverableId: string;
-  mode: "frame" | "full";
+  /** "workspace": the review board as the open document shows it, without the board's own title. */
+  mode: "frame" | "full" | "workspace";
   /** The engineer's selection inside the viewer, with a label in the page language («البنود 03/01–03/04»). */
   onSelection?(anchor: Anchor | null, label: string | null): void;
   /** React 19: the ref is a prop. */

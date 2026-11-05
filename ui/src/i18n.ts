@@ -606,6 +606,8 @@ export const texts = {
   clientBoqTitle: { en: "Client BOQ — {name}", ar: "مقايسة العميل — {name}" },
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
+  // The workspace's open document (workspace Task 5)
+  noViewer: { en: "No viewer for this kind yet", ar: "لسه مافيش عرض للنوع ده" },
   sourceOpenFile: { en: "Open source", ar: "افتح المصدر" },
   // The source card in the workspace: the quoted line, what the quote covers, and the page opened as the document
   sourceOpenPage: { en: "Open the page", ar: "افتح الصفحة" },
