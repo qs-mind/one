@@ -1374,6 +1374,90 @@ BOQ_ROW_SKIPPED = {
     "en": "Row {row} was not imported: {why}",
     "ar": "الصف {row} مااتستوردش: {why}",
 }
+# Task 9: the import's own words. Why a row was left out ({field} is a BOQ_FIELDS pair).
+BOQ_WHY_TEXT = {
+    "en": "the {field} in column {column} is text, not a number",
+    "ar": "{field} في العمود {column} نص، مش رقم",
+}
+BOQ_WHY_DECIMALS = {
+    "en": "the {field} in column {column} has more than 6 decimals; check the cell in Excel",
+    "ar": "{field} في العمود {column} فيه أكتر من 6 أرقام عشرية؛ راجع الخانة في Excel",
+}
+BOQ_WHY_NO_UNIT = {"en": "a quantity with no unit", "ar": "كمية من غير وحدة"}
+BOQ_WHY_NO_DESCRIPTION = {"en": "numbers with no description", "ar": "أرقام من غير وصف"}
+BOQ_WHY_TOTAL = {"en": "a total row", "ar": "صف إجمالي"}
+BOQ_WHY_NUMBER_ONLY = {
+    "en": "a rate or amount with no quantity and no unit",
+    "ar": "فئة أو إجمالي من غير كمية ولا وحدة",
+}
+BOQ_WHY_HIDDEN = {"en": "the row is hidden in Excel", "ar": "الصف مخفي في Excel"}
+BOQ_WHY_HEADER = {"en": "the column headings again", "ar": "عناوين الأعمدة تاني"}
+BOQ_FIELDS = {
+    "code": {"en": "Item no.", "ar": "رقم البند"},
+    "description": {"en": "Description", "ar": "الوصف"},
+    "unit": {"en": "Unit", "ar": "الوحدة"},
+    "quantity": {"en": "Quantity", "ar": "الكمية"},
+    "rate": {"en": "Rate", "ar": "الفئة"},
+    "amount": {"en": "Amount", "ar": "الإجمالي"},
+}
+BOQ_FILE = {"en": "the BOQ file", "ar": "ملف المقايسة"}
+DOING_BOQ_PREVIEW = {
+    "en": "Look at the BOQ columns in {name}",
+    "ar": "يبص على أعمدة المقايسة في {name}",
+}
+BOQ_NOT_EXCEL = {
+    "en": "This file is not an Excel workbook (.xlsx or .xls); files_read reads it.",
+    "ar": "الملف ده مش ملف Excel (.xlsx أو .xls)؛ files_read بيقراه.",
+}
+BOQ_NO_ROWS = {
+    "en": "No BOQ rows were found below the header row with these columns. Check the header row "
+    "and the columns with boq_preview.",
+    "ar": "مالقيناش صفوف مقايسة تحت صف العناوين بالأعمدة دي. راجع صف العناوين والأعمدة بـ "
+    "boq_preview.",
+}
+BOQ_NEEDS_CURRENCY = {
+    "en": "Rates and amounts need their currency: three letters, e.g. EGP, SAR, AED.",
+    "ar": "الفئات والإجماليات محتاجة عملتها: تلات حروف، زي EGP أو SAR أو AED.",
+}
+# The card that shows the column mapping before anything is written.
+BOQ_CONFIRM_TITLE = {
+    "en": "Import the BOQ from {name}, sheet {sheet}?",
+    "ar": "أستورد المقايسة من {name}، شيت {sheet}؟",
+}
+BOQ_CONFIRM_DETAIL = {
+    "en": "Rows {first} to {last}: {items} items and {headings} headings; {skipped} rows left "
+    "out. Tick each column that is right. An unticked rate or amount is left out.",
+    "ar": "الصفوف من {first} لـ {last}: {items} بند و{headings} عنوان؛ {skipped} صف متسابين. "
+    "علّم على كل عمود صح. الفئة أو الإجمالي اللي مش متعلّم عليه مش هيتستورد.",
+}
+BOQ_CONFIRM_HIDDEN = {
+    "en": "{count} rows hidden in Excel are left out.",
+    "ar": "{count} صف مخفيين في Excel متسابين.",
+}
+BOQ_CONFIRM_HIDDEN_IN = {
+    "en": "{count} rows hidden in Excel are included.",
+    "ar": "{count} صف مخفيين في Excel داخلين في الاستيراد.",
+}
+BOQ_CONFIRM_FLAGGED = {
+    "en": "{count} rows have hidden text (white, tiny or invisible) or look like orders to an "
+    "AI; they are imported as data only.",
+    "ar": "{count} صف فيهم نص مخفي (أبيض أو صغير جداً أو مش ظاهر) أو شكلهم أوامر لذكاء "
+    "اصطناعي؛ بيتستوردوا كبيانات بس.",
+}
+BOQ_CARD_COLUMNS = {
+    "field": {"en": "What", "ar": "البيان"},
+    "column": {"en": "Column", "ar": "العمود"},
+    "header": {"en": "Its heading in the file", "ar": "عنوانه في الملف"},
+    "example": {"en": "First values", "ar": "أول القيم"},
+}
+BOQ_NOT_CONFIRMED = {
+    "en": "The engineer did not confirm the columns, so nothing was imported.",
+    "ar": "المهندس ماأكدش الأعمدة، فمااتستوردش حاجة.",
+}
+BOQ_REQUIRED_UNTICKED = {
+    "en": "The engineer did not tick the {fields} column, so nothing was imported.",
+    "ar": "المهندس ماعلّمش على عمود {fields}، فمااتستوردش حاجة.",
+}
 
 # Evidence for numbers.
 SOURCE_NOT_EVIDENCE = {
