@@ -21,9 +21,11 @@ import { sourceKeys } from "../sources/targets";
 import { DocumentHead, Workspace } from "./Workspace";
 
 const located: { row?: string }[] = [];
+let viewerRenders = 0;
 
 // one component for every kind, as the real registry gives (a new one each render would remount the viewer)
 function StandIn({ deliverableId, onSelection, ref }: ViewerProps) {
+  viewerRenders++;
   useImperativeHandle(ref, () => ({
     locate: (anchor) => {
       located.push({ row: anchor.row });
@@ -232,6 +234,33 @@ describe("the workspace", () => {
       }),
     );
     await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).querySelector("[data-working-dot]")).not.toBeNull());
+    stop.abort();
+  });
+
+  it("an agent's events re-render the line by its row, never the open document", async () => {
+    const { startActivity } = await import("../project/live/activity");
+    const sources = show();
+    await screen.findByTestId("viewer-dA");
+    const stop = new AbortController();
+    startActivity(sources, stop.signal, { desks: [], agents: [] });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    const before = viewerRenders;
+    const measured = located.length;
+    const frame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+    for (const [i, state] of (["thinking", "working", "working", "working", "idle"] as const).entries()) {
+      act(() =>
+        sources.emit({
+          type: "agent",
+          agent: {
+            id: "est", kind: "specialist", role: { en: "Estimator", ar: "مهندس التسعير" }, desk_id: null, model: "m",
+            state, line: { en: `step ${i}`, ar: `خطوة ${i}` }, brief_id: "b1", focus: { frame: "deliverable:dA", anchor: { row: "3/02" } }, at: "",
+          },
+        }),
+      );
+      await frame(); // the live store takes its events once a frame
+    }
+    expect(located.length).toBeGreaterThan(measured); // the line heard them: it measured the row
+    expect(viewerRenders).toBe(before);
     stop.abort();
   });
 });

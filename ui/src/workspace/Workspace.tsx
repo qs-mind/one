@@ -19,7 +19,7 @@ import { DocumentSwitcher } from "./DocumentSwitcher";
 import { DocumentView } from "./DocumentView";
 import { titleOf, type Documents } from "./documents";
 import { markFor } from "./reveal";
-import { WorkingLine } from "./WorkingLine";
+import { LiveWorkingLine } from "./WorkingLine";
 
 const FADE_MS = 200;
 const DOC_KINDS = ["deliverable:", "file:", "clientboq:", "files:"];
@@ -138,7 +138,6 @@ export function DocumentHead({ documents }: { documents: Documents }) {
 }
 
 function Open({ projectId, sources, documents, opened }: { projectId: string; sources: ProjectSources; documents: Documents; opened: Opened }) {
-  const agents = useAgents();
   const [handle, setHandle] = useState<ViewerHandle | null>(null);
   const [box, setBox] = useState<HTMLElement | null>(null); // where the document scrolls: the first element that did
   const unmarked = useSourceMark(opened);
@@ -185,7 +184,7 @@ function Open({ projectId, sources, documents, opened }: { projectId: string; so
               onSelection={onSelection}
               notice={unmarked ? t("sourceNotMarked") : null}
             />
-            <WorkingLine handle={handle} agents={agents} opened={opened.key} box={box} />
+            <LiveWorkingLine handle={handle} opened={opened.key} box={box} />
           </div>
         </Shown>
       </div>
