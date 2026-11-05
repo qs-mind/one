@@ -31,8 +31,8 @@ export function CommandDialog({
 export function CommandInput({ className = "", ...props }: ComponentProps<typeof Cmdk.Input>) {
   return (
     <Cmdk.Input
-      dir="auto"
-      className={`border-b border-ink/10 bg-transparent px-4 py-3 outline-none placeholder:text-slate ${className}`}
+      dir="auto" // typed text sets its own side; the empty field keeps the page's, so the placeholder sits right in Arabic
+      className={`border-b border-ink/10 bg-transparent px-4 py-3 outline-none placeholder:text-slate [&:placeholder-shown]:[direction:inherit] ${className}`}
       {...props}
     />
   );
