@@ -282,7 +282,7 @@ def test_xlsx_sources_sheet_has_every_number_with_its_source_and_date(rec):
     assert Decimal(str(rate[2])) == Decimal("39850.50") and rate[3] == "EGP"
     assert "بيانات تجريبية - عينة" in rate and "2026-11-01" in rate
     total = rows[-1]
-    assert total[0] == copy.EXPORT_LABELS["total"]["ar"] and "sum(amount)" in total
+    assert total[0] == copy.EXPORT_LABELS["total"]["ar"] and "مجموع الإجمالي" in total
     english = openpyxl.load_workbook(io.BytesIO(to_xlsx(tiny_sheet()))).worksheets[1]
     line = next(english.iter_rows(min_row=2, values_only=True))
     assert {"prices - sample.pdf", "https://example.com/sample", "page 3"} <= set(line)
@@ -328,7 +328,7 @@ def test_docx_refs_show_their_value_and_every_source_stays_visible(rec):
         "[1]",
         "5,182,755.00",
         "EGP",
-        "sum(amount)",
+        "مجموع الإجمالي",
     ]
     assert "2026-11-01" in [c.text for c in sources.rows[1].cells]
     assert sources._tbl.tblPr.find(qn("w:bidiVisual")) is not None
@@ -441,11 +441,9 @@ def test_pdf_marks_every_page_and_lists_the_sources(rec):
     assert all(copy.EXPORT_DRAFT_MARK["ar"] in p and copy.SAMPLE_DATA["ar"] in p for p in pages)
     assert all(v["title"] in p for p in pages)
     assert sum("الوحدة" in p for p in pages) >= 2  # the header row repeats on every table page
-    # pdfium reads a Latin run inside a right-to-left line in reverse word order
-    # («rate * quantity»); the page draws it right, so only words are checked.
     text = "\n".join(pages)
     assert (
-        copy.EXPORT_LABELS["sources"]["ar"] in text and "محرك الحسابات" in text and "amount" in text
+        copy.EXPORT_LABELS["sources"]["ar"] in text and "محرك الحسابات" in text and "مجموع" in text
     )
 
 
@@ -461,7 +459,7 @@ def test_pdf_payload_cannot_inject_typst(rec):
 def test_document_pdf_has_its_refs_and_their_sources(rec):
     v = view(rec, sample_document(rec, sample_sheet(rec)))
     text = pdf_text(to_pdf(v))
-    assert "5,182,755.00" in text and "amount" in text and "2026-11-01" in text
+    assert "5,182,755.00" in text and "مجموع" in text and "2026-11-01" in text
     assert "الأسعار سارية" in text or "ألسعار سارية" in text  # pdfium splits lam-alef
     assert copy.EXPORT_DRAFT_MARK["ar"] in text
 

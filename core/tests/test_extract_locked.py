@@ -1,6 +1,6 @@
-"""A workbook locked with a password says so and asks for an open copy; an empty workbook is noted as
-empty (tender day, 5 Nov 2026: the locked one was «ONE لسه مش بيقرا النوع ده من الملفات», the empty
-one "read" with no note). Synthetic files only."""
+"""A workbook locked with a password says so and asks for an open copy; an empty workbook is noted
+as empty (tender day, 5 Nov 2026: the locked one was «ONE لسه مش بيقرا النوع ده من الملفات»
+the empty one "read" with no note). Synthetic files only."""
 
 import io
 

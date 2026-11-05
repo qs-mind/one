@@ -149,5 +149,8 @@ def _sources(ws, view: dict) -> None:
             target = ws.cell(r, i)
             _text(target, value)
             target.font = _font(color=SLATE) if i > 4 else _font()
+            # wrapped, a long source never runs over an empty cell beside it: each stays in its
+            # column
+            target.alignment = Alignment(vertical="top", wrap_text=True)
         _number(ws.cell(r, 3), cell)
     ws.freeze_panes = "A2"
