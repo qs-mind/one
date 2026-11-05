@@ -208,24 +208,28 @@ export class Walk {
     // `card` matches only unanswered cards, so once answered it is gone: count the answers in the chat instead.
     const answers = this.chat.locator("section[data-approval-card][data-answered]");
     const before = await answers.count();
+    // the card speaks its Brief's language (its `lang`), which may not be the screen's: an English Brief in Arabic
+    const said = await card.getAttribute("lang");
+    const lang: Lang = said === "en" || said === "ar" ? said : this.lang;
+    const w = words[lang];
     let kind = "approval";
     if (await card.getByRole("checkbox").count()) {
       kind = "rows";
       await this.shot("rows-card");
       for (const box of await card.getByRole("checkbox").all()) await box.check();
-      await card.getByRole("button", { name: this.w.keepTicked }).click();
+      await card.getByRole("button", { name: w.keepTicked }).click();
     } else if (await card.locator("fieldset").count()) {
       kind = "question";
       await this.shot("question-card");
       for (const set of await card.locator("fieldset").all()) {
         const radio = set.getByRole("radio").first();
         if (await radio.count()) await radio.check();
-        else await set.getByRole("textbox").fill(this.lang === "ar" ? "إجابة تجريبية" : "bench answer (sample)");
+        else await set.getByRole("textbox").fill(lang === "ar" ? "إجابة تجريبية" : "bench answer (sample)");
       }
-      await card.getByRole("button", { name: this.w.send, exact: true }).click();
+      await card.getByRole("button", { name: w.send, exact: true }).click();
     } else {
       await this.shot("approval-card");
-      const yes = card.getByRole("button", { name: this.w.yes, exact: true });
+      const yes = card.getByRole("button", { name: w.yes, exact: true });
       const button = (await yes.count()) ? yes : card.getByRole("button").first();
       if ((await button.getAttribute("data-hold")) === null) await button.click();
       else {

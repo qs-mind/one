@@ -47,7 +47,11 @@ test("calm details: tab underline, warm tips and the palette's glide, in Arabic"
   // A Deliverable's review tabs: the underline lands under the chosen tab, then glides to the next one
   await walk.brief("bench:deliverable Make the priced BOQ and the cover letter");
   await page.waitForTimeout(1500);
+  // the chat's Open glides to the frame on the canvas (DELIVERABLE_CARD_OPENS); the review tabs are in full screen
   await walk.chat.getByRole("button", { name: /^افتح: / }).first().click();
+  await page.waitForTimeout(1200);
+  const sheet = page.locator('[data-frame^="deliverable:"]').filter({ has: page.getByRole("grid") }).first();
+  await sheet.getByRole("button", { name: texts.openFull.ar, exact: true }).click();
   const tabs = page.getByRole("tablist", { name: texts.reviewPanels.ar });
   await expect(tabs).toBeVisible();
   const line = tabs.locator("[data-tab-underline]");
