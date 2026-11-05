@@ -1,13 +1,15 @@
 // Connect AI: first the consent (where the engineer's text goes, with the terms and the privacy policy), then how ONE
 // reaches AI: the engineer's own Claude Code, or an API key (the key field AI settings use). Neither choice can be
 // made before "I understand"; the core refuses every AI call until then as well (AI_CONSENT_NEEDED). The same step
-// opens alone from the chat's "Connect AI" when the consent is missing.
-import { useEffect, useState, useSyncExternalStore } from "react";
+// opens alone from the chat's "Connect AI" when the consent is missing. No Check button: choosing Claude Code checks
+// it at once (choosing it again, or coming back to ONE's window after a failed check, checks it again), and a key
+// checks itself as it is pasted or typed. Next waits, in its place, until the check works, so no button moves.
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, inInstalledApp } from "../api";
 import { coreLine, send } from "../core";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
-import { Feedback, type Nav, openSetup, option, primary, quiet, secondary, StepScreen } from "./parts";
+import { Feedback, type Nav, openSetup, option, primary, quiet, StepScreen } from "./parts";
 
 // The consent, as GET /settings/ai-consent says: `at` is null until the engineer said yes to `text_version`.
 type Consent = { at: string | null; text_version: number };
@@ -74,7 +76,7 @@ export function ConnectAi({ nav }: { nav: Nav }) {
   const [via, setVia] = useState<Via>();
   const [found, setFound] = useState<{ found: boolean; version: string | null }>();
   const [check, setCheck] = useState<Check>("idle");
-  const [keyField, setKeyField] = useState(0);
+  const runs = useRef(0); // only the latest check's answer shows
   const agreed = given?.at != null;
 
   async function agree() {
@@ -92,32 +94,42 @@ export function ConnectAi({ nav }: { nav: Nav }) {
     return body;
   }
 
-  async function run(chosen: Via) {
+  async function checkClaudeCode() {
+    const mine = ++runs.current;
     setCheck("checking");
-    if (chosen === "claude_code" && !(await findClaudeCode())?.found) return setCheck(texts.aiLinkClaudeCodeMissing);
-    const response = await send("/settings/ai/check", "POST", { via: chosen });
-    setCheck(response?.ok ? "works" : await coreLine(response, texts.claudeCodeCheckFailed));
-    if (!response?.ok && chosen === "api_key") setKeyField((n) => n + 1); // the field again, for another key
+    let answer: Check = texts.aiLinkClaudeCodeMissing;
+    if ((await findClaudeCode())?.found) {
+      const response = await send("/settings/ai/check", "POST", { via: "claude_code" });
+      answer = response?.ok ? "works" : await coreLine(response, texts.claudeCodeCheckFailed);
+    }
+    if (mine === runs.current) setCheck(answer);
   }
 
   function choose(chosen: Via) {
+    runs.current++; // a check still running for the other choice is no longer this screen's answer
     setVia(chosen);
     setCheck("idle");
-    if (chosen === "claude_code" && !found) void findClaudeCode();
+    if (chosen === "claude_code") void checkClaudeCode();
   }
 
-  const checking = check === "checking";
+  // Back in ONE's window after a failed check (Claude Code installed, or signed in, meanwhile): check it again.
+  const again = useRef<() => void>(undefined);
+  again.current = via === "claude_code" && typeof check === "object" ? () => void checkClaudeCode() : undefined;
+  useEffect(() => {
+    const back = () => again.current?.();
+    window.addEventListener("focus", back);
+    return () => window.removeEventListener("focus", back);
+  }, []);
+
   return (
     <StepScreen
       title={t("connectAi")}
       nav={nav}
       failed={failed && pick(failed)}
       next={
-        check === "works" && (
-          <button type="button" onClick={() => void nav.pass("done")} className={`${primary} fl-rise`}>
-            {t("setupNext")}
-          </button>
-        )
+        <button type="button" disabled={check !== "works"} onClick={() => void nav.pass("done")} className={primary}>
+          {t("setupNext")}
+        </button>
       }
     >
       <div className="flex flex-col gap-3 rounded-lg bg-stone px-5 py-4">
@@ -149,26 +161,18 @@ export function ConnectAi({ nav }: { nav: Nav }) {
           </button>
         </div>
 
-        {via === "claude_code" && (
-          <div className="flex flex-col gap-3">
-            {found &&
-              (found.found ? (
-                <p className="fl-rise">{fill(t("aiLinkClaudeCodeFound"), { version: found.version ?? "" })}</p>
-              ) : (
-                typeof check !== "object" && <p className="fl-rise text-slate">{t("aiLinkClaudeCodeMissing")}</p>
-              ))}
-            <div>
-              <button type="button" disabled={checking} onClick={() => void run("claude_code")} className={secondary}>
-                {t("aiLinkCheck")}
-              </button>
+        {/* what the choice shows keeps one height (the key field's), so the buttons under it never move */}
+        <div className="min-h-40">
+          {via === "claude_code" && (
+            <div className="flex flex-col gap-2">
+              {found?.found && <p className="fl-rise">{fill(t("aiLinkClaudeCodeFound"), { version: found.version ?? "" })}</p>}
+              {check === "checking" && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
+              {check === "works" && <Feedback state="done">{t("aiLinkWorks")}</Feedback>}
+              {typeof check === "object" && <Feedback state="failed">{pick(check)}</Feedback>}
             </div>
-          </div>
-        )}
-        {via === "api_key" && <AiKey key={keyField} plain onSaved={() => void run("api_key")} />}
-
-        {checking && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
-        {check === "works" && <Feedback state="done">{t("aiLinkWorks")}</Feedback>}
-        {typeof check === "object" && <Feedback state="failed">{pick(check)}</Feedback>}
+          )}
+          {via === "api_key" && <AiKey plain onChecking={() => setCheck("idle")} onChecked={(works) => setCheck(works ? "works" : "idle")} />}
+        </div>
       </fieldset>
     </StepScreen>
   );

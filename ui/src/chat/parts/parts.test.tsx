@@ -196,7 +196,7 @@ describe("ApprovalCard", () => {
     expect(screen.getByText(/2\.41 of 3\.00 USD/)).toBeInTheDocument();
   });
 
-  it("raising the cap saves the new caps first, then answers", async () => {
+  it("raising the cap saves the new caps as typed; going on waits for the last save, then answers", async () => {
     const amounts = { brief: "3.00", day: "15.00", month: "150.00", budget_above: "0.50" };
     const caps = { ...amounts, subscription_stops: false };
     const fetch = core({
@@ -217,7 +217,8 @@ describe("ApprovalCard", () => {
     await waitFor(() => expect(field).toHaveValue("3.00"));
     await user.clear(field);
     await user.type(field, "5.00");
-    await user.click(screen.getByRole("button", { name: texts.save.ar }));
+    // pressed before the pause is over: the change is saved first, then the card answered
+    await user.click(screen.getByRole("button", { name: texts.capRaiseGo.ar }));
 
     expect(await screen.findByText("ردّك: ارفع السقف")).toBeInTheDocument();
     expect(bodyOf(fetch, "PUT", "/api/settings/ai/caps")).toEqual([{ ...amounts, brief: "5.00" }]);

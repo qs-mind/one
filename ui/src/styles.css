@@ -151,13 +151,29 @@
 .fl-spin {
   animation: fl-spin 900ms linear infinite;
 }
+/* A quiet "Saved": it rises in, stays a moment, then fades out where it is. */
+@keyframes fl-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+.fl-fade {
+  animation:
+    fl-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    fl-fade-out 240ms ease-out 1800ms forwards;
+}
 @media (prefers-reduced-motion: reduce) {
   [data-firstlaunch],
-  [data-firstlaunch] * {
+  [data-firstlaunch] *,
+  .fl-rise,
+  .fl-rise-late,
+  .fl-fade,
+  .fl-spin,
+  .fl-check {
     transition-duration: 0ms !important;
     animation: none !important;
   }
-  [data-firstlaunch] .fl-check {
+  .fl-check {
     stroke-dashoffset: 0;
   }
 }

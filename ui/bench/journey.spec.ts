@@ -109,7 +109,7 @@ for (const lang of ["ar", "en"] as const) {
     const contract = card.getByLabel(say(walk, "understoodContractType"));
     await contract.fill(lang === "ar" ? "مقطوعية (عينة)" : "Lump sum (sample)");
     await shot(walk, "fact-change");
-    await card.getByRole("button", { name: say(walk, "save"), exact: true }).click();
+    await contract.press("Enter"); // no Save button: Enter (or leaving the field) saves it
     await expect(card.getByText(lang === "ar" ? "مقطوعية (عينة)" : "Lump sum (sample)")).toBeVisible();
     await card.getByRole("button", { name: say(walk, "understoodApprove"), exact: true }).click();
     await expect(chat.locator("[data-understood-card][data-approved]")).toBeVisible();
@@ -147,7 +147,6 @@ for (const lang of ["ar", "en"] as const) {
     const last = (await code.textContent())!.split("-").at(-1)!;
     await page.getByRole("button", { name: say(walk, "recoverySaved"), exact: true }).click();
     await page.getByLabel(say(walk, "recoveryLastGroup")).fill(last);
-    await page.getByRole("button", { name: say(walk, "recoveryConfirm"), exact: true }).click();
     await expect(code).toHaveCount(0);
     await page.getByRole("button", { name: say(walk, "confidentialTurnOff"), exact: true }).click();
     await expect(page.getByText(say(walk, "confidentialOffConfirm"))).toBeVisible();
@@ -177,7 +176,7 @@ for (const lang of ["ar", "en"] as const) {
     await more(walk, "backupTitle");
     const panel = page.getByRole("region", { name: say(walk, "backupTitle") });
     await panel.getByLabel(say(walk, "backupFolderPath")).fill(backups);
-    await panel.getByRole("button", { name: say(walk, "backupPickFolder"), exact: true }).click();
+    await panel.getByLabel(say(walk, "backupFolderPath")).press("Enter"); // a typed folder is used on Enter
     await expect(panel.getByText(backups)).toBeVisible();
     await shot(walk, "backup-panel");
     await panel.getByRole("button", { name: say(walk, "backupNow"), exact: true }).click();
@@ -189,7 +188,6 @@ for (const lang of ["ar", "en"] as const) {
     await shot(walk, "backup-recovery-code");
     await panel.getByRole("button", { name: say(walk, "recoverySaved"), exact: true }).click();
     await panel.getByLabel(say(walk, "recoveryLastGroup")).fill(backupCode.split("-").at(-1)!);
-    await panel.getByRole("button", { name: say(walk, "recoveryConfirm"), exact: true }).click();
     await expect(panel.locator("output")).toHaveCount(0);
 
     await newComputer(walk);
@@ -197,7 +195,7 @@ for (const lang of ["ar", "en"] as const) {
     await panel.getByRole("button", { name: say(walk, "restoreTitle"), exact: true }).click();
     const restore = panel.getByRole("region", { name: say(walk, "restoreTitle") });
     await restore.getByLabel(say(walk, "backupFolderPath")).fill(backups);
-    await restore.getByRole("button", { name: say(walk, "restorePickFolder"), exact: true }).click();
+    await restore.getByLabel(say(walk, "backupFolderPath")).press("Enter");
     // a project's name is inside its encrypted copy: each shows unnamed until it is back
     const rows = restore.locator("li");
     await expect(rows).toHaveCount(3); // the tender and the two old projects

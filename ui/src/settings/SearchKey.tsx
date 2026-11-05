@@ -1,10 +1,14 @@
 // Web search (Plan 5, Task 14): which search One uses now, written out, and a place for the engineer's own Brave
 // Search key. The core keeps the key in the system key store and never sends it back, so the page never shows it.
+// No Save button: a pasted key is saved at once, a typed one after a pause once it is long enough (ui/live.tsx).
+// The core has no check of its own for this key, so the line says it is saved, and which search ONE now uses.
 // Self-contained: whoever opens Settings places it.
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { api } from "../api";
 import { coreLine, send } from "../core";
+import { Feedback } from "../firstlaunch/parts";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
+import { KEY_MIN, useLiveKey } from "../ui/live";
 
 /** GET /settings/search (core/qsone/app.py). */
 type Search = { provider: "brave" | "native" | "connector" | "none"; own_key: boolean };
@@ -20,11 +24,8 @@ const providerText: Record<Search["provider"], Text> = {
 export function SearchKey() {
   useLanguage();
   const title = useId();
+  const field = useId();
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
-  const [value, setValue] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [failed, setFailed] = useState<Text>();
 
   const load = useCallback(async () => {
     const response = await api("/settings/search").catch(() => undefined);
@@ -36,21 +37,14 @@ export function SearchKey() {
     void load();
   }, [load]);
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setSaved(false);
-    setFailed(undefined);
-    const response = await send("/settings/search-key", "PUT", { value: value.trim() });
-    setSaving(false);
-    if (response?.ok) {
-      setValue("");
-      setSaved(true);
-      void load();
-    } else {
-      setFailed(await coreLine(response, texts.keyFailed));
-    }
-  }
+  const key = useLiveKey(KEY_MIN.brave, async (value, signal) => {
+    const response = await send("/settings/search-key", "PUT", { value }, signal);
+    if (signal.aborted) return null;
+    if (!response?.ok) return coreLine(response, texts.keyFailed);
+    void load(); // the search ONE uses now
+    return null;
+  });
+  const { live } = key;
 
   return (
     <section aria-labelledby={title} className="border-b border-stone px-4 py-4">
@@ -66,36 +60,28 @@ export function SearchKey() {
           </p>
         )}
         {loaded.state === "ready" && loaded.search.own_key && <p className="text-slate">{t("searchKeyKept")}</p>}
-        <form onSubmit={save} className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           <p className="text-slate">{t("searchKeyHelp")}</p>
-          <label className="flex flex-col gap-1">
-            <span>{t("searchKey")}</span>
-            <input
-              type="password"
-              dir="ltr"
-              autoComplete="off"
-              spellCheck={false}
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              className="rounded-md border border-slate bg-paper px-3 py-2 outline-none focus:border-ink"
-            />
-          </label>
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={!value.trim() || saving}
-              className="rounded-md bg-ink px-4 py-2 text-paper disabled:opacity-40"
-            >
-              {t("save")}
-            </button>
-            {saved && <p role="status">{t("keyAdded")}</p>}
-            {failed && (
-              <p role="alert" className="text-copper">
-                {pick(failed)}
-              </p>
-            )}
+          <label htmlFor={field}>{t("searchKey")}</label>
+          <input
+            id={field}
+            type="password"
+            dir="ltr"
+            autoComplete="off"
+            spellCheck={false}
+            {...key.field}
+            aria-invalid={live.state === "failed" || undefined}
+            className={`rounded-md border bg-paper px-3 py-2 outline-none transition-colors duration-150 ease-out focus:border-ink ${
+              live.state === "failed" ? "border-copper" : "border-slate"
+            }`}
+          />
+          <div className="min-h-7">
+            {live.state === "short" && <p className="fl-rise text-slate">{t("keyTooShort")}</p>}
+            {live.state === "busy" && <Feedback state="busy">{t("saving")}</Feedback>}
+            {live.state === "done" && <Feedback state="done">{t("keySaved")}</Feedback>}
+            {live.state === "failed" && <Feedback state="failed">{pick(live.line)}</Feedback>}
           </div>
-        </form>
+        </div>
       </div>
     </section>
   );

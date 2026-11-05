@@ -41,6 +41,16 @@ const calls = (fetch: ReturnType<typeof mockCore>, key: string) =>
     .filter(([url, init]) => `${init?.method ?? "GET"} ${String(url).replace(/^\/api/, "")}` === key)
     .map(([, init]) => (init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : undefined));
 
+/** A sample key, long enough to be whole: not a real key. */
+const KEY = "sk-ant-sample-not-a-real-key-0000000000000000";
+
+/** The buttons whose name is Save or Check, in either language: none must be left. */
+const noSaveOrCheck = () =>
+  screen
+    .queryAllByRole("button")
+    .map((button) => button.textContent ?? "")
+    .filter((name) => /\b(save|check)\b|حفظ|احفظ|افحص|اتأكد/i.test(name));
+
 /** A choice button, named by its title and its help line. */
 const choice = (title: string) => (name: string) => name.startsWith(title);
 
@@ -232,7 +242,7 @@ describe("FirstLaunch", () => {
     expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(0); // no AI call was asked for
   });
 
-  it("an API key is saved, then checked through the core", async () => {
+  it("a pasted API key is saved, then checked through the core, at once", async () => {
     const fetch = mockCore({
       "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
       "PUT /settings/ai-key": () => Response.json({ set: true }),
@@ -241,17 +251,21 @@ describe("FirstLaunch", () => {
     const user = userEvent.setup();
     flowAt("ai");
     await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkApiKey.en) }));
-    await user.type(screen.getByLabelText(texts.aiKeyLabel.en), "sk-ant-sample-not-a-key");
-    await user.click(screen.getByRole("button", { name: texts.save.en }));
-    const works = await screen.findByText(texts.aiLinkWorks.en);
+    const next = screen.getByRole("button", { name: texts.setupNext.en });
+    expect(next).toBeDisabled(); // in its place from the start, so no button moves when it works
+    await user.click(screen.getByLabelText(texts.aiKeyLabel.en));
+    await user.paste(KEY);
+    const works = await screen.findByText(texts.aiLinkWorks.en, {}, { timeout: 300 }); // no wait for a pause
     expect(works.closest("[data-feedback]")).toHaveAttribute("data-feedback", "done"); // the same mark on every step
     expect(works.closest("[role=status]")).not.toBeNull();
+    expect(calls(fetch, "PUT /settings/ai-key")).toEqual([{ provider: "anthropic", value: KEY }]);
     expect(calls(fetch, "POST /settings/ai/check")[0]).toEqual({ via: "api_key" });
-    await user.click(screen.getByRole("button", { name: texts.setupNext.en }));
+    expect(next).toBeEnabled();
+    await user.click(next);
     expect(calls(fetch, "PUT /setup/ai")[0]).toEqual({ state: "done" });
   });
 
-  it("a key the check refuses says why, and the key field comes back for another", async () => {
+  it("a key the check refuses says why, and stays in the field to be fixed", async () => {
     const refused = { en: "The key was refused (sample).", ar: "المفتاح اترفض (عينة)." };
     mockCore({
       "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
@@ -261,14 +275,14 @@ describe("FirstLaunch", () => {
     const user = userEvent.setup();
     flowAt("ai");
     await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkApiKey.en) }));
-    await user.type(screen.getByLabelText(texts.aiKeyLabel.en), "sk-ant-sample-not-a-key");
-    await user.click(screen.getByRole("button", { name: texts.save.en }));
+    await user.click(screen.getByLabelText(texts.aiKeyLabel.en));
+    await user.paste(KEY);
     expect(await screen.findByRole("alert")).toHaveTextContent(refused.en);
-    expect(screen.getByLabelText(texts.aiKeyLabel.en)).toHaveValue("");
-    expect(screen.queryByRole("button", { name: texts.setupNext.en })).toBeNull();
+    expect(screen.getByLabelText(texts.aiKeyLabel.en)).toHaveValue(KEY);
+    expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeDisabled();
   });
 
-  it("Claude Code: found shows its version and Check; not found says how to get it", async () => {
+  it("Claude Code is checked as soon as it is chosen; not found says how to get it, and coming back checks again", async () => {
     let found = false;
     const refused = { en: "Claude Code is signed out (sample).", ar: "Claude Code مش داخل (عينة)." };
     const fetch = mockCore({
@@ -279,17 +293,49 @@ describe("FirstLaunch", () => {
     const user = userEvent.setup();
     flowAt("ai");
     await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkClaudeCode.en) }));
-    expect(await screen.findByText(texts.aiLinkClaudeCodeMissing.en)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: texts.aiLinkCheck.en }));
-    expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(0); // nothing to check yet
     expect(await screen.findByRole("alert")).toHaveTextContent(texts.aiLinkClaudeCodeMissing.en); // and what to do
+    expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(0); // nothing to check yet
 
-    found = true; // the engineer installed it
-    await user.click(screen.getByRole("button", { name: texts.aiLinkCheck.en }));
+    found = true; // the engineer installed it, and comes back to ONE's window
+    window.dispatchEvent(new Event("focus"));
     expect(await screen.findByText("Found: Claude Code 2.3.1")).toBeInTheDocument();
     expect(calls(fetch, "POST /settings/ai/check")[0]).toEqual({ via: "claude_code" });
     expect(await screen.findByRole("alert")).toHaveTextContent(refused.en); // the core's plain reason
-    expect(screen.queryByRole("button", { name: texts.setupNext.en })).toBeNull();
+    expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: choice(texts.aiLinkClaudeCode.en) })); // chosen again: again
+    await waitFor(() => expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(2));
+  });
+
+  it("an answer for a choice the engineer left is not shown", async () => {
+    let answer!: (response: Response) => void;
+    mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "GET /settings/claude-code": () => Response.json({ found: true, version: "2.3.1" }),
+      "POST /settings/ai/check": () => new Promise<Response>((resolve) => (answer = resolve)),
+    });
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkClaudeCode.en) }));
+    await waitFor(() => expect(answer).toBeDefined());
+    await user.click(screen.getByRole("button", { name: choice(texts.aiLinkApiKey.en) }));
+    await act(async () => answer(Response.json({ ok: true })));
+    expect(screen.queryByText(texts.aiLinkWorks.en)).toBeNull();
+    expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeDisabled();
+  });
+
+  it("the AI step has no Save or Check button, in either language, for either choice", async () => {
+    mockCore({ "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }) });
+    const user = userEvent.setup();
+    for (const lang of ["en", "ar"] as const) {
+      setLanguage(lang);
+      const { unmount } = render(<FirstLaunch initial={{ ...fresh(), steps: { ...fresh().steps, language: "done", account: "skipped" } }} onDone={vi.fn()} />);
+      for (const via of [texts.aiLinkClaudeCode, texts.aiLinkApiKey]) {
+        await user.click(await screen.findByRole("button", { name: choice(via[lang]) }));
+        expect(noSaveOrCheck()).toEqual([]);
+      }
+      unmount();
+    }
   });
 
   it("introduction card: the country starts at the system's, with no blank choice", async () => {

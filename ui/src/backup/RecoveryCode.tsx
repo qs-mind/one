@@ -1,9 +1,10 @@
 // A recovery code, shown once: in a monospace box, with Copy, then "I saved it" and its last group typed to
-// confirm. The code lives only in the screen that shows it: the caller drops it when `onDone` comes, and it is
-// never logged or stored. The core keeps only the last group, in memory, to check the confirmation.
-import { type FormEvent, useId, useState } from "react";
+// confirm, checked as soon as its five characters are in (no Confirm button). The code lives only in the screen that
+// shows it: the caller drops it when `onDone` comes, and it is never logged or stored. The core keeps only the last
+// group, in memory, to check the confirmation.
+import { useId, useRef, useState } from "react";
 import { coreLine, send } from "../core";
-import { field, primary, secondary } from "../firstlaunch/parts";
+import { Feedback, field, primary, secondary } from "../firstlaunch/parts";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 
 export function RecoveryCode({ code, confirmPath, onDone }: { code: string; confirmPath: string; onDone: () => void }) {
@@ -14,15 +15,24 @@ export function RecoveryCode({ code, confirmPath, onDone }: { code: string; conf
   const [last, setLast] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Text>();
+  const tries = useRef(0); // only the latest group's answer shows
+  const sent = useRef("");
 
-  async function confirm(event: FormEvent) {
-    event.preventDefault();
+  async function type(value: string) {
+    setLast(value);
+    const group = value.trim();
+    if (group.replace(/[^a-z0-9]/gi, "").length !== 5) return; // a whole group of five, or nothing is sent
+    if (group.toUpperCase() === sent.current) return; // a space after it: the same group, already sent
+    sent.current = group.toUpperCase();
+    const mine = ++tries.current;
     setBusy(true);
     setFailed(undefined);
-    const response = await send(confirmPath, "POST", { last_group: last.trim() });
+    const response = await send(confirmPath, "POST", { last_group: group });
+    if (mine !== tries.current) return;
     setBusy(false);
-    if (response?.ok) onDone();
-    else setFailed(await coreLine(response, texts.backupNotSaved));
+    if (response?.ok) return onDone();
+    sent.current = ""; // refused: the next change is sent again
+    setFailed(await coreLine(response, texts.backupNotSaved));
   }
 
   return (
@@ -58,29 +68,24 @@ export function RecoveryCode({ code, confirmPath, onDone }: { code: string; conf
         )}
       </div>
       {saving && (
-        <form onSubmit={confirm} className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <label htmlFor={id}>{t("recoveryLastGroup")}</label>
-          <div className="flex gap-2">
-            <input
-              id={id}
-              dir="ltr"
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={20}
-              value={last}
-              onChange={(event) => setLast(event.target.value)}
-              className={`${field} min-w-0 flex-1 font-mono uppercase`}
-            />
-            <button type="submit" disabled={busy || !last.trim()} className={primary}>
-              {t("recoveryConfirm")}
-            </button>
+          <input
+            id={id}
+            dir="ltr"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={20}
+            value={last}
+            aria-invalid={failed ? true : undefined}
+            onChange={(event) => void type(event.target.value)}
+            className={`${field} min-w-0 font-mono uppercase ${failed ? "border-copper" : ""}`}
+          />
+          <div className="min-h-7">
+            {busy && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
+            {failed && <Feedback state="failed">{pick(failed)}</Feedback>}
           </div>
-        </form>
-      )}
-      {failed && (
-        <p role="alert" className="text-copper">
-          {pick(failed)}
-        </p>
+        </div>
       )}
     </section>
   );

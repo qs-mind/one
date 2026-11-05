@@ -276,20 +276,21 @@ describe("the chat in the shell", () => {
     expect(await screen.findByRole("heading", { name: texts.aiTitle.en })).toBeInTheDocument();
   });
 
-  it("saving the first key stores it in the core, shows only that it was added, and opens the chat", async () => {
-    const fetch = core({ keySet: false });
+  it("pasting the first key stores it in the core and checks it, without showing it, and opens the chat", async () => {
+    const key = "sk-ant-sample-not-a-real-key-0000000000000"; // not a real key
+    const fetch = core({ keySet: false, routes: { "POST /api/settings/ai/check": () => Response.json({ ok: true }) } });
     const user = userEvent.setup();
     render(<App />);
     const field = await screen.findByLabelText(texts.aiKeyLabel.ar);
     expect(field).toHaveAttribute("type", "password");
-    await user.type(field, "sk-ant-test");
-    await user.click(screen.getByRole("button", { name: texts.save.ar }));
+    await user.click(field);
+    await user.paste(key);
 
-    expect(await screen.findByText(texts.keyAdded.ar)).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("sk-ant-test")).not.toBeInTheDocument();
     expect(await box()).toBeInTheDocument(); // the chat is open now
+    expect(screen.queryByDisplayValue(key)).not.toBeInTheDocument();
     const [, init] = calls(fetch, "PUT", "/api/settings/ai-key")[0]!;
-    expect(bodyOf(init)).toEqual({ provider: "anthropic", value: "sk-ant-test" });
+    expect(bodyOf(init)).toEqual({ provider: "anthropic", value: key });
+    expect(calls(fetch, "POST", "/api/settings/ai/check")).toHaveLength(1);
   });
 
   it("“AI” opens its one settings panel while the chat stays, and closes again", async () => {

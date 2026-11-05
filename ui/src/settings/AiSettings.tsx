@@ -1,9 +1,13 @@
 // AI settings: the AI Connectors (the Claude key, Standard Links, the engineer's own Claude Code), which model does
 // each job, prices One does not know, and the Spending Caps. The engineer picks every model; nothing here is fixed.
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+// No Save or Check button: a key checks itself, a choice saves when it is made, an amount after a pause in typing
+// or on leaving its field, a file path on leaving its field (never a half-typed path), each with its quiet line.
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api } from "../api";
 import { coreLine, send } from "../core";
+import { Feedback } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { looksLikeAmount, SaveNote, useSaving } from "../ui/live";
 import { AiKey } from "./AiKey";
 
 export type Role = "lead" | "checker" | "specialist" | "quick";
@@ -165,7 +169,7 @@ function ClaudeKey({ settings, onSaved }: { settings: Settings; onSaved: () => v
       {saved && <p className="text-slate">{t("claudeKeySaved")}</p>}
       {settings.key_store === "file" && <p className="text-slate">{t("keyStoreFile")}</p>}
       <Alert line={settings.connectors.find((c) => c.id === "anthropic" && c.key_set)?.error ?? undefined} />
-      <AiKey onSaved={onSaved} />
+      <AiKey onChecked={onSaved} />
     </div>
   );
 }
@@ -284,33 +288,50 @@ function statusLine(status: ClaudeCodeStatus): string {
   return fill(t("claudeCodeReady"), { version: status.version ?? "" });
 }
 
-/** The Subscription Link. Checked only when the engineer presses Check: no timer, no polling. */
+/** The Subscription Link. Checked when it opens switched on, when it is switched on, and when its file changes: once
+ * each, no timer, no polling. The file is saved on leaving its field (or Enter), never while it is typed. */
 function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; onChanged: () => void }) {
   const on = connectors.some((c) => c.id === "claude-code");
   const [path, setPath] = useState("");
+  const kept = useRef(""); // the file last saved from this field
   const [status, setStatus] = useState<"checking" | ClaudeCodeStatus | Text>();
   const [switchedOn, setSwitchedOn] = useState(false);
   const [failed, setFailed] = useState<Text>();
+  const checks = useRef(0); // only the latest check's answer shows
 
   async function save(nextOn: boolean): Promise<boolean> {
     setFailed(undefined);
     const response = await send("/settings/ai/claude-code", "PUT", { path: path.trim() || null, on: nextOn });
     if (!response?.ok) setFailed(await coreLine(response, texts.claudeCodeNotSaved));
+    else kept.current = path.trim();
     return response?.ok === true;
   }
 
-  async function check() {
+  const check = useCallback(async () => {
+    const mine = ++checks.current;
     setStatus("checking");
-    if (path.trim() && !(await save(on))) return setStatus(undefined); // check the file the engineer picked
     const response = await api("/settings/ai/claude-code").catch(() => undefined);
-    if (response?.ok) setStatus((await response.json()) as ClaudeCodeStatus);
-    else setStatus(await coreLine(response, texts.claudeCodeCheckFailed));
+    const answer = response?.ok
+      ? ((await response.json()) as ClaudeCodeStatus)
+      : await coreLine(response, texts.claudeCodeCheckFailed);
+    if (mine === checks.current) setStatus(answer);
+  }, []);
+
+  const opened = useRef(on);
+  useEffect(() => {
+    if (opened.current) void check(); // switched on already: say how it is now
+  }, [check]);
+
+  async function leave() {
+    if (path.trim() === kept.current) return;
+    if (await save(on)) void check(); // the file the engineer picked
   }
 
   async function toggle() {
     if (await save(!on)) {
       setSwitchedOn(!on);
       onChanged();
+      if (!on) void check();
     }
   }
 
@@ -320,30 +341,37 @@ function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; on
       <p className="text-slate">{t("claudeCodeHelp")}</p>
       <label className="flex flex-col gap-1">
         <span>{t("claudeCodePath")}</span>
-        <input dir="ltr" spellCheck={false} value={path} onChange={(event) => setPath(event.target.value)} className={field} />
+        <input
+          dir="ltr"
+          spellCheck={false}
+          value={path}
+          onChange={(event) => setPath(event.target.value)}
+          onBlur={() => void leave()}
+          onKeyDown={(event) => event.key === "Enter" && void leave()}
+          className={field}
+        />
       </label>
-      <div className="flex flex-wrap items-center gap-4">
-        <button
-          type="button"
-          disabled={status === "checking"}
-          onClick={() => void check()}
-          className="rounded-md border border-ink px-4 py-2 disabled:opacity-40"
-        >
-          {t("check")}
-        </button>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={on} onChange={() => void toggle()} className="accent-ink" />
-          <span>{t("useClaudeCode")}</span>
-        </label>
+      <label className="flex items-center gap-2 self-start">
+        <input type="checkbox" checked={on} onChange={() => void toggle()} className="accent-ink" />
+        <span>{t("useClaudeCode")}</span>
+      </label>
+      <div className="min-h-7">
+        {failed ? (
+          <Feedback state="failed">{pick(failed)}</Feedback>
+        ) : (
+          status && <StatusLine status={status} />
+        )}
       </div>
-      {status === "checking" && <p className="text-slate">{t("claudeCodeChecking")}</p>}
-      {status && status !== "checking" && (
-        <p role="status">{"en" in status ? pick(status) : statusLine(status)}</p>
-      )}
       {(on || switchedOn) && <p className="text-slate">{t("claudeCodeCopy")}</p>}
-      <Alert line={failed} />
     </div>
   );
+}
+
+function StatusLine({ status }: { status: "checking" | ClaudeCodeStatus | Text }) {
+  if (status === "checking") return <Feedback state="busy">{t("claudeCodeChecking")}</Feedback>;
+  if ("en" in status) return <Feedback state="failed">{pick(status)}</Feedback>;
+  const ready = !status.code && status.signed_in !== false;
+  return <Feedback state={ready ? "done" : "failed"}>{statusLine(status)}</Feedback>;
 }
 
 function priceText(card: ModelCard): string {
@@ -355,20 +383,19 @@ function priceText(card: ModelCard): string {
 
 /** One select per role, from the Model Data Sheet; the Recommended Setting is marked. */
 function RoleModels({ settings, onSaved }: { settings: Settings; onSaved: (roles: Roles) => void }) {
-  const [failed, setFailed] = useState<Text>();
-  const [saving, setSaving] = useState(false);
+  const { saving, n, now } = useSaving();
   const { sheet, roles, defaults } = settings;
 
-  async function choose(role: Role, value: string) {
+  function choose(role: Role, value: string) {
     const card = sheet.find((item) => keyOf(item) === value);
     if (!card) return;
     const next = { ...roles, [role]: { connector: card.connector, model: card.model } };
-    setSaving(true);
-    setFailed(undefined);
-    const response = await send("/settings/ai/roles", "PUT", next);
-    setSaving(false);
-    if (response?.ok) onSaved(((await response.json().catch(() => undefined)) as Roles | undefined) ?? next);
-    else setFailed(await coreLine(response, texts.roleNotSaved));
+    void now(async () => {
+      const response = await send("/settings/ai/roles", "PUT", next);
+      if (!response?.ok) return coreLine(response, texts.roleNotSaved);
+      onSaved(((await response.json().catch(() => undefined)) as Roles | undefined) ?? next);
+      return null;
+    });
   }
 
   return (
@@ -388,8 +415,8 @@ function RoleModels({ settings, onSaved }: { settings: Settings; onSaved: (roles
               <select
                 dir="ltr"
                 value={value}
-                disabled={saving}
-                onChange={(event) => void choose(role, event.target.value)}
+                disabled={saving.state === "busy"}
+                onChange={(event) => choose(role, event.target.value)}
                 className={field}
               >
                 {!chosen && <option value={value}>{current?.model ?? ""}</option>}
@@ -407,38 +434,40 @@ function RoleModels({ settings, onSaved }: { settings: Settings; onSaved: (roles
           );
         })
       )}
-      <Alert line={failed} />
+      <SaveNote saving={saving} n={n} />
     </div>
   );
 }
 
-/** Prices for models genai-prices does not know; the core keeps them with "engineer, <date>" as the source. */
+/** Prices for models genai-prices does not know; the core keeps them with "engineer, <date>" as the source. Saved once
+ * both amounts are typed: after a pause when both are whole amounts, or on leaving a field. */
 function PriceForm({ sheet, onSaved }: { sheet: ModelCard[]; onSaved: () => void }) {
   const unknown = sheet.filter((card) => !card.on_device && (card.price_in == null || card.price_out == null));
   const [picked, setPicked] = useState<string>();
   const [priceIn, setPriceIn] = useState("");
   const [priceOut, setPriceOut] = useState("");
-  const [failed, setFailed] = useState<Text>();
+  const { saving, n, later, drop, flush } = useSaving();
   const title = useId();
   if (unknown.length === 0) return null;
   const card = unknown.find((item) => keyOf(item) === picked) ?? unknown[0]!;
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    setFailed(undefined);
-    const body = { connector: card.connector, model: card.model, in: priceIn.trim(), out: priceOut.trim() };
-    const response = await send("/settings/ai/prices", "PUT", body);
-    if (response?.ok) {
+  function changed(next: { in: string; out: string }) {
+    setPriceIn(next.in);
+    setPriceOut(next.out);
+    if (!next.in.trim() || !next.out.trim()) return drop(); // nothing to save yet
+    const body = { connector: card.connector, model: card.model, in: next.in.trim(), out: next.out.trim() };
+    later(async () => {
+      const response = await send("/settings/ai/prices", "PUT", body);
+      if (!response?.ok) return coreLine(response, texts.priceNotSaved);
       setPriceIn("");
       setPriceOut("");
       onSaved();
-    } else {
-      setFailed(await coreLine(response, texts.priceNotSaved));
-    }
+      return null;
+    }, looksLikeAmount(next.in) && looksLikeAmount(next.out));
   }
 
   return (
-    <form onSubmit={save} aria-labelledby={title} className="flex flex-col gap-2">
+    <form onSubmit={(event) => event.preventDefault()} onBlur={() => void flush()} aria-labelledby={title} className="flex flex-col gap-2">
       <h3 id={title} className="font-semibold">
         {t("enterPrice")}
       </h3>
@@ -453,14 +482,9 @@ function PriceForm({ sheet, onSaved }: { sheet: ModelCard[]; onSaved: () => void
           ))}
         </select>
       </label>
-      <Amount label={t("priceIn")} value={priceIn} onChange={setPriceIn} />
-      <Amount label={t("priceOut")} value={priceOut} onChange={setPriceOut} />
-      <div>
-        <button type="submit" disabled={!priceIn.trim() || !priceOut.trim()} className={primary}>
-          {t("save")}
-        </button>
-      </div>
-      <Alert line={failed} />
+      <Amount label={t("priceIn")} value={priceIn} onChange={(value) => changed({ in: value, out: priceOut })} />
+      <Amount label={t("priceOut")} value={priceOut} onChange={(value) => changed({ in: priceIn, out: value })} />
+      <SaveNote saving={saving} n={n} />
     </form>
   );
 }
@@ -471,11 +495,14 @@ function Amount({
   value,
   onChange,
   hint,
+  invalid = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   hint?: string;
+  /** The core refused it: its border turns Copper until it saves. */
+  invalid?: boolean;
 }) {
   const hintId = useId();
   return (
@@ -490,7 +517,8 @@ function Amount({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           aria-describedby={hint ? hintId : undefined}
-          className={field}
+          aria-invalid={invalid || undefined}
+          className={`${field} ${invalid ? "border-copper" : ""}`}
         />
       </label>
       {hint && (
@@ -513,13 +541,15 @@ const capFields = [
   ["budget_above", "budgetAbove"],
 ] as const;
 
-/** The three Spending Caps and the Brief Budget line, in USD. Also used by a cap card's "Raise the cap". */
-export function CapsForm({ onSaved }: { onSaved?: () => void }) {
+/** The three Spending Caps and the Brief Budget line, in USD, each saved as it is typed: after a pause when it is a
+ * whole amount, or on leaving its field. Also used by a cap card's "Raise the cap", whose `go` button goes on once
+ * the last change is saved. */
+export function CapsForm({ go }: { go?: { label: string; onGo: () => void } }) {
   useLanguage();
   const [caps, setCaps] = useState<Amounts>();
   const [recommended, setRecommended] = useState<Amounts>();
-  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
-  const [failed, setFailed] = useState<Text>();
+  const { saving, n, later, flush } = useSaving();
+  const [bad, setBad] = useState<string>();
 
   const shown = useCallback((body: CapsAnswer) => {
     const amounts = (from: Caps): Amounts => ({
@@ -543,45 +573,48 @@ export function CapsForm({ onSaved }: { onSaved?: () => void }) {
     };
   }, [shown]);
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
+  function changed(name: keyof Amounts, value: string) {
     if (!caps) return;
-    setState("saving");
-    setFailed(undefined);
-    // only the amounts on this form: whether the subscription stops is not changed here
-    const response = await send("/settings/ai/caps", "PUT", caps);
-    if (response?.ok) {
-      const body = (await response.json().catch(() => undefined)) as CapsAnswer | undefined;
-      if (body?.caps) shown(body);
-      setState("saved");
-      onSaved?.();
-    } else {
-      setState("idle");
-      setFailed(await coreLine(response, texts.capsNotSaved));
-    }
+    const next = { ...caps, [name]: value };
+    setCaps(next);
+    // only the amounts on this form: whether the subscription stops is not changed here. What the engineer typed
+    // stays as typed: the core's answer never rewrites a field under their hands.
+    later(async () => {
+      const response = await send("/settings/ai/caps", "PUT", next);
+      if (response?.ok) {
+        setBad(undefined);
+        return null;
+      }
+      const body = (await response?.clone().json().catch(() => undefined)) as { field?: string } | undefined;
+      setBad(body?.field); // the amount the core refused, when it says
+      return coreLine(response, texts.capsNotSaved);
+    }, Object.values(next).every(looksLikeAmount));
+  }
+
+  async function goOn() {
+    if (await flush()) go?.onGo();
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-2">
+    <form onSubmit={(event) => event.preventDefault()} onBlur={() => void flush()} className="flex flex-col gap-2">
       {capFields.map(([name, label]) => (
         <Amount
           key={name}
           label={t(label)}
           value={caps?.[name] ?? ""}
           hint={recommended ? fill(t("recommendedAmount"), { value: recommended[name] }) : undefined}
-          onChange={(value) => {
-            setState("idle");
-            setCaps((now) => (now ? { ...now, [name]: value } : now));
-          }}
+          onChange={(value) => changed(name, value)}
+          invalid={bad === name}
         />
       ))}
-      <div className="flex items-center gap-3">
-        <button type="submit" disabled={!caps || state === "saving"} className={primary}>
-          {t("save")}
-        </button>
-        {state === "saved" && <p role="status">{t("capsSaved")}</p>}
-      </div>
-      <Alert line={failed} />
+      <SaveNote saving={saving} n={n} />
+      {go && (
+        <div>
+          <button type="button" disabled={!caps} onClick={() => void goOn()} className={primary}>
+            {go.label}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

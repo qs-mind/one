@@ -5,7 +5,11 @@ core. With `--samples DIR`, the sample input files are written there first.
 
 The bench core has one route of its own, `POST /bench/new-computer`: the data folder as on a
 computer One was just installed on (no projects, no snapshots, no backup settings, no project
-key and no Backup key in the key store), so a walk can restore from the backup folder."""
+key and no Backup key in the key store), so a walk can restore from the backup folder.
+
+A Claude key is checked by the bench, never by Anthropic (`check_keys`): one with "-bench-ok-" in
+it works, any other is refused, each after a short wait so the screen's "Checking…" shows. A walk
+that saved one takes it out again with `POST /bench/forget-claude-key`."""
 
 import argparse
 import os
@@ -31,6 +35,40 @@ def seed() -> None:
     for step in setup_state.STEPS:  # the walks start in the app, past the first launch
         setup_state.mark(step, "skipped")
     setup_state.set_language("ar")  # the screen's first language: the Briefs One starts match it
+
+
+BENCH_KEY = "-bench-ok-"  # in a sample Claude key that the bench's check takes
+
+
+def check_keys() -> None:
+    """The first launch's and AI settings' key check (POST /settings/ai/check, via "api_key") is
+    answered here from the key the screen saved: no request leaves the bench."""
+    import asyncio
+
+    from qsone import copy, keys
+    from qsone.engine import connectors
+
+    real = connectors.check
+
+    async def check(via: str, *, among=None):
+        if not via.startswith("anthropic/"):
+            return await real(via, among=among)
+        await asyncio.sleep(1.2)
+        if BENCH_KEY in (keys.get_key("anthropic") or ""):
+            return None
+        return copy.fill(copy.AI_KEY_REFUSED, provider="Anthropic")
+
+    connectors.check = check
+
+
+def forget_claude_key(app) -> None:
+    """Adds `POST /bench/forget-claude-key`: the walks after one that saved a key run as before."""
+    from qsone import keys
+
+    @app.post("/bench/forget-claude-key")
+    def forget() -> dict:
+        keys.delete_key("anthropic")
+        return {"set": False}
 
 
 def new_computer(app, data_dir: Path) -> None:
@@ -72,6 +110,7 @@ def main(argv: list[str] | None = None) -> None:
     from qsone.engine import connectors
 
     connectors.connectors = lambda **_: fake.connectors()  # the Settings screen's list too
+    check_keys()
     args.data_dir.mkdir(parents=True, exist_ok=True)
     seed()
     if args.samples is not None:
@@ -87,6 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     def create_app(*a, **k):
         app = real_app(*a, **k)
         new_computer(app, args.data_dir)
+        forget_claude_key(app)
         return app
 
     core.create_app = create_app
