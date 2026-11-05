@@ -1,7 +1,7 @@
 // What one sheet cell shows: its value, a Suggested change (old struck in Slate, new in Ink, ✓ ✗), a value the
 // QS Calc Engine would recalculate, comment marks, and a section's fold button. Values are never computed here.
 import type { Change, Thread, ViewCell, ViewColumn, ViewRow } from "../../deliverables/types";
-import { isNumber } from "../../deliverables/types";
+import { asCell, isNumber } from "../../deliverables/types";
 import { t } from "../../i18n";
 import { fieldKey, numberName } from "./clipboard";
 import { formatDecimal } from "./format";
@@ -14,13 +14,14 @@ export type Mark = "review" | "note";
 /** The cells each pending change paints. An edit wins over a recalculation shown on the same cell. */
 export function pendingCells(changes: Change[], columns: ViewColumn[], titleColumn: string | undefined) {
   const cells = new Map<string, Pending>();
-  const put = (row: string, column: string | undefined, p: Omit<Pending, "recalculated">, recalculated: boolean) => {
-    const key = column && cellKey(row, column);
+  const put = (row: string | null, column: string | undefined, p: Omit<Pending, "recalculated">, recalculated: boolean) => {
+    const key = row !== null && column && cellKey(row, column);
     if (key && !(recalculated && cells.has(key))) cells.set(key, { ...p, recalculated });
   };
   const pending = changes.filter((c) => c.status === "pending");
   for (const change of pending) {
-    const { op, before, after } = change;
+    const { op } = change;
+    const [before, after] = [asCell(change.before), asCell(change.after)];
     if (op.op === "set_number")
       put(op.row, columns.find((c) => c.kind === "number" && numberName(c) === op.name)?.key, { change, before, after }, false);
     else if (op.op === "set_field")
@@ -176,6 +177,8 @@ export function SheetCell(p: CellProps) {
         <Value cell={cell} />
       </span>
     );
+  } else if (!cell && row.kind === "section" && column.kind === "calc") {
+    content = <span className="w-full text-end text-slate">—</span>; // nothing priced under it yet: never 0
   } else if (cell) {
     content = column.wrap ? (
       <span dir="auto" className={wrap}>

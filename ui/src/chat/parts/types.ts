@@ -66,6 +66,8 @@ export type ReviewData = { code: "A" | "B" | "C"; comments: ReviewComment[]; sam
 export type UnsourcedData = { values: string[] };
 /** data-status, id = the Brief. */
 export type StatusData = { state: BriefState; step: Text | null };
+/** data-deliverable, id = the Deliverable (Plan 6): the Lead QS made it; the chat shows its card. */
+export type DeliverableData = { id: string };
 
 export type OneData = {
   progress: ProgressData;
@@ -75,6 +77,7 @@ export type OneData = {
   review: ReviewData;
   unsourced: UnsourcedData;
   status: StatusData;
+  deliverable: DeliverableData;
 };
 
 /** A message the engineer sent while a Brief ran is marked as steering it. */

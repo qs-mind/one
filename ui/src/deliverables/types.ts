@@ -38,8 +38,9 @@ export type NumberCell = {
   value: string;
   unit?: string | null;
   currency?: string | null;
-  number_id: string;
-  source: string;
+  /** Null in what a pending change would write: the dry run that made the number was rolled back. */
+  number_id: string | null;
+  source: string | null;
   dated: string | null;
   calculated?: boolean;
 };
@@ -131,8 +132,11 @@ export type Op =
   | { op: "move_block"; block: string; after: string | null; expect: number }
   | { op: "update_from_records"; cells: RecordsCell[]; expect?: unknown };
 
-export type CellChange = { row: string; column: string; before: ViewCell | null; after: ViewCell | null };
-export type RecordsCell = CellChange & { why: { corrected: string } | { recalculated: true } };
+/** A cell a change touches. `row` is a part id, or "total" for the bill total; in a Document, `row` is the block
+ * (null when the reference is in no block) and `column` the reference key. */
+export type CellChange = { row: string | null; column: string; before: ViewCell | null; after: ViewCell | null };
+/** Why a cell moved in Project Records: corrected (with the reason, null for an item field) or recalculated. */
+export type RecordsCell = CellChange & { why: { corrected: string | null } | { recalculated: true } };
 
 export type Change = {
   id: string;
@@ -146,13 +150,21 @@ export type Change = {
   decided_at: string | null;
   decided_by: string | null;
   version_n: number | null;
-  before: ViewCell | null;
-  after: ViewCell | null;
+  /** What the change shows, old and new: a cell for a number, field or section title; a Block for a Document op;
+   * a row for a row op; {columns} for set_columns. */
+  before: Shown | null;
+  after: Shown | null;
   follows: CellChange[];
   note?: Text | null; // e.g. NUMBER_WAS_CALCULATED
   /** A Document block change: the core's word segments, old → new (Task 3). */
   segments?: Segment[];
 };
+
+export type Shown = ViewCell | Block | ViewRow | { columns: ViewColumn[] };
+
+/** The cell a change shows, or null when it shows a block, a row or the columns. */
+export const asCell = (shown: Shown | null | undefined): ViewCell | null =>
+  shown && !("node" in shown) && !("cells" in shown) && ("value" in shown || "text" in shown) ? shown : null;
 
 /** Where a comment sits, keyed on part ids and column keys (never A1 addresses). */
 export type CommentAnchor =
@@ -203,12 +215,30 @@ export type Compare =
     }
   | { blocks: { id: string; change: "added" | "removed" | "moved" | "changed" | "same"; segments: Segment[] }[] };
 
+/** GET /fill-plans/{f}/preview: what filling the client's own file would write, from the newest signed-off
+ * Revision. */
 export type FillPreview = {
-  writes: { cell: string; before: string | null; after: string; code_ours: string | null; code_theirs: string | null; client_text: string | null }[];
-  skipped: [string, string][];
-  mismatches: { row: number; code_ours: string; code_theirs: string }[];
+  plan_id: string;
+  deliverable_id: string;
+  file_id: string;
+  revision: number;
+  sheet: string;
+  writes: {
+    cell: string;
+    row: number;
+    column: string;
+    before: string | null;
+    after: string;
+    code_ours: string | null;
+    code_theirs: string | null;
+    client_text: string | null;
+  }[];
+  /** Cells left as they are: "formula" (the client's formula) or "merged". */
+  skipped: { cell: string; reason: string }[];
+  mismatches: { row: number; code_ours: string | null; code_theirs: string | null; accepted: boolean; text: Text }[];
   unmapped_rows: number[];
-  unmapped_items: string[];
+  unmapped_items: { part: string; code: string | null }[];
+  accepted_mismatches: number[];
 };
 
 /** Plan 3's GET /projects/{p}/numbers/{id}/explain. */

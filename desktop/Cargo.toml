@@ -13,3 +13,4 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"  # a second One focuses the first instead of opening another window
 tauri-plugin-window-state = "2"  # remembers the window's size and position
+tauri-plugin-dialog = "=2.8.1"  # the native Save dialog for exports (MIT OR Apache-2.0)

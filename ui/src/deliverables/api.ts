@@ -75,7 +75,7 @@ export const deliverablesApi = {
   list: (p: string) => call<{ deliverables: DeliverableInfo[] }>(`${base(p)}/deliverables`),
   view: (p: string, d: string, at: { version?: number; revision?: number } = {}) =>
     call<View>(`${base(p)}/deliverables/${id(d)}${query(at)}`),
-  changes: (p: string, d: string, status?: "pending") =>
+  changes: (p: string, d: string, status?: "pending" | "stale") =>
     call<{ changes: Change[] }>(`${base(p)}/deliverables/${id(d)}/changes${query({ status })}`),
   propose: (p: string, d: string, ops: Op[], reason: string | null = null) =>
     call<{ changes: Change[] }>(`${base(p)}/deliverables/${id(d)}/changes`, "POST", { ops, reason }),
