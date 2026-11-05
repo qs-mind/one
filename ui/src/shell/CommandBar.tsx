@@ -16,6 +16,7 @@ import { ArchivedLine } from "../records/Archived";
 import { useProject } from "../records/project";
 import { type Ai, keyOf } from "../settings/AiSettings";
 import { chip, EffortChip, ModelChip } from "./ComposerChips";
+import { useDraft } from "./drafts";
 import { MessageQueue, QueueHint, useMessageQueue } from "./MessageQueue";
 import type { ChatState } from "./useChats";
 
@@ -66,7 +67,7 @@ export function CommandBar({
 }) {
   useLanguage();
   const selection = useSelection();
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useDraft(chat.chatId); // kept outside the box: it outlives a folded chat
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false); // Escape folded it while it keeps the focus
   const [picking, setPicking] = useState(false);
