@@ -488,6 +488,9 @@ describe("keyboard and layout", () => {
     await waitFor(() => expect(chat()).toBeNull());
     fireEvent.keyDown(document, { key: "ب", code: "KeyF", ctrlKey: true, shiftKey: true });
     await waitFor(() => expect(chat()).not.toBeNull());
+    // never while writing: the message box keeps the keys
+    fireEvent.keyDown(screen.getByRole("textbox", { name: texts.message.ar }), { key: "ب", code: "KeyF", ctrlKey: true, shiftKey: true });
+    expect(chat()).not.toBeNull();
   });
 
   it("sample mode says sample once: an open sample Deliverable's facts, else the top bar's plain words", async () => {

@@ -63,7 +63,8 @@ export function httpSources(projectId: string): ProjectSources {
     team: () => json<Team>(`${base}/team`, { desks: [], agents: [] }),
     status: () => json(`${base}/status`, {}),
     workspace: () => json<{ open: DocKey | null; anchor: Anchor | null; client_boqs: ClientBoqInfo[] }>(`${base}/workspace`),
-    saveWorkspace: (opened, keepalive = false) => put(`${base}/workspace`, opened, keepalive),
+    // the core names the document `open` (workspace.py): {open, anchor}
+    saveWorkspace: (opened, keepalive = false) => put(`${base}/workspace`, { open: opened.key, anchor: opened.anchor }, keepalive),
     activity(onEvent, signal, onReconnect) {
       if (signal.aborted) return;
       const stop = subscribeActivity(projectId, onEvent, onReconnect);
