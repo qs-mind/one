@@ -665,7 +665,7 @@ export const texts = {
   announceFailed: { en: "{role} stopped with an error", ar: "{role} وقف بسبب خطأ" },
   announceNoNews: { en: "No news from {role} for a minute", ar: "مفيش جديد من {role} من دقيقة" },
   // Plan 7 Task 4 (the canvas frames)
-  canvasFailed: { en: "The canvas could not be loaded. Try again.", ar: "مقدرناش نفتح الكانفاس. جرّب تاني." },
+  documentFailed: { en: "This document could not be opened. Try again.", ar: "مقدرناش نفتح المستند ده. جرّب تاني." },
   projectTeam: { en: "Project team", ar: "فريق المشروع" },
   showPageText: { en: "Show the page's text", ar: "اعرض نص الصفحة" },
   showPageImage: { en: "Show the page", ar: "اعرض الصفحة" },

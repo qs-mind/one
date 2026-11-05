@@ -44,7 +44,7 @@ describe("the project's sources over /api", () => {
     await expect(s.workspace()).rejects.toEqual(new SourceError(line));
     await expect(s.saveWorkspace({ key: "files:all", anchor: null })).rejects.toBeInstanceOf(SourceError);
     core(() => new Response("", { status: 500 }));
-    await expect(httpSources("p1").files()).rejects.toMatchObject({ line: texts.canvasFailed });
+    await expect(httpSources("p1").files()).rejects.toMatchObject({ line: texts.documentFailed });
   });
 
   it("saves the open document to the project with keepalive when asked", async () => {

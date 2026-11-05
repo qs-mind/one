@@ -18,7 +18,7 @@ export function useClientBoq(sources: ProjectSources, fileId: string, at: string
     let current = true;
     sources.clientBoq(fileId).then(
       (view) => current && setLoaded({ view }),
-      (error) => current && setLoaded({ failed: error instanceof SourceError ? error.line : texts.canvasFailed }),
+      (error) => current && setLoaded({ failed: error instanceof SourceError ? error.line : texts.documentFailed }),
     );
     return () => {
       current = false;

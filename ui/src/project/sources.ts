@@ -33,7 +33,7 @@ export function viewerFor(kind: DeliverableInfo["kind"]): ComponentType<ViewerPr
 async function json<T>(url: string, empty?: T, init?: RequestInit): Promise<T> {
   const response = await api(url, init).catch(() => undefined);
   if (response?.status === 404 && empty !== undefined) return empty;
-  if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
+  if (!response?.ok) throw new SourceError(await coreLine(response, texts.documentFailed));
   return (await response.json()) as T;
 }
 
@@ -44,7 +44,7 @@ async function put(url: string, body: unknown, keepalive: boolean): Promise<void
     body: JSON.stringify(body),
     keepalive,
   }).catch(() => undefined);
-  if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
+  if (!response?.ok) throw new SourceError(await coreLine(response, texts.documentFailed));
 }
 
 export function httpSources(projectId: string): ProjectSources {
@@ -94,7 +94,7 @@ export function httpSources(projectId: string): ProjectSources {
     async pages(fileId) {
       const response = await api(`${file(fileId)}/pages`).catch(() => undefined);
       if (response?.status === 404 || response?.status === 409) return 0; // no route yet, or not a PDF
-      if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
+      if (!response?.ok) throw new SourceError(await coreLine(response, texts.documentFailed));
       return ((await response.json()) as { pages: number }).pages;
     },
     async fileText(fileId, page) {
@@ -103,7 +103,7 @@ export function httpSources(projectId: string): ProjectSources {
     },
     async clientBoq(fileId) {
       const response = await api(`${base}/client-boq/${encodeURIComponent(fileId)}`).catch(() => undefined);
-      if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
+      if (!response?.ok) throw new SourceError(await coreLine(response, texts.documentFailed));
       return (await response.json()) as SheetView;
     },
     async upload(chosen) {
