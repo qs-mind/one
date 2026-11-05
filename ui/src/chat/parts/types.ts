@@ -36,6 +36,8 @@ export type CardPayload = {
   tick?: boolean;
   connector?: { name: string; transport: "stdio" | "http"; runs: string };
   tools?: ConnectorTool[];
+  /** A price card's model (core: costs._ask_unknown_price). */
+  model?: { connector: string; model: string; name: string };
 };
 /** data-card, id = the card: anything the engineer must answer. */
 export type CardData = {
@@ -43,6 +45,7 @@ export type CardData = {
     | "outside"
     | "online"
     | "cap"
+    | "price"
     | "budget"
     | "fallback"
     | "desk"

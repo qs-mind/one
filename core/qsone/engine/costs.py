@@ -5,7 +5,8 @@ and the Brief Budget.
 - The day is the engineer's own day, as the cost book counts it. The day cap counts the Briefs
   of every project and the General chat.
 - At 80% of a cap One pauses and asks, once per scope in a Brief; at 100% it stops hard.
-- A model whose price is unknown asks before it spends, because the cap cannot protect it.
+- A model whose price is unknown asks once, the first time it is used: its price, or use it
+  without one. Without a price the caps count its tokens: a million for each dollar of a cap.
 - A model on this computer costs nothing and is never held back by a cap.
 - The Claude subscription's cost is "equivalent cost": always recorded and shown, and counted
   towards the caps only when the engineer turns `subscription_stops` on. Otherwise One says so
@@ -29,7 +30,16 @@ from pydantic_ai.models.wrapper import WrapperModel
 from qsone import copy, settings
 from qsone.engine import cards
 from qsone.engine.store import CostBook
-from qsone.engine.types import Card, CostNotice, ModelCard, ModelChoice, Role, TeamHost, Text
+from qsone.engine.types import (
+    Card,
+    CostNotice,
+    ModelCard,
+    ModelChoice,
+    Role,
+    TeamHost,
+    Text,
+    choice_of,
+)
 
 Scope = Literal["brief", "day", "month"]
 
@@ -133,6 +143,25 @@ _SCOPE_NAMES: dict[Scope, Text] = {
 }
 REPORTED_BASIS = "reported by Claude Code"
 PRICE_UNKNOWN_BASIS = "price unknown"
+# The caps of a model used without a price count its tokens: a million for each dollar of a cap.
+# ONE's own choice (audit B6): about what a small paid model costs, so a cap still stops a run.
+TOKENS_PER_USD = 1_000_000
+
+
+def _no_price_key(choice: ModelChoice) -> str:
+    return f"{choice.connector}/{choice.model}"
+
+
+def _without_price(choice: ModelChoice) -> bool:
+    """The engineer chose to use this model without a price (kept in the settings)."""
+    found = settings.ai().get("without_price")
+    return isinstance(found, list) and _no_price_key(choice) in found
+
+
+def _use_without_price(choice: ModelChoice) -> None:
+    found = settings.ai().get("without_price")
+    kept = [k for k in found if isinstance(k, str)] if isinstance(found, list) else []
+    settings.save_ai("without_price", sorted({*kept, _no_price_key(choice)}))
 
 
 class Spending:
@@ -144,7 +173,7 @@ class Spending:
         self.clock = clock
         self._asked: dict[tuple[str, Scope], Decimal] = {}  # the cap each pause was asked at
         self._warned: set[tuple[str, Scope]] = set()  # equivalent cost said at 80%
-        self._unpriced: set[tuple[str, ModelChoice]] = set()  # "yes" to an unknown price
+        self._unpriced: set[ModelChoice] = set()  # used without a price, if the settings fail
 
     def _spent(self, brief_id: str, *, count_equivalent: bool) -> dict[Scope, Decimal]:
         today = self.clock().astimezone(self.book.local_tz).date()
@@ -156,21 +185,36 @@ class Spending:
             ),
         }
 
-    async def before_request(self, host: TeamHost, *, brief_id: str, card: ModelCard) -> None:
-        """Returns when the request may go. Raises `CallRefused` or `CapReached`; awaits
-        `host.ask` at 80% of a scope not yet asked in this Brief."""
+    def _tokens(self, brief_id: str) -> dict[Scope, int]:
+        """The tokens of models with no known price, per scope."""
+        today = self.clock().astimezone(self.book.local_tz).date()
+        found = {
+            "brief": self.book.tokens(brief_id=brief_id, unpriced_only=True),
+            "day": self.book.tokens(day=today, unpriced_only=True),
+            "month": self.book.tokens(month=(today.year, today.month), unpriced_only=True),
+        }
+        return {scope: t["input"] + t["output"] for scope, t in found.items()}
+
+    async def before_request(self, host: TeamHost, *, brief_id: str, card: ModelCard) -> ModelCard:
+        """Returns the card the request goes with (priced, if the engineer just entered its
+        price). Raises `CallRefused` or `CapReached`; awaits `host.ask` at 80% of a scope not
+        yet asked in this Brief."""
         for check in AI_CALL_CHECKS:
             refusal = check(card.choice)
             if refusal is not None:
                 raise CallRefused(refusal)
         if card.on_device:
-            return
+            return card
         limits = caps()
         if card.subscription and not limits.subscription_stops:
             self._say_equivalent(host, brief_id, limits)
-            return
+            return card
         if card.price_in is None or card.price_out is None:
-            await self._ask_unknown_price(host, brief_id, card)
+            card = cards.priced(card)  # a price entered since the card was made
+        if card.price_in is None or card.price_out is None:
+            card = await self._ask_unknown_price(host, brief_id, card)
+        if card.price_in is None or card.price_out is None:
+            await self._token_caps(host, brief_id, limits)
         spent = self._spent(brief_id, count_equivalent=limits.subscription_stops)
         limit = {"brief": limits.brief, "day": limits.day, "month": limits.month}
         for scope, cap in limit.items():
@@ -192,16 +236,65 @@ class Spending:
                 raise CapReached(scope, spent[scope], cap, report=True)
             if choice == "raise":  # the screen saved the new caps: check against them
                 return await self.before_request(host, brief_id=brief_id, card=card)
+        return card
 
-    async def _ask_unknown_price(self, host: TeamHost, brief_id: str, card: ModelCard) -> None:
-        if (brief_id, card.choice) in self._unpriced:
-            return
+    async def _ask_unknown_price(self, host: TeamHost, brief_id: str, card: ModelCard) -> ModelCard:
+        """Once per model, kept: its price (the screen saves it, then answers "price"), or use
+        it without a price. "no" stops the Brief."""
+        if card.choice in self._unpriced or _without_price(card.choice):
+            return card
         detail = copy.fill(copy.PRICE_UNKNOWN, model=card.name)
-        if await host.ask(Card(uuid4().hex, "cap", copy.CAP_TITLE, detail, ("yes", "no"))) != "yes":
-            limits = caps()
-            spent = self.book.spent(brief_id=brief_id, count_equivalent=limits.subscription_stops)
-            raise CapReached("brief", spent, limits.brief)
-        self._unpriced.add((brief_id, card.choice))
+        model = {"connector": card.choice.connector, "model": card.choice.model, "name": card.name}
+        options = ("price", "nocap", "no")
+        asked = Card(uuid4().hex, "price", copy.PRICE_TITLE, detail, options, {"model": model})
+        choice = choice_of(asked, await host.ask(asked))
+        if choice == "price":
+            return cards.priced(card)  # still unknown if nothing was saved: asked again next time
+        if choice == "nocap":
+            self._unpriced.add(card.choice)
+            try:
+                _use_without_price(card.choice)
+            except OSError:
+                pass  # kept for this run of ONE
+            return card
+        limits = caps()
+        spent = self.book.spent(brief_id=brief_id, count_equivalent=limits.subscription_stops)
+        raise CapReached("brief", spent, limits.brief)
+
+    async def _token_caps(self, host: TeamHost, brief_id: str, limits: Caps) -> None:
+        """The caps of a model with no price, on its tokens: a million for each dollar."""
+        used = self._tokens(brief_id)
+        limit = {
+            "brief": limits.brief * TOKENS_PER_USD,
+            "day": limits.day * TOKENS_PER_USD,
+            "month": limits.month * TOKENS_PER_USD,
+        }
+        for scope, cap in limit.items():
+            if used[scope] >= cap:
+                host.emit(self._token_notice(brief_id, "stopped", scope, used[scope], cap))
+                raise CapReached(scope, Decimal(used[scope]), cap)
+        for scope, cap in limit.items():
+            key = (brief_id, f"tokens:{scope}")
+            if used[scope] < cap * Decimal("0.8") or self._asked.get(key) == cap:
+                continue
+            self._asked[key] = cap
+            notice = self._token_notice(brief_id, "paused", scope, used[scope], cap)
+            host.emit(notice)
+            options = ("continue", "raise", "report")
+            choice = await host.ask(Card(uuid4().hex, "cap", copy.CAP_TITLE, notice.text, options))
+            if choice == "report":
+                raise CapReached(scope, Decimal(used[scope]), cap, report=True)
+            if choice == "raise":  # the screen saved the new caps: check against them
+                return await self._token_caps(host, brief_id, caps())
+
+    @staticmethod
+    def _token_notice(
+        brief_id: str, level: Literal["paused", "stopped"], scope: Scope, used: int, cap: Decimal
+    ) -> CostNotice:
+        words = copy.CAP_TOKENS_PAUSED if level == "paused" else copy.CAP_TOKENS_STOPPED
+        used_text, cap_text = f"{used:,}", f"{int(cap):,}"
+        text = copy.fill(words, scope_name=_SCOPE_NAMES[scope], spent=used_text, cap=cap_text)
+        return CostNotice(brief_id, level, scope, used_text, cap_text, False, text)
 
     def _say_equivalent(self, host: TeamHost, brief_id: str, limits: Caps) -> None:
         """The subscription is not held back: at 80% of a cap, One only says so, once."""
@@ -340,7 +433,10 @@ class CostedModel(WrapperModel):
         self.effort = effort  # the run's own `thinking` setting, recorded with each cost
 
     async def _before(self) -> None:
-        await self.spending.before_request(self.host, brief_id=self.brief_id, card=self.card)
+        # a price entered in the card counts from this request on
+        self.card = await self.spending.before_request(
+            self.host, brief_id=self.brief_id, card=self.card
+        )
 
     def _record(self, usage) -> None:
         self.spending.after_response(
@@ -400,9 +496,34 @@ def summary(book: CostBook | None, *, brief_id: str | None, now: datetime) -> di
     def text(values: dict[str, Decimal | None]) -> dict[str, str | None]:
         return {k: None if v is None else format(v, "f") for k, v in values.items()}
 
+    def tokens() -> tuple[dict, dict]:
+        """Every response's tokens, priced or not, and how many had no known price: Costs shows
+        the real tokens and says a price is unknown, never a false 0 (audit B6)."""
+        none = {"input": 0, "output": 0, "unpriced": 0}
+        if book is None:
+            found = {"brief": None if brief_id is None else none, "today": none, "month": none}
+        else:
+            today = now.astimezone(book.local_tz).date()
+            found = {
+                "brief": None if brief_id is None else book.tokens(brief_id=brief_id),
+                "today": book.tokens(day=today),
+                "month": book.tokens(month=(today.year, today.month)),
+            }
+        counts = {
+            k: None if v is None else {"input": v["input"], "output": v["output"]}
+            for k, v in found.items()
+        }
+        return counts, {k: None if v is None else v["unpriced"] for k, v in found.items()}
+
     paid, both = amounts(False), amounts(True)
     equivalent = {k: None if v is None else both[k] - v for k, v in paid.items()}
-    return text(paid) | {"equivalent": text(equivalent), "caps": caps_json(caps())}
+    counts, unpriced = tokens()
+    return text(paid) | {
+        "equivalent": text(equivalent),
+        "tokens": counts,
+        "unpriced": unpriced,
+        "caps": caps_json(caps()),
+    }
 
 
 # The Brief Budget --------------------------------------------------------------------------------

@@ -61,11 +61,17 @@ def _base(price: Decimal | TieredPrices | None) -> Decimal | None:
     return price.base if isinstance(price, TieredPrices) else price
 
 
+def _book_name(model: str) -> str:
+    """The model's name as the price book knows it: Google's OpenAI-compatible list names
+    "models/gemini-…", the book "gemini-…" (audit B6)."""
+    return model.removeprefix("models/")
+
+
 def _genai(card: ModelCard) -> tuple[ModelPrice, str] | None:
     """genai-prices' price for the card's model at its own provider, and its source text."""
     try:
         provider, model = data_snapshot.get_snapshot().find_provider_model(
-            card.choice.model, None, card.provider, None
+            _book_name(card.choice.model), None, card.provider, None
         )
     except LookupError:  # an unknown provider, or a model it does not list
         return None
@@ -119,7 +125,7 @@ def cost(
         )
         try:
             return genai_prices.calc_price(
-                usage, card.choice.model, provider_id=card.provider
+                usage, _book_name(card.choice.model), provider_id=card.provider
             ).total_price
         except LookupError:
             pass  # a card a connector priced itself, under another name

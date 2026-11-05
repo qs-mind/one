@@ -36,8 +36,8 @@ def brief_language(text: str) -> Literal["ar", "en"]:
     return "en" if latin > len(re.findall("[\u0600-\u06ff]", text)) else "ar"
 
 
-# Words only Egyptian Arabic uses (formal Arabic says \u0647\u0630\u0627\u060c \u0645\u0627\u0630\u0627\u060c \u0643\u064a\u0641\u060c \u0623\u064a\u0646\u060c \u0644\u0645\u0627\u0630\u0627\u060c \u0644\u064a\u0633\u060c \u0627\u0644\u0622\u0646\u2026), and
-# its "do it for me" imperatives (\u0642\u0648\u0644\u064a\u060c \u0627\u062d\u0633\u0628\u0644\u064a\u060c \u0642\u0627\u0631\u0646\u0644\u064a). One is enough to answer in Egyptian.
+# Words only Egyptian Arabic uses (formal Arabic says هذا، ماذا، كيف، أين، لماذا، ليس، الآن…),
+# and its "do it for me" imperatives (قولي، احسبلي، قارنلي). One is enough to answer in Egyptian.
 _EGYPTIAN = re.compile(
     r"(?<![\u0600-\u06ff])(?:\u062f\u0647|\u062f\u064a|\u062f\u0648\u0644|\u0625\u064a\u0647|\u0627\u064a\u0647|\u0625\u0632\u0627\u064a|\u0627\u0632\u0627\u064a|\u0639\u0627\u064a\u0632|\u0639\u0627\u064a\u0632\u0629|\u0639\u0627\u0648\u0632|\u0639\u0627\u0648\u0632\u0629|\u0641\u064a\u0646|\u0625\u0645\u062a\u0649|\u0627\u0645\u062a\u0649|"
     r"\u0644\u064a\u0647|\u0645\u0634|\u0643\u062f\u0647|\u0643\u062f\u0627|\u062f\u0644\u0648\u0642\u062a\u064a|\u0627\u0644\u0646\u0647\u0627\u0631\u062f\u0647|\u0627\u0644\u0646\u0647\u0627\u0631\u062f\u0647|\u0628\u062a\u0627\u0639|\u0628\u062a\u0627\u0639\u0629|\u0628\u062a\u0627\u0639\u062a|\u0644\u0633\u0647|\u0628\u0631\u0636\u0647|\u0628\u0631\u062f\u0648|\u0627\u0644\u0644\u064a|"
@@ -139,6 +139,7 @@ CardKind = Literal[
     "outside",
     "online",
     "cap",
+    "price",
     "budget",
     "fallback",
     "desk",

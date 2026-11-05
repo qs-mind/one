@@ -28,8 +28,9 @@ const allow: Labels = { yes: "allowOnce", brief: "allowBrief", no: "dontAllow" }
 const optionTexts: Record<CardData["kind"], Labels> = {
   outside: allow,
   online: allow,
-  // a pause at 80% of a cap; yes and no answer a model of unknown price
+  // a pause at 80% of a cap (yes and no: a card from before the price card)
   cap: { continue: "capContinue", raise: "capRaise", report: "capReport", yes: "useIt", no: "dontUseIt" },
+  price: { price: "enterItsPrice", nocap: "useWithoutPrice", no: "dontUseIt" },
   budget: { yes: "startBrief", no: "dontStart" },
   fallback: { yes: "useIt", no: "dontUseIt" },
   desk: { yes: "keepDesk", no: "dontKeep" },
