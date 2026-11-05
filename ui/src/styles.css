@@ -137,7 +137,8 @@
     transform: rotate(360deg);
   }
 }
-.fl-step {
+/* the step's content slides; its bar of Back, Skip and Next stays still, in the same place on every step */
+.fl-step [data-step] > :not([data-step-bar]) {
   animation: fl-step-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .fl-step[data-way="back"] {
@@ -283,4 +284,52 @@ html.lang-wipe::view-transition-new(root) {
 }
 [dir="rtl"] .shimmer {
   animation-direction: reverse;
+}
+
+/* Scroll edges (ui/src/ui/useScrollEdges.ts): a scroll area fades 24 px at its top or bottom only while there is
+   more to see that way. A mask, so the fade shows whatever is behind the area; the edges ease in and out where the
+   webview can animate a registered length, and simply appear where it cannot. */
+@property --fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.scroll-fade {
+  transition:
+    --fade-top var(--dur-base) var(--ease-calm),
+    --fade-bottom var(--dur-base) var(--ease-calm);
+}
+.scroll-fade[data-more-top] {
+  --fade-top: 24px;
+}
+.scroll-fade[data-more-bottom] {
+  --fade-bottom: 24px;
+}
+.scroll-fade:is([data-more-top], [data-more-bottom]) {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-fade {
+    transition: none;
+  }
+}
+
+/* A total rolling to its new value (ui/src/ui/RollingNumber.tsx): a digit that changed is a one-figure window; the
+   old figure slides out of it as the new one slides in. The window is the new figure's width, so the number takes
+   the same room while it rolls as at rest. */
+.roll-col {
+  position: relative;
+  display: inline-block;
+  clip-path: inset(0);
+}
+.roll-from {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
 }

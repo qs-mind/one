@@ -9,6 +9,7 @@ import { ChatLog } from "../chat/Chat";
 import { ConsentNeeded } from "../firstlaunch/ConnectAi";
 import { dir, t, useLanguage } from "../i18n";
 import { type Ai, AiSettings } from "../settings/AiSettings";
+import { useScrollEdges } from "../ui/useScrollEdges";
 import type { ChatState } from "./useChats";
 
 export const CHAT_WIDTH = { min: 320, max: 640, start: 420, step: 16 };
@@ -29,11 +30,13 @@ export type ChatBodyProps = {
 /** AI settings while nothing is connected, else the conversation; above both, the way to the AI consent while the
  * engineer has not given it (until then the core refuses every AI call). */
 export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpenDeliverable }: ChatBodyProps) {
+  const settings = useRef<HTMLDivElement>(null);
+  useScrollEdges(settings);
   return (
     <>
       <ConsentNeeded />
       {aiMain && (
-        <div className={ai.connected === false ? "min-h-0 flex-1 overflow-y-auto" : "max-h-[50%] shrink-0 overflow-y-auto"}>
+        <div ref={settings} className={`scroll-fade ${ai.connected === false ? "min-h-0 flex-1 overflow-y-auto" : "max-h-[50%] shrink-0 overflow-y-auto"}`}>
           <AiSettings ai={ai} onClose={ai.connected === false ? undefined : onAiClose} />
         </div>
       )}

@@ -6,8 +6,10 @@ import { deliverablesApi } from "../../deliverables/api";
 import type { Change, NumberCell, Op, SheetView, Thread, ViewRow } from "../../deliverables/types";
 import { isNumber } from "../../deliverables/types";
 import { count, dir, fill, language, pick, t, texts, useLanguage, type Text } from "../../i18n";
+import { RollingNumber } from "../../ui/RollingNumber";
 import { cellText, pasteOps, parseTsv, toHtml, toTsv, why } from "./clipboard";
-import { cellKey, cellName, commentMarks, pendingCells, SheetCell, Value } from "./cells";
+import { cellKey, cellName, commentMarks, pendingCells, SheetCell } from "./cells";
+import { formatDecimal } from "./format";
 import { loadCollapsed, saveCollapsed, visibleRows } from "./collapse";
 import { Grid, type GridHandle, type SheetColumn } from "./grid";
 import { linesHeight, makeMeasure, rowHeight, titleColumnOf } from "./heights";
@@ -267,12 +269,15 @@ export function SheetViewer(props: SheetViewerProps) {
           className="w-full text-end font-bold hover:text-copper"
           onClick={(event) => openSource(total, event.currentTarget, event.detail === 0)}
         >
-          <Value cell={total} />
+          {/* the core's total, rolling to its new value when an edit changes it; another Deliverable's shows still */}
+          <bdi dir="ltr">
+            <RollingNumber key={view.id} text={formatDecimal(total.value, total.currency ? 2 : undefined)} />
+          </bdi>
         </button>
       );
     },
     // openSource reads the layout when called
-    [titleColumn, totalColumn, total, view.language],
+    [titleColumn, totalColumn, total, view.language, view.id],
   );
 
   const full = props.mode === "full";

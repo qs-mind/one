@@ -1,7 +1,10 @@
 // What every first-launch screen shares: its frame (title, help, the step's own content, then Back, Skip and Next),
 // the buttons and the fields, in the screen's usual look: Paper, Stone surfaces, Ink for the one main action.
+// Back, Skip and Next sit in a bar at the foot of the window, in the same place on every step: a feedback line or a
+// longer step never moves them or pushes them out of sight (the step scrolls under the bar instead).
 import { type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react";
 import { t, useLanguage } from "../i18n";
+import { AutoHeight } from "../ui/AutoHeight";
 
 export type Step = "language" | "account" | "ai" | "card" | "usage";
 export const STEPS: readonly Step[] = ["language", "account", "ai", "card", "usage"];
@@ -13,6 +16,8 @@ export type Setup = { done: boolean; steps: Record<Step, StepState> };
 export type Nav = {
   back?: () => void;
   pass: (state: "done" | "skipped") => Promise<boolean>;
+  /** The core did not save the step's end: the step says so, above its bar. */
+  notSaved?: boolean;
 };
 
 // Opening the flow from inside the app -------------------------------------------------------------------------------
@@ -107,7 +112,8 @@ export function Alert({ children }: { children: ReactNode }) {
   return <Feedback state="failed">{children}</Feedback>;
 }
 
-/** One screen of the flow. Its heading takes focus when it opens, so a screen reader hears each new step. */
+/** One screen of the flow. Its heading takes focus when it opens, so a screen reader hears each new step. It fills
+ * the flow's height (FirstLaunch), so its bar sits at the window's foot; its content eases to a new height. */
 export function StepScreen({
   title,
   help,
@@ -135,16 +141,22 @@ export function StepScreen({
   const id = useId();
   useEffect(() => heading.current?.focus({ preventScroll: true }), [title]);
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-8">
+    <section aria-labelledby={id} data-step="" className="flex flex-1 flex-col gap-8">
       <div className="flex flex-col gap-3">
         <h1 id={id} ref={heading} tabIndex={-1} className="text-2xl font-semibold text-ink outline-none">
           {title}
         </h1>
         {help && <p className="text-slate">{help}</p>}
       </div>
-      {children}
-      <Alert>{failed}</Alert>
-      <div className="flex flex-wrap items-center gap-2 pt-2">
+      <AutoHeight className="flex flex-col gap-8">
+        {children}
+        <Alert>{failed ?? (nav.notSaved && t("setupNotSaved"))}</Alert>
+      </AutoHeight>
+      {/* on Paper, with a Paper fade above it, so the step scrolls softly under it */}
+      <div
+        data-step-bar=""
+        className="sticky bottom-0 mt-auto flex flex-wrap items-center gap-2 bg-paper pt-2 pb-6 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-6 before:bg-linear-to-t before:from-paper before:to-transparent"
+      >
         {nav.back && (
           <button type="button" onClick={nav.back} className={`${quiet} -ms-3`}>
             {t("setupBack")}

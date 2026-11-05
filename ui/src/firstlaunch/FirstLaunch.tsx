@@ -15,7 +15,7 @@ import { Account } from "./Account";
 import { ConnectAi } from "./ConnectAi";
 import { IntroCard } from "./IntroCard";
 import { Language } from "./Language";
-import { Alert, closeSetup, type Nav, primary, type Setup, type Step, StepScreen, STEPS, useSetupRequest } from "./parts";
+import { closeSetup, type Nav, primary, type Setup, type Step, StepScreen, STEPS, useSetupRequest } from "./parts";
 import { UsageStats } from "./UsageStats";
 
 export { openSetup } from "./parts";
@@ -141,20 +141,23 @@ export function FirstLaunch({
   const nav = (step: Step): Nav => ({
     back: at > 0 && !only ? back : undefined,
     pass: (state) => pass(step, state),
+    notSaved,
   });
 
   return (
-    <div dir={dir()} data-firstlaunch="" className="flex min-h-dvh flex-col overflow-y-auto bg-paper text-ink">
+    // the window's height, scrolling inside, so each step's bar can stay at the window's foot (parts.tsx StepScreen);
+    // a line scrolled into view stops above the bar
+    <div dir={dir()} data-firstlaunch="" className="flex h-dvh scroll-pb-28 flex-col overflow-y-auto bg-paper text-ink">
       <header className="flex items-center gap-3 px-6 py-4 text-slate">
         <Mark />
         <span className="font-semibold text-ink">{t("appName")}</span>
         <span aria-hidden="true">·</span>
         <span>{t("setupTitle")}</span>
       </header>
-      <main className="flex flex-1 justify-center px-4 pt-6 pb-12 sm:pt-16">
+      <main className="flex flex-1 justify-center px-4 pt-6 sm:pt-16">
         <div className="flex w-full max-w-[36rem] flex-col gap-8">
           {!only && <Dots at={at} />}
-          <div key={screen} data-way={way} className="fl-step">
+          <div key={screen} data-way={way} className="fl-step flex flex-1 flex-col">
             {screen === "language" && <Language nav={nav("language")} />}
             {screen === "account" && <Account nav={nav("account")} />}
             {screen === "ai" && <ConnectAi nav={nav("ai")} />}
@@ -170,7 +173,6 @@ export function FirstLaunch({
               />
             )}
           </div>
-          {notSaved && <Alert>{t("setupNotSaved")}</Alert>}
         </div>
       </main>
     </div>

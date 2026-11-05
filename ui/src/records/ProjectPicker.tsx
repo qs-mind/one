@@ -6,6 +6,7 @@ import { api } from "../api";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 import { askForBackupFolder } from "../backup/ask";
 import { coreLine } from "../core";
+import { useScrollEdges } from "../ui/useScrollEdges";
 import { currentProject, type Project, setCurrentProject, switchProject, useProject } from "./project";
 
 type Listed = (Project & { open: boolean }) | { id: string; error: Text };
@@ -28,6 +29,10 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
   const [failed, setFailed] = useState<Text>();
   const toFocus = useRef<HTMLButtonElement>(null);
   const nameField = useRef<HTMLInputElement>(null);
+  const workingList = useRef<HTMLUListElement>(null);
+  const archivedList = useRef<HTMLUListElement>(null);
+  useScrollEdges(workingList);
+  useScrollEdges(archivedList);
 
   const load = useCallback(async () => {
     setList({ state: "loading" });
@@ -151,11 +156,11 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
           </div>
         )}
         {list.state === "ready" && list.projects.length === 0 && <p className="text-slate">{t("noProjects")}</p>}
-        {working.length > 0 && <ul className="flex max-h-[40dvh] flex-col gap-1 overflow-y-auto">{working.map(row)}</ul>}
+        {working.length > 0 && <ul ref={workingList} className="scroll-fade flex max-h-[40dvh] flex-col gap-1 overflow-y-auto">{working.map(row)}</ul>}
         {archived.length > 0 && (
           <div className="flex flex-col gap-1">
             <h3 className="px-3 text-sm text-slate">{t("archivedGroup")}</h3>
-            <ul className="flex max-h-[30dvh] flex-col gap-1 overflow-y-auto">{archived.map(row)}</ul>
+            <ul ref={archivedList} className="scroll-fade flex max-h-[30dvh] flex-col gap-1 overflow-y-auto">{archived.map(row)}</ul>
           </div>
         )}
         <form onSubmit={create} className="flex flex-col gap-2 border-t border-stone pt-3">
