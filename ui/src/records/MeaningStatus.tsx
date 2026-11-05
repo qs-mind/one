@@ -1,147 +1,71 @@
-// Search by meaning in Project Records: one line for the search model's state and at most one button.
-// The core holds the state; the line polls GET /api/meaning every second while something moves.
+// Search by meaning in Project files: one quiet Slate line, and only while it gets ready or when it is not.
+// Nothing to press (5 Nov 2026): the core downloads the search model by itself the first time a project has a
+// file, then prepares each open project; a failure waits for the next start. The line polls GET /api/meaning
+// every second while something moves; `files` changing (a file came in) asks again at once.
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
-import { ProgressBar } from "../ui/ProgressBar";
-import { WorkDots } from "../ui/WorkDots";
+import { fill, t, useLanguage } from "../i18n";
 
-type Model = {
-  state: "off" | "downloading" | "checking" | "stopped" | "failed" | "ready" | "unavailable";
-  done_bytes: number;
-  total_bytes: number;
-  reason: Text | null;
-};
-type Job = { state: "waiting" | "indexing" | "ready" | "failed"; done: number; total: number; reason: Text | null };
-type Status = { model: Model; indexing: { paused: boolean; projects: Record<string, Job | undefined> } };
+type Model = { state: "off" | "downloading" | "checking" | "failed" | "ready" | "unavailable"; done_bytes: number; total_bytes: number };
+type Job = { state: "waiting" | "indexing" | "ready" | "failed"; done: number; total: number };
+type Status = { model: Model; indexing: { projects: Record<string, Job | undefined> } };
 
-/** "420 MB" or "1.2 GB": Latin units and Western digits in both languages, as in the rest of the screen. */
-export function formatBytes(n: number): string {
-  return n < 1e9 ? `${Math.round(n / 1e6)} MB` : `${(n / 1e9).toFixed(1)} GB`;
+/** "42%": Western digits in both languages, as in the rest of the screen. */
+function percent(done: number, total: number): string {
+  return `${total > 0 ? Math.min(100, Math.floor((done / total) * 100)) : 0}%`;
 }
 
-/** True while the line must keep polling: a download, its check, or this project's preparing. */
+/** True while the line must keep polling: the download, its check, or this project's preparing. */
 function moving({ model, indexing }: Status, projectId: string): boolean {
   if (model.state === "downloading" || model.state === "checking") return true;
   const job = indexing.projects[projectId];
-  return model.state === "ready" && !indexing.paused && (job?.state === "indexing" || job?.state === "waiting");
+  return model.state === "ready" && (job?.state === "indexing" || job?.state === "waiting");
 }
 
-type Shown = { line: string; tone: "ink" | "slate" | "copper"; button?: { label: Text; post: string }; count?: { done: number; total: number }; running?: boolean };
-
-function shown({ model, indexing }: Status, projectId: string): Shown {
-  const bytes = { done: formatBytes(model.done_bytes), total: formatBytes(model.total_bytes) };
-  switch (model.state) {
-    case "off":
-      return {
-        line: fill(t("meaningOff"), { size: formatBytes(model.total_bytes) }),
-        tone: "ink",
-        button: { label: texts.meaningDownload, post: "download" },
-      };
-    case "downloading":
-      return {
-        line: fill(t("meaningDownloading"), bytes),
-        tone: "ink",
-        button: { label: texts.meaningStop, post: "stop" },
-        count: { done: model.done_bytes, total: model.total_bytes },
-      };
-    case "stopped":
-      return {
-        line: fill(t("meaningStopped"), bytes),
-        tone: "ink",
-        button: { label: texts.meaningResume, post: "download" },
-      };
-    case "checking":
-      return { line: t("meaningChecking"), tone: "ink", running: true };
-    case "failed":
-      return {
-        line: model.reason ? pick(model.reason) : "",
-        tone: "copper",
-        button: { label: texts.meaningRetry, post: "download" },
-      };
-    case "unavailable":
-      return { line: model.reason ? pick(model.reason) : "", tone: "slate" };
-  }
+/** The line, or none: nothing while off (no file yet), ready, or on a computer that cannot run it. */
+function line({ model, indexing }: Status, projectId: string): string | undefined {
+  if (model.state === "downloading" || model.state === "checking")
+    return fill(t("meaningPreparing"), { percent: percent(model.done_bytes, model.total_bytes) });
+  if (model.state === "failed") return t("meaningNotReady");
+  if (model.state !== "ready") return undefined;
   const job = indexing.projects[projectId];
-  if (job?.state === "failed")
-    return {
-      line: job.reason ? pick(job.reason) : "",
-      tone: "copper",
-      button: { label: texts.meaningRetry, post: "resume" },
-    };
-  if (job && job.state !== "ready") {
-    if (indexing.paused)
-      return {
-        line: fill(t("meaningPaused"), { done: job.done, total: job.total }),
-        tone: "ink",
-        button: { label: texts.meaningResume, post: "resume" },
-      };
-    return {
-      line: fill(t("meaningIndexing"), { done: job.done, total: job.total }),
-      tone: "ink",
-      button: { label: texts.meaningPause, post: "pause" },
-      count: { done: job.done, total: job.total },
-    };
-  }
-  return { line: t("meaningReady"), tone: "slate" };
+  if (job?.state === "failed") return t("meaningNotReady");
+  if (job && job.state !== "ready" && job.total > job.done)
+    return fill(t("meaningPreparing"), { percent: percent(job.done, job.total) });
+  return undefined;
 }
 
-const toneClass = { ink: "", slate: "text-slate", copper: "text-copper" } as const;
-
-export function MeaningStatus({ projectId }: { projectId: string }) {
+export function MeaningStatus({ projectId, files = 0 }: { projectId: string; files?: number }) {
   useLanguage();
   const [status, setStatus] = useState<Status>();
-  const [pressing, setPressing] = useState(false);
-  const [asked, setAsked] = useState(0); // a button press polls again at once
 
   useEffect(() => {
     let live = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let last: Status | undefined;
+    let waits = 0; // polls spent waiting for the core to start on a new file (the core looks every 5 s)
     async function poll() {
       const response = await api("/meaning").catch(() => undefined);
       const body = response?.ok ? ((await response.json().catch(() => undefined)) as Status | undefined) : undefined;
       if (!live) return;
       if (body) setStatus((last = body));
-      // a missed answer keeps the last line; polling goes on while that line still moves
-      if (last && moving(last, projectId)) timer = setTimeout(() => void poll(), 1000);
+      // a missed answer keeps the last line; polling goes on while that line still moves, and for a few seconds
+      // while the core has not yet started on a new file (one with no text never starts it)
+      const waiting = files > 0 && last?.model.state === "off" && waits++ < 10;
+      if (last && (moving(last, projectId) || waiting)) timer = setTimeout(() => void poll(), 1000);
     }
     void poll();
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [projectId, asked]);
+  }, [projectId, files]);
 
-  if (!status) return null;
-  const { line, tone, button, count, running } = shown(status, projectId);
-
-  async function press(post: string) {
-    setPressing(true);
-    await api(`/meaning/${post}`, { method: "POST" }).catch(() => undefined);
-    setPressing(false);
-    setAsked((n) => n + 1);
-  }
-
+  const shown = status && line(status, projectId);
+  if (!shown) return null;
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-4">
-        <p role="status" className={`flex items-baseline gap-2 ${toneClass[tone]}`}>
-          {line}
-          {running && <WorkDots />}
-        </p>
-        {button && (
-          <button
-            type="button"
-            disabled={pressing}
-            onClick={() => void press(button.post)}
-            className="shrink-0 rounded-md border border-ink px-4 py-2 disabled:opacity-40"
-          >
-            {pick(button.label)}
-          </button>
-        )}
-      </div>
-      {count && <ProgressBar done={count.done} total={count.total} className="h-0.5 w-full" />}
-    </div>
+    <p role="status" className="text-slate">
+      {shown}
+    </p>
   );
 }
