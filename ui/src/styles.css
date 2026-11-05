@@ -404,3 +404,111 @@ html.lang-wipe::view-transition-new(root) {
 [dir="rtl"] .undo-line {
   transform-origin: right center;
 }
+
+/* Calm interaction details (ui/src/ui/TabUnderline, Segmented, Glide, Tip, ProgressBar, InkCheck): marks that slide
+   to what is chosen or reached, measured from the real positions and anchored at the physical left, so they land
+   right in Arabic too. Transform and opacity only, EASE, 150 to 300 ms; a mark's first place shows at once and it
+   glides only once [data-ready]. Reduced motion: every mark jumps, nothing fades. */
+.tab-underline,
+.segment-thumb,
+.glide-mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+/* a 1 px Ink line, 2 px tall, stretched to the tab's width */
+.tab-underline {
+  top: auto;
+  bottom: 0;
+  width: 1px;
+  height: 2px;
+  background: var(--color-ink);
+  transform-origin: 0 0;
+  transform: translateX(var(--x, 0)) scaleX(var(--w, 0));
+}
+.tab-underline[data-hidden] {
+  opacity: 0;
+}
+.segment-thumb {
+  z-index: -1;
+  border-radius: 6px;
+  background: var(--color-stone);
+  transform: translate(var(--x, 0), var(--y, 0));
+}
+.glide-mark {
+  z-index: -1;
+  border-radius: 10px;
+  background: var(--color-stone);
+  opacity: 0;
+  transform: translate(var(--x, 0), var(--y, 0));
+  transition: opacity var(--dur-short) ease-out;
+}
+.glide-mark[data-on] {
+  opacity: 1;
+}
+.tab-underline[data-ready],
+.segment-thumb[data-ready] {
+  transition: transform var(--dur-base) var(--ease-calm);
+}
+.glide-mark[data-ready] {
+  transition:
+    transform var(--dur-short) var(--ease-calm),
+    opacity var(--dur-short) ease-out;
+}
+/* cmdk's list holds its rows in a sizer: the palette's glide moves in that */
+[cmdk-list-sizer] {
+  position: relative;
+  isolation: isolate;
+}
+/* a real count's bar grows from the side the words start on */
+.progress-fill {
+  transform-origin: left center;
+  transition: transform var(--dur-long) var(--ease-calm);
+}
+[dir="rtl"] .progress-fill {
+  transform-origin: right center;
+}
+.progress-fill[data-still] {
+  transition: none;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+}
+.tip-in {
+  animation: tip-in var(--dur-short) ease-out;
+}
+/* the ink check beside a select that just saved: it rises in, draws itself, then fades before it goes (900 ms in all,
+   InkCheck.tsx CHECK_SHOWN) */
+.saved-check {
+  animation:
+    fl-rise 200ms var(--ease-calm) both,
+    fl-fade-out 240ms ease-out 660ms forwards;
+}
+/* small switches and icon buttons: a 32 px tap area at least, from an invisible layer centred on them */
+.tap {
+  position: relative;
+}
+.tap::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 32px);
+  height: max(100%, 32px);
+  transform: translate(-50%, -50%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-underline,
+  .segment-thumb,
+  .glide-mark,
+  .progress-fill {
+    transition: none !important;
+  }
+  .tip-in,
+  .saved-check {
+    animation: none !important;
+  }
+}
