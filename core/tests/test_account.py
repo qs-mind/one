@@ -214,7 +214,7 @@ def test_sign_in_on_a_second_computer_adopts_the_vault_key(
 
     assert keys.backup_key() == other
     local_doc = keys.read_doc(projects.root / pid / keys.KEY_FILE)
-    backed_doc = keys.read_doc(folder / "QS Mind One Backup" / pid / keys.KEY_FILE)
+    backed_doc = keys.read_doc(folder / "QS Mind ONE Backup" / pid / keys.KEY_FILE)
     for doc in (local_doc, backed_doc):
         assert doc["key_id"] == keys.key_id(other)
         assert keys.unwrap(doc, backup_key=other) == project_key

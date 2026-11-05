@@ -108,7 +108,7 @@ def test_an_escrow_that_fails_never_blocks():
 def test_adopt_wraps_every_key_file_again(tmp_path, data_dir, bk, memory_keyring):
     old = keys.ensure_backup_key()
     local = data_dir / "projects" / ("a" * 32)
-    folder = tmp_path / "usb" / "QS Mind One Backup" / ("a" * 32)
+    folder = tmp_path / "usb" / "QS Mind ONE Backup" / ("a" * 32)
     for place in (local, folder):
         place.mkdir(parents=True)
         keys.write_doc(

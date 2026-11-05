@@ -1,4 +1,4 @@
-"""Backup copies on disk: `<folder>/QS Mind One Backup/<project id>/<UTC time>.db` plus `key.json`,
+"""Backup copies on disk: `<folder>/QS Mind ONE Backup/<project id>/<UTC time>.db` plus `key.json`,
 and `engineer/` the same way. Every name is an id or a time, so nothing in the folder is
 readable. A copy is encrypted with the project's own key; its `key.json` holds that key wrapped
 by the Backup key, or by the project's recovery code for a Confidential Project. Log ids only."""
@@ -22,7 +22,7 @@ from qsone.records.project import FILE_NAME, Records
 
 log = logging.getLogger(__name__)
 
-BACKUP_DIR = "QS Mind One Backup"  # not "ONE": Linux would no longer find the backups made before
+BACKUP_DIR = "QS Mind ONE Backup"
 ENGINEER = engineer.FOLDER  # the Engineer Records folder, backed up as one more id
 _ID = re.compile(r"[0-9a-f]{32}")
 _STAMP = "%Y-%m-%dT%H%M%SZ"  # no colons: a valid file name on every system
