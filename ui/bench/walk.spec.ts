@@ -12,6 +12,8 @@ test("full tender walk-through, in Arabic", async ({ walk }) => {
   await walk.shot("files-added");
   const kinds = await walk.brief("سعّر جدول الكميات المرفق وجهّز العطاء");
   expect.soft(kinds, "the cards of the walk-through, in order").toEqual(["rows", "question", "approval", "rows"]);
+  // the Brief's steps fold into its work log line when it ends; open it to read them
+  await walk.chat.getByRole("button", { name: /^اشتغل|^Worked for/ }).last().click();
   await expect.soft(walk.chat.getByText(/مهندس المراجعة|Checking QS/).first(), "the Checking QS's review is in the chat").toBeVisible();
   await walk.deliverables(2);
 });

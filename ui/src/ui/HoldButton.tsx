@@ -80,6 +80,7 @@ export function HoldButton({
         type="button"
         disabled={disabled}
         aria-describedby={hintId}
+        data-hold
         onPointerDown={(event) => event.button === 0 && start()}
         onPointerUp={release}
         onPointerLeave={release}

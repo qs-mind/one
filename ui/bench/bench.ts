@@ -226,7 +226,16 @@ export class Walk {
     } else {
       await this.shot("approval-card");
       const yes = card.getByRole("button", { name: this.w.yes, exact: true });
-      await (await yes.count() ? yes : card.getByRole("button").first()).click();
+      const button = (await yes.count()) ? yes : card.getByRole("button").first();
+      if ((await button.getAttribute("data-hold")) === null) await button.click();
+      else {
+        // paid or irreversible: the engineer holds it (about 900 ms), a click does nothing
+        const box = (await button.boundingBox())!;
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await this.page.mouse.down();
+        await this.page.waitForTimeout(1200);
+        await this.page.mouse.up();
+      }
     }
     await expect.soft(answers, `the ${kind} card shows its answer`).toHaveCount(before + 1);
     await this.shot(`${kind}-answered`);
