@@ -1135,3 +1135,294 @@ UPDATE_FIRST = {
     ),
     "ar": "راجع «تحديث من سجلات المشروع» الأول: سجلات المشروع اتغيرت من ساعة الإصدار ده.",
 }
+
+# Tools (Plan 5). Activity words: the Progress Line and the online and outside cards show them,
+# so they hold the exact thing that would leave One.
+DOING_WEB_SEARCH = {"en": "Search the web for: {query}", "ar": "يدوّر في الويب على: {query}"}
+DOING_WEB_READ = {"en": "Open the web page: {url}", "ar": "يفتح صفحة الويب: {url}"}
+DOING_FILES_READ = {"en": "Read {name}, pages {pages}", "ar": "يقرا {name}، صفحات {pages}"}
+DOING_BOQ_IMPORT = {
+    "en": "Import the BOQ from {name}, sheet {sheet}",
+    "ar": "يستورد المقايسة من {name}، شيت {sheet}",
+}
+DOING_PRICES = {"en": "Look up the price of: {item}", "ar": "يدوّر على سعر: {item}"}
+DOING_SANDBOX = {
+    "en": "Run a script in the Sandbox on {count} files",
+    "ar": "يشغّل سكريبت في الصندوق المعزول على {count} ملف",
+}
+DOING_CONNECTOR = {
+    "en": "Use {connector}: {tool} with {args}",
+    "ar": "يستخدم {connector}: {tool} بـ {args}",
+}
+DOING_ASK = {"en": "Waiting for your answer", "ar": "مستني ردك"}
+
+ON_DEVICE_NO_ONLINE = {
+    "en": (
+        "This is an On-device Project: nothing leaves this computer, so One cannot do this here."
+    ),
+    "ar": "ده مشروع على الجهاز: مفيش حاجة بتخرج من الجهاز، فـ One مش هيقدر يعمل ده هنا.",
+}
+
+# The web.
+WEB_OFFLINE = {
+    "en": (
+        "No internet connection, so One could not reach the web. "
+        "It will try again when the connection is back."
+    ),
+    "ar": "مفيش نت، فـ One مقدرش يوصل للويب. هيحاول تاني لما النت يرجع.",
+}
+WEB_NO_SEARCH = {
+    "en": (
+        "No web search is set up. Add a search key in Settings, connect an AI that can search "
+        "(Claude), or subscribe to QS Mind."
+    ),
+    "ar": (
+        "مفيش بحث على الويب متظبط. ضيف مفتاح بحث من الإعدادات، أو وصّل ذكاء اصطناعي بيعرف يدوّر "
+        "(Claude)، أو اشترك في QS Mind."
+    ),
+}
+WEB_SEARCH_KEY_REFUSED = {
+    "en": "The search key was refused. Check it in Settings.",
+    "ar": "مفتاح البحث اترفض. راجعه من الإعدادات.",
+}
+WEB_SEARCH_LIMIT = {
+    "en": (
+        "This month's search allowance is used up. Add your own search key in Settings to continue."
+    ),
+    "ar": "رصيد البحث للشهر ده خلص. ضيف مفتاح بحث بتاعك من الإعدادات عشان تكمّل.",
+}
+WEB_SEARCH_BUSY = {
+    "en": "The search service is busy. Try again in a minute.",
+    "ar": "خدمة البحث عليها ضغط. جرّب تاني كمان دقيقة.",
+}
+WEB_BAD_URL = {
+    "en": "Send a full web address that starts with https:// or http://.",
+    "ar": "ابعت عنوان ويب كامل بيبدأ بـ https:// أو http://.",
+}
+WEB_PRIVATE_ADDRESS = {
+    "en": "This address points inside this computer or its local network, so One will not open it.",
+    "ar": "العنوان ده بيشاور على حاجة جوه الجهاز أو الشبكة المحلية، فـ One مش هيفتحه.",
+}
+WEB_PAGE_REFUSED = {
+    "en": "The site refused the page, or it does not exist.",
+    "ar": "الموقع رفض الصفحة، أو هي مش موجودة.",
+}
+WEB_SITE_DOWN = {
+    "en": "The site did not answer in time. Try again later.",
+    "ar": "الموقع مارَدّش في الوقت. جرّب تاني بعدين.",
+}
+WEB_TOO_BIG = {
+    "en": "The page is larger than 10 MB, so One did not read it.",
+    "ar": "الصفحة أكبر من 10 ميجا، فـ One ماقراهاش.",
+}
+WEB_KIND_NOT_READ = {
+    "en": "One cannot read this kind of web file yet.",
+    "ar": "One لسه مش بيقرا النوع ده من ملفات الويب.",
+}
+WEB_ROBOTS = {
+    "en": "The site asks programs not to read this page, so One did not.",
+    "ar": "الموقع طالب من البرامج ماتقراش الصفحة دي، فـ One ماقراهاش.",
+}
+WEB_QUERY_NAMES_PROJECT = {
+    "en": "Search in general words, without the project's or the client's name.",
+    "ar": "دوّر بكلام عام، من غير اسم المشروع أو اسم العميل.",
+}
+WEB_NO_DATE = {
+    "en": "The page shows no date; the date it was read is given instead.",
+    "ar": "الصفحة مفيهاش تاريخ؛ مكتوب بدله تاريخ قرايتها.",
+}
+
+# Files.
+FILE_NOT_IN_PROJECT = {
+    "en": "There is no file with this id here. files_list shows the files.",
+    "ar": "مفيش ملف بالرقم ده هنا. files_list بيعرض الملفات.",
+}
+FILE_PAGES_OUT_OF_RANGE = {
+    "en": "Those pages are not in the file. It has {pages}.",
+    "ar": "الصفحات دي مش في الملف. الملف فيه {pages}.",
+}
+FILE_OLD_WORD = {
+    "en": (
+        "Kept. One reads Word files saved as .docx: open this one in Word, save it as .docx, "
+        "then drop it again."
+    ),
+    "ar": (
+        "اتحفظ. One بيقرا ملفات Word المحفوظة .docx: افتح الملف ده في Word واحفظه .docx "
+        "وبعدين ارميه تاني."
+    ),
+}
+FILE_DWG_NOT_YET = {
+    "en": "Kept. One cannot read DWG drawings yet: save a DXF copy, or use the Qiyas Connector.",
+    "ar": "اتحفظ. One لسه مش بيقرا رسومات DWG: احفظ نسخة DXF، أو استخدم موصّل قياس.",
+}
+FILE_IMAGE_STORED = {
+    "en": "Kept. One reads the image when it is asked to.",
+    "ar": "اتحفظت. One هيقرا الصورة لما يتطلب منه.",
+}
+FILE_HIDDEN_TEXT = {
+    "en": (
+        "This file has hidden text (white, tiny or invisible) or lines that look like orders to "
+        "an AI. One treats them as data only and shows them to you and the Checking QS."
+    ),
+    "ar": (
+        "الملف ده فيه نص مخفي (أبيض أو صغير جداً أو مش ظاهر) أو سطور شكلها أوامر لذكاء اصطناعي. "
+        "One بيتعامل معاها كبيانات بس وبيوريها ليك ولمهندس المراجعة."
+    ),
+}
+
+# Scanned pages, read by the engineer's AI.
+OCR_NEEDS_MODEL = {
+    "en": (
+        "Reading scanned pages needs an AI model that can read images. Connect one, then ask again."
+    ),
+    "ar": "قراية الصفحات المتصورة محتاجة نموذج ذكاء اصطناعي بيقرا الصور. وصّل واحد واطلب تاني.",
+}
+OCR_FAILED = {
+    "en": "The page image could not be read. Try again, or use another model.",
+    "ar": "صورة الصفحة مااتقرتش. جرّب تاني، أو استخدم نموذج تاني.",
+}
+OCR_ASK = {
+    "en": "Read {pages} scanned pages with {model}? About {cost}.",
+    "ar": "أقرا {pages} صفحة متصورة بـ {model}؟ تقريباً {cost}.",
+}
+
+# BOQ import.
+BOQ_NO_SHEET = {
+    "en": "This file has no sheet by that name. The sheets are: {sheets}.",
+    "ar": "الملف ده مفيهوش شيت بالاسم ده. الشيتات: {sheets}.",
+}
+BOQ_BAD_COLUMNS = {
+    "en": 'Map at least the description, unit and quantity columns, by letter (e.g. "C").',
+    "ar": 'حدّد على الأقل أعمدة الوصف والوحدة والكمية، بالحرف (زي "C").',
+}
+BOQ_ROW_SKIPPED = {
+    "en": "Row {row} was not imported: {why}",
+    "ar": "الصف {row} مااتستوردش: {why}",
+}
+
+# Evidence for numbers.
+SOURCE_NOT_EVIDENCE = {
+    "en": (
+        "A source must point to real evidence: a file and its page or row, a web page One read, "
+        "a QS Mind price, or the engineer's answer."
+    ),
+    "ar": (
+        "المصدر لازم يشاور على دليل حقيقي: ملف وصفحته أو صفه، أو صفحة ويب One قراها، "
+        "أو سعر من QS Mind، أو رد المهندس."
+    ),
+}
+NUMBER_NEEDS_CALC = {
+    "en": (
+        "A computed number comes only from the QS Calc Engine. "
+        "Send the formula there; it records the result with its sources."
+    ),
+    "ar": "الرقم المحسوب بييجي من محرك الحسابات بس. ابعت المعادلة هناك؛ هو بيسجل النتيجة بمصادرها.",
+}
+
+# What to keep.
+KEEP_ASK = {"en": "Keep {kind} in your records?", "ar": "أحفظ {kind} في سجلاتك؟"}
+KEEP_NEVER = {
+    "en": "Not kept: you chose never to keep {kind}.",
+    "ar": "ماتحفظش: إنت اخترت ماتتحفظش {kind} أبداً.",
+}
+KEEP_ENGINEER_ASK = {
+    "en": "Keep this for all your projects?",
+    "ar": "أحفظ ده لكل مشاريعك؟",
+}
+KEEP_KINDS = {
+    "phone": {"en": "phone numbers", "ar": "أرقام التليفون"},
+    "email": {"en": "email addresses", "ar": "الإيميلات"},
+    "person_name": {"en": "people's names", "ar": "أسامي الأشخاص"},
+    "address": {"en": "addresses", "ar": "العناوين"},
+    "national_id": {"en": "ID numbers", "ar": "أرقام البطاقات"},
+    "whatsapp": {"en": "WhatsApp numbers", "ar": "أرقام الواتساب"},
+}
+
+# Prices.
+PRICES_ASK = {
+    "en": "Keep these prices? Tick the rows to keep.",
+    "ar": "أحفظ الأسعار دي؟ علّم على الصفوف اللي تتحفظ.",
+}
+PRICES_NOT_SUBSCRIBED = {
+    "en": (
+        "QS Mind Prices come with a QS Mind subscription. "
+        "Showing your own prices and this project's."
+    ),
+    "ar": "أسعار QS Mind بتيجي مع اشتراك QS Mind. بنعرض أسعارك وأسعار المشروع ده.",
+}
+PRICES_OFFLINE = {
+    "en": "No internet: showing the QS Mind prices saved on {date}.",
+    "ar": "مفيش نت: بنعرض أسعار QS Mind المحفوظة يوم {date}.",
+}
+PRICES_DOWN = {
+    "en": "QS Mind Prices did not answer. Showing the prices saved on {date}.",
+    "ar": "أسعار QS Mind مارَدّتش. بنعرض الأسعار المحفوظة يوم {date}.",
+}
+PRICES_NONE_FOUND = {
+    "en": "No price was found for this item. Try other words, or search the market.",
+    "ar": "مالقيناش سعر للبند ده. جرّب كلام تاني، أو دوّر في السوق.",
+}
+PRICES_COUNTRY = {
+    "en": "Prices cover Egypt, Saudi Arabia and the UAE: send EG, SA or AE.",
+    "ar": "الأسعار لمصر والسعودية والإمارات: ابعت EG أو SA أو AE.",
+}
+
+# The Sandbox.
+SANDBOX_NOT_READY = {
+    "en": "The Sandbox's Python is missing or damaged, so no code can run. Reinstall One.",
+    "ar": "بايثون الصندوق المعزول ناقص أو بايظ، فمفيش كود هيشتغل. نزّل One تاني.",
+}
+SANDBOX_SYNTAX = {
+    "en": "The script has a mistake on line {line}: {message}",
+    "ar": "في غلطة في السكريبت في سطر {line}: {message}",
+}
+SANDBOX_MODULE = {
+    "en": (
+        "The Sandbox has Python's own modules plus openpyxl and xlrd only. "
+        "Rewrite the script without {module}."
+    ),
+    "ar": (
+        "الصندوق المعزول فيه موديولات بايثون الأساسية ومعاها openpyxl و xlrd بس. "
+        "اكتب السكريبت من غير {module}."
+    ),
+}
+SANDBOX_TIMEOUT = {
+    "en": "The script ran longer than {seconds} seconds and was stopped.",
+    "ar": "السكريبت اشتغل أكتر من {seconds} ثانية فاتوقف.",
+}
+SANDBOX_MEMORY = {
+    "en": "The script used more than 512 MB of memory and was stopped.",
+    "ar": "السكريبت استهلك أكتر من 512 ميجا من الذاكرة فاتوقف.",
+}
+SANDBOX_TOO_MUCH = {
+    "en": "The script's files are larger than 64 MB in all.",
+    "ar": "ملفات السكريبت أكبر من 64 ميجا في المجموع.",
+}
+SANDBOX_FAILED = {
+    "en": "The script stopped with an error; its last lines are below.",
+    "ar": "السكريبت وقف بغلطة؛ آخر سطوره تحت.",
+}
+
+# Connectors.
+CONNECTOR_ASK_ADD = {
+    "en": "Add the {connector} Connector? It can:",
+    "ar": "أضيف موصّل {connector}؟ يقدر:",
+}
+CONNECTOR_NOT_FOUND = {
+    "en": "There is no Connector with this name. connector_tools lists them.",
+    "ar": "مفيش موصّل بالاسم ده. connector_tools بيعرضهم.",
+}
+CONNECTOR_OFF = {"en": "This Connector is switched off.", "ar": "الموصّل ده مقفول."}
+CONNECTOR_DOWN = {
+    "en": "The Connector did not start or did not answer. Check it, then try again.",
+    "ar": "الموصّل ماشتغلش أو مارَدّش. راجعه وجرّب تاني.",
+}
+CONNECTOR_TOOL_UNKNOWN = {
+    "en": "This Connector has no tool by that name; connector_tools lists them.",
+    "ar": "الموصّل ده مفيهوش أداة بالاسم ده؛ connector_tools بيعرضهم.",
+}
+
+CARD_BAD_ANSWER = {
+    "en": "Answer every question: choose an option or write a reply.",
+    "ar": "جاوب على كل الأسئلة: اختار اختيار أو اكتب رد.",
+}

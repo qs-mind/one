@@ -265,4 +265,61 @@ CREATE TRIGGER fill_plans_no_delete BEFORE DELETE ON fill_plans
   BEGIN SELECT RAISE(ABORT, 'Fill Plans are never deleted'); END;
 """
 
-MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4]
+# Tools (Plan 5): the Web Log, hidden-text flags, Sandbox runs, Connector calls, and in
+# Engineer Records the what-to-keep answers and the QS Mind price cache. Every Records file
+# has these tables; the cache and the keep policy are used only in Engineer Records.
+TOOLS_SQL = """
+CREATE TABLE web_log (
+  id TEXT PRIMARY KEY, at TEXT NOT NULL, actor TEXT NOT NULL, brief_id TEXT,
+  action TEXT NOT NULL CHECK (action IN ('search', 'read')),
+  provider TEXT, query TEXT, url TEXT, final_url TEXT, status INTEGER, title TEXT,
+  dated TEXT, dated_how TEXT CHECK (dated_how IS NULL OR dated_how IN ('page', 'server')),
+  file_id TEXT REFERENCES files(id),
+  results TEXT CHECK (results IS NULL OR json_valid(results)));
+CREATE TABLE file_flags (
+  id INTEGER PRIMARY KEY, file_id TEXT NOT NULL REFERENCES files(id), kind TEXT NOT NULL,
+  locator TEXT NOT NULL CHECK (json_valid(locator)), excerpt TEXT NOT NULL, count INTEGER NOT NULL);
+CREATE INDEX file_flags_file ON file_flags(file_id);
+CREATE TABLE sandbox_runs (
+  id TEXT PRIMARY KEY, at TEXT NOT NULL, actor TEXT NOT NULL, brief_id TEXT, script TEXT NOT NULL,
+  script_sha256 TEXT NOT NULL, inputs TEXT NOT NULL CHECK (json_valid(inputs)),
+  params TEXT NOT NULL CHECK (json_valid(params)), limits TEXT NOT NULL CHECK (json_valid(limits)),
+  exit INTEGER, ended TEXT NOT NULL, seconds TEXT NOT NULL,
+  outputs TEXT NOT NULL CHECK (json_valid(outputs)), printed TEXT NOT NULL);
+CREATE TABLE connector_calls (
+  id TEXT PRIMARY KEY, at TEXT NOT NULL, actor TEXT NOT NULL, brief_id TEXT,
+  connector TEXT NOT NULL, tool TEXT NOT NULL, args TEXT NOT NULL CHECK (json_valid(args)),
+  ok INTEGER NOT NULL,
+  result_sha256 TEXT, file_ids TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(file_ids)));
+CREATE TABLE keep_policy (kind TEXT PRIMARY KEY,
+  decision TEXT NOT NULL CHECK (decision IN ('keep', 'never')),
+  decided_at TEXT NOT NULL, card_id TEXT NOT NULL);
+CREATE TABLE price_cache (country TEXT NOT NULL, item_id TEXT NOT NULL, day TEXT,
+  payload TEXT NOT NULL CHECK (json_valid(payload)), PRIMARY KEY (country, item_id));
+CREATE TABLE price_cache_meta (country TEXT PRIMARY KEY, fetched_at TEXT NOT NULL, last_day TEXT);
+-- rowid = price_cache.rowid
+CREATE VIRTUAL TABLE price_cache_fts USING fts5(norm, content='', contentless_delete=1,
+  tokenize='unicode61 remove_diacritics 0');
+-- web_log, file_flags, sandbox_runs, connector_calls: no UPDATE, no DELETE.
+-- keep_policy: no DELETE; a decision changes only through the tool, audited.
+CREATE TRIGGER web_log_no_update BEFORE UPDATE ON web_log
+  BEGIN SELECT RAISE(ABORT, 'The Web Log is never edited'); END;
+CREATE TRIGGER web_log_no_delete BEFORE DELETE ON web_log
+  BEGIN SELECT RAISE(ABORT, 'The Web Log is never deleted'); END;
+CREATE TRIGGER file_flags_no_update BEFORE UPDATE ON file_flags
+  BEGIN SELECT RAISE(ABORT, 'Hidden-text flags are never edited'); END;
+CREATE TRIGGER file_flags_no_delete BEFORE DELETE ON file_flags
+  BEGIN SELECT RAISE(ABORT, 'Hidden-text flags are never deleted'); END;
+CREATE TRIGGER sandbox_runs_no_update BEFORE UPDATE ON sandbox_runs
+  BEGIN SELECT RAISE(ABORT, 'Sandbox runs are never edited'); END;
+CREATE TRIGGER sandbox_runs_no_delete BEFORE DELETE ON sandbox_runs
+  BEGIN SELECT RAISE(ABORT, 'Sandbox runs are never deleted'); END;
+CREATE TRIGGER connector_calls_no_update BEFORE UPDATE ON connector_calls
+  BEGIN SELECT RAISE(ABORT, 'Connector calls are never edited'); END;
+CREATE TRIGGER connector_calls_no_delete BEFORE DELETE ON connector_calls
+  BEGIN SELECT RAISE(ABORT, 'Connector calls are never deleted'); END;
+CREATE TRIGGER keep_policy_no_delete BEFORE DELETE ON keep_policy
+  BEGIN SELECT RAISE(ABORT, 'What-to-keep answers are never deleted'); END;
+"""
+
+MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4, TOOLS_SQL]
