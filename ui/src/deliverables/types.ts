@@ -33,6 +33,8 @@ export type Source = {
   locator: Record<string, string | number>;
   url?: string | null;
   dated?: string | null;
+  /** Who quoted it, when a card's row says (a price to keep). */
+  supplier?: string | null;
 };
 
 /** A cell that shows a ledger number. */

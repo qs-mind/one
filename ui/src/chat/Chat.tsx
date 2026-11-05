@@ -92,7 +92,14 @@ function BriefReply({
     <div className="flex flex-col gap-4">
       <ProgressLine items={progress} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
-      {text && <Reply text={text} unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)} />}
+      {text && (
+        <Reply
+          text={text}
+          unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)}
+          sourced={Object.assign({}, ...partsOf(parts, "sourced").map((part) => part.data.numbers))}
+          projectId={projectId}
+        />
+      )}
       {partsOf(parts, "view").map((part) => (
         <ViewPart key={part.id} view={part.data} projectId={projectId} />
       ))}

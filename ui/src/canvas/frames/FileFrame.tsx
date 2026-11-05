@@ -7,6 +7,7 @@ import { dir, fill, t, useLanguage } from "../../i18n";
 import type { FilePiece } from "../types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type FileData } from "./Frame";
 import { FileName } from "../../ui/FileName";
+import { fileKey, TARGET } from "../../sources/targets";
 
 /** Page images come in two widths: enough for the frame on screen, never more (decision 13). */
 const SMALL = 600;
@@ -125,7 +126,15 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
                 {t("pageNotShown")}
               </p>
             ) : (
-              image && <img src={image.url} alt={pageOf ?? file.name} className="block w-full" draggable={false} />
+              image && (
+                <img
+                  src={image.url}
+                  alt={pageOf ?? file.name}
+                  className="block w-full"
+                  draggable={false}
+                  {...{ [TARGET]: fileKey(file.id, { page }) }} // a number from this page draws its source line here
+                />
+              )
             ))}
           {showText &&
             pieces &&
@@ -134,7 +143,8 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
             ) : (
               <ul className="flex flex-col divide-y divide-stone">
                 {pieces.map((piece, index) => (
-                  <li key={index} className="flex flex-col gap-1 px-5 py-3">
+                  // a number from this sheet row, line or page draws its source line here, and is marked here when opened
+                  <li key={index} className="flex flex-col gap-1 px-5 py-3" {...{ [TARGET]: fileKey(file.id, piece.locator) }}>
                     {!pages && where(piece.locator) && <span className="text-slate">{where(piece.locator)}</span>}
                     <span dir="auto" className="whitespace-pre-wrap">
                       {piece.text}

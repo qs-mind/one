@@ -9,8 +9,11 @@ never removed. These are not counted:
 - a year (four digits from 1900 to 2099) with no unit or currency next to it.
 
 Values match after normalising: Arabic-Indic digits become 0-9, the Arabic decimal mark a
-point, thousands separators go, and trailing zeros after the point do not count."""
+point, thousands separators go, and trailing zeros after the point do not count. A number that
+exactly one ledger number in the tool results has is named with that number's id (`sourced`), so
+the screen opens it into its source card (decision 16.3)."""
 
+import json
 import re
 from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
@@ -119,6 +122,56 @@ def known_values(tool_results: Iterable[str]) -> set[str]:
             if value is not None:
                 found.add(value)
     return found
+
+
+_DATA = re.compile(r"^data: (.+)$", re.M)  # a tool result's data line (qsone.tools.cite)
+_LEDGER_ID = re.compile(r"[0-9a-f]{32}")
+# The keys naming the ledger number a `value` is: a price found, a calculation's output, an input.
+_ID_KEYS = ("number_id", "output", "number")
+
+
+def _ledger_numbers(data: object, out: dict[str, set[tuple[str, str]]]) -> None:
+    """Each ledger number in `data` as {canonical value: {(number id, exact value)}}: an object
+    with a `value` and the id of the number it is (or `number: {id, value}`, as explain has it)."""
+    if isinstance(data, list):
+        for item in data:
+            _ledger_numbers(item, out)
+        return
+    if not isinstance(data, dict):
+        return
+    value = data.get("value")
+    ids = [data.get(k) for k in _ID_KEYS]
+    nested = data.get("number")
+    if isinstance(nested, dict):
+        value, ids = nested.get("value"), [nested.get("id")]
+    number_id = next((i for i in ids if isinstance(i, str) and _LEDGER_ID.fullmatch(i)), None)
+    canonical = _canonical(value) if isinstance(value, str) else None
+    if number_id and canonical is not None:
+        out.setdefault(canonical, set()).add((number_id, value))
+    for child in data.values():
+        _ledger_numbers(child, out)
+
+
+def sourced(text: str, tool_results: Iterable[str]) -> dict[str, dict]:
+    """The counted numbers in `text` whose value exactly one ledger number in `tool_results` has,
+    as written, each with that number's id and exact value: the screen opens each into its source
+    card (decision 16.3). A value two ledger numbers share is left out (which one the reply meant
+    is not known), as is any number no ledger number gave."""
+    found: dict[str, set[tuple[str, str]]] = {}
+    for result in tool_results:
+        lines = _DATA.findall(result) or [result]
+        for line in lines:
+            try:
+                _ledger_numbers(json.loads(line), found)
+            except ValueError:
+                continue
+    out: dict[str, dict] = {}
+    for written, value in _counted(text):
+        ids = found.get(value, set())
+        if written not in out and len({i for i, _ in ids}) == 1:
+            number_id, exact = next(iter(ids))
+            out[written] = {"id": number_id, "value": exact}
+    return out
 
 
 def unsourced(text: str, known: set[str]) -> list[str]:

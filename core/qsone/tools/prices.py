@@ -419,7 +419,16 @@ def _language(ctx: ToolContext) -> str:
     return "en" if len(re.findall(r"[A-Za-z]", text)) > len(re.findall("[؀-ۿ]", text)) else "ar"
 
 
-def _card(ctx: ToolContext, args: ProposeArgs) -> Card:
+def _row_source(r: ProposedRow, quote: dict | None) -> dict:
+    """Where a row's rate comes from, as the card shows it (decision 16.3): its quote, checked
+    against the file, or the chat; with the supplier the row names."""
+    supplier = {"supplier": _supplier_text(r.supplier) or None}
+    if quote is None:
+        return {"kind": "chat", "title": "", "locator": {}, "dated": r.dated} | supplier
+    return quote | supplier
+
+
+def _card(ctx: ToolContext, args: ProposeArgs, quotes: list[dict] | None = None) -> Card:
     lang = _language(ctx)
     rows = [
         {
@@ -443,6 +452,11 @@ def _card(ctx: ToolContext, args: ProposeArgs) -> Card:
         payload={
             "columns": [{"key": k, "label": label} for k, label in copy.PRICES_COLUMNS.items()],
             "rows": rows,
+            "number_column": "rate",
+            "row_sources": [
+                _row_source(r, quotes[i] if quotes is not None else None)
+                for i, r in enumerate(args.rows)
+            ],
             "tick": True,
         },
     )
@@ -502,7 +516,7 @@ async def _propose(ctx: ToolContext, args: ProposeArgs) -> str:
     quotes = None
     if file_id is not None:  # checked before the engineer is asked
         quotes = await asyncio.to_thread(_file_evidence, ctx, target, args)
-    card = _card(ctx, args)
+    card = _card(ctx, args, quotes)
     answer = read_answer(card, await keep.ask(ctx, card))
     ticked = [] if answer["choice"] != KEEP else answer["rows_ok"]
     ticked = sorted({i for i in ticked if isinstance(i, int) and 0 <= i < len(args.rows)})

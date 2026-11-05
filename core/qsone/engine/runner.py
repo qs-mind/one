@@ -1083,22 +1083,19 @@ class _Brief:
         choice = self.store.run(self.lead_run_id)["choice"]
         self._agent(self.lead_run_id, spec=spec, model=choice.model, state="thinking")
 
-    def known(self) -> set[str]:
-        """Every number the Brief's tools gave (the team's own words do not count)."""
-        results = [
-            text
-            for run in self.store.runs(self.brief_id)
-            if run["history"]
-            for name, text in agents.tool_returns(run["history"])
-            if name not in team.TEAM_TOOLS
-        ]
-        return numbers_guard.known_values(results)
+    def results(self) -> list[str]:
+        """What the Brief's tools gave (the team's own words do not count)."""
+        return _tool_results(self.store.runs(self.brief_id))
 
     async def _finish(self, output: Any) -> None:
         if isinstance(output, str):
-            marked = numbers_guard.unsourced(output, self.known())
+            results = self.results()
+            marked = numbers_guard.unsourced(output, numbers_guard.known_values(results))
             if marked:
                 self.emit(Unsourced(self.brief_id, tuple(marked)))
+            named = numbers_guard.sourced(output, results)
+            if named:  # decision 16.3: each opens into its ledger number's source card
+                self.emit(Data(self.brief_id, "sourced", self.brief_id, {"numbers": named}))
         drafts = self.store.unchecked(self.brief_id)
         if self.place.rec is not None:  # Plan 6: the Deliverables this Brief made or changed
             returns = [
@@ -1568,6 +1565,18 @@ class Engine:
         return sum(len(b.waiting) for b in self._in(project_id))
 
 
+def _tool_results(runs: list[dict]) -> list[str]:
+    """What the tools gave in these runs, the numbers guard's sources (the team's own words do
+    not count)."""
+    return [
+        text
+        for run in runs
+        if run["history"]
+        for name, text in agents.tool_returns(run["history"])
+        if name not in team.TEAM_TOOLS
+    ]
+
+
 def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
     """A Brief as events again, from what is stored: the Lead's words, the Coordination Room,
     the cards and their answers, the Deliverable cards, the Reviews, the unsourced marks and the
@@ -1619,15 +1628,12 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
         )
         events.append(Reviewed(brief_id, deliverable_id, review))
     if reply and brief["status"] == "done":
-        known = numbers_guard.known_values(
-            text
-            for run in runs
-            if run["history"]
-            for name, text in agents.tool_returns(run["history"])
-            if name not in team.TEAM_TOOLS
-        )
-        marked = numbers_guard.unsourced(reply, known)
+        results = _tool_results(runs)
+        marked = numbers_guard.unsourced(reply, numbers_guard.known_values(results))
         if marked:
             events.append(Unsourced(brief_id, tuple(marked)))
+        named = numbers_guard.sourced(reply, results)
+        if named:
+            events.append(Data(brief_id, "sourced", brief_id, {"numbers": named}))
     events.append(Status(brief_id, brief["status"], brief["step"]))
     return events

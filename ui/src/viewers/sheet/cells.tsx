@@ -3,6 +3,8 @@
 import type { Change, Thread, ViewCell, ViewColumn, ViewRow } from "../../deliverables/types";
 import { asCell, isNumber } from "../../deliverables/types";
 import { t } from "../../i18n";
+import { sourceLineHandlers } from "../../sources/line";
+import { TARGET } from "../../sources/targets";
 import { fieldKey, numberName } from "./clipboard";
 import { formatDecimal } from "./format";
 
@@ -148,6 +150,8 @@ export type CellProps = {
   onToggle: (sectionId: string) => void;
   onAccept: (changeId: string) => void;
   onReject: (changeId: string) => void;
+  /** Where the number's source shows (../../sources/targets.ts): hovering it draws the source line. */
+  sourceKeys?: string[];
 };
 
 export function SheetCell(p: CellProps) {
@@ -173,7 +177,12 @@ export function SheetCell(p: CellProps) {
       );
   } else if (isNumber(cell)) {
     content = (
-      <span className="w-full text-end">
+      // the ledger number shows here: a number quoted elsewhere draws its source line to this cell
+      <span
+        className="w-full text-end"
+        {...(cell.number_id ? { [TARGET]: `number:${cell.number_id}` } : {})}
+        {...sourceLineHandlers(p.sourceKeys ?? [])}
+      >
         <Value cell={cell} />
       </span>
     );
