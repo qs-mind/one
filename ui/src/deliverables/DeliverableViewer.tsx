@@ -4,7 +4,7 @@
 // Changes, Comments, Versions and Close-out, with the exports; `mode="workspace"` is the same board as the open
 // document of the workspace, which names the document itself. Everything it draws stays inside its own box.
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Anchor, ViewerProps } from "../project/types";
+import type { Anchor, LocateOptions, ViewerProps } from "../project/types";
 import { fill, language, pick, t, useLanguage } from "../i18n";
 import { ChangesPanel } from "../review/ChangesPanel";
 import { CommentsPanel } from "../review/CommentsPanel";
@@ -106,8 +106,8 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
   }, [projectId, deliverableId, findPlan, view]);
 
   /** Where the anchor is, relative to this viewer's root, in its own unscaled pixels (it may sit in a scaled frame). */
-  function locate(anchor: Anchor): DOMRect | null {
-    const inner = (view?.kind === "sheet" ? sheet.current : doc.current)?.locate(anchor) ?? null;
+  function locate(anchor: Anchor, options?: LocateOptions): DOMRect | null {
+    const inner = (view?.kind === "sheet" ? sheet.current : doc.current)?.locate(anchor, options) ?? null;
     const outer = root.current;
     const wrapper = body.current;
     if (!inner || !outer || !wrapper) return inner;
@@ -201,6 +201,14 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
     ["closeout", t("reviewCloseOut")],
   ];
   const tabId = (key: Tab) => `review-${view.id}-${key}`;
+  // As the open document, a review with nothing in it is only its tab row: the sheet takes the height. Another tab,
+  // a Fill preview or a change to review opens the panel again.
+  const folded =
+    mode === "workspace" &&
+    tab === "changes" &&
+    !fillOpen &&
+    !state.changes.some((c) => c.status === "pending") &&
+    state.stale.length === 0;
   const onLocate = (anchor: Anchor) => void locate(anchor);
   const undoLine = undo && (
     <UndoNotice
@@ -235,13 +243,19 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
           review panels take the rest; a Document keeps 3/5 */}
       <div
         ref={body}
-        className={mode === "frame" ? "min-h-0 flex-1" : view.kind === "sheet" ? `flex min-h-0 ${mode === "workspace" ? "max-h-[75%]" : "max-h-[60%]"} flex-[0_1_auto] flex-col` : "min-h-0 flex-[3_1_0%]"}
+        className={
+          mode === "frame" || folded
+            ? "flex min-h-0 flex-1 flex-col"
+            : view.kind === "sheet"
+              ? `flex min-h-0 ${mode === "workspace" ? "max-h-[75%]" : "max-h-[60%]"} flex-[0_1_auto] flex-col`
+              : "min-h-0 flex-[3_1_0%]"
+        }
       >
         {viewer}
       </div>
       {mode !== "frame" && (
-        <div className="flex min-h-0 flex-[2_1_0%] flex-col bg-stone/50">
-          <div className="flex flex-wrap items-center gap-3 px-5 pb-1 pt-3">
+        <div data-review-panel={folded ? "folded" : "open"} className={`flex min-h-0 flex-col bg-stone/50 ${folded ? "shrink-0" : "flex-[2_1_0%]"}`}>
+          <div className={`flex flex-wrap items-center gap-3 ${mode === "workspace" ? "px-3 py-1" : "px-5 pb-1 pt-3"}`}>
             <div role="tablist" aria-label={t("reviewPanels")} className="relative flex flex-wrap gap-1">
               {tabs.map(([key, label]) => (
                 <button
@@ -281,9 +295,10 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
             role="tabpanel"
             aria-labelledby={`${tabId(tab)}-tab`}
             dir={language() === "ar" ? "rtl" : "ltr"}
+            hidden={folded}
             className={`min-h-0 flex-1 overflow-auto ${mode === "workspace" ? "p-3" : "px-5 py-4"}`}
           >
-            {fillOpen ? (
+            {folded ? null : fillOpen ? (
               <FillPreview projectId={projectId} planId={fillOpen} announce={announce} onClose={() => setFillOpen(null)} />
             ) : tab === "changes" ? (
               <ChangesPanel

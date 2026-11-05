@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
 import { deliverablesApi, type Accepted, type Rejected } from "../../deliverables/api";
 import type { Change, NumberCell, Op, SheetView, Thread, ViewRow } from "../../deliverables/types";
+import type { LocateOptions } from "../../project/types";
 import { isNumber } from "../../deliverables/types";
 import { count, dir, fill, language, pick, t, texts, useLanguage, type Text } from "../../i18n";
 import { RollingNumber } from "../../ui/RollingNumber";
@@ -22,8 +23,9 @@ import { sourceKeys } from "../../sources/targets";
 export type SheetAnchor = { row?: string; column?: string };
 export type SheetRange = { from: { row: string; column: string }; to: { row: string; column: string } };
 export type SheetHandle = {
-  /** The cell's (or row's) box in the viewer's own unscaled pixels, or null when it is not on screen. */
-  locate(anchor: SheetAnchor): DOMRect | null;
+  /** The cell's (or row's) box in the viewer's own unscaled pixels, or null when it is not on screen. It scrolls the
+   * cell into view first, unless `scroll` is false. */
+  locate(anchor: SheetAnchor, options?: LocateOptions): DOMRect | null;
 };
 
 export type SheetViewerProps = {
@@ -187,7 +189,7 @@ export function SheetViewer(props: SheetViewerProps) {
     );
   }, [rows, columns, measure, pending, fontsLoaded, pad]);
   const contentHeight =
-    headerH +[...heights.values()].reduce((sum, h) => sum + h, 0) + (view.total ? TOTAL_H : 0) + SCROLLBAR;
+    headerH + [...heights.values()].reduce((sum, h) => sum + h, 0) + (view.total ? TOTAL_H : 0) + SCROLLBAR;
 
   const [selection, setSelection] = useState<Range | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -252,11 +254,11 @@ export function SheetViewer(props: SheetViewerProps) {
   }
 
   useImperativeHandle(props.ref, () => ({
-    locate({ row, column }) {
+    locate({ row, column }, options) {
       const r = rows.findIndex((x) => x.id === row);
       const c = column === undefined ? undefined : columns.findIndex((x) => x.key === column);
       if (r < 0 || c === -1) return null;
-      grid.current?.scrollTo({ row: r, col: c ?? 0 });
+      if (options?.scroll !== false) grid.current?.scrollTo({ row: r, col: c ?? 0 });
       const el = grid.current?.element({ row: r, col: c });
       return el ? boxOf(el) : null;
     },
@@ -380,7 +382,11 @@ export function SheetViewer(props: SheetViewerProps) {
   // in a frame, the frame's strip already says the client's document is read only: it is not said twice, and the
   // header, with nothing left to show, keeps only the title for screen readers
   const badge = readOnly && props.mode !== "frame";
-  const shown = !readOnly || badge || full || !!props.onToggleFullScreen;
+  // as the open document, the top bar says its title, state, Revision and that its numbers are sample: this row
+  // shows only what the bar does not (read only, what waits for review, an unusual provider or Desk)
+  const workspace = props.mode === "workspace";
+  const extra = badge || view.pending > 0 || !!view.same_provider || !!view.off_desk || !!props.onToggleFullScreen;
+  const shown = workspace ? extra : !readOnly || badge || full || !!props.onToggleFullScreen;
   return (
     <div
       ref={root}
@@ -392,7 +398,7 @@ export function SheetViewer(props: SheetViewerProps) {
         if (popover && event.target.matches("input, textarea")) setPopover(null); // the cell editor opened
       }}
     >
-      <header className={shown ? "flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3" : "sr-only"}>
+      <header className={shown ? `flex flex-wrap items-center gap-x-3 gap-y-2 ${workspace ? "px-3 py-1.5" : "px-5 py-3"}` : "sr-only"}>
         {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
         <h2 dir="auto" className={props.mode === "full" ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
@@ -403,8 +409,8 @@ export function SheetViewer(props: SheetViewerProps) {
           <>
             {/* in the workspace, its head line already says the status and the Revision */}
             <StatusChips view={view} status={props.mode !== "frame" && props.mode !== "workspace"} />
-            <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
-            {view.revision && props.mode !== "workspace" && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
+            {!workspace && <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>}
+            {view.revision && !workspace && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
             {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
           </>
         )}
@@ -419,7 +425,7 @@ export function SheetViewer(props: SheetViewerProps) {
           </button>
         )}
       </header>
-      {view.sample && (
+      {view.sample && !workspace && (
         <p role="note" className="bg-stone px-5 py-2 text-ink">
           {t("sheetSample")}
         </p>

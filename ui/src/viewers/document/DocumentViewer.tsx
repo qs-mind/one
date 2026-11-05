@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
 import { deliverablesApi } from "../../deliverables/api";
 import type { Change, DocumentView, NumberCell, Op, Thread } from "../../deliverables/types";
+import type { LocateOptions } from "../../project/types";
 import { count, dir, fill, pick, t, useLanguage, type Text } from "../../i18n";
 import { StatusChips } from "../sheet/SheetViewer";
 import { SourcePopover } from "../sheet/SourcePopover";
@@ -14,8 +15,9 @@ import { DocEditor, type DocComment, type TextAnchor } from "./plate";
 /** A block, or a range of its text (Plan 7's anchor, its document fields: `row` is the block id). */
 export type DocumentAnchor = { row?: string; text?: [number, number] };
 export type DocumentHandle = {
-  /** The block's (or text range's) box in the viewer's own unscaled pixels, or null when it is not there. */
-  locate(anchor: DocumentAnchor): DOMRect | null;
+  /** The block's (or text range's) box in the viewer's own unscaled pixels, or null when it is not there. It scrolls
+   * the block into view first, unless `scroll` is false. */
+  locate(anchor: DocumentAnchor, options?: LocateOptions): DOMRect | null;
 };
 
 export type DocumentViewerProps = {
@@ -114,13 +116,13 @@ export function DocumentViewer(props: DocumentViewerProps) {
   }
 
   useImperativeHandle(props.ref, () => ({
-    locate({ row, text }) {
+    locate({ row, text }, options) {
       if (!row) return null;
       const block = [...(root.current?.querySelectorAll("[data-block-id]") ?? [])].find(
         (el) => el.getAttribute("data-block-id") === row,
       );
       if (!block) return null;
-      block.scrollIntoView?.({ block: "nearest" });
+      if (options?.scroll !== false) block.scrollIntoView?.({ block: "nearest" });
       const range = text ? textRange(block, text[0], text[1]) : null;
       const rect = range && typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : null;
       return boxOf(rect ?? block.getBoundingClientRect());
@@ -179,6 +181,10 @@ export function DocumentViewer(props: DocumentViewerProps) {
 
   const untraced = view.untraced;
   const full = props.mode === "full" || props.mode === "workspace";
+  // as the open document, the top bar says its title, state, Revision and that its numbers are sample: this row
+  // shows only what the bar does not (what waits for review, an unusual provider or Desk)
+  const workspace = props.mode === "workspace";
+  const extra = view.pending > 0 || !!view.same_provider || !!view.off_desk || !!props.onToggleFullScreen;
   return (
     <div
       ref={root}
@@ -187,15 +193,19 @@ export function DocumentViewer(props: DocumentViewerProps) {
         if (event.key === "Escape" && popover) closeSource();
       }}
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+      <header
+        className={
+          !workspace ? "flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3" : extra ? "flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-1.5" : "sr-only"
+        }
+      >
         {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
         <h2 dir="auto" className={props.mode === "full" ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
         {/* in the workspace, its head line already says the status and the Revision */}
         <StatusChips view={view} status={props.mode !== "frame" && props.mode !== "workspace"} />
-        <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
-        {view.revision && props.mode !== "workspace" && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
+        {!workspace && <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>}
+        {view.revision && !workspace && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
         {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
         {props.onToggleFullScreen && (
           <button
@@ -208,7 +218,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
           </button>
         )}
       </header>
-      {view.sample && (
+      {view.sample && !workspace && (
         <p role="note" className="bg-stone px-5 py-2 text-ink">
           {t("sheetSample")}
         </p>

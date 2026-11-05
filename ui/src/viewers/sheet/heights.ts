@@ -5,7 +5,7 @@ import type { ViewColumn, ViewRow } from "../../deliverables/types";
 import { isNumber } from "../../deliverables/types";
 import { formatDecimal } from "./format";
 
-const LINE = 24; // 15px text at line-height 1.6
+const LINE = 24; // one line of cell text: the body's 14px at 1.5 is 21 px, Arabic's 15px at 1.65 about 25 px (styles.css)
 const PAD = 16; // block padding inside a cell: a one-line row is 40 px
 /** The open document's (mode "workspace") denser rows: a one-line row is 32 px, so more of the bill shows. */
 export const COMPACT_PAD = 8;

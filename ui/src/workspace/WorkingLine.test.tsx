@@ -108,4 +108,22 @@ describe("WorkingLine", () => {
     rerender(<WorkingLine handle={handleAt(rect(-10, 24))} agents={[agent()]} opened={OPENED} box={box(0, 500)} />);
     await waitFor(() => expect(lines()).toHaveLength(1));
   });
+
+  it("only measures: scrolling the sheet away from an agent's row is not undone by a live event", () => {
+    const sheet = box();
+    // a viewer as the real ones: locate brings the row into view unless asked only to measure
+    const handle: ViewerHandle = {
+      locate: vi.fn((_: Anchor, options?: { scroll?: boolean }) => {
+        if (options?.scroll !== false) sheet.scrollTop = 5 * 32;
+        return rect(5 * 32 - sheet.scrollTop);
+      }),
+    };
+    const onRow5 = (line: string) => agent({ line: { en: line, ar: line }, focus: { frame: OPENED, anchor: { row: "row-5" } } });
+    const { rerender } = render(<WorkingLine handle={handle} agents={[onRow5("pricing")]} opened={OPENED} box={sheet} />);
+    sheet.scrollTop = 2000; // the engineer scrolls far below the row
+    sheet.dispatchEvent(new Event("scroll"));
+    rerender(<WorkingLine handle={handle} agents={[onRow5("still pricing")]} opened={OPENED} box={sheet} />); // a live event
+    expect(sheet.scrollTop).toBe(2000);
+    expect(handle.locate).toHaveBeenCalledWith({ row: "row-5" }, { scroll: false });
+  });
 });

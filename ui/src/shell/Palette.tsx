@@ -14,6 +14,7 @@ import { DUR, play } from "../ui/motion";
 import { withTransition } from "../ui/viewTransition";
 import { workspaceApi } from "../workspace/api";
 import { titleOf, type Documents } from "../workspace/documents";
+import { openSourceFile } from "../workspace/reveal";
 
 type Hit = { file_id: string; file_name: string; locator: Record<string, string | number>; text: string };
 
@@ -225,7 +226,7 @@ export function Palette({
                   key={index}
                   forceMount
                   value={`hit ${index} ${hit.file_id}`}
-                  onSelect={() => run(() => workspaceApi.open(`file:${hit.file_id}`, page !== undefined ? { page } : {}))}
+                  onSelect={() => run(() => openSourceFile(hit.file_id, hit.locator, []))} // opened at the hit, and marked
                   className="flex-col items-start"
                 >
                   <span className="flex max-w-full items-baseline text-slate">

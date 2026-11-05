@@ -1083,7 +1083,9 @@ export const texts = {
   pageViewImage: { en: "Picture", ar: "صورة" },
   pageViewText: { en: "Text", ar: "نص" },
   // The document's head and switcher.
-  docRevision: { en: "Revision {n}", ar: "نسخة {n}" },
+  docRevision: { en: "Revision {n}", ar: "إصدار {n}" },
+  fullScreen: { en: "Full screen", ar: "ملء الشاشة" },
+  leaveFullScreen: { en: "Leave full screen", ar: "اخرج من ملء الشاشة" },
   sampleNumbers: { en: "Sample numbers", ar: "الأرقام عينة" },
   docWorkingOn: { en: "being worked on", ar: "شغالين عليه" },
   docClientBoq: { en: "Client BOQ", ar: "مقايسة العميل" },

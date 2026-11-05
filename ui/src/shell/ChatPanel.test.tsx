@@ -485,6 +485,29 @@ describe("the chat in the shell", () => {
     vi.unstubAllGlobals();
   });
 
+  it("below 1000 px, Esc with words in the box only leaves the box: the panel stays open and the draft stays", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("999px"),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(within(screen.getByRole("banner")).getByRole("button", { name: texts.projectChat.ar }));
+    const chat = screen.getByRole("complementary", { name: texts.projectChat.ar });
+    await user.click(await box());
+    await user.keyboard("سعر الخرسانة");
+    await user.keyboard("{Escape}");
+    expect(chat).toBeInTheDocument();
+    expect(chat).toHaveFocus(); // out of the box, still in the chat
+    expect(await box()).toHaveValue("سعر الخرسانة");
+    vi.unstubAllGlobals();
+  });
+
   it("its head names the role it talks to and who is working now; pressing that lists the team, Desks folded", async () => {
     setCurrentProject(P1);
     core();

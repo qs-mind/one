@@ -77,12 +77,11 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
     const controller = new AbortController();
     const signal = controller.signal;
     const saver = createWorkspaceSaver(sources);
-    let lists: Lists | null = null; // null until read
-    let restoring = false;
+    let lists: Lists | null = null; // null until read: the restore below saves nothing
 
     const offOpened = subscribeOpened(() => {
       const opened = workspaceApi.current();
-      if (lists && !restoring && opened) saver.save(opened);
+      if (lists && opened) saver.save(opened);
     });
     const onHide = () => saver.flush(true);
     window.addEventListener("pagehide", onHide);
@@ -104,9 +103,7 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
     void read().then(([deliverables, files, saved, team]) => {
       if (signal.aborted) return;
       const next: Lists = { deliverables, files, clientBoqs: saved?.client_boqs ?? null, desks: team?.desks ?? null };
-      restoring = true;
       workspaceApi.reset(saved?.open ? { key: saved.open, anchor: saved.anchor } : null, (key) => exists(lists ?? next, key));
-      restoring = false;
       show(next);
       startActivity(sources, signal, team ?? undefined);
       sources.activity(

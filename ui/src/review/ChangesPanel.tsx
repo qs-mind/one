@@ -302,17 +302,20 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
   const button = "rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone disabled:opacity-40";
   return (
     <section ref={sourceCard.host} aria-label={t("reviewChanges")} className="relative flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        <button type="button" className={button} disabled={busy || pending.length === 0} onClick={() => void accept({ ids: pending.map((c) => c.id) })}>
-          {t("reviewAcceptAll")}
-        </button>
-        <button type="button" className={button} disabled={busy || mine.length === 0} onClick={() => void accept({ mine: true })}>
-          {t("reviewAcceptMine")}
-        </button>
-        <button type="button" className={button} disabled={busy || pending.length === 0} onClick={() => void reject(pending.map((c) => c.id))}>
-          {t("reviewRejectAll")}
-        </button>
-      </div>
+      {/* nothing to accept: no buttons for it */}
+      {pending.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={button} disabled={busy} onClick={() => void accept({ ids: pending.map((c) => c.id) })}>
+            {t("reviewAcceptAll")}
+          </button>
+          <button type="button" className={button} disabled={busy || mine.length === 0} onClick={() => void accept({ mine: true })}>
+            {t("reviewAcceptMine")}
+          </button>
+          <button type="button" className={button} disabled={busy} onClick={() => void reject(pending.map((c) => c.id))}>
+            {t("reviewRejectAll")}
+          </button>
+        </div>
+      )}
       {failed && (
         <div role="alert" className="flex flex-wrap items-center gap-2 text-copper">
           <span>{pick(failed)}</span>

@@ -25,7 +25,7 @@ import { RecordsPanel } from "../records/RecordsPanel";
 import { AiSettings, useAiSettings } from "../settings/AiSettings";
 import { Connectors } from "../settings/Connectors";
 import { SearchKey } from "../settings/SearchKey";
-import { workspaceApi } from "../workspace/api";
+import { useOpened, workspaceApi } from "../workspace/api";
 import { DocumentsContext, useDocuments } from "../workspace/documents";
 import { DocumentHead, Workspace } from "../workspace/Workspace";
 import { CHAT_WIDTH, ChatPanel } from "./ChatPanel";
@@ -65,6 +65,10 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const sample = sampleMode();
   const sources = useMemo(() => (project ? sourcesFor(project.id) : undefined), [project?.id, sourcesFor, sample]);
   const documents = useDocuments(sources);
+  // sample numbers are said once: in the open Deliverable's facts («الأرقام عينة»), else by the top bar
+  const opened = useOpened();
+  const factsSaySample =
+    !!project && !!documents?.deliverables.some((d) => d.sample && opened?.key === `deliverable:${d.id}`);
 
   // AI settings in place of the chat: nothing connected yet, or the first AI just connected (it stays open to say so)
   const [aiMainOpen, setAiMainOpen] = useState(false);
@@ -231,6 +235,9 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
 
   const openChatRef = useRef(() => setChatShown(true));
   openChatRef.current = () => setChatShown(true);
+  // full screen: the chat folds and the document takes the width; the second press brings the chat back
+  const toggleFullScreen = useRef(() => setChatShown(!chatShown));
+  toggleFullScreen.current = () => setChatShown(!chatShown);
   useEffect(() => {
     // shortcuts by KeyboardEvent.code, so they work with the Arabic layout too (decision 10)
     function onKey(event: KeyboardEvent) {
@@ -238,6 +245,10 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         event.preventDefault();
         setPaletteOrigin(undefined);
         setPaletteOpen((open) => !open);
+      } else if (isMod(event) && event.shiftKey && !event.altKey && event.code === "KeyF") {
+        if (!document.querySelector("[data-region='document']")) return;
+        event.preventDefault();
+        toggleFullScreen.current();
       } else if (
         event.key === "Escape" &&
         !event.defaultPrevented &&
@@ -319,7 +330,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
             project={project}
             status={status}
             sources={sources}
-            sample={sample}
+            sample={sample && !factsSaySample}
             narrow={narrow}
             panel={panel}
             onPanel={togglePanel}
@@ -333,12 +344,15 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
             chatOpen={chatShown}
             onChat={() => setChatShown(!chatShown)}
             document={project && documents && <DocumentHead documents={documents} />}
+            fullScreen={!chatShown}
+            onFullScreen={() => toggleFullScreen.current()}
           />
           <div className="relative flex min-h-0 flex-1 flex-col">
             {project && sources ? (
               // dense (5 Nov): the room is the data's: 8 px under the top bar and above the window's foot, 12 px at
               // the sides and between the document and the chat
-              <main className="relative flex min-h-0 flex-1 gap-3 px-3 py-2">
+              // below 640 px the document loses its side gutters: the phone's width is all the data's
+              <main className={`relative flex min-h-0 flex-1 gap-3 py-2 ${small ? "px-0" : "px-3"}`}>
                 {documents ? (
                   <Workspace projectId={project.id} sources={sources} documents={documents} />
                 ) : (

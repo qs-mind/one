@@ -14,7 +14,8 @@ import { setCurrentProject } from "../records/project";
 import { App } from "../shell/App";
 import { core, P1 } from "../shell/testing";
 import { workspaceApi } from "./api";
-import { openSourceFile } from "./reveal";
+import { markFor, openSourceFile } from "./reveal";
+import { sourceKeys } from "../sources/targets";
 import { DocumentHead, Workspace } from "./Workspace";
 
 const located: { row?: string }[] = [];
@@ -115,6 +116,32 @@ describe("the workspace", () => {
     act(() => workspaceApi.open("deliverable:dB"));
     fireEvent.keyDown(document.body, { code: "ArrowLeft", key: "ArrowLeft", altKey: true });
     expect(workspaceApi.current()?.key).toBe("deliverable:dA");
+  });
+
+  it("a project opens again at the saved document and its row: the row is brought into view", async () => {
+    workspaceApi.reset(null, () => true);
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({ deliverables: [A, B], workspace: { key: "deliverable:dB", anchor: { row: "4/07" } } });
+    render(<App sourcesFor={() => sources} />);
+    expect(await screen.findByTestId("viewer-dB")).toBeInTheDocument();
+    expect(workspaceApi.current()).toEqual({ key: "deliverable:dB", anchor: { row: "4/07" } });
+    await waitFor(() => expect(located).toContainEqual({ row: "4/07" }));
+    expect(sources.saved.workspace).toEqual([]); // the restore itself is not saved back
+  });
+
+  it("a Project Records hit from the palette opens its file at the hit, to be marked as a source card's is", async () => {
+    setCurrentProject(P1);
+    const hit = { file_id: "f1", file_name: file.name, locator: { page: 3 }, text: "خرسانة مسلحة - عينة" };
+    core({ routes: { "GET /api/projects/p1/search?q=concrete&k=10": () => Response.json({ results: [hit] }) } });
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({ deliverables: [A, B], files: [file] })} />);
+    await screen.findByRole("heading", { level: 1 });
+    fireEvent.keyDown(document, { key: "k", code: "KeyK", ctrlKey: true });
+    await user.type(await screen.findByRole("combobox"), "concrete");
+    await user.click(await screen.findByText("خرسانة مسلحة - عينة"));
+    expect(workspaceApi.current()).toEqual({ key: "file:f1", anchor: { page: 3 } });
+    expect(markFor(workspaceApi.current()!)).toEqual({ keys: sourceKeys({ fileId: "f1", locator: { page: 3 } }), figures: [] });
   });
 
   it("Alt+arrow in the message box moves by word there, never Back", async () => {

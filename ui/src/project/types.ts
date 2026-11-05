@@ -121,11 +121,15 @@ export interface ProjectSources {
   upload(file: File): Promise<FileInfo>;
 }
 
+/** How `locate` finds a target: by default it scrolls the target into view; `scroll: false` only measures. */
+export type LocateOptions = { scroll?: boolean };
+
 // The viewer registry's contract. Plan 6 Task 10 builds `viewerFor(kind)` in ui/src/viewers/registry.ts against
 // these types: a component per Deliverable kind (null when there is none), loading its own data.
 export interface ViewerHandle {
-  /** The target's box relative to the viewer's root, in unscaled CSS pixels, or null when it cannot be found. */
-  locate(anchor: Anchor): DOMRect | null;
+  /** The target's box relative to the viewer's root, in unscaled CSS pixels, or null when it cannot be found. It
+   * brings the target into view first, unless `scroll` is false (only measure: the thin line by an agent's row). */
+  locate(anchor: Anchor, options?: LocateOptions): DOMRect | null;
 }
 export interface ViewerProps {
   projectId: string;

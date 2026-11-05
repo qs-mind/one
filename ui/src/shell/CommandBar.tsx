@@ -229,6 +229,12 @@ export function CommandBar({
             } else if (event.key === "Escape" && draft === "" && open) {
               event.preventDefault();
               setDismissed(true);
+            } else if (event.key === "Escape" && draft !== "") {
+              // words in it: the first Escape only leaves the box, to the chat around it; the draft stays
+              event.preventDefault();
+              const around = event.currentTarget.closest<HTMLElement>("[data-region='chat']");
+              if (around) around.focus();
+              else event.currentTarget.blur();
             }
           }}
           className={`col-start-1 row-start-1 max-h-40 w-full resize-none bg-transparent ${lines} outline-none placeholder:text-slate ${draft ? "overflow-y-auto" : "truncate"} ${open ? ends.open : ends.rest}`}

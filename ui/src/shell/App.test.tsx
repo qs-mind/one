@@ -403,7 +403,32 @@ describe("keyboard and layout", () => {
     expect(where()).toBe("command");
   });
 
-  it("below 1000 px the status folds into one button and the chat opens from the top bar", async () => {
+  it("below 1280 px the status folds into More, a section at its top; no Status button", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(max-width: 1279px)",
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({ status: { submission_date: inTwoWeeks, days_left: 14 } });
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => sources} />);
+    await head();
+    expect(within(topBar()).queryByText(/فاضل 14 يوم/)).toBeNull();
+    expect(within(topBar()).queryByRole("button", { name: texts.deliverableStatus.ar })).toBeNull();
+    // search still has room here: it folds only below 1000 px
+    expect(within(topBar()).getByRole("button", { name: `${texts.searchField.ar} Ctrl K` })).toBeInTheDocument();
+    await user.click(within(topBar()).getByRole("button", { name: texts.more.ar }));
+    const status = await screen.findByText(/فاضل 14 يوم/);
+    const section = status.closest("[data-more-status]")!;
+    expect(section).not.toBeNull();
+    expect(section.parentElement!.firstElementChild).toBe(section); // the top of More
+    vi.unstubAllGlobals();
+  });
+
+  it("below 1000 px the status is in More and the chat opens from the top bar", async () => {
     screenWidth(true);
     setCurrentProject(P1);
     core();
@@ -413,25 +438,88 @@ describe("keyboard and layout", () => {
     await head();
     expect(screen.queryByRole("log")).toBeNull();
     expect(within(topBar()).queryByText(/فاضل 14 يوم/)).toBeNull();
-    await user.click(within(topBar()).getByRole("button", { name: texts.deliverableStatus.ar }));
-    expect(await screen.findByText(/فاضل 14 يوم/)).toBeInTheDocument();
+    await user.click(within(topBar()).getByRole("button", { name: texts.more.ar }));
+    expect((await screen.findByText(/فاضل 14 يوم/)).closest("[data-more-status]")).not.toBeNull();
     await user.keyboard("{Escape}");
     await user.click(within(topBar()).getByRole("button", { name: texts.projectChat.ar }));
     expect(screen.getByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument();
   });
 
-  it("sample mode shows the sample label in both languages, and the sample documents", async () => {
+  it("below 640 px the document loses its side gutters", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: /639px|999px|1279px/.test(query),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await head();
+    const main = screen.getByRole("main");
+    expect(main).toHaveClass("px-0");
+    expect(main).not.toHaveClass("px-3");
+    vi.unstubAllGlobals();
+  });
+
+  it("wider, the document keeps its 12 px gutters", async () => {
+    setCurrentProject(P1);
+    core();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await head();
+    expect(screen.getByRole("main")).toHaveClass("px-3");
+  });
+
+  it("Full screen, from More or Ctrl+Shift+F by the key's place, folds the chat; the second press brings it back", async () => {
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await box();
+    const chat = () => screen.queryByRole("complementary", { name: texts.projectChat.ar });
+    await user.click(within(topBar()).getByRole("button", { name: texts.more.ar }));
+    await user.click(await screen.findByRole("button", { name: texts.fullScreen.ar }));
+    await waitFor(() => expect(chat()).toBeNull());
+    await user.click(within(topBar()).getByRole("button", { name: texts.more.ar }));
+    const leave = await screen.findByRole("button", { name: texts.leaveFullScreen.ar });
+    expect(leave).toHaveAttribute("aria-pressed", "true");
+    await user.click(leave);
+    await waitFor(() => expect(chat()).not.toBeNull());
+    // the shortcut, read by its code: an Arabic layout's «ب» on the F key works too
+    fireEvent.keyDown(document, { key: "ب", code: "KeyF", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(chat()).toBeNull());
+    fireEvent.keyDown(document, { key: "ب", code: "KeyF", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(chat()).not.toBeNull());
+  });
+
+  it("sample mode says sample once: an open sample Deliverable's facts, else the top bar's plain words", async () => {
     window.history.replaceState(null, "", "/?sample=1");
     setCurrentProject(P1);
     core();
     const user = userEvent.setup();
     render(<App />);
-    expect(await within(topBar()).findByText(texts.sampleData.ar)).toBeInTheDocument();
+    // Project files: no document facts, so the bar says it, in Copper with no border
+    const words = await within(topBar()).findByText(texts.sampleData.ar);
+    expect(words).toHaveClass("text-copper");
+    expect(words.className).not.toMatch(/\bborder\b/);
     await user.click(await screen.findByRole("button", { name: new RegExp(texts.projectFiles.ar) }));
-    expect(await screen.findByRole("menuitem", { name: /تسعير المقايسة - عينة/ })).toBeInTheDocument();
-    await user.keyboard("{Escape}");
+    await user.click(await screen.findByRole("menuitem", { name: /تسعير المقايسة - عينة/ }));
+    // a sample Deliverable: its facts say it, and the bar says nothing more
+    expect(await within(topBar()).findByText(new RegExp(texts.sampleNumbers.ar))).toBeInTheDocument();
+    expect(within(topBar()).queryByText(texts.sampleData.ar)).toBeNull();
     act(() => setLanguage("en"));
-    expect(within(screen.getByRole("banner", { name: texts.topBar.en })).getByText(texts.sampleData.en)).toBeInTheDocument();
+    const bar = screen.getByRole("banner", { name: texts.topBar.en });
+    expect(within(bar).getByText(new RegExp(texts.sampleNumbers.en))).toBeInTheDocument();
+    expect(within(bar).queryByText(texts.sampleData.en)).toBeNull();
+  });
+
+  it("sample mode in the General chat, where no document says it: plain Copper words in the top bar, no border", async () => {
+    window.history.replaceState(null, "", "/?sample=1");
+    core();
+    render(<App />);
+    const label = await within(topBar()).findByText(texts.sampleData.ar);
+    expect(label).toHaveClass("text-copper");
+    expect(label.className).not.toMatch(/\bborder\b/);
   });
 });
 

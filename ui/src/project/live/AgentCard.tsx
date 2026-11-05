@@ -76,7 +76,7 @@ function placeOf(anchor: Anchor | null): string | null {
 }
 
 const button =
-  "nodrag rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
+  "rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
 
 export function AgentCard({ agent }: { agent: LiveAgent }) {
   useLanguage();
@@ -131,7 +131,7 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
         <button
           type="button"
           aria-label={on}
-          className="nodrag flex min-w-0 max-w-full items-baseline self-start whitespace-pre text-start underline decoration-ink/30 underline-offset-2 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-ink"
+          className="flex min-w-0 max-w-full items-baseline self-start whitespace-pre text-start underline decoration-ink/30 underline-offset-2 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-ink"
           onClick={() => workspaceApi.open(frame as DocKey, agent.focus?.anchor ?? null)} // a title is a document's
         >
           {/* the document's name keeps to one line, in its own direction; the words round it stay whole */}

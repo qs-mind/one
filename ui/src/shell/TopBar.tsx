@@ -3,9 +3,11 @@
 // copper dot and «مستنيك قرار واحد», or Slate «مافيش حاجة مستنياك»; pressing it opens the chat at the card), the
 // search field (it opens the palette from itself) and More. The Deliverables and Project Records are in the document
 // switcher. AI settings and the other language are always in More: they are set once, not used every hour, and so is
-// Setup, the first launch's steps again. Below 1000 px the status folds into one Status button and the chat opens from
-// its own button here (the waiting dot rides on it); below 1280 px search folds into More too: the project's name is
-// never cut. The chrome mirrors in Arabic.
+// Setup, the first launch's steps again, and Full screen (Ctrl/Cmd+Shift+F: the chat folds). Below 1280 px the status
+// folds first, into a section at the top of More; below 1000 px search folds into More too and the chat opens from its
+// own button here (the waiting dot rides on it): the project's name and the document's title are never cut. Sample
+// numbers are said once: in an open Deliverable's facts, else here (Project files, the General chat), in Copper. The
+// chrome mirrors in Arabic.
 // The project button carries one small mark when another chat needs a look (chatActivity.ts): working, waiting for
 // you, failed, or done since you last looked; this chat is the one on the screen, so it is seen.
 import { type ReactNode, useRef } from "react";
@@ -22,7 +24,7 @@ import { centreOf, withTransition } from "../ui/viewTransition";
 import { ActivityMark, activityWord } from "./ActivityMark";
 import { WaitingDot } from "./ChatPanel";
 import { elsewhere, GENERAL, useActivity, useOpenChat } from "./chatActivity";
-import { useCompact } from "./regions";
+import { useCompact, useSmall } from "./regions";
 import { StatusStrip } from "./StatusStrip";
 
 export type PanelKind = "ai" | "projects" | "records" | "deliverables" | "backup" | "close" | "confidential";
@@ -51,6 +53,9 @@ export type TopBarProps = {
   onChat(): void;
   /** The open document's title (its switcher) and state, after the project's name. */
   document?: ReactNode;
+  /** Full screen: the chat folds and the document takes the width (Ctrl/Cmd+Shift+F too). */
+  fullScreen?: boolean;
+  onFullScreen?(): void;
 };
 
 export function TopBar(props: TopBarProps) {
@@ -59,6 +64,7 @@ export function TopBar(props: TopBarProps) {
   const more = useRef<HTMLButtonElement>(null);
   const keys = isMac() ? "⌘K" : "Ctrl K";
   const compact = useCompact(); // the tools fold into More before the project name or the status would be cut
+  const small = useSmall(); // below 640 px what is waiting is its dot: the words would run into the title
   const chatId = project?.id ?? GENERAL;
   useOpenChat(chatId);
   const other = elsewhere(useActivity(), chatId);
@@ -159,31 +165,22 @@ export function TopBar(props: TopBarProps) {
           {props.document}
         </>
       )}
-      {/* the status folds before the document's title would cut */}
+      {/* below 1280 px the status folds into More first, before the document's title would cut */}
       {project && !(narrow || compact) && <StatusStrip status={props.status} sources={props.sources} />}
-      {project && (narrow || compact) && Object.keys(props.status).length > 0 && (
-        <Popover>
-          <PopoverTrigger className={button}>{t("deliverableStatus")}</PopoverTrigger>
-          <PopoverContent>
-            <StatusStrip status={props.status} sources={props.sources} stacked />
-          </PopoverContent>
-        </Popover>
-      )}
-      {props.sample && (
-        <span className="shrink-0 whitespace-nowrap rounded-lg border border-copper px-3 py-1 text-copper">{t("sampleData")}</span>
-      )}
+      {/* sample numbers are said once: an open Deliverable's facts say «الأرقام عينة», else these words (App.tsx) */}
+      {props.sample && <span className="shrink-0 whitespace-nowrap text-copper">{t("sampleData")}</span>}
 
       <div className="ms-auto flex shrink-0 items-center gap-2">
         {project &&
           (props.waiting > 0 ? (
             <button type="button" className={`${button} flex items-center gap-2 text-copper hover:text-copper`} onClick={props.onWaiting}>
               <WaitingDot />
-              {count("decisionsWaiting", props.waiting)}
+              <span className={small ? "sr-only" : undefined}>{count("decisionsWaiting", props.waiting)}</span>
             </button>
           ) : (
             !narrow && <span className="whitespace-nowrap px-3 text-slate">{t("nothingWaiting")}</span>
           ))}
-        {!(narrow || compact) && searchField}
+        {!narrow && searchField}
         {project && narrow && (
           <button type="button" data-chat-button aria-expanded={props.chatOpen} className={`${button} flex items-center gap-2`} onClick={props.onChat}>
             {t("projectChat")}
@@ -195,11 +192,26 @@ export function TopBar(props: TopBarProps) {
             {t("more")}
           </PopoverTrigger>
           <PopoverContent align="end" className="flex min-w-48 flex-col items-stretch gap-1 p-2 [&>button]:text-start">
-            {(narrow || compact) && (
+            {project && (narrow || compact) && Object.keys(props.status).length > 0 && (
+              <>
+                <div data-more-status className="px-3 py-1">
+                  <StatusStrip status={props.status} sources={props.sources} stacked />
+                </div>
+                <hr className="mx-3 my-1 border-ink/[0.06]" />
+              </>
+            )}
+            {narrow && (
               <>
                 {search}
                 <hr className="mx-3 my-1 border-ink/[0.06]" />
               </>
+            )}
+            {project && (
+              <PopoverClose asChild>
+                <button type="button" aria-pressed={props.fullScreen} className={button} onClick={props.onFullScreen}>
+                  {t(props.fullScreen ? "leaveFullScreen" : "fullScreen")}
+                </button>
+              </PopoverClose>
             )}
             {project && (
               <>

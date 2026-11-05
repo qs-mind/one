@@ -122,10 +122,10 @@ describe("the search field", () => {
   });
 });
 
-describe("at 1000 px", () => {
+describe("below 1000 px", () => {
   it("More holds Search as a word with its keys as a hint, the overflow set apart from the rest", async () => {
     vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query === "(max-width: 1279px)",
+      matches: query === "(max-width: 1279px)" || query.includes("999px"), // below 1000 px: search folds too
       media: query,
       addEventListener() {},
       removeEventListener() {},
@@ -134,14 +134,15 @@ describe("at 1000 px", () => {
     core();
     const user = userEvent.setup();
     render(<App />);
-    await box();
+    await screen.findByRole("heading", { level: 1 }); // narrow: the chat waits behind its button
     await user.click(within(topBar()).getByRole("button", { name: texts.more.ar }));
     const search = await screen.findByRole("button", { name: `${texts.searchField.ar} Ctrl K` });
     expect(search.querySelector("span")).toHaveTextContent(new RegExp(`^${texts.searchField.ar}$`));
     expect(search.querySelector("kbd")).toHaveTextContent(/^Ctrl K$/);
     // Search, then a line, then the rest of More (the Deliverables and Project Records are in the document switcher)
     const order = [...search.parentElement!.children].map((el) => (el.tagName === "HR" ? "—" : (el.textContent ?? "")));
-    expect(order.slice(0, 2)).toEqual([`${texts.searchField.ar}Ctrl K`, "—"]);
+    const at = order.indexOf(`${texts.searchField.ar}Ctrl K`);
+    expect(order.slice(at, at + 2)).toEqual([`${texts.searchField.ar}Ctrl K`, "—"]);
     expect(order).not.toContain(texts.deliverablesButton.ar);
     expect(order).not.toContain(texts.records.ar);
     vi.unstubAllGlobals();

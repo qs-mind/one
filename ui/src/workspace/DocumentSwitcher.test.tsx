@@ -115,12 +115,12 @@ describe("DocumentSwitcher", () => {
     expect(workspaceApi.current()?.key).toBe("files:all");
   });
 
-  it("the rows say Revision as the head does", async () => {
+  it("the rows say Revision as the head does: «إصدار», an issued Revision, never «نسخة», a saved version", async () => {
     show();
     await userEvent.click(screen.getByRole("button", { name: /المقايسة المسعّرة/ }));
     const row = screen.getAllByRole("menuitem")[0]!;
-    expect(row.textContent).toContain(fill(texts.docRevision.ar, { n: 2 }));
-    expect(row.textContent).not.toContain(fill(texts.reviewRev.ar, { n: 2 }));
+    expect(row.textContent).toContain("إصدار 2");
+    expect(row.textContent).not.toContain("نسخة 2");
   });
 
   it("the head of file:x shows the file's name whole", () => {
