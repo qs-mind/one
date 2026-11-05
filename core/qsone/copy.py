@@ -1,16 +1,16 @@
 """Texts the core returns to the engineer, always as {en, ar} pairs.
 
-"Claude key" / «مفتاح Claude» is the button label on the screen (aiKey in ui/src/i18n.ts).
+A text says what happened and what to do, never where on the screen to go: the same text shows in
+the chat, in AI settings and in the first launch. Where the engineer can act, the screen adds the
+action for its place, from `fix_of` (an "Open AI settings" button in the chat; nothing more in AI
+settings themselves).
 """
 
 import re
 
 NO_KEY = {
-    "en": (
-        "There is no Claude key yet. Press “Claude key” at the top, add your Claude key, "
-        "then send your message again."
-    ),
-    "ar": "لسه مفيش مفتاح Claude. دوس على «مفتاح Claude» فوق وضيف مفتاحك، وبعدين ابعت رسالتك تاني.",
+    "en": "There is no Claude key yet. Add your Claude key first.",
+    "ar": "لسه مفيش مفتاح Claude. ضيف مفتاح Claude بتاعك الأول.",
 }
 
 KEY_STORE_DOWN = {
@@ -22,9 +22,16 @@ KEY_STORE_DOWN = {
 }
 
 # Model errors: the engineer sees one of these; the details go to core.log only.
+# The Claude key's (the Native Link's): also what AI_KEY_REFUSED says for it.
 KEY_REFUSED = {
-    "en": "The Claude key was refused. Check it, or add a new one from “Claude key” at the top.",
-    "ar": "مفتاح Claude اترفض. راجعه، أو ضيف مفتاح جديد من «مفتاح Claude» فوق.",
+    "en": (
+        "Anthropic refused this Claude key. Check that you copied all of it, "
+        "or make a new key at console.anthropic.com."
+    ),
+    "ar": (
+        "Anthropic رفض مفتاح Claude ده. اتأكد إنك نسخته كله، "
+        "أو اعمل مفتاح جديد من console.anthropic.com."
+    ),
 }
 
 NO_CONNECTION = {
@@ -257,23 +264,26 @@ MODEL_NOT_SAVED = {
 # Money is shown in USD with 2 decimals and Western digits.
 # ---------------------------------------------------------------------------------------------
 
-# "AI" / «الذكاء الاصطناعي» is the header button that opens AI settings (`ai` in ui/src/i18n.ts):
-# the reply when no AI is connected at all.
+# The reply when no AI is connected at all.
 NO_AI = {
     "en": (
-        "No AI is connected yet. Press “AI” at the top and add a Claude key, another AI "
-        "provider, or your own Claude Code, then send your message again."
+        "No AI is connected yet. Connect a Claude key, another AI provider or your own "
+        "Claude Code, then send your message again."
     ),
     "ar": (
-        "لسه مفيش ذكاء اصطناعي متوصّل. دوس على «الذكاء الاصطناعي» فوق وضيف مفتاح Claude، "
-        "أو مزوّد تاني، أو Claude Code بتاعك، وبعدين ابعت رسالتك تاني."
+        "لسه مفيش ذكاء اصطناعي متوصّل. وصّل مفتاح Claude، أو مزوّد تاني، أو Claude Code بتاعك، "
+        "وبعدين ابعت رسالتك تاني."
     ),
 }
 
-# Model errors for any AI Connector; KEY_REFUSED and the others above stay for the Native Link.
+# Model errors for any AI Connector; KEY_REFUSED and the others above stay for the Native Link,
+# whose refused key is KEY_REFUSED here too (`key_refused`).
 AI_KEY_REFUSED = {
-    "en": "The {provider} key was refused. Check it in “AI” at the top, or add a new one.",
-    "ar": "مفتاح {provider} اترفض. راجعه من «الذكاء الاصطناعي» فوق، أو ضيف مفتاح جديد.",
+    "en": (
+        "{provider} refused the key. Check that you copied all of it, "
+        "or make a new key at {provider}."
+    ),
+    "ar": "{provider} رفض المفتاح. اتأكد إنك نسخته كله، أو اعمل مفتاح جديد من عند {provider}.",
 }
 
 AI_NO_CONNECTION = {
@@ -289,6 +299,12 @@ AI_BUSY = {
 AI_FAILED = {
     "en": "The work stopped because of a problem with {provider}. The work so far is saved.",
     "ar": "الشغل وقف بسبب مشكلة في {provider}. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
+}
+
+# The one tiny check (first launch, AI settings): there is no work to save yet.
+AI_CHECK_FAILED = {
+    "en": "{provider} did not answer the check. Try again in a few minutes.",
+    "ar": "{provider} مارَدّش على الفحص. جرّب تاني كمان كام دقيقة.",
 }
 
 # When a model does not answer. {role} is a ROLE_* pair; prices are USD per million tokens.
@@ -369,13 +385,11 @@ EQUIVALENT_COST = {
 
 PRICE_UNKNOWN = {
     "en": (
-        "ONE does not know the price of {model}, so the Spending Cap cannot protect you. "
-        "Enter its price in “AI” at the top, or mark it as running on this computer. "
-        "Use it anyway in this Brief?"
+        "ONE does not know the price of {model}, so the Spending Cap cannot protect you "
+        "until you enter its price. Use it anyway in this Brief?"
     ),
     "ar": (
-        "ONE مش عارف سعر {model}، فسقف الصرف مش هيقدر يحميك. "
-        "اكتب سعره في «الذكاء الاصطناعي» فوق، أو علّم عليه إنه شغال على الجهاز ده. "
+        "ONE مش عارف سعر {model}، فسقف الصرف مش هيقدر يحميك لحد ما تكتب سعره. "
         "نستخدمه برضه في التكليف ده؟"
     ),
 }
@@ -633,33 +647,37 @@ TOOL_USE_DESK = {"en": "Opening a saved Desk", "ar": "بيفتح قسم محفو
 # The Subscription Link: the engineer's own Claude Code.
 CLAUDE_CODE_MISSING = {
     "en": (
-        "Claude Code was not found on this computer. "
-        "Install it from https://code.claude.com/docs/en/setup, or pick its file."
+        "Claude Code was not found on this computer. Install it from "
+        "https://code.claude.com/docs/en/setup and sign in to it once in a terminal, "
+        "then try again."
     ),
     "ar": (
-        "Claude Code مش موجود على الجهاز ده. "
-        "نزّله من https://code.claude.com/docs/en/setup، أو اختار الملف بتاعه."
+        "Claude Code مش موجود على الجهاز ده. نزّله من https://code.claude.com/docs/en/setup "
+        "وسجّل دخولك فيه مرة من الـ terminal، وبعدين جرّب تاني."
     ),
 }
 
 CLAUDE_CODE_TOO_OLD = {
-    "en": "Your Claude Code lacks options ONE needs. Update it, then check again.",
-    "ar": "Claude Code اللي عندك ناقصه اختيارات ONE محتاجها. حدّثه وبعدين افحص تاني.",
+    "en": (
+        "Your Claude Code lacks options ONE needs. Update it to the newest version, then try again."
+    ),
+    "ar": "Claude Code اللي عندك ناقصه اختيارات ONE محتاجها. حدّثه لآخر نسخة، وبعدين جرّب تاني.",
 }
 
 CLAUDE_CODE_SHIM = {
     "en": (
-        "This is the npm claude.cmd, which ONE cannot run safely. "
-        "Install the native Claude Code, then pick it."
+        "This is the npm claude.cmd, which ONE cannot run safely. Install the native "
+        "Claude Code from https://code.claude.com/docs/en/setup, then try again."
     ),
     "ar": (
-        "ده claude.cmd بتاع npm، وONE مش هيقدر يشغّله بأمان. نزّل Claude Code الأصلي وبعدين اختاره."
+        "ده claude.cmd بتاع npm، وONE مش هيقدر يشغّله بأمان. نزّل Claude Code الأصلي من "
+        "https://code.claude.com/docs/en/setup، وبعدين جرّب تاني."
     ),
 }
 
 CLAUDE_CODE_SIGNED_OUT = {
-    "en": "Claude Code is signed out. Open Claude Code once and sign in, then try again.",
-    "ar": "Claude Code مش مسجّل دخول. افتح Claude Code مرة وسجّل دخول، وبعدين جرّب تاني.",
+    "en": "Claude Code is signed out. Sign in to it once in a terminal, then try again.",
+    "ar": "Claude Code مش مسجّل دخول. سجّل دخولك فيه مرة من الـ terminal، وبعدين جرّب تاني.",
 }
 
 CLAUDE_CODE_LIMIT = {
@@ -1433,23 +1451,21 @@ WEB_OFFLINE = {
 }
 WEB_NO_SEARCH = {
     "en": (
-        "No web search is set up. Add a search key in Settings, connect an AI that can search "
+        "No web search is set up. Add a search key, connect an AI that can search "
         "(Claude), or subscribe to QS Mind."
     ),
     "ar": (
-        "مفيش بحث على الويب متظبط. ضيف مفتاح بحث من الإعدادات، أو وصّل ذكاء اصطناعي بيعرف يدوّر "
+        "مفيش بحث على الويب متظبط. ضيف مفتاح بحث، أو وصّل ذكاء اصطناعي بيعرف يدوّر "
         "(Claude)، أو اشترك في QS Mind."
     ),
 }
 WEB_SEARCH_KEY_REFUSED = {
-    "en": "The search key was refused. Check it in Settings.",
-    "ar": "مفتاح البحث اترفض. راجعه من الإعدادات.",
+    "en": "The search key was refused. Check that you copied all of it, or add a new one.",
+    "ar": "مفتاح البحث اترفض. اتأكد إنك نسخته كله، أو ضيف مفتاح جديد.",
 }
 WEB_SEARCH_LIMIT = {
-    "en": (
-        "This month's search allowance is used up. Add your own search key in Settings to continue."
-    ),
-    "ar": "رصيد البحث للشهر ده خلص. ضيف مفتاح بحث بتاعك من الإعدادات عشان تكمّل.",
+    "en": ("This month's search allowance is used up. Add your own search key to continue."),
+    "ar": "رصيد البحث للشهر ده خلص. ضيف مفتاح بحث بتاعك عشان تكمّل.",
 }
 WEB_SEARCH_BUSY = {
     "en": "The search service is busy. Try again in a minute.",
@@ -1922,24 +1938,21 @@ PROJECT_ARCHIVED = {
     "ar": "المشروع ده مؤرشف، فهو للقراءة بس. لغي الأرشفة عشان تعدّل فيه.",
 }
 ARCHIVE_BACKUP_FAILED = {
-    "en": "The project is archived, but its final backup was not made. Back it up from Backup.",
-    "ar": "المشروع اتأرشف، بس آخر نسخة احتياطية ليه ماتعملتش. اعمله نسخة من «النسخة الاحتياطية».",
+    "en": "The project is archived, but its final backup was not made. Back it up now.",
+    "ar": "المشروع اتأرشف، بس آخر نسخة احتياطية ليه ماتعملتش. اعمله نسخة احتياطية دلوقتي.",
 }
 AI_CONSENT_NEEDED = {
-    "en": "Before ONE uses AI, say yes to the note on where your text goes. Open “Connect AI”.",
-    "ar": (
-        "قبل ما ONE يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين. "
-        "افتح «وصّل الذكاء الاصطناعي»."
-    ),
+    "en": "Before ONE uses AI, say yes to the note on where your text goes.",
+    "ar": "قبل ما ONE يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين.",
 }
 CLAUDE_CODE_NOT_FOUND = {
     "en": (
         "Claude Code was not found on this computer. Install it, sign in to it once in a "
-        "terminal, then press Check."
+        "terminal, then try again."
     ),
     "ar": (
         "مالقيناش Claude Code على الجهاز ده. نزّله، وسجّل دخولك فيه مرة من الـ terminal، "
-        "وبعدين دوس «اتأكد»."
+        "وبعدين جرّب تاني."
     ),
 }
 
@@ -2127,3 +2140,61 @@ UPDATE_OFFLINE = {
     "en": "Could not check for updates. Check the internet connection, then try again.",
     "ar": "مقدرناش ندوّر على تحديثات. اتأكد إن النت شغال وجرّب تاني.",
 }
+
+
+# ---------------------------------------------------------------------------------------------
+# What the screen can add to a text: the action that fixes it, for the place it shows in.
+# "ai": AI settings ("Open AI settings" in the chat; nothing more in AI settings or the first
+# launch's Connect AI, where the fix is already in place). "consent": the first launch's Connect
+# AI step. "retry": the same check once more ("Try again"). "backup": the Backup panel.
+# ---------------------------------------------------------------------------------------------
+FIXES = {
+    "ai": (
+        NO_KEY,
+        KEY_REFUSED,
+        NO_AI,
+        AI_KEY_REFUSED,
+        PRICE_UNKNOWN,
+        WEB_NO_SEARCH,
+        WEB_SEARCH_KEY_REFUSED,
+        WEB_SEARCH_LIMIT,
+    ),
+    "consent": (AI_CONSENT_NEEDED,),
+    "retry": (
+        KEY_STORE_DOWN,
+        NO_CONNECTION,
+        CLAUDE_BUSY,
+        MODELS_FAILED,
+        AI_NO_CONNECTION,
+        AI_BUSY,
+        AI_CHECK_FAILED,
+        CLAUDE_CODE_MISSING,
+        CLAUDE_CODE_TOO_OLD,
+        CLAUDE_CODE_SHIM,
+        CLAUDE_CODE_SIGNED_OUT,
+        CLAUDE_CODE_NOT_FOUND,
+    ),
+    "backup": (ARCHIVE_BACKUP_FAILED,),
+}
+
+
+def _shape(text: dict[str, str]) -> re.Pattern:
+    """The English words of `text`, with any value in each {placeholder}."""
+    pieces = re.split(r"\{[a-z_]+\}", text["en"])
+    return re.compile(".+?".join(re.escape(piece) for piece in pieces), re.S)
+
+
+_FIX_SHAPES = [(fix, _shape(text)) for fix, found in FIXES.items() for text in found]
+
+
+def fix_of(text: object) -> str | None:
+    """The action that fixes `text` (one of FIXES, filled or not), or None."""
+    if not isinstance(text, dict) or not isinstance(text.get("en"), str):
+        return None
+    return next((fix for fix, shape in _FIX_SHAPES if shape.fullmatch(text["en"])), None)
+
+
+def error(text: dict[str, str]) -> dict:
+    """A JSON error body: `{"error": text}`, and its `fix` when the screen can add one."""
+    fix = fix_of(text)
+    return {"error": text} if fix is None else {"error": text, "fix": fix}

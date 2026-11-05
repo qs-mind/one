@@ -5,7 +5,6 @@ GET /chat/{id}/stream."""
 import json
 import logging
 from collections.abc import AsyncIterator
-from uuid import uuid4
 
 import pydantic_ai
 from pydantic_ai.models import Model
@@ -17,8 +16,8 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from qsone import copy, keys, settings
 from qsone.engine import roles, selection
 from qsone.engine.runner import BriefBusy, Engine, NoAI, reply_id
-from qsone.engine.stream import HEADERS, ui_stream
-from qsone.engine.types import EFFORTS, Effort, ModelChoice, TextDelta
+from qsone.engine.stream import HEADERS, error_chunk, ui_stream
+from qsone.engine.types import EFFORTS, Effort, ModelChoice
 
 # The default; the engineer picks another from the header (PUT /settings/model).
 LEAD_MODEL = roles.LEAD_MODEL
@@ -48,8 +47,11 @@ def stream(events: AsyncIterator, message_id: str) -> StreamingResponse:
     )
 
 
-async def _say(text: dict[str, str]) -> AsyncIterator:
-    yield TextDelta("", f"{text['ar']}\n\n{text['en']}")
+async def _refused(text: dict[str, str]) -> AsyncIterator[str]:
+    """No Brief: only the stream's `error` chunk, so the chat shows `text` as its error line, with
+    the action that fixes it (Open AI settings, for a refused key)."""
+    yield error_chunk(text)
+    yield "data: [DONE]\n\n"
 
 
 def _last_text(body: dict) -> str:
@@ -123,7 +125,9 @@ async def respond(request: Request, engine: Engine) -> Response:
     except BriefBusy as busy:
         return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
     except NoAI as none:
-        # No Brief: the plain reply comes through the same stream, so the screen shows it.
-        return stream(_say(none.text), uuid4().hex)
+        # No Brief: the plain words come through the same stream, so the screen shows them.
+        return StreamingResponse(
+            _refused(none.text), media_type="text/event-stream", headers=HEADERS
+        )
     remember(lead, effort)
     return stream(engine.events(brief_id), reply_id(brief_id))

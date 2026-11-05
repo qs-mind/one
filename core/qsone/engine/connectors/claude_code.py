@@ -712,7 +712,9 @@ class ClaudeCodeConnector:
         """`auth status` only, never a model request: None when ready, else why not."""
         found = await status(self.path, command_prefix=self._prefix)
         if found.code is not None:
-            return copy.fill(getattr(copy, found.code), provider=self.name)
+            # it did not answer: a check has no work to save, so not AI_FAILED's words
+            code = "AI_CHECK_FAILED" if found.code == "AI_FAILED" else found.code
+            return copy.fill(getattr(copy, code), provider=self.name)
         return None
 
     async def run(self, job: AgentJob, sink: Callable[[Event], None]) -> AgentOutcome:

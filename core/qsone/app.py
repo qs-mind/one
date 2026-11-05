@@ -211,7 +211,7 @@ def create_app(
 
     @app.exception_handler(RecordsError)
     async def records_error(request: Request, exc: RecordsError) -> JSONResponse:
-        return JSONResponse({"error": exc.text}, status_code=exc.status)
+        return JSONResponse(copy.error(exc.text), status_code=exc.status)
 
     @app.exception_handler(Exception)
     async def crashed(request: Request, exc: Exception) -> Response:
@@ -288,7 +288,7 @@ def create_app(
         try:
             keys.set_key(body.provider, body.value)
         except KeyringError:
-            return JSONResponse({"error": copy.KEY_STORE_DOWN}, status_code=503)
+            return JSONResponse(copy.error(copy.KEY_STORE_DOWN), status_code=503)
         return JSONResponse({"set": True})
 
     @app.get("/settings/search")
@@ -307,20 +307,20 @@ def create_app(
         try:
             keys.set_key(web_search.KEY_USER, body.value)
         except KeyringError:
-            return JSONResponse({"error": copy.KEY_STORE_DOWN}, status_code=503)
+            return JSONResponse(copy.error(copy.KEY_STORE_DOWN), status_code=503)
         return JSONResponse({"set": True})
 
     @app.get("/settings/models")
     async def list_models() -> JSONResponse:
         key = keys.get_key("anthropic")
         if key is None:
-            return JSONResponse({"error": copy.NO_KEY}, status_code=409)
+            return JSONResponse(copy.error(copy.NO_KEY), status_code=409)
         try:
             return JSONResponse(await models_lister(key))
         except anthropic.APIError as error:
             # The provider's own words go to core.log; the screen gets a plain {en, ar} pair.
             models.log.warning("Listing the models failed: %s", error)
-            return JSONResponse({"error": models.plain_error(error)}, status_code=502)
+            return JSONResponse(copy.error(models.plain_error(error)), status_code=502)
 
     @app.get("/settings/model")
     def lead_model() -> dict:

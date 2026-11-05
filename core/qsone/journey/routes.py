@@ -131,7 +131,7 @@ def router(engine: Any) -> APIRouter:
         if body.via == "api_key":
             failed = await engine_connectors.check(f"anthropic/{chat.lead_model_id()}", among=found)
             if failed:
-                return JSONResponse({"error": failed}, 409)
+                return JSONResponse(copy.error(failed), 409)
             usage.track("ai_link", via="api_key")
             return JSONResponse({"ok": True})
         saved = claude_link.saved()["path"]
@@ -143,7 +143,7 @@ def router(engine: Any) -> APIRouter:
             found.append(claude_link.ClaudeCodeConnector(saved or picked))
         failed = await engine_connectors.check(claude_link.ID, among=found)
         if failed:
-            return JSONResponse({"error": failed}, 409)
+            return JSONResponse(copy.error(failed), 409)
         try:
             claude_link.save(path=saved or picked, on=True)
         except OSError:
