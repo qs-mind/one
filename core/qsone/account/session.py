@@ -78,7 +78,7 @@ class Account:
         self._synced = False  # on_signed_in succeeded since the sign-in or this start
         self._escrow: AccountEscrow | None = None
 
-    # The protocol client ---------------------------------------------------------------------------
+    # The protocol client --------------------------------------------------------------------------
 
     def client(self) -> oidc.Client:
         """Raises `AccountError` (ACCOUNT_UNAVAILABLE) when this build has no client id yet."""
@@ -99,7 +99,7 @@ class Account:
                 self._client.close()
                 self._client = None
 
-    # What is kept ----------------------------------------------------------------------------------
+    # What is kept ---------------------------------------------------------------------------------
 
     def _load(self) -> tuple[str, dict] | None:
         """(refresh token, profile), or None when signed out. Raises `KeyringError`."""
@@ -159,7 +159,7 @@ class Account:
             except KeyringError:
                 return False
 
-    # What the screen asks --------------------------------------------------------------------------
+    # What the screen asks -------------------------------------------------------------------------
 
     def state(self) -> dict:
         """The GET /account answer: {"state", "email"?, "name"?, "url"?, "device"?, "note"?}.
@@ -325,7 +325,7 @@ class Account:
         with self._lock:
             self._synced = True
 
-    # Tokens ----------------------------------------------------------------------------------------
+    # Tokens ---------------------------------------------------------------------------------------
 
     def access_token(self) -> str | None:
         """A good access token, refreshed when needed; None when signed out, offline, or after
@@ -413,7 +413,7 @@ class Account:
         # In the background: asking for the account never waits on the network.
         threading.Thread(target=refresh, name="account-refresh", daemon=True).start()
 
-    # The vault -------------------------------------------------------------------------------------
+    # The vault ------------------------------------------------------------------------------------
 
     def escrow(self) -> AccountEscrow | None:
         """The account's vault, which keeps the Backup key; None when signed out."""

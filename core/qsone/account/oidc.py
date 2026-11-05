@@ -382,7 +382,9 @@ class Loopback:
             "ui_locales": locale,
         }
         self.url = f"{authorize}?{urlencode(query)}"
-        threading.Thread(target=self.server.serve_forever, name="account-loopback", daemon=True).start()
+        threading.Thread(
+            target=self.server.serve_forever, name="account-loopback", daemon=True
+        ).start()
         self._timer = threading.Timer(SIGN_IN_SECONDS, self._expire)
         self._timer.daemon = True
         self._timer.start()

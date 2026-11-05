@@ -89,7 +89,10 @@ class AccountEscrow:
 
     def _call(self, method: str, **kwargs) -> httpx.Response:
         with self._lock:
-            if self._offline_at is not None and time.monotonic() - self._offline_at < OFFLINE_SECONDS:
+            if (
+                self._offline_at is not None
+                and time.monotonic() - self._offline_at < OFFLINE_SECONDS
+            ):
                 raise VaultError("offline")
         client = self.account.client()
         url = f"{client.issuer}/api/vault/{NAME}"
