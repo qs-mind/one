@@ -210,9 +210,11 @@
 @theme {
   --font-logo: "Instrument Sans", "Kumbh Sans Variable", system-ui, sans-serif;
 }
+/* The gap is longer than the line and the start sits 5 units into it, so a round cap never shows as a dot
+   before its line draws. */
 @keyframes mark-draw {
   from {
-    stroke-dashoffset: var(--len);
+    stroke-dashoffset: calc(var(--len) + 5);
   }
 }
 @keyframes mark-fill {
@@ -227,7 +229,7 @@
   }
 }
 [data-draw] .mark-line {
-  stroke-dasharray: var(--len);
+  stroke-dasharray: var(--len) calc(var(--len) + 10);
   animation: mark-draw var(--line-ms) var(--ease-calm) backwards;
 }
 [data-draw] .mark-face {
