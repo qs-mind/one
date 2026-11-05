@@ -1,16 +1,14 @@
-// One team member in the team and Desk frames: role, model, state in words with an icon (never colour alone), the
-// Progress Line, what it is on (a button that shows that frame), Follow, and Stop for the Brief it works on.
-import { useStore, type ReactFlowState } from "@xyflow/react";
+// One team member in the team list (the chat's head): role, model, state in words with an icon (never colour alone),
+// the Progress Line, what it is on (a button that opens that document), and Stop for the Brief it works on.
 import { useState } from "react";
 import { ProviderLogo } from "../../brand/providers/ProviderLogo";
 import { coreLine, send } from "../../core";
 import { fill, pick, t, texts, useLanguage, type Text } from "../../i18n";
-import { canvasApi } from "../../canvas/api";
-import { idOf } from "../../canvas/frames/Frame";
-import type { AgentInfo, Anchor, FrameKey } from "../types";
+import type { AgentInfo, Anchor, DocKey } from "../types";
 import { FileName } from "../../ui/FileName";
-import { cursorShown, type LiveAgent } from "./activity";
-import { follow, stopFollowing, useFollowing } from "../../canvas/live/follow";
+import { workspaceApi } from "../../workspace/api";
+import { useDocTitle } from "../../workspace/documents";
+import type { LiveAgent } from "./activity";
 
 export const stateText: Record<AgentInfo["state"], keyof typeof texts> = {
   idle: "stateIdle",
@@ -70,15 +68,6 @@ function StateIcon({ state }: { state: AgentInfo["state"] }) {
   }
 }
 
-/** A frame's name as the canvas shows it; a file not open on the canvas is named from the Project files frame. */
-const titleOf = (key: FrameKey) => (s: ReactFlowState) => {
-  const node = s.nodeLookup.get(key);
-  if (node) return node.ariaLabel ?? null;
-  if (!key.startsWith("file:")) return null;
-  const files = (s.nodeLookup.get("files:all")?.data as { files?: { id: string; name: string }[] } | undefined)?.files;
-  return files?.find((f) => f.id === idOf(key))?.name ?? null;
-};
-
 /** «البند 3/02», «صفحة 4»: never a raw id. */
 function placeOf(anchor: Anchor | null): string | null {
   if (anchor?.row) return fill(t("anchorRow"), { row: anchor.row });
@@ -91,9 +80,8 @@ const button =
 
 export function AgentCard({ agent }: { agent: LiveAgent }) {
   useLanguage();
-  const followed = useFollowing() === agent.id;
   const frame = agent.focus?.frame ?? null;
-  const title = useStore(frame ? titleOf(frame) : () => null);
+  const title = useDocTitle(frame); // a document of the project; a Desk or the team names none
   const [stopping, setStopping] = useState(false);
   const [problem, setProblem] = useState<Text | null>(null);
   const role = pick(agent.role);
@@ -144,41 +132,25 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
           type="button"
           aria-label={on}
           className="nodrag flex min-w-0 max-w-full items-baseline self-start whitespace-pre text-start underline decoration-ink/30 underline-offset-2 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-ink"
-          onClick={(event) => {
-            event.stopPropagation(); // the click must not also select the team frame around the card
-            canvasApi.focusFrame(frame, agent.focus?.anchor ? { anchor: agent.focus.anchor } : undefined);
-          }}
+          onClick={() => workspaceApi.open(frame as DocKey, agent.focus?.anchor ?? null)} // a title is a document's
         >
-          {/* the frame's name keeps to one line, in its own direction; the words round it stay whole */}
+          {/* the document's name keeps to one line, in its own direction; the words round it stay whole */}
           <span className="shrink-0">{before}</span>
           <FileName name={title} fit />
           <span className="shrink-0">{after}</span>
         </button>
       )}
-      {(cursorShown(agent) || (running && agent.brief_id)) && (
+      {running && agent.brief_id && (
         <span className="flex flex-wrap gap-2 pt-1">
-          {cursorShown(agent) && (
-            <button
-              type="button"
-              aria-pressed={followed}
-              aria-label={followed ? t("stopFollowing") : fill(t("followRole"), { role })}
-              className={button}
-              onClick={() => (followed ? stopFollowing() : follow(agent.id))}
-            >
-              {followed ? t("stopFollowing") : t("follow")}
-            </button>
-          )}
-          {running && agent.brief_id && (
-            <button
-              type="button"
-              disabled={stopping}
-              aria-label={fill(t("stopRole"), { role })}
-              className={`${button} disabled:opacity-50`}
-              onClick={() => void stop()}
-            >
-              {t("stop")}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={stopping}
+            aria-label={fill(t("stopRole"), { role })}
+            className={`${button} disabled:opacity-50`}
+            onClick={() => void stop()}
+          >
+            {t("stop")}
+          </button>
         </span>
       )}
       {problem && (
