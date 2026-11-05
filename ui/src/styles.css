@@ -247,3 +247,11 @@
     animation: none !important;
   }
 }
+
+/* Motion, group A: the language wipe (ui/src/ui/viewTransition.ts). The new page is revealed by a growing circle
+   over the old one, so neither picture fades on its own. */
+html.lang-wipe::view-transition-old(root),
+html.lang-wipe::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}

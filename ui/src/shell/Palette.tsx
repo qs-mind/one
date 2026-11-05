@@ -9,6 +9,7 @@ import { fill, language, pick, setLanguage, t, useLanguage } from "../i18n";
 import { type Project, switchProject } from "../records/project";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { FileName } from "../ui/FileName";
+import { withTransition } from "../ui/viewTransition";
 
 type Hit = { file_id: string; file_name: string; locator: Record<string, string | number>; text: string };
 
@@ -136,7 +137,7 @@ export function Palette({
           {project && command(t("arrangeByStage"), () => canvasApi.arrange("stage"))}
           {project && command(t("tidy"), () => canvasApi.arrange("tidy"))}
           {project && command(t(chatOpen ? "closeChat" : "openChat"), onToggleChat)}
-          {command(t("otherLanguage"), () => setLanguage(language() === "ar" ? "en" : "ar"))}
+          {command(t("otherLanguage"), () => void withTransition(() => setLanguage(language() === "ar" ? "en" : "ar")))}
           {project && command(t("generalChat"), onGeneralChat)}
           {command(t("newProject"), onNewProject)}
         </CommandGroup>

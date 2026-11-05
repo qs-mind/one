@@ -14,6 +14,7 @@ import { chooseFolder } from "../import/FolderDrop";
 import { fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { centreOf, withTransition } from "../ui/viewTransition";
 import { useCompact } from "./regions";
 import { StatusStrip } from "./StatusStrip";
 
@@ -69,9 +70,9 @@ export function TopBar(props: TopBarProps) {
       type="button"
       lang={lang === "ar" ? "en" : "ar"}
       className={button}
-      onClick={() => {
+      onClick={(event) => {
         const next = language() === "ar" ? "en" : "ar";
-        setLanguage(next);
+        void withTransition(() => setLanguage(next), centreOf(event.currentTarget)); // the wipe spreads from here
         // the core starts some Briefs itself (a tender folder's, a project's lessons): in the language on the screen
         void send("/setup/language", "PUT", { state: "done", lang: next });
       }}
