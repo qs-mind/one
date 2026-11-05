@@ -105,7 +105,7 @@ def test_wrong_key_or_damage_says_so(tmp_path, memory_keyring):
     path = tmp_path / "p" / "records.db"
     data = bytearray(path.read_bytes())
     middle = len(data) // 2
-    data[middle : middle + 4096] = bytes(4096)
+    data[middle:] = bytes(len(data) - middle)  # the second half: table pages, whatever the layout
     path.write_bytes(bytes(data))
     # Opening reads only a few pages; damage elsewhere is found when its page is read.
     with pytest.raises(RecordsError) as e:

@@ -60,7 +60,8 @@ def dump_tables(rec) -> dict:
             n
             for (n,) in c.execute(
                 "select name from sqlite_master where type = 'table'"
-                " and name not like 'chunks_fts%' order by name"
+                " and name not like 'chunks_fts%' and name not like 'price_cache_fts%'"
+                " order by name"
             )
         ]
         return {n: c.execute(f"select * from {n} order by rowid").fetchall() for n in names}

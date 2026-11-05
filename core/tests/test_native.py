@@ -37,6 +37,16 @@ def test_file_readers_import():
     import xlrd  # noqa: F401
 
 
+def test_new_libraries_import():
+    # Plan 5: web pages to Markdown, and the Sandbox's WebAssembly runtime (its native library).
+    import bs4  # noqa: F401
+    import docx  # noqa: F401
+    import markdownify  # noqa: F401
+    import wasmtime
+
+    assert wasmtime.Engine()
+
+
 @pytest.mark.skipif(
     importlib.util.find_spec("onnxruntime") is None, reason="no onnxruntime here (Intel Mac)"
 )

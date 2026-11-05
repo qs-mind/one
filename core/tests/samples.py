@@ -5,18 +5,38 @@ import io
 import struct
 import zipfile
 import zlib
+from collections.abc import Mapping, Sequence
 from xml.sax import saxutils
 
 import openpyxl
 import pytest
 import xlwt
+from openpyxl.styles import Font
+
+_HIDDEN_OPS = {"white": "1 1 1 rg /F1 12 Tf", "tiny": "/F1 0.5 Tf", "invisible": "3 Tr /F1 12 Tf"}
 
 
-def sample_pdf(pages: list[list[str]]) -> bytes:
+def sample_pdf(
+    pages: list[list[str]],
+    *,
+    white: Sequence[tuple[int, str]] = (),
+    tiny: Sequence[tuple[int, str]] = (),
+    invisible: Sequence[tuple[int, str]] = (),
+) -> bytes:
     """A hand-written PDF, one string per line. Each string must be in visual order, as Arabic PDFs
     store their glyphs. An empty page has no text layer, like a scanned page. A Type1 Helvetica font
-    with a ToUnicode map gives each character a one-byte code, so no font file is needed."""
-    chars = sorted({c for page in pages for line in page for c in line} - {" "})
+    with a ToUnicode map gives each character a one-byte code, so no font file is needed.
+
+    `white`, `tiny` and `invisible` add hidden text, each entry `(page, text)` with pages from 1:
+    drawn in white (`1 1 1 rg`), at 0.5 pt (`0.5 Tf`) or in render mode 3 (`3 Tr`), low on the
+    page, after the visible lines."""
+    hidden = [
+        (p, t, how)
+        for how, e in [("white", white), ("tiny", tiny), ("invisible", invisible)]
+        for p, t in e
+    ]
+    shown = {c for page in pages for line in page for c in line}
+    chars = sorted((shown | {c for _, t, _ in hidden for c in t}) - {" "})
     assert len(chars) <= 223, "too many different characters for a one-byte font"
     codes = {" ": 32} | {c: n for n, c in enumerate(chars, start=33)}
     cmap = "".join(f"<{n:02X}> <{c.encode('utf-16-be').hex().upper()}>\n" for c, n in codes.items())
@@ -42,7 +62,12 @@ def sample_pdf(pages: list[list[str]]) -> bytes:
     ]
     for i, lines in enumerate(pages):
         text = "".join(f"<{bytes(codes[c] for c in line).hex()}> Tj T*\n" for line in lines)
-        content = f"BT /F1 12 Tf 16 TL 72 770 Td\n{text}ET".encode() if lines else b""
+        content = f"BT /F1 12 Tf 16 TL 72 770 Td\n{text}ET" if lines else ""
+        mine = [(t, how) for p, t, how in hidden if p == i + 1]
+        for n, (t, how) in enumerate(mine):
+            glyphs = bytes(codes[c] for c in t).hex()
+            content += f"\nq BT {_HIDDEN_OPS[how]} 72 {120 - 16 * n} Td <{glyphs}> Tj ET Q"
+        content = content.encode()
         objects.append(
             b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842]"
             b" /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>" % (6 + 2 * i)
@@ -64,13 +89,27 @@ def sample_pdf(pages: list[list[str]]) -> bytes:
     return bytes(out)
 
 
-def sample_xlsx(sheets: dict[str, list[list]]) -> bytes:
+def sample_xlsx(
+    sheets: dict[str, list[list]],
+    *,
+    hidden_sheets: Sequence[str] = (),
+    hidden_rows: Mapping[str, Sequence[int]] | None = None,
+    white_cells: Mapping[str, Sequence[str]] | None = None,
+) -> bytes:
+    """Sheets of rows. `hidden_sheets` are hidden, `hidden_rows` hides rows (from 1) per sheet,
+    and `white_cells` gives cells ("B2") a white font, per sheet."""
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
     for name, rows in sheets.items():
         ws = wb.create_sheet(name)
         for row in rows:
             ws.append(row)
+        if name in hidden_sheets:
+            ws.sheet_state = "hidden"
+        for n in (hidden_rows or {}).get(name, ()):
+            ws.row_dimensions[n].hidden = True
+        for ref in (white_cells or {}).get(name, ()):
+            ws[ref].font = Font(color="FFFFFFFF")
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -545,3 +584,165 @@ def sample_client_xlsx(*, xlsm: bool = False) -> bytes:
             )
             z.writestr(info, data)
     return out.getvalue()
+
+
+# Plan 5: Tools ---------------------------------------------------------------------------------
+
+BOQ_HEADER = ["البند", "الوصف", "الوحدة", "الكمية", "الفئة", "الإجمالي"]
+
+
+def sample_boq_xlsx(rows: list[list], *, header_row: int = 3, sheet: str = "BOQ") -> bytes:
+    """A client BOQ sheet: a title in row 1, the header «البند / الوصف / الوحدة / الكمية» (and
+    «الفئة / الإجمالي» when the rows are that wide) in `header_row`, then `rows` from the next
+    row. An empty string is an empty cell."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws.cell(row=1, column=1, value="جدول الكميات - عينة")
+    width = max([4, *(len(r) for r in rows)])
+    for c, label in enumerate(BOQ_HEADER[:width], start=1):
+        ws.cell(row=header_row, column=c, value=label)
+    for r, row in enumerate(rows, start=header_row + 1):
+        for c, value in enumerate(row, start=1):
+            if value != "" and value is not None:
+                ws.cell(row=r, column=c, value=value)
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+_HEADINGS = {"h1": 1, "h2": 2, "h3": 3}
+
+
+def sample_docx(
+    paragraphs: Sequence[tuple[str, str]],
+    tables: Sequence[Sequence[Sequence[str]]] = (),
+    hidden: Sequence[str] = (),
+) -> bytes:
+    """A Word file: `paragraphs` as `(style, text)` with style "h1", "h2", "h3" or "p", in order;
+    then one paragraph per `hidden` text, its run marked hidden (`w:vanish`); then `tables`,
+    each a list of rows of cell texts."""
+    import docx
+
+    doc = docx.Document()
+    doc.core_properties.author = "عينة"
+    for style, text in paragraphs:
+        if style in _HEADINGS:
+            doc.add_heading(text, level=_HEADINGS[style])
+        else:
+            doc.add_paragraph(text)
+    for text in hidden:
+        doc.add_paragraph().add_run(text).font.hidden = True
+    for rows in tables:
+        table = doc.add_table(rows=len(rows), cols=max(len(r) for r in rows))
+        for r, row in enumerate(rows):
+            for c, text in enumerate(row):
+                table.cell(r, c).text = text
+    out = io.BytesIO()
+    doc.save(out)
+    return out.getvalue()
+
+
+def sample_dxf(layers: Mapping[str, Sequence[str]], codepage: str | None = None) -> bytes:
+    """An ASCII DXF as AutoCAD writes one: group codes right-aligned in three places, CRLF line
+    ends. Per layer, each entry is a TEXT, or "INSERT:<block>" for a block insert, or
+    "MTEXT:<text>" for an MTEXT (format codes as given). With `codepage` (e.g. "ANSI_1256") the
+    header names it, the version is AutoCAD 2004 and text is in that code page (cp1256);
+    otherwise the version is 2013 and text is UTF-8."""
+    pairs: list[tuple[int, str]] = []
+
+    def add(*items: tuple[int, str | float]) -> None:
+        pairs.extend((code, str(value)) for code, value in items)
+
+    add((0, "SECTION"), (2, "HEADER"), (9, "$ACADVER"), (1, "AC1018" if codepage else "AC1027"))
+    if codepage:
+        add((9, "$DWGCODEPAGE"), (3, codepage))
+    add((0, "ENDSEC"))
+    blocks = sorted(
+        {e.split(":", 1)[1] for es in layers.values() for e in es if e.startswith("INSERT:")}
+    )
+    add((0, "SECTION"), (2, "BLOCKS"))
+    for name in blocks:
+        add((0, "BLOCK"), (8, "0"), (2, name), (70, 0), (10, 0.0), (20, 0.0), (30, 0.0), (3, name))
+        add((0, "ENDBLK"), (8, "0"))
+    add((0, "ENDSEC"), (0, "SECTION"), (2, "ENTITIES"))
+    y = 0.0
+    for layer, entries in layers.items():
+        for entry in entries:
+            y += 5.0
+            kind, _, rest = entry.partition(":")
+            at = ((10, 10.0), (20, y), (30, 0.0))
+            if kind == "INSERT" and rest:
+                add((0, "INSERT"), (8, layer), (2, rest), *at)
+            elif kind == "MTEXT" and rest:
+                add((0, "MTEXT"), (8, layer), *at, (40, 2.5), (1, rest))
+            else:
+                add((0, "TEXT"), (8, layer), *at, (40, 2.5), (1, entry))
+    add((0, "ENDSEC"), (0, "EOF"))
+    text = "".join(f"{code:>3}\r\n{value}\r\n" for code, value in pairs)
+    return text.encode("cp1256" if codepage == "ANSI_1256" else "utf-8")
+
+
+def ifc_text(s: str) -> str:
+    """`s` as an IFC (STEP) string body: ASCII as is (a quote doubled), each run of other
+    characters as `\\X2\\HHHH…\\X0\\`."""
+    out: list[str] = []
+    run: list[str] = []
+    for ch in [*s, None]:
+        if ch is not None and ord(ch) > 126:
+            run.append(f"{ord(ch):04X}")
+            continue
+        if run:
+            out.append("\\X2\\" + "".join(run) + "\\X0\\")
+            run = []
+        if ch is not None:
+            out.append("''" if ch == "'" else ch)
+    return "".join(out)
+
+
+SAMPLE_IFC_LINES = [
+    f"#1=IFCPROJECT('0001',$,'{ifc_text('مشروع - عينة')}',$,$,$,$,$,$);",
+    f"#10=IFCBUILDINGSTOREY('0010',$,'{ifc_text('الدور الأرضي - عينة')}',$,$,$,$,$,.ELEMENT.,0.);",
+    "#20=IFCSPACE('0020',$,'Caf\\X\\E9 - sample',$,$,$,$,$,.ELEMENT.,.INTERNAL.,$);",
+    f"#30=IFCWALL('0030',$,'{ifc_text('جدار')}',$,$,$,$,$,$);",
+    "#31=IFCWALL('0031',$,'Wall - sample',$,$,$,$,$,$);",
+    "#41=IFCQUANTITYAREA('NetSideArea',$,$,12.5,$);",
+    "#42=IFCELEMENTQUANTITY('0042',$,'Qto_WallBaseQuantities',$,$,(#41));",
+    "#43=IFCRELDEFINESBYPROPERTIES('0043',$,$,$,(#30),#42);",
+    "#50=IFCPROPERTYSINGLEVALUE('FireRating',$,IFCLABEL('F60'),$);",
+    "#51=IFCPROPERTYSET('0051',$,'Pset_WallCommon',$,(#50));",
+    "#52=IFCRELDEFINESBYPROPERTIES('0052',$,$,$,(#31),#51);",
+    "#60=IFCRELCONTAINEDINSPATIALSTRUCTURE('0060',$,$,$,(#30,#31),#10);",
+    "#61=IFCRELAGGREGATES('0061',$,$,$,#10,(#20));",
+]
+
+
+def sample_ifc(lines: Sequence[str] | None = None, *, schema: str = "IFC4") -> bytes:
+    """An IFC (STEP) file around `lines`, or around `SAMPLE_IFC_LINES`: a project, a storey, a
+    space («Café» as `\\X\\E9`), two walls (one named «جدار» as `\\X2\\…\\X0\\`), a NetSideArea of
+    12.5 at #41 and a FireRating property."""
+    body = "\n".join(SAMPLE_IFC_LINES if lines is None else lines)
+    text = (
+        "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');\n"
+        "FILE_NAME('sample.ifc','2026-11-01T00:00:00',('sample'),('QS Mind - sample'),'','','');\n"
+        f"FILE_SCHEMA(('{schema}'));\nENDSEC;\nDATA;\n{body}\nENDSEC;\nEND-ISO-10303-21;\n"
+    )
+    return text.encode("ascii")
+
+
+def sample_html(
+    title: str, body: str, meta: Mapping[str, str] | None = None, *, lang: str = "ar"
+) -> str:
+    """A web page: `title`, `body` as given (HTML), and one `<meta>` per entry of `meta`: a key
+    with a colon ("article:published_time") as `property`, any other as `name`."""
+    tags = "".join(
+        f'<meta {"property" if ":" in k else "name"}="{saxutils.escape(k)}"'
+        f' content="{saxutils.escape(v)}">'
+        for k, v in (meta or {}).items()
+    )
+    direction = "rtl" if lang == "ar" else "ltr"
+    return (
+        f'<!doctype html><html lang="{lang}" dir="{direction}"><head>'
+        f'<meta charset="utf-8"><title>{saxutils.escape(title)}</title>{tags}</head>'
+        f"<body>{body}</body></html>"
+    )
