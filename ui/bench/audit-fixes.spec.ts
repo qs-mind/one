@@ -35,9 +35,11 @@ test("audit fixes, in Arabic", async ({ walk, page }) => {
   await step("C11", () => shot("C11"));
   await walk.brief("bench:deliverable Make the priced BOQ and the cover letter");
   await page.waitForTimeout(1500);
+  page.setDefaultTimeout(8000); // a step whose control is not there (before its fix) fails fast and the walk goes on
 
   await step("R5", async () => {
-    await walk.chat.getByRole("button", { name: /^اشتغل/ }).last().click({ timeout: 5000 });
+    // the log speaks the Brief's language: the bench's Brief is in English
+    await walk.chat.getByRole("button", { name: /^(اشتغل|Worked for)/ }).last().click({ timeout: 5000 });
     await page.waitForTimeout(500);
     await shot("R5", walk.chat);
   });
@@ -111,16 +113,17 @@ test("audit fixes, in Arabic", async ({ walk, page }) => {
   await step("R13", async () => {
     await page.getByRole("button", { name: texts.ai.ar, exact: true }).click({ timeout: 5000 });
     await page.waitForTimeout(800);
-    const panel = page.getByRole("dialog").filter({ hasText: texts.aiTitle.ar }).last();
-    const scroller = panel.locator(".overflow-y-auto, .overflow-auto").first();
-    await (await scroller.count() ? scroller : panel).evaluate((el) => el.scrollTo(0, el.scrollHeight / 3));
-    await page.waitForTimeout(300);
+    await expect(page.getByRole("heading", { name: texts.aiTitle.ar }).first()).toBeVisible();
     await shot("R13");
     if (after) {
-      const sideways = await panel.evaluate((el) =>
-        [el, ...el.querySelectorAll<HTMLElement>("*")].some((x) => x.scrollWidth > x.clientWidth + 1 && getComputedStyle(x).overflowX !== "visible" && getComputedStyle(x).overflowX !== "hidden"),
+      // wherever AI settings open, nothing on the page that scrolls does so sideways (the canvas pans, it never scrolls)
+      const sideways = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>("body *")]
+          .filter((x) => !x.closest(".react-flow"))
+          .filter((x) => ["auto", "scroll"].includes(getComputedStyle(x).overflowX) && x.scrollWidth > x.clientWidth + 1)
+          .map((x) => x.className.slice(0, 60)),
       );
-      expect.soft(sideways, "nothing in AI settings scrolls sideways").toBe(false);
+      expect.soft(sideways, "nothing scrolls sideways").toEqual([]);
     }
     await page.keyboard.press("Escape");
   });
