@@ -107,10 +107,10 @@ def test_the_general_chat(bench):
     assert kinds == [] and "رد تجريبي" in reply
 
 
-def test_the_imported_boq_is_on_the_canvas(bench):
+def test_the_imported_boq_is_in_the_workspace(bench):
     client, project = bench
     run(client, project, "bench:boq Import the BOQ")
-    [boq] = client.get(f"/projects/{project}/canvas").json()["client_boqs"]
+    [boq] = client.get(f"/projects/{project}/workspace").json()["client_boqs"]
     assert boq["name"] == samples.BOQ_NAME and boq["items"] == 4 and boq["headings"] == 2
     rows = client.get(f"/projects/{project}/client-boq/{boq['file_id']}").json()["rows"]
     assert [r["kind"] for r in rows] == ["section", "item", "item", "section", "item", "item"]
