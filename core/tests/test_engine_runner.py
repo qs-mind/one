@@ -256,6 +256,66 @@ async def test_unchecked_deliverable_with_numbers_is_checked_before_done(make_en
     assert store_of(engine, project).unchecked(brief) == []
 
 
+def table_brief(ids: dict) -> dict:
+    rows = [{"code": "03/02", "quantity": {"number_id": ids["quantity"]}}]
+    return {"kind": "table", "title": "جدول - عينة", "rows": rows, "sources": [ids["source"]]}
+
+
+async def checked_on(engine: Engine, project: str) -> tuple[list, Reviewed]:
+    brief = await engine.start_brief(project, BRIEF)
+    events = await finish(engine, brief)
+    [review] = [e for e in events if isinstance(e, Reviewed)]
+    return events, review
+
+
+async def test_the_engineers_checker_choice_wins_even_on_the_leads_model(make_engine, rec_ids):
+    """The live Haiku run: every role on one model; the check runs on it, blind, no card."""
+    project, ids = rec_ids
+    for role in roles.ROLES:
+        roles.choose(role, HAIKU.choice)
+    claude = links(only_anthropic=True)[0]
+    model = claude.models[HAIKU.choice.model] = scripted(
+        call("make_deliverable", table_brief(ids)),
+        said("الجدول جاهز - عينة"),
+        call("final_result", {"code": "A", "comments": []}),
+    )
+    events, review = await checked_on(await started(make_engine([claude])), project)
+    assert review.review.checker == HAIKU.choice and review.review.same_provider is True
+    assert not [e for e in events if isinstance(e, Asked)] and states(events)[-1] == "done"
+    assert model.calls == 3 and len(model.seen[2]) == 1  # a fresh session: the packet only
+
+
+async def test_a_default_checker_never_moves_to_a_costlier_model(make_engine, rec_ids):
+    """Checking QS left at its default, on the maker's model, nothing the same price or
+    cheaper: it stays there (no costlier model, no card)."""
+    project, ids = rec_ids
+    roles.choose("lead", HAIKU.choice)  # the default Checking QS here is HAIKU too
+    claude = FakeLink("anthropic", "Claude", "anthropic", sheet=[OPUS, HAIKU])
+    claude.models[HAIKU.choice.model] = scripted(
+        call("make_deliverable", table_brief(ids)),
+        said("الجدول جاهز - عينة"),
+        call("final_result", {"code": "A", "comments": []}),
+    )
+    events, review = await checked_on(await started(make_engine([claude])), project)
+    assert review.review.checker == HAIKU.choice
+    assert not [e for e in events if isinstance(e, Asked)] and states(events)[-1] == "done"
+    assert OPUS.choice.model not in claude.models
+
+
+async def test_a_default_checker_moves_off_the_makers_model_to_a_cheaper_one(make_engine, rec_ids):
+    project, ids = rec_ids
+    roles.choose("lead", SONNET.choice)  # the default Checking QS here is SONNET too
+    claude = links(only_anthropic=True)[0]
+    claude.models[SONNET.choice.model] = scripted(
+        call("make_deliverable", table_brief(ids)), said("الجدول جاهز - عينة")
+    )
+    claude.models[HAIKU.choice.model] = scripted(
+        call("final_result", {"code": "A", "comments": []})
+    )
+    _, review = await checked_on(await started(make_engine([claude])), project)
+    assert review.review.checker == HAIKU.choice and review.review.same_provider is True
+
+
 @pytest.fixture
 async def rec_ids(registry, project):
     """The sample ledger in the project, made by an earlier (done) Brief."""
