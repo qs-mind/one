@@ -794,14 +794,30 @@ def file_name(name: str) -> str:
     return f"\u2068{name[: found.start()]}\u2066{found.group(1)}\u2069\u2069"
 
 
+_BLANK_THEN_STOP = re.compile(r"\{(\w+)\}\.")
+_ISOLATES = "⁦⁧⁨⁩ "
+
+
+def _one_stop(s: str, values: dict) -> str:
+    """A value that ends a sentence itself («…شيت BOQ؟») takes the place of the full stop after
+    its blank, never «؟.»."""
+
+    def keep(m: re.Match) -> str:
+        value = str(values.get(m[1], "")).rstrip(_ISOLATES)
+        return m[0][:-1] if value[-1:] in (".", "?", "!", "؟", "…") else m[0]
+
+    return _BLANK_THEN_STOP.sub(keep, s)
+
+
 def fill(text: dict[str, str], /, **values) -> dict[str, str]:
     """Both languages of `text` with its {placeholders} filled from `values`.
 
     A value that is itself an {en, ar} pair gives each language its own words."""
-    return {
-        lang: s.format(**{k: v[lang] if isinstance(v, dict) else v for k, v in values.items()})
-        for lang, s in text.items()
-    }
+    found = {}
+    for lang, s in text.items():
+        mine = {k: v[lang] if isinstance(v, dict) else v for k, v in values.items()}
+        found[lang] = _one_stop(s, mine).format(**mine)
+    return found
 
 
 # The formula.

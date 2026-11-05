@@ -12,7 +12,7 @@ import { HandOffCards } from "../shell/HandOffCard";
 import type { ChatState } from "../shell/useChats";
 import { textOf } from "../shell/useChats";
 import { DUR, play, useReducedMotion } from "../ui/motion";
-import { ApprovalQueue, CARD_ANSWERED } from "./parts/ApprovalCard";
+import { CARD_ANSWERED, useApprovalQueue } from "./parts/ApprovalCard";
 import { ContinueBriefs } from "./parts/ContinueBriefs";
 import { CoordinationRoom } from "./parts/CoordinationRoom";
 import { CostNotice } from "./parts/CostNotice";
@@ -88,26 +88,34 @@ function BriefReply({
   const progress = partsOf(parts, "progress");
   // the Brief's own language: the core's word for it, else the engineer's message's
   const said = progress.find((item) => item.data.lang)?.data.lang ?? lang;
+  // one card open at a time; the top bar's "Waiting for you" goes to it (data-waiting)
+  const cardAt = useApprovalQueue(partsOf(parts, "card"), said);
+  const firstText = parts.findIndex((part) => part.type === "text");
+  // the words, the views, the cards and the "I understood this" card each in its own place, in the order they came
+  const inOrder = parts.map((part, index) => {
+    if (part.type === "text")
+      return index === firstText && text ? (
+        <Reply
+          key="text"
+          text={text}
+          unsourced={partsOf(parts, "unsourced").flatMap((one) => one.data.values)}
+          sourced={Object.assign({}, ...partsOf(parts, "sourced").map((one) => one.data.numbers))}
+          projectId={projectId}
+        />
+      ) : null;
+    const [one] = partsOf([part], "view");
+    if (one) return <ViewPart key={`view:${one.id}`} view={one.data} projectId={projectId} />;
+    const [card] = partsOf([part], "card");
+    if (card) return cardAt(card.id);
+    const [understood] = partsOf([part], "understood");
+    if (understood) return <UnderstoodCard key={`understood:${understood.id}`} projectId={understood.data.project_id} />;
+    return null;
+  });
   return (
     <div className="flex flex-col gap-4">
       <ProgressLine items={progress} worklog={partsOf(parts, "worklog").at(-1)?.data} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
-      {text && (
-        <Reply
-          text={text}
-          unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)}
-          sourced={Object.assign({}, ...partsOf(parts, "sourced").map((part) => part.data.numbers))}
-          projectId={projectId}
-        />
-      )}
-      {partsOf(parts, "view").map((part) => (
-        <ViewPart key={part.id} view={part.data} projectId={projectId} />
-      ))}
-      {/* one card open at a time; the top bar's "Waiting for you" goes to it (data-waiting) */}
-      <ApprovalQueue cards={partsOf(parts, "card")} lang={said} />
-      {partsOf(parts, "understood").map((part) => (
-        <UnderstoodCard key={part.id} projectId={part.data.project_id} />
-      ))}
+      {inOrder}
       {partsOf(parts, "cost").map((cost) => (
         <CostNotice key={cost.id} cost={cost.data} />
       ))}
@@ -223,7 +231,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
     // a word too long for its line (a long Arabic word, a file name) breaks only there, never by letter where it
     // fits; a table keeps its words whole and scrolls inside its own box; the chat never scrolls sideways
     <div className={`flex min-h-0 flex-col [overflow-wrap:anywhere] [&_table]:[overflow-wrap:normal] ${className}`}>
-      <ContinueBriefs onContinued={chat.continued} />
+      <ContinueBriefs chatId={chat.chatId} onContinued={chat.continued} onLeft={() => void chat.reread()} />
       <div
         ref={ref}
         role="log"

@@ -253,7 +253,7 @@ describe("the chat in the shell", () => {
     });
     const user = userEvent.setup();
     render(<App />);
-    expect(await screen.findByText("التكليف ده وقف عند: بيسعّر البنود. نكمّله؟")).toBeInTheDocument();
+    expect(await screen.findByText("التكليف ده وقف عند: بيسعّر البنود")).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(calls(fetch, "POST", "/api/briefs/b1/continue")).toHaveLength(0); // never by itself
 

@@ -14,6 +14,7 @@ import { count, dir, fill, type Language, pick, t, useLanguage } from "../../i18
 import { AutoHeight } from "../../ui/AutoHeight";
 import { DUR, play, useReducedMotion } from "../../ui/motion";
 import { WorkDots } from "../../ui/WorkDots";
+import { FoldMark } from "./Fold";
 import type { ProgressData, WorklogData, WorkStep } from "./types";
 
 /** The app's numerals: Latin digits in both languages. */
@@ -140,7 +141,7 @@ function WorkLog({ log, lang, live }: { log: WorklogData; lang: Language; live: 
             onClick={() => setOpen(!open)}
             className="flex items-baseline gap-2 text-start hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
           >
-            <span aria-hidden="true">{open ? "▾" : lang === "ar" ? "◂" : "▸"}</span>
+            <FoldMark open={open} lang={lang} />
             <span className="tabular-nums">{settled}</span>
           </button>
         ) : ended ? (
