@@ -440,7 +440,7 @@ def test_default_tool_lists_take_plan_5_tools_once_registered(monkeypatch):
         monkeypatch.setitem(REGISTRY, name, _sample(name, "read"))
     monkeypatch.setitem(REGISTRY, "web_search", _sample("web_search", "online"))
     lead, checker = agents.lead_spec().tools, agents.checker_spec().tools
-    assert lead[: len(before_lead)] == before_lead
+    assert set(before_lead) <= set(lead)  # in LEAD_TOOLS order, so not always a prefix
     assert {"files_list", "files_read", "ask_engineer"} <= set(lead)
     assert "web_search" not in lead and "sandbox_rerun" not in lead  # specialists' tools
     assert {"files_list", "files_read", "sandbox_rerun"} <= set(checker)

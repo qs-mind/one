@@ -1,11 +1,13 @@
 // A card the engineer must answer: an approval, a Spending Cap pause, a Brief Budget and the like. The core stored it
 // before it was shown; the answer goes to POST /cards/{id}. Raising a cap saves the new caps first. A card with a
-// payload (Plan 5) also shows its questions or its table, and sends the answers or the ticked rows with the choice.
-import { useId, useState } from "react";
+// payload (Plan 5) is drawn by its kind's renderer in cardKinds (questions: QuestionCard), which sends the answers with
+// the choice; a table with no renderer of its own shows here, and its ticked rows go with the choice.
+import { useState } from "react";
 import { coreLine, send } from "../../core";
 import { fill, pick, t, type Text, texts, useLanguage } from "../../i18n";
 import { CapsForm } from "../../settings/AiSettings";
-import type { CardData, CardPayload, CardQuestion } from "./types";
+import { type CardAnswer, cardKinds } from "./cardKinds";
+import type { CardData, CardPayload } from "./types";
 
 type Labels = Record<string, keyof typeof texts>;
 const allow: Labels = { yes: "allowOnce", brief: "allowBrief", no: "dontAllow" };
@@ -32,73 +34,6 @@ const REFUSE = "no"; // takes nothing: no answers, no rows (core/qsone/engine/ty
 function optionLabel(kind: CardData["kind"], option: string): string {
   const key = optionTexts[kind]?.[option] ?? plain[option];
   return key ? t(key) : option;
-}
-
-/** Every question has an answer: one of its options, or written text where it takes one. */
-function complete(questions: CardQuestion[], answers: Record<string, string>): boolean {
-  return questions.every((q) => (answers[q.id] ?? "").trim() !== "");
-}
-
-function Questions({
-  questions,
-  answers,
-  onAnswer,
-  disabled,
-}: {
-  questions: CardQuestion[];
-  answers: Record<string, string>;
-  onAnswer?: (id: string, answer: string) => void;
-  disabled: boolean;
-}) {
-  const group = useId(); // radio groups stay apart when two cards are on the screen
-  return (
-    <ol className="flex flex-col gap-3">
-      {questions.map((q, i) => {
-        const options = q.options ?? [];
-        const writes = q.free_text || options.length === 0;
-        const answer = answers[q.id] ?? "";
-        if (!onAnswer) {
-          return (
-            <li key={q.id} className="flex flex-col">
-              <span dir="auto">{q.text}</span>
-              <span dir="auto" className="font-semibold">
-                {answer}
-              </span>
-            </li>
-          );
-        }
-        return (
-          <li key={q.id}>
-            <fieldset className="flex flex-col gap-1" disabled={disabled}>
-              <legend dir="auto">{q.text}</legend>
-              {options.map((option) => (
-                <label key={option} className="flex items-center gap-2" dir="auto">
-                  <input
-                    type="radio"
-                    name={`${group}-${i}`}
-                    value={option}
-                    checked={answer === option}
-                    onChange={() => onAnswer(q.id, option)}
-                  />
-                  {option}
-                </label>
-              ))}
-              {writes && (
-                <input
-                  type="text"
-                  dir="auto"
-                  aria-label={q.text}
-                  value={options.includes(answer) ? "" : answer}
-                  onChange={(e) => onAnswer(q.id, e.target.value)}
-                  className="rounded-md border border-slate px-2 py-1"
-                />
-              )}
-            </fieldset>
-          </li>
-        );
-      })}
-    </ol>
-  );
 }
 
 function Rows({
@@ -154,37 +89,40 @@ export function ApprovalCard({ id, card }: { id: string; card: CardData }) {
   const [sending, setSending] = useState(false);
   const [raising, setRaising] = useState(false);
   const [failed, setFailed] = useState<Text>();
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [sent, setSent] = useState<CardAnswer>({});
   const [ticked, setTicked] = useState<number[]>([]);
   const settled = card.status === "settled" ? (card.choice ?? chosen) : chosen;
   const payload = card.payload;
-  const questions = payload?.questions ?? [];
+  const Kind = payload ? cardKinds[card.kind] : undefined;
   const tickable = Boolean(payload?.tick && payload.rows?.length);
-  const shownAnswers = card.status === "settled" && card.answers ? card.answers : answers;
   const shownTicked = card.status === "settled" && card.rows_ok ? card.rows_ok : settled === REFUSE ? [] : ticked;
+  // The card as it stands: settled with what was sent as soon as the core took it, before the stream says so.
+  const shown: CardData =
+    chosen && card.status !== "settled" ? { ...card, status: "settled", choice: chosen, ...sent } : card;
 
   function ready(option: string): boolean {
     if (option === REFUSE) return true;
-    if (!complete(questions, answers)) return false;
     return card.kind !== "rows" || !tickable || ticked.length > 0; // "keep the ticked rows" needs one
   }
 
-  async function answer(choice: string) {
+  async function answer(choice: string, extra: CardAnswer = {}) {
     setSending(true);
     setFailed(undefined);
-    const body: { choice: string; answers?: Record<string, string>; rows_ok?: number[] } = { choice };
-    if (choice !== REFUSE && questions.length) {
-      body.answers = Object.fromEntries(questions.map((q) => [q.id, (answers[q.id] ?? "").trim()]));
-    }
-    if (choice !== REFUSE && tickable) body.rows_ok = [...ticked].sort((a, b) => a - b);
-    const response = await send(`/api/cards/${encodeURIComponent(id)}`, "POST", body);
+    const response = await send(`/api/cards/${encodeURIComponent(id)}`, "POST", { choice, ...extra });
     setSending(false);
     if (response?.ok) {
+      setSent(extra);
       setChosen(choice);
       setRaising(false);
     } else {
       setFailed(await coreLine(response, texts.answerNotSent));
     }
+  }
+
+  function choose(option: string) {
+    if (option === "raise") return setRaising(!raising);
+    const rows = option !== REFUSE && tickable ? { rows_ok: [...ticked].sort((a, b) => a - b) } : {};
+    void answer(option, rows);
   }
 
   const open = card.status !== "withdrawn" && !settled;
@@ -194,15 +132,15 @@ export function ApprovalCard({ id, card }: { id: string; card: CardData }) {
     <section className="flex flex-col gap-2 rounded-md border border-copper px-3 py-2">
       <h3 className="font-semibold">{pick(card.title)}</h3>
       <p dir="auto">{pick(card.detail)}</p>
-      {questions.length > 0 && (settled !== REFUSE || open) && (
-        <Questions
-          questions={questions}
-          answers={shownAnswers}
-          disabled={sending}
-          onAnswer={open ? (q, a) => setAnswers((all) => ({ ...all, [q]: a })) : undefined}
+      {Kind && (
+        <Kind
+          card={shown}
+          sending={sending}
+          onAnswer={(choice, extra) => void answer(choice, extra)}
+          label={(option) => optionLabel(card.kind, option)}
         />
       )}
-      {payload?.rows && payload.rows.length > 0 && (
+      {!Kind && payload?.rows && payload.rows.length > 0 && (
         <Rows
           payload={payload}
           ticked={shownTicked}
@@ -218,9 +156,9 @@ export function ApprovalCard({ id, card }: { id: string; card: CardData }) {
       ) : settled ? (
         <>
           <p className="text-slate">{fill(t("answered"), { choice: optionLabel(card.kind, settled) })}</p>
-          {tickable && <p className="text-slate">{fill(t("rowsKept"), { n: shownTicked.length, total })}</p>}
+          {!Kind && tickable && <p className="text-slate">{fill(t("rowsKept"), { n: shownTicked.length, total })}</p>}
         </>
-      ) : (
+      ) : Kind ? null : (
         <>
           <div className="flex flex-wrap gap-2">
             {card.options.map((option) => (
@@ -229,7 +167,7 @@ export function ApprovalCard({ id, card }: { id: string; card: CardData }) {
                 type="button"
                 disabled={sending || !ready(option)}
                 aria-expanded={option === "raise" ? raising : undefined}
-                onClick={() => (option === "raise" ? setRaising(!raising) : void answer(option))}
+                onClick={() => choose(option)}
                 className={`rounded-md px-3 py-1 disabled:opacity-40 ${option === "no" ? "border border-ink" : "bg-ink text-paper"}`}
               >
                 {optionLabel(card.kind, option)}

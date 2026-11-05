@@ -150,53 +150,6 @@ describe("ApprovalCard", () => {
     }
   });
 
-  const questions: CardData = {
-    kind: "question",
-    title: { en: "Two questions", ar: "سؤالين" },
-    detail: { en: "The Lead QS asks", ar: "كبير مهندسي الكميات بيسأل" },
-    options: ["sent"],
-    status: "pending",
-    payload: {
-      questions: [
-        { id: "q1", text: "الخرسانة جاهزة ولا موقع؟ - عينة", options: ["جاهزة", "موقع"] },
-        { id: "q2", text: "سعر الأسمنت عندك كام؟ - عينة", free_text: true },
-      ],
-    },
-  };
-
-  it("a question card shows every question and sends all answers together", async () => {
-    const fetch = core({ "POST /api/cards/c1": () => new Response(null, { status: 204 }) });
-    const user = userEvent.setup();
-    render(<ApprovalCard id="c1" card={questions} />);
-    const send = screen.getByRole("button", { name: texts.send.ar });
-    expect(send).toBeDisabled();
-    await user.click(screen.getByRole("radio", { name: "موقع" }));
-    expect(send).toBeDisabled(); // q2 still has no answer
-    const reply = screen.getByRole("textbox", { name: "سعر الأسمنت عندك كام؟ - عينة" });
-    expect(reply).toHaveAttribute("dir", "auto");
-    await user.type(reply, "3950 جنيه");
-    await user.click(send);
-    expect(bodyOf(fetch, "POST", "/api/cards/c1")).toEqual([
-      { choice: "sent", answers: { q1: "موقع", q2: "3950 جنيه" } },
-    ]);
-    expect(await screen.findByText("3950 جنيه")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(screen.queryByText("q1")).not.toBeInTheDocument(); // never the raw id
-  });
-
-  it("a question card settled in the stream shows each answer", () => {
-    render(
-      <ApprovalCard
-        id="c1"
-        card={{ ...questions, status: "settled", choice: "sent", answers: { q1: "جاهزة", q2: "4100" } }}
-      />,
-    );
-    expect(screen.getByText("الخرسانة جاهزة ولا موقع؟ - عينة")).toBeInTheDocument();
-    expect(screen.getByText("جاهزة")).toBeInTheDocument();
-    expect(screen.getByText("4100")).toBeInTheDocument();
-    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-  });
-
   const rows: CardData = {
     kind: "rows",
     title: { en: "Keep these prices?", ar: "أحفظ الأسعار دي؟" },
@@ -247,18 +200,6 @@ describe("ApprovalCard", () => {
     expect(screen.getByText("1 of 3 rows kept.")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-  });
-
-  it("a refused answer to a question card says so and keeps the answers", async () => {
-    const line = { en: "Answer every question.", ar: "جاوب على كل الأسئلة." };
-    core({ "POST /api/cards/c1": () => Response.json({ error: line, field: "answers" }, { status: 422 }) });
-    const user = userEvent.setup();
-    const one: CardData = { ...questions, payload: { questions: questions.payload!.questions!.slice(0, 1) } };
-    render(<ApprovalCard id="c1" card={one} />);
-    await user.click(screen.getByRole("radio", { name: "جاهزة" }));
-    await user.click(screen.getByRole("button", { name: texts.send.ar }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(line.ar);
-    expect(screen.getByRole("radio", { name: "جاهزة" })).toBeChecked();
   });
 
   it("a disagreement card names what each answer does", () => {
