@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setLanguage, texts } from "../i18n";
+import { fill, setLanguage, texts } from "../i18n";
 import { AiSettings, useAiSettings } from "./AiSettings";
 
 type Route = (init: RequestInit) => Response | Promise<Response>;
@@ -54,7 +54,10 @@ function settings(more: { connectors?: object[] } = {}) {
   };
 }
 
-const caps = { brief: "3.00", day: "15.00", month: "150.00", budget_above: "0.50", subscription_stops: false };
+// GET and PUT /settings/ai/caps answer the caps in force and the Recommended Setting (sample amounts).
+const caps = { brief: "2.00", day: "15.00", month: "150.00", budget_above: "0.50", subscription_stops: false };
+const recommended = { brief: "3", day: "15", month: "150", budget_above: "0.50", subscription_stops: false };
+const amounts = { brief: "2.00", day: "15.00", month: "150.00", budget_above: "0.50" };
 
 function core(routes: Record<string, Route> = {}) {
   const fetch = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -62,7 +65,7 @@ function core(routes: Record<string, Route> = {}) {
     const route = routes[key];
     if (route) return route(init);
     if (key === "GET /api/settings/ai") return Response.json(settings());
-    if (key === "GET /api/settings/ai/caps") return Response.json(caps);
+    if (key === "GET /api/settings/ai/caps") return Response.json({ caps, recommended });
     return new Response("not found", { status: 404 });
   });
   vi.stubGlobal("fetch", fetch);
@@ -233,7 +236,8 @@ describe("AiSettings", () => {
   });
 
   it("the caps are exact numbers, saved as typed", async () => {
-    const fetch = core({ "PUT /api/settings/ai/caps": (init) => Response.json(JSON.parse(String(init.body))) });
+    const saved = (init: RequestInit) => Response.json({ caps: { ...caps, ...JSON.parse(String(init.body)) }, recommended });
+    const fetch = core({ "PUT /api/settings/ai/caps": saved });
     const user = userEvent.setup();
     render(<Harness />);
     const day = await screen.findByLabelText(texts.capDay.ar);
@@ -244,7 +248,19 @@ describe("AiSettings", () => {
     const form = day.closest("form")!;
     await user.click(within(form).getByRole("button", { name: texts.save.ar }));
     expect(await within(form).findByRole("status")).toHaveTextContent(texts.capsSaved.ar);
-    expect(bodies(fetch, "PUT", "/api/settings/ai/caps")).toEqual([{ ...caps, day: "20.50" }]);
+    expect(bodies(fetch, "PUT", "/api/settings/ai/caps")).toEqual([{ ...amounts, day: "20.50" }]);
+    expect(day).toHaveValue("20.50");
+  });
+
+  it("each cap shows the recommended amount beside it", async () => {
+    core();
+    render(<Harness />);
+    const brief = await screen.findByLabelText(texts.capBrief.ar);
+    await waitFor(() => expect(brief).toHaveValue("2.00"));
+    const hint = (value: string) => fill(texts.recommendedAmount.ar, { value });
+    expect(brief).toHaveAccessibleDescription(hint("3"));
+    expect(screen.getByLabelText(texts.capMonth.ar)).toHaveAccessibleDescription(hint("150"));
+    expect(screen.getByLabelText(texts.budgetAbove.ar)).toHaveAccessibleDescription(hint("0.50"));
   });
 
   it("caps the core refuses say why", async () => {
