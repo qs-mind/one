@@ -122,8 +122,9 @@ function BriefReply({
 }: { parts: OnePart[]; lang: Language; live: boolean } & Omit<ChatLogProps, "chat" | "label">) {
   const text = textOf(parts);
   const progress = partsOf(parts, "progress");
-  // the Brief's own language: the core's word for it, else the engineer's message's
-  const said = progress.find((item) => item.data.lang)?.data.lang ?? lang;
+  // what is stored in both languages (the work log, the cards, notices) reads in the page's, whatever the Brief's was
+  // (tender day: an English page kept «اشتغل 4 ثواني · 4 خطوات»); the reply's own words stay as written
+  const said = useLanguage();
   // one card open at a time; the top bar's "Waiting for you" goes to it (data-waiting)
   const cardAt = useApprovalQueue(partsOf(parts, "card"), said);
   const firstText = parts.findIndex((part) => part.type === "text");

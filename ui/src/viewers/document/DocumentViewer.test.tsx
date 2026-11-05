@@ -208,6 +208,19 @@ describe("DocumentViewer", () => {
     expect(screen.getByText(count("docUntracedCount", 1, {}, "ar"))).toBeInTheDocument();
   });
 
+  it("its notes read in the page's direction: an Arabic letter on an English page starts no note with a full stop (tender day)", () => {
+    setLanguage("en");
+    render(
+      <div dir="rtl">
+        <DocumentViewer projectId={P} view={letter()} />
+      </div>,
+    );
+    for (const note of [screen.getByText(count("docUntracedCount", 1, {}, "en")), screen.getByText(texts.docCommitHint.en)]) {
+      expect(note).toHaveAttribute("dir", "ltr");
+      expect(note).toHaveAttribute("lang", "en");
+    }
+  });
+
   it("an edit is sent on Ctrl+Enter as one set_block op with the block's version, then shows as suggested", async () => {
     const added = " - عينة";
     const posted = change("c9", {

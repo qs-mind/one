@@ -212,7 +212,8 @@ export function DocumentViewer(props: DocumentViewerProps) {
         </p>
       )}
       {untraced.length > 0 && (
-        <p role="note" className="px-5 py-2 text-slate">
+        // the page's words in the page's direction, whatever the letter's: never a full stop thrown to the start
+        <p role="note" dir={dir(screen)} lang={screen} className="px-5 py-2 text-slate">
           {count("docUntracedCount", untraced.length)}
         </p>
       )}
@@ -240,7 +241,11 @@ export function DocumentViewer(props: DocumentViewerProps) {
           sources={view.sources}
           onSelectText={onSelectText}
         />
-        {!props.readOnly && <p className="mx-auto max-w-[44rem] px-8 pb-6 text-xs text-slate">{t("docCommitHint")}</p>}
+        {!props.readOnly && (
+          <p dir={dir(screen)} lang={screen} className="mx-auto max-w-[44rem] px-8 pb-6 text-xs text-slate">
+            {t("docCommitHint")}
+          </p>
+        )}
       </div>
       {popover && (
         <SourcePopover
