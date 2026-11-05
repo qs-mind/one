@@ -559,6 +559,7 @@ def _sheet_view(conn, d: str, bill: str | None, tmpl: dict, at: str) -> dict:
         "columns": [
             {
                 "key": c["key"],
+                "from": c["from"],  # the Sheet viewer turns a paste into ops by it
                 "label": c["label"],
                 "kind": template.kind_of(c),
                 "edit": c.get("edit", False),

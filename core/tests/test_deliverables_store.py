@@ -299,6 +299,7 @@ def test_extra_field_columns_are_allowed(rec):
     assert row_by_code_in(v, "1-1")["cells"]["floor"] == {"text": "الدور الأرضي"}
     assert v["columns"][-1] == {
         "key": "floor",
+        "from": "field:floor",
         "label": {"en": "Floor", "ar": "الدور"},
         "kind": "text",
         "edit": False,

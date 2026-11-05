@@ -55,7 +55,9 @@ def _instructions(name: str) -> str:
 
 
 def lead_spec() -> AgentSpec:
-    """The Lead QS: the Project Records tools, every team tool, and Plan 5's Lead tools."""
+    """The Lead QS: the Project Records tools, every team tool, Plan 5's Lead tools and the
+    outputs tools (Plan 6)."""
+    from qsone.deliverables.tools import OUTPUTS_TOOLS
     from qsone.engine import team  # registers the team tools; team imports this module
 
     return AgentSpec(
@@ -63,7 +65,7 @@ def lead_spec() -> AgentSpec:
         name=copy.ROLE_LEAD,
         role="lead",
         instructions=_instructions("lead_qs.txt"),
-        tools=(*RECORDS_TOOLS, *team.TEAM_TOOLS, *_registered(LEAD_TOOLS)),
+        tools=(*RECORDS_TOOLS, *team.TEAM_TOOLS, *_registered(LEAD_TOOLS), *OUTPUTS_TOOLS),
         tier="lead",
     )
 

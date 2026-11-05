@@ -1143,6 +1143,11 @@ MANUAL_EDIT_REASON = {
     "ar": "تعديل يدوي في «{title}»",
 }
 
+EXPORT_FORMAT_NOT_ALLOWED = {
+    "en": "A Sheet exports to Excel or PDF, a Document to Word or PDF.",
+    "ar": "الجدول بيتصدّر Excel أو PDF، والمستند Word أو PDF.",
+}
+
 # The client's own file.
 FILL_XLS_NOT_SUPPORTED = {
     "en": "Open the file in Excel, save it as .xlsx, then drop it again.",
@@ -1177,6 +1182,16 @@ FILL_CODE_MISMATCH = {
 FILL_FORMULA_SKIPPED = {
     "en": "{cell} holds the client's formula, so it was left as it is.",
     "ar": "{cell} فيها معادلة العميل، فسيبناها زي ما هي.",
+}
+
+FILL_COLUMN_LETTER = {
+    "en": "A column of the client's sheet is a letter from A to XFD, as Excel shows it.",
+    "ar": "عمود ورقة العميل حرف من A لحد XFD، زي ما Excel بيعرضه.",
+}
+
+FILL_PLAN_NOT_FOUND = {
+    "en": "This Fill Plan is not in the project. Ask One to map the client's file again.",
+    "ar": "خطة التعبئة دي مش موجودة في المشروع. اطلب من One يربط ملف العميل تاني.",
 }
 
 # Accepting while Project Records moved.
