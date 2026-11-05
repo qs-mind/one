@@ -23,6 +23,7 @@ const locale = (lang: Language) => (lang === "ar" ? "ar-EG-u-nu-latn" : "en-GB")
 export function duration(ms: number, lang: Language): string {
   const s = Math.floor(Math.max(0, ms) / 1000);
   const both = (a: string, b: string) => fill(t("durationAnd", lang), { a, b });
+  if (s < 1) return t("underASecond", lang);
   if (s < 60) return count("seconds", s, {}, lang);
   const m = Math.floor(s / 60);
   if (m < 60) {
@@ -119,9 +120,10 @@ function WorkLog({ log, lang, live }: { log: WorklogData; lang: Language; live: 
   const [open, setOpen] = useState(false);
   const header = useRef<HTMLDivElement>(null);
   const ended = log.ended !== null;
-  const settled = ended
-    ? fill(t("workedFor", lang), { time: duration(span(log.started, log.ended!), lang), steps: count("steps", log.steps.length, {}, lang) })
-    : undefined;
+  const steps = log.steps.length;
+  const time = ended ? duration(span(log.started, log.ended!), lang) : "";
+  // with no steps there is nothing to open: just the time, as words, not a button
+  const settled = ended && steps ? fill(t("workedFor", lang), { time, steps: count("steps", steps, {}, lang) }) : undefined;
   const was = useRef(ended);
   useLayoutEffect(() => {
     // Thinking settles to the real time: the new words fade in where the shimmer was (opacity only)
@@ -141,6 +143,8 @@ function WorkLog({ log, lang, live }: { log: WorklogData; lang: Language; live: 
             <span aria-hidden="true">{open ? "▾" : lang === "ar" ? "◂" : "▸"}</span>
             <span className="tabular-nums">{settled}</span>
           </button>
+        ) : ended ? (
+          <span className="tabular-nums">{fill(t("workedForOnly", lang), { time })}</span>
         ) : (
           live && <span className={reduced ? "text-slate" : "shimmer"}>{t("thinking", lang)}</span>
         )}

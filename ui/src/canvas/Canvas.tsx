@@ -814,25 +814,10 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={24} size={1.25} color="rgb(14 15 18 / 0.09)" />
-          <MiniMap
-            className="max-[900px]:hidden"
-            position={rtl ? "bottom-right" : "bottom-left"}
-            // in one bottom band with the zoom bar beside it, so the two take a strip off the free area, not a column
-            style={{ margin: 16, width: 168, height: 112 }}
-            ariaLabel={t("minimap")}
-            bgColor="#F9F8F4"
-            nodeColor="#F2EEE7"
-            nodeStrokeColor="rgb(14 15 18 / 0.2)"
-            maskColor="rgb(242 238 231 / 0.6)"
-            maskStrokeColor="#0E0F12"
-            maskStrokeWidth={1.5}
-            pannable
-            zoomable
-          />
+          <MapAndZoom rtl={rtl} onArrange={() => doArrange("stage")} />
           {children}
         </ReactFlow>
       </CanvasActionsContext.Provider>
-      <ZoomBar onArrange={() => doArrange("stage")} />
       {state === "failed" && (
         <div role="alert" dir={dir()} className="absolute inset-x-0 top-6 mx-auto flex w-fit items-center gap-3 rounded-[14px] border border-ink/10 bg-paper px-4 py-2 text-copper">
           {t("canvasFailed")}
@@ -860,42 +845,61 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   );
 }
 
-/** Zoom out, the zoom level, zoom in, and Arrange by stage, at the bottom inline start (it mirrors in Arabic), beside
- * the minimap where it shows (wider than 900 px). */
-function ZoomBar({ onArrange }: { onArrange(): void }) {
+/** The minimap's size; the zoom controls under it take its width. */
+const MAP = { w: 168, h: 112 };
+
+/** The minimap and, under it and as wide, zoom out, the zoom level, zoom in and Arrange by stage: one block in the
+ * bottom inline-start corner (it mirrors in Arabic). Under 900 px the minimap hides and the controls stay. It sits
+ * inside React Flow, so the minimap keeps React Flow's own styles; the whole block is a cover (cover.ts), so no fit
+ * puts a frame under it. */
+function MapAndZoom({ rtl, onArrange }: { rtl: boolean; onArrange(): void }) {
   useLanguage();
   const flow = useReactFlow();
   const percent = useStore((s) => Math.round(s.transform[2] * 100));
-  const button =
-    "rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
+  const button = "rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
   return (
     <div
-      role="toolbar"
-      aria-label={t("zoomControls")}
       data-canvas-cover
-      dir={dir()}
-      style={{ [dir() === "rtl" ? "right" : "left"]: 16 }}
-      className={`absolute bottom-4 z-10 flex ${dir() === "rtl" ? "min-[901px]:right-[196px]!" : "min-[901px]:left-[196px]!"} items-center gap-1 rounded-[16px] border border-ink/[0.08] bg-paper p-1.5 shadow-[0_2px_12px_rgb(14_15_18/0.06)]`}
+      style={{ [rtl ? "right" : "left"]: 16, width: MAP.w + 2 }} // the map's width and the block's 1 px border each side
+      className="absolute bottom-4 z-10 flex flex-col overflow-hidden rounded-[16px] border border-ink/[0.08] bg-paper shadow-[0_2px_12px_rgb(14_15_18/0.06)]"
     >
-      <Tip label={t("zoomOut")} side="top">
-        <button type="button" aria-label={t("zoomOut")} className={`${button} tap`} onClick={() => void flow.zoomOut({ duration: duration() })}>
-          −
+      <MiniMap
+        className="border-b border-ink/[0.08] max-[900px]:hidden"
+        style={{ position: "static", margin: 0, width: MAP.w, height: MAP.h }}
+        ariaLabel={t("minimap")}
+        bgColor="#F9F8F4"
+        nodeColor="#F2EEE7"
+        nodeStrokeColor="rgb(14 15 18 / 0.2)"
+        maskColor="rgb(242 238 231 / 0.6)"
+        maskStrokeColor="#0E0F12"
+        maskStrokeWidth={1.5}
+        pannable
+        zoomable
+      />
+      <div role="toolbar" aria-label={t("zoomControls")} dir={dir()} className="flex w-full flex-col p-1">
+        <div className="flex items-center justify-between">
+          <Tip label={t("zoomOut")} side="top">
+            <button type="button" aria-label={t("zoomOut")} className={`${button} tap`} onClick={() => void flow.zoomOut({ duration: duration() })}>
+              −
+            </button>
+          </Tip>
+          <span className="tabular-nums">
+            <span className="sr-only">{fill(t("zoomLevel"), { percent })}</span>
+            <bdi dir="ltr" aria-hidden="true">
+              {percent}%
+            </bdi>
+          </span>
+          <Tip label={t("zoomIn")} side="top">
+            <button type="button" aria-label={t("zoomIn")} className={`${button} tap`} onClick={() => void flow.zoomIn({ duration: duration() })}>
+              +
+            </button>
+          </Tip>
+        </div>
+        <button type="button" className={`${button} w-full`} onClick={onArrange}>
+          {t("arrangeByStage")}
         </button>
-      </Tip>
-      <span className="min-w-14 text-center tabular-nums">
-        <span className="sr-only">{fill(t("zoomLevel"), { percent })}</span>
-        <bdi dir="ltr" aria-hidden="true">
-          {percent}%
-        </bdi>
-      </span>
-      <Tip label={t("zoomIn")} side="top">
-        <button type="button" aria-label={t("zoomIn")} className={`${button} tap`} onClick={() => void flow.zoomIn({ duration: duration() })}>
-          +
-        </button>
-      </Tip>
-      <button type="button" className={button} onClick={onArrange}>
-        {t("arrangeByStage")}
-      </button>
+      </div>
     </div>
   );
 }
+

@@ -935,6 +935,8 @@ export const texts = {
   searchField: { en: "Search", ar: "بحث" },
   // The honest work log, approvals that can't be pressed by mistake, Undo instead of "are you sure?".
   workedFor: { en: "Worked for {time} · {steps}", ar: "اشتغل {time} · {steps}" },
+  workedForOnly: { en: "Worked for {time}", ar: "اشتغل {time}" },
+  underASecond: { en: "under a second", ar: "أقل من ثانية" },
   workSteps: { en: "Steps", ar: "الخطوات" },
   durationAnd: { en: "{a} {b}", ar: "{a} و{b}" },
   tickSeconds: { en: "{s} s", ar: "{s} ث" },
@@ -1106,11 +1108,11 @@ export const counted = {
   // The work log: its steps, and a Brief's whole time in words.
   steps: {
     en: { one: "{n} step", other: "{n} steps" },
-    ar: { zero: "مفيش خطوات", one: "خطوة واحدة", two: "خطوتين", few: "{n} خطوات", other: "{n} خطوة" },
+    ar: { one: "خطوة واحدة", two: "خطوتين", few: "{n} خطوات", other: "{n} خطوة" },
   },
   seconds: {
     en: { other: "{n}s" },
-    ar: { zero: "أقل من ثانية", one: "ثانية", two: "ثانيتين", few: "{n} ثواني", other: "{n} ثانية" },
+    ar: { one: "ثانية", two: "ثانيتين", few: "{n} ثواني", other: "{n} ثانية" },
   },
   minutes: {
     en: { other: "{n}m" },
