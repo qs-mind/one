@@ -177,7 +177,8 @@ export function SheetViewer(props: SheetViewerProps) {
     const [r, c] = [rows[selection.focus.row], columns[selection.focus.col]];
     const cell = r && c ? r.cells[c.key] : undefined;
     const el = grid.current?.element({ row: selection.focus.row, col: selection.focus.col });
-    if (!isNumber(cell) || !el || !root.current?.contains(document.activeElement)) return;
+    // a click under the pointer already drew it from the number itself
+    if (!isNumber(cell) || !el || el.matches(":hover") || !root.current?.contains(document.activeElement)) return;
     showSourceLine(el, keysOf(cell));
     return () => hideSourceLine(el);
   }, [selection, rows, columns, keysOf]);

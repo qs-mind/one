@@ -371,6 +371,30 @@ describe("SheetViewer", () => {
     expect(fetch.mock.calls.map(([u]) => String(u))).toContain(`${base}/numbers/n-amount/explain?page=1`);
   });
 
+  it("a number focused from the keyboard draws its source line to its file's row on the canvas, and opens labelled", async () => {
+    const user = userEvent.setup();
+    core({});
+    const quote = { kind: "quote", title: "عرض سعر - عينة", file_id: "f1", locator: { sheet: "Quote", row: 7 }, url: null, dated: null };
+    render(<SheetViewer projectId={P} view={sheet({ sources: { ...sheet().sources, s1: quote } })} />);
+    const row = document.createElement("li"); // the quote's row, as its file's frame on the canvas shows it
+    row.setAttribute("data-source-at", "file:f1#sheet=Quote&row=7");
+    document.body.append(row);
+    const boxes = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      if (this === row) return new DOMRect(40, 500, 300, 30);
+      if (this.matches('[role="gridcell"]')) return new DOMRect(600, 100, 110, 30);
+      return new DOMRect(0, 0, 0, 0);
+    });
+    await user.click(cellOf("03/02", "unit"));
+    await user.keyboard("{ArrowLeft}{ArrowLeft}");
+    const line = () => document.querySelector('svg[data-source-overlay] [data-source="line"]');
+    await waitFor(() => expect(line()).not.toBeNull());
+    await user.keyboard(" ");
+    const dialog = await screen.findByRole("dialog", { name: texts.sheetSource.ar });
+    expect(dialog).toHaveTextContent("الفئة"); // what the number is, in the card's header
+    boxes.mockRestore();
+    row.remove();
+  });
+
   it("Space opens a number's source from the keyboard, and Esc gives the focus back", async () => {
     const user = userEvent.setup();
     core({});
