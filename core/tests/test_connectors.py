@@ -7,6 +7,7 @@ Connector, reaches the internet or calls an AI model."""
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -313,6 +314,43 @@ async def test_stdio_server_stops_with_the_core(rec, general, tmp_path):
     while alive(pid) and time.monotonic() < deadline:
         time.sleep(0.05)
     assert not alive(pid) and hub_mod.active() is None
+
+
+async def test_a_server_that_died_is_down_once_then_started_again(rec, general, hub, tmp_path):
+    await install(hub, tmp_path, read=True)
+    ctx = ctx_for(rec, hub, general, answers={"online": "yes"})
+    await call("connector_call", {"connector": NAME, "tool": "read_inbox"}, ctx)
+    os.kill(int((tmp_path / f"{NAME}.pid").read_text()), signal.SIGTERM)
+    time.sleep(0.5)
+    out = await call("connector_call", {"connector": NAME, "tool": "read_inbox"}, ctx)
+    if "not done:" not in out:  # the kill may land after the call; the next one is down then
+        out = await call("connector_call", {"connector": NAME, "tool": "read_inbox"}, ctx)
+    assert copy.CONNECTOR_DOWN["en"] in out
+    again = await call("connector_call", {"connector": NAME, "tool": "read_inbox"}, ctx)
+    assert "عرض سعر حديد - عينة" in again  # a new server was started
+
+
+async def test_http_connector_gets_its_token_as_bearer(rec, general, hub, serve_app):
+    from tests import fake_mcp_server
+
+    seen: list[str | None] = []
+    inner = fake_mcp_server.server.streamable_http_app()
+
+    async def app(scope, receive, send):  # records the Authorization header of each request
+        if scope["type"] == "http":
+            headers = dict(scope["headers"])
+            seen.append(headers.get(b"authorization", b"").decode() or None)
+        await inner(scope, receive, send)
+
+    url = serve_app(app) + "/mcp"
+    remote = ConnectorConfig(name="remote-sample", transport="http", url=url)
+    host = FakeHost(answers={"connector": answer(read=True)})
+    assert await hub.propose(remote, "tok-sample-123", ask=host.ask)
+    assert hub.config("remote-sample").transport == "http"
+    ctx = ctx_for(rec, hub, general)
+    out = await call("connector_call", {"connector": "remote-sample", "tool": "read_inbox"}, ctx)
+    assert "عرض سعر حديد - عينة" in out and seen and set(seen) == {"Bearer tok-sample-123"}
+    await hub.close()  # before the server stops: it waits for open streams
 
 
 def test_tools_are_registered_with_their_risks():

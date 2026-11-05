@@ -63,6 +63,7 @@ _NAME = re.compile(r"[a-z0-9-]{2,40}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 _ENV = ("PATH", "SYSTEMROOT", "HOME", "USERPROFILE", "LANG")  # all a stdio server is given
 _LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+_GONE = {types.CONNECTION_CLOSED, types.REQUEST_TIMEOUT}  # MCP errors that mean the server is gone
 READ = "read_without_asking"  # the card's two questions
 SEARCH = "search"
 NO_SEARCH = "none"
@@ -441,7 +442,10 @@ class ConnectorHub:
         except ConnectorDown:
             raise
         except MCPError as error:
-            raise _Refused(str(error)) from None
+            if error.code not in _GONE:
+                raise _Refused(" ".join(error.message.split())[:500]) from None
+            await self._drop(config.name)
+            raise ConnectorDown() from None
         except Exception as error:
             log.warning("Connector %s call failed: %s", config.name, type(error).__name__)
             await self._drop(config.name)
