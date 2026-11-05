@@ -1,5 +1,6 @@
 // Add or replace the engineer's Claude key. The core keeps it in the system key store; the page never shows it again.
-// `plain`: the field alone, with no title or frame, inside another screen (the first launch's Connect AI).
+// `plain`: the field alone, with no title, help or frame, inside another screen (the first launch's Connect AI, whose
+// choice already says what the key is).
 import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { t, useLanguage } from "../i18n";
@@ -31,7 +32,7 @@ export function AiKey({ onSaved, onClose, plain = false }: { onSaved: () => void
           <p role="status">{t("keyAdded")}</p>
         ) : (
           <form onSubmit={save} className="flex flex-col gap-3">
-            <p className="text-slate">{t("aiKeyHelp")}</p>
+            {!plain && <p className="text-slate">{t("aiKeyHelp")}</p>}
             <label className="flex flex-col gap-1">
               <span>{t("aiKeyLabel")}</span>
               <input

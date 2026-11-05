@@ -132,15 +132,15 @@ export function ConnectAi({ nav }: { nav: Nav }) {
         </div>
       </div>
 
-      <fieldset disabled={!agreed} className="flex min-w-0 flex-col gap-4 disabled:opacity-60">
+      <fieldset disabled={!agreed} className="flex min-w-0 flex-col gap-4">
         <legend className="mb-4 text-lg font-semibold">{t("aiLinkTitle")}</legend>
         {!agreed && <p className="text-slate">{t("aiLinkAfterConsent")}</p>}
         <div className="grid gap-3 sm:grid-cols-2">
-          <button type="button" aria-pressed={via === "claude_code"} onClick={() => choose("claude_code")} className={option(via === "claude_code")}>
+          <button type="button" aria-pressed={via === "claude_code"} onClick={() => choose("claude_code")} className={`${option(via === "claude_code")} text-start`}>
             <span className="block font-semibold">{t("aiLinkClaudeCode")}</span>
             <span className={`block text-sm ${via === "claude_code" ? "text-paper/80" : "text-slate"}`}>{t("aiLinkClaudeCodeHelp")}</span>
           </button>
-          <button type="button" aria-pressed={via === "api_key"} onClick={() => choose("api_key")} className={option(via === "api_key")}>
+          <button type="button" aria-pressed={via === "api_key"} onClick={() => choose("api_key")} className={`${option(via === "api_key")} text-start`}>
             <span className="block font-semibold">{t("aiLinkApiKey")}</span>
             <span className={`block text-sm ${via === "api_key" ? "text-paper/80" : "text-slate"}`}>{t("aiLinkApiKeyHelp")}</span>
           </button>

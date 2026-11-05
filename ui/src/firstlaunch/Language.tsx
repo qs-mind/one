@@ -30,7 +30,7 @@ export function Language({ nav }: { nav: Nav }) {
             dir={choice.lang === "ar" ? "rtl" : "ltr"}
             aria-pressed={lang === choice.lang}
             onClick={() => language() !== choice.lang && setLanguage(choice.lang)}
-            className={`${option(lang === choice.lang)} py-5 text-center text-lg`}
+            className={`${option(lang === choice.lang)} py-5 text-lg`}
           >
             {choice.label}
           </button>

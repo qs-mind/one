@@ -51,11 +51,12 @@ export const secondary =
   "rounded-md bg-stone px-5 py-2.5 text-ink hover:bg-ink/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40";
 export const quiet =
   "rounded-md px-3 py-2.5 text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-40";
-export const field = "w-full rounded-md border border-slate/40 bg-paper px-3 py-2 outline-none focus:border-ink";
-/** A choice the engineer picks among a few: Stone at rest, Ink once chosen. */
+export const field = "h-11 w-full rounded-md border border-slate/40 bg-paper px-3 outline-none focus:border-ink";
+/** A choice the engineer picks among a few: a quiet frame on Paper at rest, Ink once chosen. Its text aligns to the
+ * start unless the caller says otherwise. */
 export const option = (chosen: boolean) =>
-  `rounded-lg px-4 py-3 text-start focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40 ${
-    chosen ? "bg-ink text-paper" : "bg-stone text-ink hover:bg-ink/[0.08]"
+  `rounded-lg border px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40 ${
+    chosen ? "border-ink bg-ink text-paper" : "border-ink/15 bg-paper text-ink hover:bg-stone"
   }`;
 
 export function Alert({ children }: { children: ReactNode }) {

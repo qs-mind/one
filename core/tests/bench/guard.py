@@ -1,15 +1,18 @@
-"""What keeps the bench off everything real: a key store in memory, no internet, no Claude Code.
+"""What keeps the bench off everything real: a key store in memory, no internet, no Claude Code, no
+browser.
 
 `install()` is called once, before the core starts. Loopback stays open: the screen reaches the
 core, and the core its own MCP server, through 127.0.0.1."""
 
 import asyncio.selector_events
 import socket
+import webbrowser
 
 import keyring
 from keyring.backend import KeyringBackend
 
 from qsone.engine.connectors import claude_code
+from qsone.journey import claude_code as first_launch_claude
 
 
 class MemoryKeyring(KeyringBackend):
@@ -79,3 +82,7 @@ def install() -> None:
 
     # The engineer's own Claude Code is never found, so never run.
     claude_code.executable = lambda picked: (None, "CLAUDE_CODE_MISSING")
+    first_launch_claude.on_path = lambda: None  # the first launch's own search, too
+    first_launch_claude.find_claude = lambda: (None, None)
+    # A link the core opens for the page (terms, privacy, sign-in) opens no browser on this machine.
+    webbrowser.open = lambda *args, **kwargs: False

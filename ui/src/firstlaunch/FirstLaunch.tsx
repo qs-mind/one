@@ -9,6 +9,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { api } from "../api";
 import { send } from "../core";
 import { dir, fill, language, setLanguage, t, useLanguage } from "../i18n";
+import { useAiSettings } from "../settings/AiSettings";
 import { Mark } from "../shell/TopBar";
 import { Account } from "./Account";
 import { ConnectAi } from "./ConnectAi";
@@ -56,7 +57,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
         {children}
       </div>
       {asked && (
-        <div role="dialog" aria-modal="true" aria-label={t("setupTitle")} className="fixed inset-0 z-[60]">
+        <div role="dialog" aria-modal="true" aria-label={t("setupTitle")} className="fixed inset-0 z-[60] overflow-y-auto">
           <FirstLaunch
             key={`${asked.from} ${asked.only}`}
             initial={state.setup}
@@ -161,13 +162,11 @@ function Dots({ at }: { at: number }) {
         {STEPS.map((step, index) => (
           <li
             key={step}
-            className={`h-2 rounded-full transition-[width] ${index === at ? "w-6 bg-ink" : index < at ? "w-2 bg-ink" : "w-2 bg-stone"}`}
+            className={`h-2 rounded-full ${index === at ? "w-6 bg-ink" : index < at ? "w-2 bg-ink" : "w-2 bg-stone"}`}
           />
         ))}
       </ol>
-      <span className="text-xs text-slate">
-        {at < STEPS.length ? fill(t("setupStepOf"), { n, total: STEPS.length }) : t("readyTitle")}
-      </span>
+      {at < STEPS.length && <span className="text-xs text-slate">{fill(t("setupStepOf"), { n, total: STEPS.length })}</span>}
     </div>
   );
 }
@@ -184,6 +183,7 @@ function Ready({
   onImport?: (from: DataTransfer | FileList, old: boolean) => void;
 }) {
   const [over, setOver] = useState(false);
+  const ai = useAiSettings(); // "no AI is connected" only when that is so: a link may be set up from AI settings
   const nav: Nav = { back, pass: async () => true };
   const start = (
     <button type="button" onClick={onStart} className={primary}>
@@ -191,7 +191,7 @@ function Ready({
     </button>
   );
   return (
-    <StepScreen title={t("readyTitle")} help={aiSkipped ? t("aiLinkLater") : undefined} nav={nav} skip={false} next={start}>
+    <StepScreen title={t("readyTitle")} help={aiSkipped && ai.connected !== true ? t("aiLinkLater") : undefined} nav={nav} skip={false} next={start}>
       {onImport && (
         <div className="flex flex-col gap-4">
           <div

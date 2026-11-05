@@ -94,7 +94,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
                   role="radio"
                   aria-checked={role === value}
                   onClick={() => setRole(value)}
-                  className={option(role === value)}
+                  className={`${option(role === value)} text-start`}
                 >
                   {t(label)}
                 </button>
@@ -118,7 +118,8 @@ export function IntroCard({ nav }: { nav: Nav }) {
               <input dir="auto" maxLength={80} value={city} onChange={(event) => setCity(event.target.value)} className={field} />
             </label>
           </div>
-          <label className="flex flex-col gap-2 sm:w-1/2 sm:pe-2">
+          <div className="flex flex-col gap-2 sm:w-1/2 sm:pe-2">
+            <label className="flex flex-col gap-2">
             <span>{t("cardCurrency")}</span>
             <input
               dir="ltr"
@@ -130,10 +131,11 @@ export function IntroCard({ nav }: { nav: Nav }) {
               onChange={(event) => setCurrency(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
               className={`${field} uppercase tracking-wider`}
             />
+            </label>
             <span id={ids.help} className="text-xs text-slate">
               {t("cardCurrencyHelp")}
             </span>
-          </label>
+          </div>
         </div>
       </StepScreen>
     </form>
