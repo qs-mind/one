@@ -24,15 +24,26 @@
   --text-2xl--line-height: 1.35;
 }
 
-/* Zain's Arabic letters are drawn smaller than Kumbh Sans's Latin at the same size: they are drawn a little larger,
-   so an Arabic file name or BOQ line reads as large as the English beside it, on either page. Same files as the
-   @fontsource/zain Arabic subsets (400 and 700), only the size differs. */
+/* Arabic in Zain, matched to Kumbh Sans beside it. Zain's letters are drawn smaller, so they are set 3% larger; and its
+   strokes are darker than Kumbh's at the same weight, so each weight takes Zain's next lighter cut: body (400) uses
+   Zain 300, semibold (600) uses Zain 400, bold (700) Zain 700. Before (108% and 400 / 700) Arabic read bigger and
+   heavier than the English next to it (Kareem, 5 Nov 2026). Same files as the @fontsource/zain Arabic subsets. */
 @font-face {
   font-family: "Zain";
   font-style: normal;
   font-display: swap;
-  font-weight: 400;
-  size-adjust: 108%;
+  font-weight: 100 450;
+  size-adjust: 103%;
+  src: url("../../node_modules/@fontsource/zain/files/zain-arabic-300-normal.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
+    U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+@font-face {
+  font-family: "Zain";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 451 650;
+  size-adjust: 103%;
   src: url("../../node_modules/@fontsource/zain/files/zain-arabic-400-normal.woff2") format("woff2");
   unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
     U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
@@ -41,8 +52,8 @@
   font-family: "Zain";
   font-style: normal;
   font-display: swap;
-  font-weight: 700;
-  size-adjust: 108%;
+  font-weight: 651 900;
+  size-adjust: 103%;
   src: url("../../node_modules/@fontsource/zain/files/zain-arabic-700-normal.woff2") format("woff2");
   unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
     U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
