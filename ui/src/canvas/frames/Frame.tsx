@@ -3,18 +3,20 @@
 // frame never move the canvas or the frame (decision 11). Enter goes in, Esc comes back (handled by the canvas).
 import { NodeResizer, useStore, type Node } from "@xyflow/react";
 import { createContext, memo, useContext, type ComponentType, type ReactNode } from "react";
-import { fill, pick, t, texts, useLanguage } from "../../i18n";
+import { fill, pick, t, useLanguage } from "../../i18n";
 import { lod, type Detail } from "../lod";
 import { MIN_H, MIN_W, STRIP_H } from "../place";
-import type { AgentInfo, Anchor, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
+import type { Anchor, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
 
 /** `h` is the frame's open height, kept while it is folded to its strip. */
 type Base = { collapsed: boolean; live: boolean; h: number };
 export type FilesData = Base & { files: FileInfo[] };
 export type FileData = Base & { file: FileInfo; page?: number };
 export type DeliverableData = Base & { deliverable: DeliverableInfo };
-export type DeskData = Base & { desk: DeskInfo; agents: AgentInfo[] };
-export type TeamData = Base & { agents: AgentInfo[] };
+/** `working`: how many of the Desk's agents work now (from the live store), for its folded line. The agents
+ * themselves are read by the frames from the live store, so their moves never touch the canvas's nodes. */
+export type DeskData = Base & { desk: DeskInfo; working: number };
+export type TeamData = Base;
 
 export type FrameNode =
   | Node<FilesData, "files">
@@ -51,8 +53,6 @@ export function useDetail(): Detail {
 export const kindOf = (key: FrameKey) => key.slice(0, key.indexOf(":")) as FrameKind;
 export const idOf = (key: string) => key.slice(key.indexOf(":") + 1);
 
-const working = (a: AgentInfo) => a.state === "working" || a.state === "thinking";
-
 type TypeAndData<N> = N extends { type?: infer T; data: infer D } ? { type?: T; data: D } : never;
 export type Titled = TypeAndData<FrameNode>;
 
@@ -67,21 +67,12 @@ export function frameTitle(node: Titled): string {
       return node.data.deliverable.title;
     case "desk":
       return node.data.collapsed
-        ? fill(t("deskSummary"), { desk: pick(node.data.desk.name), n: node.data.agents.filter(working).length })
+        ? fill(t("deskSummary"), { desk: pick(node.data.desk.name), n: node.data.working })
         : pick(node.data.desk.name);
     default:
       return t("projectTeam");
   }
 }
-
-export const stateText: Record<AgentInfo["state"], keyof typeof texts> = {
-  idle: "stateIdle",
-  thinking: "stateThinking",
-  working: "stateWorking",
-  waiting: "stateWaiting",
-  done: "stateDone",
-  failed: "stateFailed",
-};
 
 type FrameProps = {
   id: FrameKey;
@@ -182,26 +173,5 @@ export function memoFrame<P extends FrameComponentProps>(component: ComponentTyp
     component,
     (a, b) =>
       a.id === b.id && a.selected === b.selected && a.width === b.width && a.height === b.height && shallowEqual(a.data, b.data),
-  );
-}
-
-/** A team member's row: role, state in words, Progress Line. Task 5 replaces it with the agent card. */
-export function AgentRow({ agent }: { agent: AgentInfo }) {
-  return (
-    <li className="flex flex-col px-3 py-2">
-      <span className="flex items-center justify-between gap-3">
-        <span dir="auto" className="min-w-0 truncate font-semibold">
-          {pick(agent.role)}
-        </span>
-        <span className={agent.state === "waiting" || agent.state === "failed" ? "text-copper" : "text-slate"}>
-          {t(stateText[agent.state])}
-        </span>
-      </span>
-      {agent.line && (
-        <span dir="auto" className="text-slate">
-          {pick(agent.line)}
-        </span>
-      )}
-    </li>
   );
 }

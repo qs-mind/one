@@ -35,6 +35,7 @@ import {
   type FrameNode,
 } from "./frames/Frame";
 import { TeamFrame } from "./frames/TeamFrame";
+import { deskCounts, startActivity, useDeskCounts } from "./live/activity";
 import { isMac, isMod, isTyping, matches } from "./keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
@@ -43,7 +44,6 @@ import { select } from "./selection";
 import { SourceError } from "./sources";
 import type {
   ActivityEvent,
-  AgentInfo,
   Anchor,
   DeliverableInfo,
   DeskInfo,
@@ -74,10 +74,9 @@ type Things = {
   files: FileInfo[];
   deliverables: Map<string, DeliverableInfo>;
   desks: Map<string, DeskInfo>;
-  agents: Map<string, AgentInfo>;
 };
 
-const nothing = (): Things => ({ files: [], deliverables: new Map(), desks: new Map(), agents: new Map() });
+const nothing = (): Things => ({ files: [], deliverables: new Map(), desks: new Map() });
 
 const reduced = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 const duration = () => (reduced() ? 0 : 300);
@@ -98,10 +97,6 @@ function exists(key: FrameKey, things: Things): boolean {
   }
 }
 
-const deskAgents = (things: Things, deskId: string) => [...things.agents.values()].filter((a) => a.desk_id === deskId);
-/** Agents outside every known Desk sit in the team frame, so none is lost. */
-const teamAgents = (things: Things) =>
-  [...things.agents.values()].filter((a) => a.desk_id === null || !things.desks.has(a.desk_id));
 
 /** What should be on the canvas: Project files, every Deliverable, the team and every Desk. */
 function wanted(things: Things): Incoming[] {
@@ -109,7 +104,7 @@ function wanted(things: Things): Incoming[] {
   for (const d of things.deliverables.values()) out.push({ key: `deliverable:${d.id}`, ...sizeFor(`deliverable:${d.id}`, d) });
   out.push({ key: "team:core", ...sizeFor("team:core") });
   for (const desk of things.desks.values()) {
-    const agents = deskAgents(things, desk.id).length;
+    const agents = deskCounts().get(desk.id)?.members ?? 0;
     out.push({ key: `desk:${desk.id}`, ...sizeFor(`desk:${desk.id}`, { agents }), collapsed: DESKS_START_COLLAPSED });
   }
   if (FILE_FRAMES === "every") for (const f of things.files) out.push({ key: `file:${f.id}`, ...sizeFor(`file:${f.id}`) });
@@ -149,11 +144,11 @@ function nodeFor(p: Placed, things: Things, previous?: FrameNode): FrameNode | n
     case "desk": {
       const desk = things.desks.get(id);
       if (!desk) return null;
-      node = { ...common, type: "desk", data: { ...base, desk, agents: deskAgents(things, id) } };
+      node = { ...common, type: "desk", data: { ...base, desk, working: deskCounts().get(id)?.working ?? 0 } };
       break;
     }
     case "team":
-      node = { ...common, type: "team", data: { ...base, agents: teamAgents(things) } };
+      node = { ...common, type: "team", data: { ...base } };
       break;
   }
   node.ariaLabel = frameTitle(node);
@@ -432,11 +427,12 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   // Loading the project: its things and its saved layout; saved frames whose thing is gone are removed.
   useEffect(() => {
     let live = true;
+    const team = new AbortController(); // the live team (agents, cursors) runs while this project is on the canvas
     setState("loading");
     setNodes([]);
     void (async () => {
       try {
-        const [files, deliverables, team, layout] = await Promise.all([
+        const [files, deliverables, loaded, layout] = await Promise.all([
           sources.files(),
           sources.deliverables(),
           sources.team(),
@@ -446,9 +442,9 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
         things.current = {
           files,
           deliverables: new Map(deliverables.map((d) => [d.id, d])),
-          desks: new Map(team.desks.map((d) => [d.id, d])),
-          agents: new Map(team.agents.map((a) => [a.id, a])),
+          desks: new Map(loaded.desks.map((d) => [d.id, d])),
         };
+        startActivity(sources, team.signal, loaded);
         const kept = layout.frames.filter((f) => exists(f.key, things.current));
         const removed = layout.frames.filter((f) => !exists(f.key, things.current)).map((f) => f.key);
         const all = place(kept, wanted(things.current), opts());
@@ -469,11 +465,13 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     })();
     return () => {
       live = false;
+      team.abort();
       saver.flush(true);
     };
   }, [projectId, sources, attempt]);
 
-  // Live events: new and changed Deliverables, Desks and agents; after a reconnect the lists are read again.
+  // Live events: new and changed Deliverables and Desks; after a reconnect the lists are read again. Agents are the
+  // live store's (live/activity.ts): the canvas sees only each Desk's counts, for its folded line.
   useEffect(() => {
     if (state !== "ready") return;
     const controller = new AbortController();
@@ -481,8 +479,6 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       const now = things.current;
       if (event.type === "deliverable") now.deliverables.set(event.deliverable.id, event.deliverable);
       else if (event.type === "desk") now.desks.set(event.desk.id, event.desk);
-      else if (event.type === "agent") now.agents.set(event.agent.id, event.agent);
-      else if (event.type === "agent-gone") now.agents.delete(event.id);
       else return;
       things.current = { ...now };
       rebuild();
@@ -495,7 +491,6 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
             ...things.current,
             deliverables: new Map(deliverables.map((d) => [d.id, d])),
             desks: new Map(team.desks.map((d) => [d.id, d])),
-            agents: new Map(team.agents.map((a) => [a.id, a])),
           };
           rebuild();
         },
@@ -505,6 +500,12 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     sources.activity(onEvent, controller.signal, reload);
     return () => controller.abort();
   }, [state, sources, rebuild]);
+
+  // A Desk's folded line counts its working agents: refreshed when a count changes, never on an agent's move.
+  const counts = useDeskCounts();
+  useEffect(() => {
+    if (state === "ready") rebuild();
+  }, [counts, state, rebuild]);
 
   useEffect(() => {
     const leave = () => saver.flush(true);
