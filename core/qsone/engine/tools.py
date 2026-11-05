@@ -73,6 +73,14 @@ class Tool:
     group: str = ""
     risk_for: Callable[[BaseModel], Risk] | None = None  # a risk that depends on the arguments
     # (a Connector's tool); the gate uses it in place of `risk` when set
+    allow_for: Callable[[BaseModel], str] | None = None  # what "Allow for this Brief" covers,
+    # when narrower than the whole tool (one Connector's one tool)
+
+
+def allow_key(tool: Tool, args: BaseModel) -> str:
+    """What the engineer's "Allow for this Brief" is saved as: the tool's name, or its name and
+    `tool.allow_for(args)` (`connector_call:outlook/read_inbox`)."""
+    return tool.name if tool.allow_for is None else f"{tool.name}:{tool.allow_for(args)}"
 
 
 def risk_of(tool: Tool, args: BaseModel) -> Risk:

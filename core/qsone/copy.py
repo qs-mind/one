@@ -1385,6 +1385,10 @@ WEB_QUERY_NAMES_PROJECT = {
     "en": "Search in general words, without the project's or the client's name.",
     "ar": "دوّر بكلام عام، من غير اسم المشروع أو اسم العميل.",
 }
+WEB_QUERY_PERSONAL = {
+    "en": "Search without anyone's phone numbers, emails or ID numbers.",
+    "ar": "دوّر من غير أرقام تليفونات أو إيميلات أو أرقام بطاقات لحد.",
+}
 WEB_NO_DATE = {
     "en": "The page shows no date; the date it was read is given instead.",
     "ar": "الصفحة مفيهاش تاريخ؛ مكتوب بدله تاريخ قرايتها.",

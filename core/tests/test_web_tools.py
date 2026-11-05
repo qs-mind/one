@@ -103,6 +103,25 @@ async def test_query_with_the_project_or_client_name_is_refused(rec):
     assert len(search.calls) == 1
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "سعر حديد المورد 01012345678",
+        "rebar supplier sales@steel-sample.example",
+        "مورد أسمنت واتساب +971501234567",
+        "عقد المقاول 29801011234567",
+    ],
+)
+async def test_query_with_personal_data_is_refused(rec, query):
+    search = FakeSearch([HIT])
+    ctx = ctx_for(rec, search=search)
+    with pytest.raises(ModelRetry, match="phone numbers, emails or ID numbers"):
+        await call("web_search", {"query": query}, ctx)
+    assert search.calls == [] and ctx.host.cards == []  # nothing left, and nothing was asked
+    await call("web_search", {"query": "سعر حديد 16 مم 2026"}, ctx)  # sizes and years are fine
+    assert len(search.calls) == 1
+
+
 async def test_country_defaults_to_the_projects(rec):
     with rec.write("engineer") as conn:
         rec.set_meta(conn, "country", "eg")

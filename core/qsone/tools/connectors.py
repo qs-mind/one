@@ -183,6 +183,7 @@ for _tool in (
         roles=_ROLES,
         group="connectors",
         risk_for=_risk,
+        allow_for=lambda a: f"{a.connector}/{a.tool}",  # "Allow for this Brief": this tool
     ),
 ):
     register(_tool)
