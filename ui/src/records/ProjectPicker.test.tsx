@@ -102,7 +102,7 @@ describe("ProjectPicker", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(switcher());
-    expect(await within(picker()).findByText(texts.noProjects.ar)).toBeInTheDocument();
+    await user.click(await within(picker()).findByRole("button", { name: texts.newProject.ar }));
 
     const name = within(picker()).getByLabelText(texts.projectName.ar);
     expect(name).toHaveAttribute("dir", "auto");
@@ -174,7 +174,7 @@ describe("ProjectPicker", () => {
     render(<App />);
     await user.click(switcher(texts.generalChat.en));
     const region = screen.getByRole("region", { name: texts.projects.en });
-    expect(await within(region).findByText(texts.noProjects.en)).toBeInTheDocument();
+    await user.click(await within(region).findByRole("button", { name: texts.newProject.en }));
     expect(within(region).getByLabelText(texts.projectName.en)).toBeInTheDocument();
     expect(within(region).getByRole("button", { name: texts.create.en })).toBeInTheDocument();
   });

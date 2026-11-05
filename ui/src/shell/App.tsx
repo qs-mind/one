@@ -263,7 +263,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   };
 
   const floatingPanel = panel && (
-    <FloatingPanel onClose={closePanel} wide={panel === "deliverables"}>
+    <FloatingPanel onClose={closePanel} wide={panel === "deliverables"} narrow={panel === "projects"}>
       {panel === "ai" && (
         <>
           <AiSettings ai={ai} onClose={closePanel} />
