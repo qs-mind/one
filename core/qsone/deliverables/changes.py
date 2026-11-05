@@ -496,6 +496,7 @@ def accept(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: s
             if any(not ops.is_stale(conn, head, c.op) for c in todo):
                 raise RecordsError(copy.UPDATE_FIRST, status=409, field="ids")
         accepted, rows, everything = [], set(), False
+        (audit_from,) = conn.execute("SELECT coalesce(max(id), 0) FROM audit").fetchone()
         for change in todo:
             if ops.is_stale(conn, head, change.op):
                 _decide(conn, rec, change, "stale", actor=actor)
@@ -512,7 +513,9 @@ def accept(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: s
             )
         if accepted:
             ids = [c.id for c in accepted]
-            n = store.save_version(conn, rec, deliverable_id, by=actor, change_ids=ids)
+            n = store.save_version(
+                conn, rec, deliverable_id, by=actor, change_ids=ids, audit_from=audit_from
+            )
         for change in accepted:
             _decide(conn, rec, change, "accepted", actor=actor, version_n=n)
     if accepted or stale:

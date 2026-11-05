@@ -274,15 +274,25 @@ def put_part(
     return part_id
 
 
-def save_version(conn, rec: Records, deliverable_id: str, *, by: str, change_ids: list[str]) -> int:
-    """Inside a write: the next Saved version, at this moment, listing the changes it holds."""
+def save_version(
+    conn,
+    rec: Records,
+    deliverable_id: str,
+    *,
+    by: str,
+    change_ids: list[str],
+    audit_from: int | None = None,
+) -> int:
+    """Inside a write: the next Saved version, at this moment, listing the changes it holds. An
+    accept passes `audit_from`, the audit row before its own writes, so it can be undone."""
     (last,) = conn.execute(
         "SELECT coalesce(max(n), 0) FROM versions WHERE deliverable_id = ?", (deliverable_id,)
     ).fetchone()
     n, at = last + 1, rec.clock()
     conn.execute(
-        "INSERT INTO versions (deliverable_id, n, at, by, changes) VALUES (?, ?, ?, ?, ?)",
-        (deliverable_id, n, at, by, _dump(change_ids)),
+        "INSERT INTO versions (deliverable_id, n, at, by, changes, audit_from)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (deliverable_id, n, at, by, _dump(change_ids), audit_from),
     )
     conn.execute("UPDATE deliverables SET updated_at = ? WHERE id = ?", (at, deliverable_id))
     row = {"deliverable_id": deliverable_id, "n": n, "at": at, "by": by, "changes": change_ids}
