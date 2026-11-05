@@ -201,7 +201,8 @@ export function BackupAsk() {
       aria-label={t("backupTitle")}
       className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-[14px] border border-ink/[0.08] bg-paper px-4 py-1.5"
     >
-      <p dir="auto" className="min-w-0 flex-1 break-words">
+      {/* its own line before the buttons squeeze it to a word a line: they wrap under it in a narrow chat */}
+      <p dir="auto" className="min-w-0 flex-[1_1_12rem] break-words">
         {t("backupAskFolder")}
       </p>
       {!typing && (

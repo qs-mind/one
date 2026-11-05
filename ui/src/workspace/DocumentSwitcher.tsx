@@ -81,11 +81,12 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
   return (
     <div className="flex min-w-0 items-baseline gap-x-3">
       <Popover open={open} onOpenChange={setOpen}>
-        <h1 className="shrink-0 whitespace-nowrap text-base font-semibold text-ink">
+        {/* whole from 1000 px (the facts are cut first); below, the title is the last thing cut, never run over */}
+        <h1 className="shrink-0 whitespace-nowrap text-base font-semibold text-ink max-[999px]:min-w-0 max-[999px]:shrink">
           <PopoverTrigger asChild>
-            <button type="button" aria-haspopup="menu" className="inline-flex items-center gap-2 rounded-lg px-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink">
+            <button type="button" aria-haspopup="menu" className="inline-flex max-w-full items-center gap-2 rounded-lg px-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink">
               <Dot on={working.has(opened.key)} />
-              {title}
+              <span className="min-w-0 truncate">{title}</span>
               <span aria-hidden>▾</span>
             </button>
           </PopoverTrigger>
@@ -127,10 +128,11 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
         </PopoverContent>
       </Popover>
       {facts.length > 0 && (
-        <p className="min-w-0 truncate text-sm text-slate max-[999px]:hidden">
+        // short of room the state is cut, never «الأرقام عينة»: sample numbers are always said whole
+        <p className="flex min-w-0 overflow-hidden whitespace-nowrap text-sm text-slate max-[999px]:hidden">
           {facts.map((f, i) => (
-            <span key={f}>
-              {i > 0 && <span> · </span>}
+            <span key={f} className={f === t("sampleNumbers") ? "shrink-0" : "min-w-0 truncate"}>
+              {i > 0 && <span className="whitespace-pre"> · </span>}
               <span>{f}</span>
             </span>
           ))}

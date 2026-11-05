@@ -324,6 +324,10 @@ function Card({ projectId, cell, sources, style, focus, onClose, from, label }: 
           last = now;
           const view = { width: innerWidth, height: innerHeight };
           const placed = placeCard(at, { width: el.offsetWidth, height: el.scrollHeight }, view, side === "rtl");
+          // a number in the open document keeps its card over the document, never over the chat beside it
+          const doc = from.closest('[data-region="document"]')?.getBoundingClientRect();
+          if (doc && doc.width >= el.offsetWidth + 16)
+            placed.left = Math.min(Math.max(placed.left, doc.left + 8), doc.right - el.offsetWidth - 8);
           el.style.top = `${placed.top}px`;
           el.style.left = `${placed.left}px`;
           el.style.maxHeight = `${placed.maxHeight}px`;
