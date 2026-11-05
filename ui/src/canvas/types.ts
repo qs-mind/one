@@ -53,6 +53,7 @@ export type ActivityEvent =
   | { type: "agent"; agent: AgentInfo }
   | { type: "agent-gone"; id: string }
   | { type: "deliverable"; deliverable: DeliverableInfo }
+  | { type: "file"; file: FileInfo }
   | { type: "desk"; desk: DeskInfo }
   | { type: "waiting"; count: number };
 

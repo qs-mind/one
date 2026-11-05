@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { deliverablesApi } from "../deliverables/api";
 import type { FillPreview as Preview } from "../deliverables/types";
-import { fill, language, pick, t, type Text } from "../i18n";
+import { count, fill, language, pick, t, type Text } from "../i18n";
 import { formatDecimal } from "../viewers/sheet/format";
 import { saveAnswer } from "./save";
 
@@ -121,7 +121,7 @@ export function FillPreview({ projectId, planId, announce, onClose }: FillPrevie
             </div>
           )}
           {preview.unmapped_rows.length > 0 && (
-            <p className="text-slate">{fill(t("fillUnmappedRows"), { n: preview.unmapped_rows.length })}</p>
+            <p className="text-slate">{count("fillUnmappedRows", preview.unmapped_rows.length)}</p>
           )}
           {preview.unmapped_items.length > 0 && (
             <p className="text-slate">

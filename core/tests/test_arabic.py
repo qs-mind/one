@@ -45,3 +45,28 @@ def test_idempotent():
 
 def test_display_keeps_what_the_engineer_wrote():
     assert display_text("ﺧﺮﺳﺎﻧﺔ ٥١٩٣ m³") == "خرسانة ٥١٩٣ m³"
+
+
+def test_a_file_name_on_screen_is_isolated_with_its_extension_last():
+    from qsone import copy
+
+    name = "مواصفات - عينة اختبار (sample spec).docx"
+    shown = copy.file_name(name)
+    assert shown == "\u2068مواصفات - عينة اختبار (sample spec)\u2066.docx\u2069\u2069"
+    assert shown.translate({0x2066: None, 0x2068: None, 0x2069: None}) == name
+    assert copy.file_name("README") == "\u2068README\u2069"
+    words = copy.fill(copy.DOING_BOQ_IMPORT, name=shown, sheet="BOQ")
+    assert shown in words["ar"] and shown in words["en"]
+
+
+def test_every_tool_has_plain_progress_words_never_its_id():
+    import qsone.app  # noqa: F401 - registers every tool
+    from qsone import copy
+    from qsone.engine.tools import REGISTRY
+
+    assert set(REGISTRY) <= set(copy.TOOL_WORDS), set(REGISTRY) - set(copy.TOOL_WORDS)
+    for name, words in copy.TOOL_WORDS.items():
+        assert words["en"].strip() and words["ar"].strip(), name
+        assert "_" not in words["en"] + words["ar"], name  # no tool id such as files_list
+        assert name not in words["ar"], name
+    assert copy.tool_step("a_tool_from_nowhere") == copy.TOOL_STEP

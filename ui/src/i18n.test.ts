@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { dir, language, setLanguage, t, texts } from "./i18n";
+import { count, counted, dir, language, setLanguage, t, texts } from "./i18n";
 
 beforeEach(() => setLanguage("ar"));
 
@@ -48,5 +48,26 @@ describe("i18n", () => {
     expect(texts.reviewRecordsMoved.ar).toBe("تحديث من سجلات المشروع");
     expect(texts.exportDraftMark.ar).toBe("مسودة — غير معتمد");
     expect(texts.sheetSample.ar).toContain("بيانات تجريبية");
+  });
+
+  it("a count takes the form its number needs, in Arabic one, two, few and the rest", () => {
+    expect(count("openComments", 1, {}, "ar")).toBe("ملاحظة واحدة مفتوحة");
+    expect(count("openComments", 2, {}, "ar")).toBe("ملاحظتين مفتوحتين");
+    expect(count("openComments", 3, {}, "ar")).toBe("3 ملاحظات مفتوحة");
+    expect(count("openComments", 10, {}, "ar")).toBe("10 ملاحظات مفتوحة");
+    expect(count("openComments", 11, {}, "ar")).toBe("11 ملاحظة مفتوحة");
+    expect(count("openComments", 100, {}, "ar")).toBe("100 ملاحظة مفتوحة");
+    expect(count("openComments", 1, {}, "en")).toBe("1 open comment");
+    expect(count("openComments", 4, {}, "en")).toBe("4 open comments");
+    expect(count("deskSummary", 2, { desk: "قسم - عينة" }, "ar")).toBe("قسم - عينة: اتنين شغالين");
+  });
+
+  it("every counted text has both languages and the same {placeholders} in every form", () => {
+    const names = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((n) => n !== "n");
+    for (const [key, text] of Object.entries(counted)) {
+      const all = [...Object.values(text.en), ...Object.values(text.ar)] as string[];
+      for (const form of all) expect(names(form).sort(), key).toEqual(names(text.en.other).sort());
+      expect(text.ar.other, key).toContain("{n}");
+    }
   });
 });

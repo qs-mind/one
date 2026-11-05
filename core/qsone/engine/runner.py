@@ -644,7 +644,7 @@ class _Brief:
     def _say_tools(self, run_id: str, spec: AgentSpec, response: ModelResponse) -> None:
         for c in _calls(response):
             tool = REGISTRY.get(c.tool_name)
-            words = copy.fill(copy.TOOL_WORKING, tool=c.tool_name)
+            words = copy.tool_step(c.tool_name)
             if tool is not None:
                 try:
                     words = tool.activity(tool.args.model_validate(c.args_as_dict()))

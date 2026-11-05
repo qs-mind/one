@@ -559,7 +559,9 @@ async def _ask_cost(ctx: ToolContext, info: FileInfo, reader, pages: list[int]) 
     card = Card(
         id=uuid4().hex,
         kind="cost",
-        title=copy.fill(copy.DOING_FILES_READ, name=info.name, pages=_ranges(pages)),
+        title=copy.fill(
+            copy.DOING_FILES_READ, name=copy.file_name(info.name), pages=_ranges(pages)
+        ),
         detail=detail,
         options=("yes", "no"),
     )
@@ -629,7 +631,7 @@ async def _files_read(ctx: ToolContext, args: ReadArgs) -> str:
     if info is None:
         raise RecordsError(copy.FILE_NOT_IN_PROJECT, status=422, field="file_id")
     sel = await asyncio.to_thread(_select, rec, info, args)
-    words = copy.fill(copy.DOING_FILES_READ, name=info.name, pages=sel.words())
+    words = copy.fill(copy.DOING_FILES_READ, name=copy.file_name(info.name), pages=sel.words())
     ctx.host.emit(Progress(ctx.brief_id, ctx.run_id, ctx.agent.name, words))
     notes: list[str] = []
     if args.ocr:
@@ -653,7 +655,7 @@ for _tool in (
         ListArgs,
         "read",
         _files_list,
-        lambda _: copy.fill(copy.TOOL_WORKING, tool="files_list"),
+        lambda _: copy.tool_step("files_list"),
         example=_LIST_EXAMPLE,
         group="files",
     ),

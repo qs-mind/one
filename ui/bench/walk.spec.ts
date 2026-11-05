@@ -1,0 +1,50 @@
+// The bench walks: each drives the real app (real core, real Records files) with the fake AI of core/tests/bench.
+// The Brief's keyword picks the fake's scenario: bench:chat, bench:question, bench:boq, bench:deliverable,
+// bench:team; none is the full tender walk-through. Run: npm run test:bench.
+import { expect, test } from "./bench";
+
+test("full tender walk-through, in Arabic", async ({ walk }) => {
+  await walk.start("ar");
+  await walk.shot("app-open");
+  await walk.createProject("مشروع عينة - منصة الاختبار");
+  await walk.shot("project-created");
+  await walk.addFiles();
+  await walk.shot("files-added");
+  const kinds = await walk.brief("سعّر جدول الكميات المرفق وجهّز العطاء");
+  expect.soft(kinds, "the cards of the walk-through, in order").toEqual(["rows", "question", "approval", "rows"]);
+  await expect.soft(walk.chat.getByText(/مهندس المراجعة|Checking QS/).first(), "the Checking QS's review is in the chat").toBeVisible();
+  await walk.deliverables(2);
+});
+
+test("BOQ import, in English", async ({ walk }) => {
+  await walk.start("en");
+  await walk.createProject("Sample project - test bench");
+  await walk.addFiles();
+  const kinds = await walk.brief("bench:boq Import the attached BOQ");
+  expect.soft(kinds).toEqual(["rows"]);
+});
+
+test("Deliverables from a BOQ, in English", async ({ walk }) => {
+  await walk.start("en");
+  await walk.createProject("Sample deliverables - test bench");
+  await walk.addFiles();
+  await walk.brief("bench:deliverable Make the priced BOQ and the cover letter");
+  await walk.deliverables(2);
+});
+
+test("a question card, in English", async ({ walk }) => {
+  await walk.start("en");
+  await walk.createProject("Sample question - test bench");
+  const kinds = await walk.brief("bench:question What do you need from me?");
+  expect.soft(kinds).toEqual(["question"]);
+});
+
+test("plain replies in the General chat and a project, in Arabic", async ({ walk }) => {
+  await walk.start("ar");
+  await walk.brief("bench:chat أهلا");
+  await walk.createProject("مشروع عينة للشات - منصة الاختبار");
+  await walk.brief("bench:chat عامل إيه؟");
+  await walk.page.reload();
+  await expect.soft(walk.chat.getByText("عامل إيه؟"), "the project chat is kept after a reload").toBeVisible();
+  await walk.shot("chat-after-reload");
+});

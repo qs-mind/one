@@ -5,7 +5,7 @@ import { ApprovalCard } from "../chat/parts/ApprovalCard";
 import { cardKinds } from "../chat/parts/cardKinds";
 import { ConnectorCard } from "../chat/parts/ConnectorCard";
 import type { CardData } from "../chat/parts/types";
-import { fill, setLanguage, texts } from "../i18n";
+import { count, fill, setLanguage, texts } from "../i18n";
 import { Connectors } from "./Connectors";
 
 type Route = (init: RequestInit) => Response | Promise<Response>;
@@ -66,7 +66,7 @@ describe("Connectors", () => {
     render(<Connectors />);
     const item = (await screen.findByText("mail-sample")).closest("li")!;
     expect(within(item).getByText(texts.onThisComputer.ar)).toBeInTheDocument();
-    expect(within(item).getByText(fill(texts.connectorTools.ar, { n: 3 }))).toBeInTheDocument();
+    expect(within(item).getByText(count("connectorTools", 3, {}, "ar"))).toBeInTheDocument();
     expect(within(item).getByText(texts.connectorTokenKept.ar)).toBeInTheDocument();
     expect(item.textContent).not.toContain("stdio");
     expect(screen.getByRole("heading", { name: texts.connectors.ar })).toBeInTheDocument();

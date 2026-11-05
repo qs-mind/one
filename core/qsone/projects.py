@@ -17,7 +17,7 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
-from qsone import copy, settings
+from qsone import activity, copy, settings
 from qsone.meaning.service import Meaning, ModelFailed
 from qsone.records import files, search
 from qsone.records.project import FILE_NAME, Records, RecordsError
@@ -228,7 +228,9 @@ def router(projects: Projects, meaning: Meaning | None = None) -> APIRouter:
             parts.append(part)
         info = await run_in_threadpool(files.add_file, rec, name, b"".join(parts), actor=ACTOR)
         wake()  # embedding happens in the background; the upload never waits for it
-        return JSONResponse(_file(info), status_code=200 if info.duplicate else 201)
+        found = _file(info)
+        activity.publish(project_id, {"type": "file", "file": found})  # the canvas, live
+        return JSONResponse(found, status_code=200 if info.duplicate else 201)
 
     @r.get("/projects/{project_id}/search")
     def search_project(

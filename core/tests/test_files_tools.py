@@ -124,7 +124,8 @@ async def test_the_engineer_sees_the_file_name_while_it_reads(rec, spec_pdf):
     ctx = ctx_for(rec)
     await call("files_read", {"file_id": spec_pdf, "pages": "2"}, ctx)
     said = [e.text for e in ctx.host.events if hasattr(e, "text")]
-    assert copy.fill(copy.DOING_FILES_READ, name="مواصفات - عينة.pdf", pages="2") in said
+    name = copy.file_name("مواصفات - عينة.pdf")  # isolated, so it reads in order on screen
+    assert copy.fill(copy.DOING_FILES_READ, name=name, pages="2") in said
 
 
 async def test_arabic_digits_and_ranges_are_reported(rec, spec_pdf):

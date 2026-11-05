@@ -69,9 +69,12 @@ describe("subscribeActivity", () => {
     const got: ActivityEvent[] = [];
     const stop = subscribeActivity("p3", (e) => got.push(e));
     await settle();
-    calls[0]!.write(": ping\n\n" + "data: {not json\n\n" + line({ type: "mystery", x: 1 }) + line({ type: "agent" }) + line(waiting(1)));
+    const file = { type: "file", file: { id: "f1", name: "جدول - عينة.xlsx", status: "read", note: null, replaces: null } };
+    calls[0]!.write(
+      ": ping\n\n" + "data: {not json\n\n" + line({ type: "mystery", x: 1 }) + line({ type: "agent" }) + line({ type: "file" }) + line(waiting(1)) + line(file),
+    );
     await settle();
-    expect(got).toEqual([waiting(1)]);
+    expect(got).toEqual([waiting(1), file]); // a file added to Project Records is one of the events
     stop();
   });
 

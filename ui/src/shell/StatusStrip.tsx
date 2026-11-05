@@ -4,7 +4,7 @@
 // than being cut: the stage first, then the open comments, the BOQ so far; the submission date stays longest.
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../canvas/types";
-import { fill, language, pick, t, useLanguage } from "../i18n";
+import { count, fill, language, pick, t, useLanguage } from "../i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 const locale = () => (language() === "ar" ? "ar-EG-u-nu-latn" : "en-GB");
@@ -115,7 +115,7 @@ export function StatusStrip({
   if (status.open_comments !== undefined && status.open_comments > 0)
     items.push({
       key: "comments",
-      node: <span className={`${chip} text-copper`}>{fill(t("openCommentsCount"), { n: status.open_comments })}</span>,
+      node: <span className={`${chip} text-copper`}>{count("openComments", status.open_comments)}</span>,
     });
 
   // each item keeps its place in the strip, laid out even while folded (invisible, out of the flow), so its width is

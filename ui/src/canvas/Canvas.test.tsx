@@ -1,7 +1,7 @@
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { forwardRef, useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fill, setLanguage, texts } from "../i18n";
+import { count, fill, setLanguage, texts } from "../i18n";
 import { canvasApi } from "./api";
 import { Canvas } from "./Canvas";
 import { fakeSources, type FakeOptions } from "./fake";
@@ -116,7 +116,7 @@ describe("the Project Canvas", () => {
 
   it("a new Desk starts folded to one line", async () => {
     show({ team: { desks: [{ id: "pricing", name: { en: "Pricing Desk (sample)", ar: "قسم التسعير - عينة" }, stage: "temporary" }], agents: [estimator] } });
-    const name = fill(texts.deskSummary.ar, { desk: "قسم التسعير - عينة", n: 1 });
+    const name = count("deskSummary", 1, { desk: "قسم التسعير - عينة" }, "ar");
     const desk = await frameEl(name);
     expect(desk.querySelector("[data-frame-body]")).toBeNull();
     expect(placedOf("desk:pricing")).toMatchObject({ collapsed: true });
@@ -264,6 +264,13 @@ describe("the Project Canvas", () => {
     expect(placedOf("file:upload1")).toMatchObject({ x: 500, y: 200 }); // where it was dropped (view at zoom 1)
     expect(fake.uploads).toEqual([file]);
     expect(await frameEl(texts.projectFiles.ar)).toHaveTextContent("عرض سعر - عينة.pdf");
+  });
+
+  it("a file added elsewhere (Project Records) comes to the Project files frame from its event", async () => {
+    const { fake } = show({});
+    const files = await frameEl(texts.projectFiles.ar);
+    act(() => fake.emit({ type: "file", file: { id: "f9", name: "جدول كميات - عينة.xlsx", status: "read", note: null, replaces: null } }));
+    await waitFor(() => expect(files).toHaveTextContent("جدول كميات - عينة.xlsx"));
   });
 
   it("a file that is not added says why, by name", async () => {

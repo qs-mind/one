@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
 import { deliverablesApi } from "../../deliverables/api";
 import type { Change, DocumentView, NumberCell, Op, Thread } from "../../deliverables/types";
-import { dir, fill, pick, t, useLanguage, type Text } from "../../i18n";
+import { count, dir, fill, pick, t, useLanguage, type Text } from "../../i18n";
 import { StatusChips } from "../sheet/SheetViewer";
 import { SourcePopover } from "../sheet/SourcePopover";
 import { opsFor, pendingBlocks, type SlateElement } from "./blockOps";
@@ -191,7 +191,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
         <StatusChips view={view} />
         <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
         {view.revision && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
-        {view.pending > 0 && <span>{fill(t("sheetPending"), { n: view.pending })}</span>}
+        {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
         {props.onToggleFullScreen && (
           <button
             type="button"
@@ -210,7 +210,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
       )}
       {untraced.length > 0 && (
         <p role="note" className="px-3 py-1 text-slate">
-          {fill(t("docUntracedCount"), { n: untraced.length })}
+          {count("docUntracedCount", untraced.length)}
         </p>
       )}
       {notice && (

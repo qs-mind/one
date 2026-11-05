@@ -3,7 +3,7 @@
 // (Plan 6 not merged yet) it always shows the poster.
 import type { Node, NodeProps } from "@xyflow/react";
 import { useCallback } from "react";
-import { fill, pick, t, useLanguage } from "../../i18n";
+import { count, fill, pick, t, useLanguage } from "../../i18n";
 import { viewerFor } from "../sources";
 import type { DeliverableInfo, FrameKey, ViewerHandle } from "../types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type DeliverableData } from "./Frame";
@@ -26,7 +26,7 @@ function CommentsPin({ n }: { n: number }) {
       <svg aria-hidden="true" viewBox="0 0 12 12" className="h-3 w-3 fill-current">
         <path d="M6 0a5 5 0 0 1 5 5c0 3.5-5 7-5 7S1 8.5 1 5a5 5 0 0 1 5-5z" />
       </svg>
-      <bdi>{fill(t("openCommentsCount"), { n })}</bdi>
+      <bdi>{count("openComments", n)}</bdi>
     </span>
   );
 }

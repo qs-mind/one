@@ -6,6 +6,7 @@ import type { FileInfo } from "../canvas/types";
 import { coreLine } from "../core";
 import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
+import { FileName } from "../ui/FileName";
 
 type Hit = {
   chunk_id?: number;
@@ -330,9 +331,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
                 {files.map((file) => (
                   <li key={file.id} className="flex flex-col py-2">
                     <div className="flex items-center justify-between gap-4">
-                      <span dir="auto" className="break-all">
-                        {file.name}
-                      </span>
+                      <FileName name={file.name} className="break-all" />
                       <span className={file.status === "read" ? "text-slate" : "text-copper"}>
                         {pick(statusText[file.status])}
                       </span>
@@ -382,9 +381,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
                   {found.results.map((hit, index) => (
                     <li key={index} className="rounded-md bg-stone px-3 py-2">
                       <div className="flex flex-wrap items-baseline gap-x-3 text-slate">
-                        <span dir="auto" className="font-semibold text-ink">
-                          {hit.file_name}
-                        </span>
+                        <FileName name={hit.file_name} className="font-semibold text-ink" />
                         <span>{where(hit.locator)}</span>
                       </div>
                       <p dir="auto" className="whitespace-pre-wrap">
