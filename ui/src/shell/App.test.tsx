@@ -277,14 +277,15 @@ describe("the open document", () => {
     expect(document.querySelector("[data-deliverable-panel]")).toBeNull(); // no board over the screen any more
   });
 
-  it("a removed document closes: its file replaced on the live stream, or gone from a reload", async () => {
+  it("a replaced file opens its new version; a document gone from a reload closes", async () => {
     setCurrentProject(P1);
     core();
     const sources = fakeSources({ files: [fileA], deliverables: [entry({ id: "dX" })], workspace: { key: "file:fa", anchor: null } });
     render(<App sourcesFor={() => sources} />);
     await waitFor(async () => expect(await head()).toHaveTextContent(fileA.name));
     act(() => sources.emit({ type: "file", file: { ...fileB, replaces: "fa" } }));
-    await waitFor(() => expect(workspaceApi.current()?.key).toBe("files:all"));
+    await waitFor(() => expect(workspaceApi.current()?.key).toBe(`file:${fileB.id}`));
+    await waitFor(async () => expect(await head()).toHaveTextContent(fileB.name));
 
     act(() => workspaceApi.open("deliverable:dX"));
     const reload = vi.spyOn(sources, "deliverables").mockResolvedValue([]);
