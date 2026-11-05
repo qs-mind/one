@@ -211,7 +211,13 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
     // the side the words start on, from their real rects: the right edges for a line that reads right to left
     const rtl = (baseDirection(textOf(last.parts)) ?? dir()) === "rtl";
     const dx = rtl ? from.right - to.right : from.left - to.left;
-    void play(el, [{ transform: `translate(${dx}px, ${from.top - to.top}px)` }, { transform: "none" }], DUR.base);
+    // while it moves it starts outside the log, which would grow the log's scroll area for a moment and flash a
+    // scrollbar; the list clips it until it lands
+    const list = el.parentElement;
+    if (list) list.style.overflow = "clip";
+    void play(el, [{ transform: `translate(${dx}px, ${from.top - to.top}px)` }, { transform: "none" }], DUR.base).finally(() => {
+      if (list) list.style.overflow = "";
+    });
   }, [messages]);
 
   return (

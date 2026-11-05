@@ -61,6 +61,27 @@ describe("sending a message", () => {
     expect(played.find((p) => p.el === bubble)!.keyframes[0]!.transform).toBe("translate(40px, 600px)");
   });
 
+  it("no scrollbar flashes while it moves: the list clips it, and stops clipping when it lands", async () => {
+    let release!: () => void;
+    const landed = new Promise<void>((resolve) => (release = resolve));
+    const played = motion();
+    Element.prototype.animate = vi.fn(function (this: Element, keyframes: Keyframe[]) {
+      played.push({ el: this, keyframes });
+      return { finished: landed, finish() {}, cancel() {} } as unknown as Animation;
+    });
+    layout(new DOMRect(300, 800, 600, 48), new DOMRect(500, 200, 360, 52));
+    core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await box(), "سعّر البند ده{enter}");
+    const bubble = await bubbleOf("سعّر البند ده");
+    await waitFor(() => expect(played.some((p) => p.el === bubble)).toBe(true));
+    const list = bubble.parentElement!;
+    expect(list.style.overflow).toBe("clip");
+    release();
+    await waitFor(() => expect(list.style.overflow).toBe(""));
+  });
+
   it("RF3: the box's real rect, on the side the text starts, never mirrored", async () => {
     const played = motion();
     layout(new DOMRect(300, 800, 600, 48), new DOMRect(500, 200, 360, 52));
