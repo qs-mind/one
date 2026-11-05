@@ -145,18 +145,5 @@ for (const lang of ["ar", "en"] as const) {
     await page.getByRole("button", { name: w.skip, exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(connect).toHaveCount(0);
-
-    // The QS Mind account's routes come with Plan 8 Task 5; until then GET /account answers 404 and the step shows
-    // "Sign in with Google" as for a signed-out engineer. Each such 404 also shows as one console line.
-    let accounts = walk.problems.filter((p) => p === "HTTP 404 GET /api/account").length;
-    const kept = walk.problems.filter((p) => {
-      if (p === "HTTP 404 GET /api/account") return false;
-      if (accounts > 0 && p.startsWith("console error: Failed to load resource: the server responded with a status of 404")) {
-        accounts -= 1;
-        return false;
-      }
-      return true;
-    });
-    walk.problems.splice(0, walk.problems.length, ...kept);
   });
 }
