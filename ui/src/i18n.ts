@@ -716,6 +716,7 @@ export const texts = {
   cardCurrency: { en: "Currency", ar: "العملة" },
   cardCurrencyHelp: { en: "Three capital letters, such as EGP, SAR or AED.", ar: "تلات حروف إنجليزي كابيتال، زي EGP أو SAR أو AED." },
   cardNotSaved: { en: "The card was not saved. Check the currency, then try again.", ar: "البطاقة ماتحفظتش. راجع العملة وجرّب تاني." },
+  cardNotSavedRetry: { en: "The card was not saved. Try again.", ar: "البطاقة ماتحفظتش. جرّب تاني." },
   usageTitle: { en: "Usage Stats", ar: "إحصائيات الاستخدام" },
   usageHelp: {
     en: "Share a few numbers about how One is used, so QS Mind can make it better. You can change this any time in Settings.",

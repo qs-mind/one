@@ -21,7 +21,7 @@ from keyring.errors import KeyringError
 from qsone import copy, settings
 from qsone.backup import keys, store
 from qsone.backup.keys import BackupError, Escrow
-from qsone.records import db, vault
+from qsone.records import db, engineer, vault
 from qsone.records.project import Records, RecordsError
 
 if TYPE_CHECKING:
@@ -230,7 +230,7 @@ class Backups:
             folder = store.target(self.data_dir, pid)
             if not (folder / "records.db").is_file():
                 return None, False
-            return Records.open(folder), True
+            return engineer.open_records(self.data_dir, self.escrow), True
         opened = dict(self.projects.opened())
         if pid in opened:
             return opened[pid], False
@@ -245,7 +245,7 @@ class Backups:
     def _copy(self, pid: str, rec: Records, dest: Path | None) -> int:
         with rec.read() as conn:
             audit_id = conn.execute("SELECT coalesce(max(id), 0) FROM audit").fetchone()[0]
-        key = vault.get_key(pid)
+        key = vault.get_key(rec.key_id)  # the Engineer Records' key has its own id
         if key is None:
             return 0
         doc = self._key_doc(pid, rec, key)
@@ -415,7 +415,7 @@ class Backups:
         rec = None
         try:
             rec, _ = self._records(pid)
-            key = vault.get_key(pid)
+            key = vault.get_key(rec.key_id) if rec is not None else None
             if rec is None or key is None:
                 raise RecordsError(copy.PROJECT_KEY_MISSING)
             doc = self._key_doc(pid, rec, key) or keys.read_doc(home / keys.KEY_FILE) or {}

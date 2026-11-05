@@ -71,24 +71,7 @@ class Projects:
         PROJECT_KEY_MISSING (no Backup key wrap, as for a Confidential Project),
         BACKUP_NEEDS_SIGN_IN (this computer has not got the Backup key), BACKUP_KEY_WRONG."""
         doc = backup_keys.read_doc(folder / backup_keys.KEY_FILE)
-        if doc is None or doc.get("kind") != backup_keys.KIND_KEY:
-            raise RecordsError(copy.PROJECT_KEY_MISSING)
-        wanted = str(doc.get("key_id"))
-        found = backup_keys.known_key(wanted)
-        escrow = self._escrow() if found is None else None
-        if escrow is not None:
-            try:
-                kept = escrow.get()
-            except Exception as e:  # noqa: BLE001 - offline: the engineer is told what is needed
-                log.warning("The Backup key escrow failed (%s)", type(e).__name__)
-                kept = None
-            if kept is not None and backup_keys.key_id(kept) == wanted:
-                found = kept
-                if backup_keys.backup_key() is None:
-                    backup_keys.set_backup_key(kept)
-        if found is None:
-            raise backup_keys.BackupError(copy.BACKUP_NEEDS_SIGN_IN)
-        vault.put_key(folder.name, backup_keys.unwrap(doc, backup_key=found))
+        vault.put_key(folder.name, backup_keys.recover(doc, self._escrow))
         log.warning("PROJECT_KEY_RESTORED %s", folder.name)
 
     def _open_file(self, folder: Path) -> tuple[Records, bool]:

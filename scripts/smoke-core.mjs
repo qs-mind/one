@@ -1,6 +1,6 @@
 // Smoke test of a packaged core: starts `<python> -I -m qsone` the way the release shell does (free port, fresh
 // secret, --exit-with-stdin, a fresh data folder, an environment without any virtual environment or PYTHON*
-// variable), then checks /health within 60 s, /about (version from package.json; 401 without the secret),
+// variable but one that keeps it off the system key store), then checks /health within 60 s, /about (version from package.json; 401 without the secret),
 // /about/native (every native library loads) and that the core exits 0 within 15 s once stdin closes.
 //
 //   node scripts/smoke-core.mjs [<python>]     (default: build/core's Python for this machine)
@@ -13,6 +13,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hostTarget, layout } from "./package-core.mjs";
 import { root } from "./python.mjs";
+
+// Never the engineer's key store: with keyring's "fail" backend the core keeps its keys in keystore.json inside the
+// temporary data folder (core/qsone/keystore.py). On 5 Nov 2026 a smoke run with the real key store wrote over the key
+// of the engineer's own Engineer Records. scripts/keystore-isolation.test.mjs checks every script that starts a core.
+export const ISOLATED_KEYS = { PYTHON_KEYRING_BACKEND: "keyring.backends.fail.Keyring" };
 
 const NATIVE = ["sqlcipher", "sqlite_vec", "pdfium", "tokenizers", "wasmtime", "typst", "keyring_backend", "cryptography"];
 
@@ -53,7 +58,7 @@ export async function smoke(python) {
   const version = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version;
   const base = `http://127.0.0.1:${port}`;
   const auth = { Authorization: `Bearer ${secret}` };
-  const env = { ...cleanEnv(), QSONE_SECRET: secret, QSONE_RELEASE: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONUTF8: "1" };
+  const env = { ...cleanEnv(), ...ISOLATED_KEYS, QSONE_SECRET: secret, QSONE_RELEASE: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONUTF8: "1" };
   const started = Date.now();
   const child = spawn(python, ["-I", "-X", "utf8", "-B", "-m", "qsone", "--port", String(port), "--exit-with-stdin", "--data-dir", data], {
     cwd: data, // never the repository, so nothing can come from core/qsone

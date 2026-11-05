@@ -37,9 +37,10 @@ def utc_now() -> str:
 class Records:
     """An open project. One connection, serialised by a lock. Close it when done."""
 
-    def __init__(self, folder: Path, conn: db.Connection):
+    def __init__(self, folder: Path, conn: db.Connection, key_id: str | None = None):
         self.id = folder.name
         self.folder = folder
+        self.key_id = key_id or folder.name  # the key's id in the key store (`vault`)
         self.clock: Callable[[], str] = utc_now
         self._conn: db.Connection | None = conn
         self._lock = threading.RLock()
@@ -47,22 +48,40 @@ class Records:
         self.archived_at: str | None = None  # meta.archived_at, read at open (Plan 8)
 
     @classmethod
-    def create(cls, folder: Path, *, name: str, actor: str) -> "Records":
-        """Makes a new project in `folder`, which must not exist yet.
+    def create(
+        cls,
+        folder: Path,
+        *,
+        name: str,
+        actor: str,
+        key_id: str | None = None,
+        meta: dict[str, str] | None = None,
+    ) -> "Records":
+        """Makes a new project in `folder`, which must not exist yet. The Engineer Records pass
+        their own `key_id` and `meta`, and may reuse their folder (`records/engineer.py`).
 
-        Raises `KeyringError` when the key store is down; then nothing exists. On any other
-        failure the folder and the key are removed before the error is raised."""
-        if folder.exists():
+        Raises `KeyringError` when the key store is down; then nothing new exists. On any other
+        failure what this made (the folder, or only the file in a folder that was there) and the
+        key are removed before the error is raised."""
+        if folder.exists() and (key_id is None or (folder / FILE_NAME).exists()):
             raise FileExistsError(folder)
         project_id = folder.name
-        key = vault.create_key(project_id)
+        key_id = key_id or project_id
+        made = not folder.exists()
+        key = vault.create_key(key_id)
         rec = None
         try:
-            folder.mkdir(parents=True)
-            rec = cls(folder, db.connect(folder / FILE_NAME, key))
+            folder.mkdir(parents=True, exist_ok=True)
+            rec = cls(folder, db.connect(folder / FILE_NAME, key), key_id)
             rec._migrate()
             at = rec.clock()
-            meta = {"project_id": project_id, "name": name, "created_at": at, "created_by": actor}
+            meta = {
+                "project_id": project_id,
+                "name": name,
+                "created_at": at,
+                "created_by": actor,
+                **(meta or {}),
+            }
             with rec.write(actor) as conn:
                 for k, v in meta.items():
                     rec.set_meta(conn, k, v)
@@ -79,26 +98,38 @@ class Records:
         except BaseException:
             if rec is not None:
                 rec.close()
-            shutil.rmtree(folder, ignore_errors=True)
+            if made:
+                shutil.rmtree(folder, ignore_errors=True)
+            else:
+                for side in ("", "-wal", "-shm", "-journal"):
+                    with suppress(OSError):
+                        (folder / f"{FILE_NAME}{side}").unlink(missing_ok=True)
             with suppress(KeyringError):
-                vault.delete_key(project_id)
+                vault.delete_key(key_id)
             raise
         return rec
 
     @classmethod
-    def open(cls, folder: Path) -> "Records":
-        """Raises `RecordsError`: NOT_FOUND, KEY_STORE_DOWN, KEY_MISSING, DAMAGED or TOO_NEW."""
+    def open(
+        cls, folder: Path, *, key_id: str | None = None, key: bytes | None = None
+    ) -> "Records":
+        """Opens with the key kept under `key_id` (the folder's name by default), or with `key`
+        when it is given (then the key store is not read).
+
+        Raises `RecordsError`: NOT_FOUND, KEY_STORE_DOWN, KEY_MISSING, DAMAGED or TOO_NEW."""
         path = folder / FILE_NAME
         if not path.is_file():
             raise RecordsError(copy.PROJECT_NOT_FOUND, status=404)
-        try:
-            key = vault.get_key(folder.name)
-        except KeyringError:
-            raise RecordsError(copy.PROJECT_KEY_STORE_DOWN, status=503) from None
+        key_id = key_id or folder.name
+        if key is None:
+            try:
+                key = vault.get_key(key_id)
+            except KeyringError:
+                raise RecordsError(copy.PROJECT_KEY_STORE_DOWN, status=503) from None
         if key is None:
             raise RecordsError(copy.PROJECT_KEY_MISSING)
         try:
-            rec = cls(folder, db.connect(path, key))
+            rec = cls(folder, db.connect(path, key), key_id)
         except db.DatabaseError as e:
             raise RecordsError(copy.PROJECT_DAMAGED) from e
         try:

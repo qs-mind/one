@@ -1240,9 +1240,14 @@ class Engine:
 
     def _ready(self) -> None:
         if self._general is None or not self._general.is_open:
-            self._general = general.open_engineer_records(self.data_dir)
+            self._general = general.open_engineer_records(self.data_dir, self._escrow)
             self.book = CostBook(self._general)
             self.spending = Spending(self.book, clock=self.clock)
+
+    def _escrow(self):
+        """The account's Backup key escrow, asked only when a lost key is looked for."""
+        backups = getattr(self.projects, "backups", None)
+        return backups.escrow() if backups is not None else None
 
     def engineer_records(self) -> Records:
         """The open Engineer Records file (Plan 5's tools use it). Raises `RecordsError` when
@@ -1260,8 +1265,8 @@ class Engine:
         not open leaves the app up: each Brief then answers why, in plain words."""
         try:
             self._ready()
-        except RecordsError:
-            log.warning("The Engineer Records file did not open")
+        except (RecordsError, OSError) as e:  # the core starts anyway
+            log.warning("The Engineer Records file did not open (%s)", type(e).__name__)
 
     async def _cancel(self, mode: str) -> int:
         briefs = [b for b in self._briefs.values() if b.task is not None and not b.finished]
