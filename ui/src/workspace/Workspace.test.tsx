@@ -10,9 +10,10 @@ import { setLanguage, texts } from "../i18n";
 import { fakeSources } from "../project/fake";
 import { currentSelection, select } from "../project/selection";
 import type { ViewerProps } from "../project/types";
-import { setCurrentProject } from "../records/project";
+import { setCurrentProject, switchProject } from "../records/project";
+import { leaveProject } from "../records/ProjectPicker";
 import { App } from "../shell/App";
-import { core, P1 } from "../shell/testing";
+import { core, P1, P2 } from "../shell/testing";
 import { importInto } from "../import/importer";
 import { workspaceApi } from "./api";
 import { markFor, openSourceFile } from "./reveal";
@@ -302,5 +303,73 @@ describe("dropping on the open document", () => {
     const transfer = { types: ["Files"], files: [new File(["a"], "أ - عينة.csv")], items: [] };
     expect(fireEvent.dragOver(chat, { dataTransfer: transfer })).toBe(false);
     expect(fireEvent.drop(chat, { dataTransfer: transfer })).toBe(false);
+  });
+});
+
+describe("the project keeps its open document", () => {
+  /** Sources whose saves the test answers, each step written down in order with the core's close. */
+  function ordered(order: string[]) {
+    const base = fakeSources({ deliverables: [A, B], workspace: { key: "deliverable:dA", anchor: null } });
+    const answers: (() => void)[] = [];
+    const sources = {
+      ...base,
+      saveWorkspace: (opened: { key: string }) =>
+        new Promise<void>((resolve) => {
+          order.push(`save ${opened.key}`);
+          answers.push(() => {
+            order.push(`saved ${opened.key}`);
+            resolve();
+          });
+        }),
+    };
+    return { sources, answer: () => answers.shift()?.() };
+  }
+  const closing = (order: string[], id: string) => ({
+    [`POST /api/projects/${id}/close`]: () => {
+      order.push(`close ${id}`);
+      return Response.json({ ok: true });
+    },
+  });
+
+  it("switching project sends the last document opened before the core closes the project", async () => {
+    const order: string[] = [];
+    const { sources, answer } = ordered(order);
+    setCurrentProject(P1);
+    core({ routes: closing(order, "p1") });
+    render(<App sourcesFor={(id) => (id === "p1" ? sources : fakeSources({}))} />);
+    await screen.findByTestId("viewer-dA");
+    act(() => workspaceApi.open("deliverable:dB")); // within the 500 ms: not sent yet
+    act(() => switchProject(P2));
+    await waitFor(() => expect(order).toEqual(["save deliverable:dB"]));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(order).toEqual(["save deliverable:dB"]); // the close waits for the core's answer
+    answer();
+    await waitFor(() => expect(order).toEqual(["save deliverable:dB", "saved deliverable:dB", "close p1"]));
+  });
+
+  it("going to the General chat does the same", async () => {
+    const order: string[] = [];
+    const { sources, answer } = ordered(order);
+    setCurrentProject(P1);
+    core({ routes: closing(order, "p1") });
+    render(<App sourcesFor={() => sources} />);
+    await screen.findByTestId("viewer-dA");
+    act(() => workspaceApi.open("deliverable:dB"));
+    act(() => leaveProject());
+    await waitFor(() => expect(order).toEqual(["save deliverable:dB"]));
+    answer();
+    await waitFor(() => expect(order).toEqual(["save deliverable:dB", "saved deliverable:dB", "close p1"]));
+  });
+
+  it("a row selected in the open document is saved, as an opening is", async () => {
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({ deliverables: [A], workspace: { key: "deliverable:dA", anchor: null } });
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => sources} />);
+    await user.click(await screen.findByRole("button", { name: "select rows" }));
+    await waitFor(() => expect(sources.saved.workspace.at(-1)?.opened).toEqual({ key: "deliverable:dA", anchor: { row: "3/02" } }), {
+      timeout: 1500,
+    });
   });
 });

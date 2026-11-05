@@ -6,8 +6,9 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { DeliverableInfo } from "../deliverables/types";
 import { fill, t } from "../i18n";
 import { startActivity } from "../project/live/activity";
+import { beforeClose } from "../records/project";
 import type { ClientBoqInfo, DeskInfo, DocKey, FileInfo, ProjectSources } from "../project/types";
-import { subscribeOpened, workspaceApi } from "./api";
+import { subscribeMoved, subscribeOpened, workspaceApi } from "./api";
 import { createWorkspaceSaver } from "./persist";
 
 export type Documents = {
@@ -79,11 +80,14 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
     const saver = createWorkspaceSaver(sources);
     let lists: Lists | null = null; // null until read: the restore below saves nothing
 
-    const offOpened = subscribeOpened(() => {
+    const changed = () => {
       const opened = workspaceApi.current();
       if (lists && opened) saver.save(opened);
-    });
-    const onHide = () => saver.flush(true);
+    };
+    const offOpened = subscribeOpened(changed);
+    const offMoved = subscribeMoved(changed); // a row selected, a page turned: saved as an opening is
+    const offClose = beforeClose(() => saver.flush()); // the core closes the project only after this save
+    const onHide = () => void saver.flush(true);
     window.addEventListener("pagehide", onHide);
 
     const show = (next: Lists) => {
@@ -130,8 +134,10 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
     return () => {
       controller.abort();
       offOpened();
+      offMoved();
+      offClose();
       window.removeEventListener("pagehide", onHide);
-      saver.flush();
+      void saver.flush();
     };
   }, [sources]);
 

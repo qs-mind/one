@@ -5,6 +5,7 @@ import type { Anchor, DocKey, Opened } from "../project/types";
 import { createHistory } from "./history";
 
 const listeners = new Set<() => void>();
+const moves = new Set<() => void>(); // the place in the open document moved: saved, nothing re-renders
 const history = createHistory();
 const home: DocKey = "files:all";
 let current: Opened | null = null;
@@ -31,10 +32,12 @@ export const workspaceApi = {
   current(): Opened | null {
     return current;
   },
-  /** The place in the open document moved (the engineer selected there): Back comes back to it. Not a step of its
-   * own, and nothing re-renders or scrolls for it. */
+  /** The place in the open document moved (the engineer selected there, paged a file): Back comes back to it, and
+   * the project keeps it. Not a step of its own, and nothing re-renders or scrolls for it. */
   at(anchor: Anchor) {
-    if (current) current.anchor = anchor;
+    if (!current) return;
+    current.anchor = anchor;
+    for (const listener of [...moves]) listener();
   },
   /** On project open: the saved document, or Project files when there is none or it is gone. Clears the history. */
   reset(opened: Opened | null, check: (key: DocKey) => boolean) {
@@ -52,6 +55,12 @@ export const workspaceApi = {
 export function subscribeOpened(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/** Told when the place in the open document moves (`at`), for the saver. */
+export function subscribeMoved(listener: () => void): () => void {
+  moves.add(listener);
+  return () => moves.delete(listener);
 }
 
 /** Re-renders the component when the open document changes. */
