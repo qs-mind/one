@@ -24,7 +24,8 @@ export type DocumentViewerProps = {
   /** Pending changes and comment threads, as the core lists them. */
   changes?: Change[];
   comments?: Thread[];
-  mode?: "frame" | "full";
+  /** "workspace" is "full" without its title shown: the workspace names the open document. */
+  mode?: "frame" | "full" | "workspace";
   /** An older version or a Revision: shown, not edited. */
   readOnly?: boolean;
   /** After a change is sent, accepted or rejected: the owner refetches the view and the changes. */
@@ -177,7 +178,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
   const onSelectText = useCallback((anchor: TextAnchor | null) => onSelection.current?.(anchor), []);
 
   const untraced = view.untraced;
-  const full = props.mode === "full";
+  const full = props.mode === "full" || props.mode === "workspace";
   return (
     <div
       ref={root}
@@ -188,7 +189,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
         {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
-        <h2 dir="auto" className={full ? "text-lg font-semibold" : "sr-only"}>
+        <h2 dir="auto" className={props.mode === "full" ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
         <StatusChips view={view} status={props.mode !== "frame"} />

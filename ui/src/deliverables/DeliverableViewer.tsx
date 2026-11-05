@@ -1,7 +1,8 @@
 // One Deliverable, as the viewer registry gives it to the canvas and the chat's side panel. It loads its own data
 // and loads it again when the project's live stream says the Deliverable changed. In `mode="frame"` it is the
 // Sheet or Document viewer only, filling its container; in `mode="full"` it is the review board: the viewer, then
-// Changes, Comments, Versions and Close-out, with the exports. Everything it draws stays inside its own box.
+// Changes, Comments, Versions and Close-out, with the exports; `mode="workspace"` is the same board as the open
+// document of the workspace, which names the document itself. Everything it draws stays inside its own box.
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Anchor, ViewerProps } from "../project/types";
 import { fill, language, pick, t, useLanguage } from "../i18n";
@@ -92,7 +93,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
 
   // The board finds the Sheet's newest Fill Plan, and looks again each time the Deliverable is loaded (a plan the
   // Lead QS saves is announced on the live stream).
-  const findPlan = mode === "full" && view?.kind === "sheet" && props.fillPlanId === undefined;
+  const findPlan = mode !== "frame" && view?.kind === "sheet" && props.fillPlanId === undefined;
   useEffect(() => {
     if (!findPlan) return;
     let live = true;
@@ -174,7 +175,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         onSelection={onSheetSelection}
         onToggleFullScreen={props.onToggleFullScreen}
         fullScreen={props.fullScreen}
-        review={mode === "full" ? { active: tab === "changes" && !fillOpen && view.pending > 0, current } : undefined}
+        review={mode !== "frame" ? { active: tab === "changes" && !fillOpen && view.pending > 0, current } : undefined}
         onAccepted={accepted}
         onRejected={rejected}
       />
@@ -233,11 +234,11 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
       {/* full: a Sheet is as tall as its rows, up to 60%, and the review panels take the rest; a Document keeps 3/5 */}
       <div
         ref={body}
-        className={mode !== "full" ? "min-h-0 flex-1" : view.kind === "sheet" ? "flex min-h-0 max-h-[60%] flex-[0_1_auto] flex-col" : "min-h-0 flex-[3_1_0%]"}
+        className={mode === "frame" ? "min-h-0 flex-1" : view.kind === "sheet" ? "flex min-h-0 max-h-[60%] flex-[0_1_auto] flex-col" : "min-h-0 flex-[3_1_0%]"}
       >
         {viewer}
       </div>
-      {mode === "full" && (
+      {mode !== "frame" && (
         <div className="flex min-h-0 flex-[2_1_0%] flex-col bg-stone/50">
           <div className="flex flex-wrap items-center gap-3 px-5 pb-1 pt-3">
             <div role="tablist" aria-label={t("reviewPanels")} className="relative flex flex-wrap gap-1">
@@ -315,7 +316,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
           </div>
         </div>
       )}
-      {mode !== "full" && undoLine && (
+      {mode === "frame" && undoLine && (
         // in a frame, under the sheet: a decision made in a cell is taken back from there
         <div data-frame-undo className="absolute inset-x-0 bottom-0 z-10 border-t border-stone bg-paper px-4 pt-2">
           {undoLine}

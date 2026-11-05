@@ -606,6 +606,8 @@ export const texts = {
   clientBoqTitle: { en: "Client BOQ — {name}", ar: "مقايسة العميل — {name}" },
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
+  // The workspace's open document (workspace Task 5)
+  noViewer: { en: "No view for this kind yet", ar: "لسه مافيش عرض للنوع ده" },
   sourceOpenFile: { en: "Open source", ar: "افتح المصدر" },
   sourceNotMarked: {
     en: "Opened at its page. The exact place on the page isn't stored, so nothing is marked.",

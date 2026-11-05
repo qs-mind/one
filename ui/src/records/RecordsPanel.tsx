@@ -8,6 +8,7 @@ import { coreLine } from "../core";
 import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
 import { FileName } from "../ui/FileName";
+import { workspaceApi } from "../workspace/api";
 
 type Hit = {
   chunk_id?: number;
@@ -153,8 +154,15 @@ export async function uploadFile(
   return { ok: false, line: await coreLine(response, texts.fileNotAdded) };
 }
 
-export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; onPickProject: () => void }) {
+/** `layout="document"`: Project files as the workspace's open document, with no panel chrome (the workspace names
+ * it); a file opens there. */
+type RecordsPanelProps =
+  | { layout?: "panel"; onClose: () => void; onPickProject: () => void }
+  | { layout: "document"; onClose?: undefined; onPickProject?: () => void };
+
+export function RecordsPanel({ layout = "panel", onClose, onPickProject }: RecordsPanelProps) {
   useLanguage();
+  const asDocument = layout === "document";
   const title = useId();
   const project = useProject();
   const chooser = useRef<HTMLInputElement>(null);
@@ -250,30 +258,35 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
 
   return (
     <section
-      aria-labelledby={title}
+      aria-labelledby={asDocument ? undefined : title}
+      aria-label={asDocument ? t("records") : undefined}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault(); // the window must not open the file itself
         void add(Array.from(event.dataTransfer.files));
       }}
-      className="border-b border-stone px-4 py-4"
+      className={asDocument ? "h-full overflow-auto bg-paper px-5 py-4 text-ink" : "border-b border-stone px-4 py-4"}
     >
-      <div className="mx-auto flex max-w-2xl flex-col gap-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id={title} className="font-semibold">
-            {t("records")}
-          </h2>
-          <button type="button" onClick={onClose} className="text-slate hover:text-ink">
-            {t("close")}
-          </button>
-        </div>
+      <div className={asDocument ? "flex flex-col gap-3" : "mx-auto flex max-w-2xl flex-col gap-3"}>
+        {!asDocument && (
+          <div className="flex items-center justify-between gap-4">
+            <h2 id={title} className="font-semibold">
+              {t("records")}
+            </h2>
+            <button type="button" onClick={onClose} className="text-slate hover:text-ink">
+              {t("close")}
+            </button>
+          </div>
+        )}
 
         {!project ? (
           <div className="flex items-center gap-3">
             <p>{t("pickProjectFirst")}</p>
-            <button type="button" onClick={onPickProject} className="rounded-md border border-ink px-4 py-2">
-              {t("projects")}
-            </button>
+            {onPickProject && (
+              <button type="button" onClick={onPickProject} className="rounded-md border border-ink px-4 py-2">
+                {t("projects")}
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -329,19 +342,40 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
             {files?.length === 0 && <p className="text-slate">{t("noFiles")}</p>}
             {files && files.length > 0 && (
               <ul className="flex flex-col divide-y divide-stone">
-                {files.map((file) => (
-                  <li key={file.id} className="flex flex-col py-2">
-                    <div className="flex items-center justify-between gap-4">
-                      <FileName name={file.name} fit />
-                      <span className={`shrink-0 ${file.status === "read" ? "text-slate" : "text-copper"}`}>
-                        {pick(statusText[file.status])}
-                      </span>
-                    </div>
-                    {file.note && <p className="text-slate">{pick(file.note)}</p>}
-                    {file.duplicate && <p className="text-slate">{t("fileDuplicate")}</p>}
-                    {(file.flags ?? 0) > 0 && <HiddenText projectId={project.id} fileId={file.id} />}
-                  </li>
-                ))}
+                {files.map((file) => {
+                  // in a button (the document), only phrasing elements
+                  const Line = asDocument ? "span" : "div";
+                  const Note = asDocument ? "span" : "p";
+                  const line = (
+                    <>
+                      <Line className={`flex items-center justify-between gap-4${asDocument ? " w-full" : ""}`}>
+                        <FileName name={file.name} fit />
+                        <span className={`shrink-0 ${file.status === "read" ? "text-slate" : "text-copper"}`}>
+                          {pick(statusText[file.status])}
+                        </span>
+                      </Line>
+                      {file.note && <Note className="text-slate">{pick(file.note)}</Note>}
+                      {file.duplicate && <Note className="text-slate">{t("fileDuplicate")}</Note>}
+                    </>
+                  );
+                  return (
+                    <li key={file.id} className="flex flex-col py-2">
+                      {asDocument ? (
+                        // the file opens as the workspace's document
+                        <button
+                          type="button"
+                          onClick={() => workspaceApi.open(`file:${file.id}`)}
+                          className="flex w-full flex-col items-start rounded-[10px] text-start hover:bg-stone/60 focus-visible:outline-2 focus-visible:outline-ink"
+                        >
+                          {line}
+                        </button>
+                      ) : (
+                        line
+                      )}
+                      {(file.flags ?? 0) > 0 && <HiddenText projectId={project.id} fileId={file.id} />}
+                    </li>
+                  );
+                })}
               </ul>
             )}
 

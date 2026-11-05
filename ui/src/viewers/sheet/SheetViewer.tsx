@@ -32,7 +32,8 @@ export type SheetViewerProps = {
   /** Pending changes and comment threads, as the core lists them. */
   changes?: Change[];
   comments?: Thread[];
-  mode?: "frame" | "full";
+  /** "workspace" is "full" without its title shown: the workspace names the open document. */
+  mode?: "frame" | "full" | "workspace";
   /** After a change is sent, accepted or rejected: the owner refetches the view and the changes. */
   onChanged?: () => void;
   onSelection?: (range: SheetRange | null) => void;
@@ -87,7 +88,7 @@ export function SheetViewer(props: SheetViewerProps) {
   const root = useRef<HTMLDivElement>(null);
   const grid = useRef<GridHandle>(null);
 
-  const full = props.mode === "full";
+  const full = props.mode === "full" || props.mode === "workspace";
   // In full mode the sheet fills the board's width: the room the columns leave goes to the description, so no empty
   // band sits beside the last column (the rows then need fewer lines). In a frame the columns keep their widths.
   const gridBox = useRef<HTMLDivElement>(null);
@@ -387,7 +388,7 @@ export function SheetViewer(props: SheetViewerProps) {
     >
       <header className={shown ? "flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3" : "sr-only"}>
         {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
-        <h2 dir="auto" className={full ? "text-lg font-semibold" : "sr-only"}>
+        <h2 dir="auto" className={props.mode === "full" ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
         {readOnly ? (

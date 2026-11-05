@@ -2,15 +2,11 @@
 // nothing editable; each number opens its source (the client's file, sheet, row and cell) and the jump to that
 // file's frame. Otherwise it shows a poster. It reloads when the file is imported again. It is not a Deliverable.
 import type { Node, NodeProps } from "@xyflow/react";
-import { useEffect, useState } from "react";
-import type { SheetView } from "../../deliverables/types";
-import { count, pick, t, texts, useLanguage, type Text } from "../../i18n";
+import { count, pick, t, useLanguage } from "../../i18n";
 import { SheetViewer } from "../../viewers/sheet/SheetViewer";
-import { SourceError } from "../../project/sources";
 import type { FrameKey } from "../../project/types";
+import { useClientBoq } from "../../workspace/docs/ClientBoqDoc";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type ClientBoqData } from "./Frame";
-
-type Loaded = { view: SheetView } | { failed: Text } | null;
 
 function ClientBoqFrameView(props: NodeProps<Node<ClientBoqData, "clientboq">>) {
   useLanguage();
@@ -18,20 +14,8 @@ function ClientBoqFrameView(props: NodeProps<Node<ClientBoqData, "clientboq">>) 
   const detail = useDetail();
   const { boq, collapsed } = props.data;
   const live = detail === "live" && !collapsed;
-  const [loaded, setLoaded] = useState<Loaded>(null);
+  const loaded = useClientBoq(sources, boq.file_id, boq.at, live);
   const title = frameTitle({ type: "clientboq", data: props.data });
-
-  useEffect(() => {
-    if (!live) return;
-    let current = true;
-    sources.clientBoq(boq.file_id).then(
-      (view) => current && setLoaded({ view }),
-      (error) => current && setLoaded({ failed: error instanceof SourceError ? error.line : texts.canvasFailed }),
-    );
-    return () => {
-      current = false;
-    };
-  }, [live, sources, boq.file_id, boq.at]);
 
   const view = loaded && "view" in loaded ? loaded.view : null;
   return (
