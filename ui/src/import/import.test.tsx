@@ -76,10 +76,12 @@ describe("the I understood this card", () => {
     render(<UnderstoodCard projectId="p1" />);
     expect(await screen.findByText("هيئة - عينة")).toBeInTheDocument();
     // each file's name isolated on one line, its extension whole, then the place in it
-    const source = (name: string) => screen.getAllByTitle(name)[0]!.parentElement!;
+    // a file's name is isolated in its own <bdi data-file-name>, its full name in a Tip only when cut
+    const source = (name: string) =>
+      [...document.querySelectorAll("[data-file-name]")].find((el) => el.textContent === name)!.closest("span.flex")!;
     expect(source("خطاب الدعوة - عينة.pdf")).toHaveTextContent(/^خطاب الدعوة - عينة\.pdf, page 3$/);
     expect(source("BOQ - عينة.xlsx")).toHaveTextContent(/^BOQ - عينة\.xlsx, BOQ, row 2$/);
-    expect(screen.getAllByTitle("BOQ - عينة.xlsx")[0]!.querySelector('bdi[dir="ltr"]')).toHaveTextContent(".xlsx");
+    expect(source("BOQ - عينة.xlsx").querySelector('bdi[dir="ltr"], [data-file-name]')).toHaveTextContent(".xlsx");
     expect(screen.getByText(texts.factSourceCount.en)).toBeInTheDocument();
     expect(screen.getByText(texts.understoodNotFound.en)).toBeInTheDocument(); // the contract type: no file states it
     expect(screen.getByText("تقرير التربة - عينة")).toBeInTheDocument();

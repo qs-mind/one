@@ -50,6 +50,7 @@ from pydantic_ai.exceptions import (
     ModelRequestTimeout,
     ModelServerError,
     ModelUnavailableError,
+    UnexpectedModelBehavior,
 )
 from pydantic_ai.messages import (
     ModelMessagesTypeAdapter,
@@ -353,7 +354,8 @@ def _error_kind(error: BaseException) -> str | None:
         | openai.InternalServerError,
     ) or (isinstance(status, int) and (status == 429 or status >= 500)):
         return "busy"
-    if isinstance(error, ModelAPIError | anthropic.APIError | openai.APIError):
+    # an empty or malformed reply, or retries used up, is the model's doing, not ONE's
+    if isinstance(error, ModelAPIError | UnexpectedModelBehavior | anthropic.APIError | openai.APIError):
         return "other"
     return None
 
