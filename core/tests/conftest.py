@@ -218,6 +218,67 @@ def serve_app():
         thread.join(timeout=10)
 
 
+# ---------------------------------------------------------------------------------------------
+# Journey and release (Plan 8): the account, Umami, the browser and scrypt.
+# ---------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def no_browser(monkeypatch):
+    """Every test: `webbrowser.open` records the URL instead of opening a browser."""
+    import webbrowser
+
+    opened: list[str] = []
+
+    def record(url, *args, **kwargs) -> bool:
+        opened.append(url)
+        return True
+
+    for name in ("open", "open_new", "open_new_tab"):
+        monkeypatch.setattr(webbrowser, name, record)
+    return opened
+
+
+@pytest.fixture(autouse=True)
+def fast_scrypt(monkeypatch):
+    """Every test: `hashlib.scrypt` runs with n at most 2**10, so a recovery code costs
+    milliseconds. Code that calls `hashlib.scrypt(...)` through the module gets it."""
+    import hashlib
+
+    real = hashlib.scrypt
+
+    def scrypt(password, *, salt, n, r, p, maxmem=0, dklen=64):
+        return real(password, salt=salt, n=min(n, 2**10), r=r, p=p, maxmem=maxmem, dklen=dklen)
+
+    monkeypatch.setattr(hashlib, "scrypt", scrypt)
+
+
+@pytest.fixture
+def fake_account(monkeypatch, no_browser):
+    """The QS Mind account on 127.0.0.1 (`tests.fakes.FakeAccount`); the core finds it through
+    QSONE_AUTH_ISSUER and QSONE_AUTH_CLIENT_ID."""
+    from tests.fakes import FakeAccount
+
+    account = FakeAccount(opened=no_browser)
+    account.start()
+    monkeypatch.setenv("QSONE_AUTH_ISSUER", account.issuer)
+    monkeypatch.setenv("QSONE_AUTH_CLIENT_ID", account.client_id)
+    yield account
+    account.stop()
+
+
+@pytest.fixture
+def fake_umami(monkeypatch):
+    """Umami's /api/send on 127.0.0.1 (`tests.fakes.FakeUmami`), at QSONE_USAGE_ENDPOINT."""
+    from tests.fakes import FakeUmami
+
+    umami = FakeUmami()
+    umami.start()
+    monkeypatch.setenv("QSONE_USAGE_ENDPOINT", umami.endpoint)
+    yield umami
+    umami.stop()
+
+
 @pytest.fixture
 def fake_claude_path() -> Path:
     """The stand-in `claude`. Run it as `engine_fakes.fake_claude_command()`."""

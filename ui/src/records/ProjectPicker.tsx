@@ -1,6 +1,7 @@
 // Pick the project to work in, or create one, or go to the General chat outside every project. The core lists
 // every project on this computer, newest first; one it cannot read is listed with the reason, never hidden.
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { api } from "../api";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 import { coreLine } from "../core";
 import { currentProject, type Project, setCurrentProject, switchProject, useProject } from "./project";
@@ -12,7 +13,7 @@ type List = { state: "loading" } | { state: "ready"; projects: Listed[] } | { st
 export function leaveProject() {
   const before = currentProject();
   setCurrentProject(undefined);
-  if (before) void fetch(`/api/projects/${before.id}/close`, { method: "POST" }).catch(() => undefined);
+  if (before) void api(`/projects/${before.id}/close`, { method: "POST" }).catch(() => undefined);
 }
 
 export function ProjectPicker({ onClose }: { onClose: () => void }) {
@@ -28,7 +29,7 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
 
   const load = useCallback(async () => {
     setList({ state: "loading" });
-    const response = await fetch("/api/projects").catch(() => undefined);
+    const response = await api("/projects").catch(() => undefined);
     if (response?.ok)
       setList({ state: "ready", projects: ((await response.json()) as { projects: Listed[] }).projects });
     else setList({ state: "failed", line: await coreLine(response, texts.projectsFailed) });
@@ -63,7 +64,7 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setFailed(undefined);
     await done(
-      await fetch(`/api/projects/${id}/open`, { method: "POST" }).catch(() => undefined),
+      await api(`/projects/${id}/open`, { method: "POST" }).catch(() => undefined),
       texts.projectNotOpened,
     );
   }
@@ -74,7 +75,7 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
     if (!trimmed) return;
     setBusy(true);
     setFailed(undefined);
-    const response = await fetch("/api/projects", {
+    const response = await api("/projects", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: trimmed }),

@@ -1,6 +1,7 @@
 // AI settings: the AI Connectors (the Claude key, Standard Links, the engineer's own Claude Code), which model does
 // each job, prices One does not know, and the Spending Caps. The engineer picks every model; nothing here is fixed.
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { api } from "../api";
 import { coreLine, send } from "../core";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AiKey } from "./AiKey";
@@ -52,7 +53,7 @@ export function useAiSettings() {
 
   const load = useCallback(async () => {
     setLoaded((now) => (now.state === "ready" ? now : { state: "loading" })); // a reload keeps what is shown
-    const response = await fetch("/api/settings/ai").catch(() => undefined);
+    const response = await api("/settings/ai").catch(() => undefined);
     const settings = response?.ok ? ((await response.json().catch(() => undefined)) as Settings | undefined) : undefined;
     setLoaded(settings ? { state: "ready", settings } : { state: "failed" });
   }, []);
@@ -157,7 +158,7 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
     setSaving(true);
     setFailed(undefined);
     const body = { name: name.trim(), base_url: baseUrl.trim(), ...(key.trim() ? { key: key.trim() } : {}) };
-    const response = await send("/api/settings/ai/standard", "POST", body);
+    const response = await send("/settings/ai/standard", "POST", body);
     setSaving(false);
     setKey(""); // the key is sent once and never kept on the page, whatever the answer
     if (response?.ok) {
@@ -172,7 +173,7 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
 
   async function remove(id: string) {
     setFailed(undefined);
-    const response = await send(`/api/settings/ai/standard/${encodeURIComponent(id)}`, "DELETE");
+    const response = await send(`/settings/ai/standard/${encodeURIComponent(id)}`, "DELETE");
     if (response?.ok) onChanged();
     else setFailed(await coreLine(response, texts.removeFailed));
   }
@@ -268,7 +269,7 @@ function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; on
 
   async function save(nextOn: boolean): Promise<boolean> {
     setFailed(undefined);
-    const response = await send("/api/settings/ai/claude-code", "PUT", { path: path.trim() || null, on: nextOn });
+    const response = await send("/settings/ai/claude-code", "PUT", { path: path.trim() || null, on: nextOn });
     if (!response?.ok) setFailed(await coreLine(response, texts.claudeCodeNotSaved));
     return response?.ok === true;
   }
@@ -276,7 +277,7 @@ function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; on
   async function check() {
     setStatus("checking");
     if (path.trim() && !(await save(on))) return setStatus(undefined); // check the file the engineer picked
-    const response = await fetch("/api/settings/ai/claude-code").catch(() => undefined);
+    const response = await api("/settings/ai/claude-code").catch(() => undefined);
     if (response?.ok) setStatus((await response.json()) as ClaudeCodeStatus);
     else setStatus(await coreLine(response, texts.claudeCodeCheckFailed));
   }
@@ -339,7 +340,7 @@ function RoleModels({ settings, onSaved }: { settings: Settings; onSaved: (roles
     const next = { ...roles, [role]: { connector: card.connector, model: card.model } };
     setSaving(true);
     setFailed(undefined);
-    const response = await send("/api/settings/ai/roles", "PUT", next);
+    const response = await send("/settings/ai/roles", "PUT", next);
     setSaving(false);
     if (response?.ok) onSaved(((await response.json().catch(() => undefined)) as Roles | undefined) ?? next);
     else setFailed(await coreLine(response, texts.roleNotSaved));
@@ -401,7 +402,7 @@ function PriceForm({ sheet, onSaved }: { sheet: ModelCard[]; onSaved: () => void
     event.preventDefault();
     setFailed(undefined);
     const body = { connector: card.connector, model: card.model, in: priceIn.trim(), out: priceOut.trim() };
-    const response = await send("/api/settings/ai/prices", "PUT", body);
+    const response = await send("/settings/ai/prices", "PUT", body);
     if (response?.ok) {
       setPriceIn("");
       setPriceOut("");
@@ -508,7 +509,7 @@ export function CapsForm({ onSaved }: { onSaved?: () => void }) {
 
   useEffect(() => {
     let live = true;
-    fetch("/api/settings/ai/caps")
+    api("/settings/ai/caps")
       .then((response) => (response.ok ? (response.json() as Promise<CapsAnswer>) : undefined))
       .then((body) => live && body?.caps && shown(body))
       .catch(() => undefined);
@@ -523,7 +524,7 @@ export function CapsForm({ onSaved }: { onSaved?: () => void }) {
     setState("saving");
     setFailed(undefined);
     // only the amounts on this form: whether the subscription stops is not changed here
-    const response = await send("/api/settings/ai/caps", "PUT", caps);
+    const response = await send("/settings/ai/caps", "PUT", caps);
     if (response?.ok) {
       const body = (await response.json().catch(() => undefined)) as CapsAnswer | undefined;
       if (body?.caps) shown(body);

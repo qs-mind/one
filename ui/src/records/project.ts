@@ -1,5 +1,6 @@
 // The project the engineer works in. Built like i18n.ts: one value for the page, remembered by its id only.
 import { useSyncExternalStore } from "react";
+import { api } from "../api";
 
 export type Project = { id: string; name: string; created_at: string };
 
@@ -31,7 +32,7 @@ export function switchProject(next: Project) {
   const before = current;
   setCurrentProject(next);
   if (before && before.id !== next.id) {
-    void fetch(`/api/projects/${before.id}/close`, { method: "POST" }).catch(() => undefined);
+    void api(`/projects/${before.id}/close`, { method: "POST" }).catch(() => undefined);
   }
 }
 
@@ -44,7 +45,7 @@ export async function restoreProject(): Promise<"none" | "opened" | "failed"> {
     return "none";
   }
   if (!id) return "none";
-  const response = await fetch(`/api/projects/${encodeURIComponent(id)}/open`, { method: "POST" }).catch(
+  const response = await api(`/projects/${encodeURIComponent(id)}/open`, { method: "POST" }).catch(
     () => undefined,
   );
   if (response?.ok) {

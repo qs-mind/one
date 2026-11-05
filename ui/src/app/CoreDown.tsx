@@ -1,6 +1,7 @@
 // Before the chat opens, check that the core answers. If it does not, say so in both languages, show where its log
 // is, and offer Retry, so the window is never just blank.
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { api } from "../api";
 import { t, texts, useLanguage } from "../i18n";
 
 // Set by the dev server (scripts/core-dev.ts); the release build gets its own path in a later plan.
@@ -11,7 +12,7 @@ export function HealthGate({ children, logPath = coreLog }: { children: ReactNod
 
   const check = useCallback(async () => {
     setState("checking");
-    const up = await fetch("/api/health")
+    const up = await api("/health")
       .then((response) => response.ok)
       .catch(() => false);
     setState(up ? "up" : "down");

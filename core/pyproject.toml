@@ -35,8 +35,9 @@ dependencies = [
   "onnxruntime ; sys_platform != 'darwin' or platform_machine == 'arm64'",
   "tokenizers",
   "numpy",
-  "truststore",
-  "httpx",  # the model download
+  "truststore",  # MIT; HTTPS with the system's certificates (the model download, the account)
+  "httpx",  # BSD-3-Clause; the model download, the QS Mind account and Usage Stats (Plan 8)
+  "pyjwt",  # MIT; checks the QS Mind account's ID token (Plan 8), already there through mcp
   "python-docx",  # Word export (Plan 6); brings lxml (BSD-3-Clause)
   "typst",  # PDF export (Plan 6): typst-py, Apache-2.0, abi3 wheels for every CI system
   # Tools (Plan 5): web pages to Markdown, and the Sandbox's WebAssembly runtime.

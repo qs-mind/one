@@ -70,7 +70,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
   async function answer(choice: string, extra: CardAnswer = {}) {
     setSending(true);
     setFailed(undefined);
-    const response = await send(`/api/cards/${encodeURIComponent(id)}`, "POST", { choice, ...extra });
+    const response = await send(`/cards/${encodeURIComponent(id)}`, "POST", { choice, ...extra });
     setSending(false);
     if (response?.ok) {
       setSent(extra);

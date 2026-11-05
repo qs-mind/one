@@ -1895,3 +1895,192 @@ CARD_BAD_ANSWER = {
     "en": "Answer every question: choose an option or write a reply.",
     "ar": "جاوب على كل الأسئلة: اختار اختيار أو اكتب رد.",
 }
+
+# Plan 8: journey and release. "Connect AI" / «وصّل الذكاء الاصطناعي» is the first-launch step
+# (connectAi in ui/src/i18n.ts). Proposed terms: Backup key / مفتاح النسخة الاحتياطية, Recovery
+# code / كود الاسترجاع, Archived project / مشروع مؤرشف.
+PROJECT_ARCHIVED = {
+    "en": "This project is archived, so it is read-only. Unarchive it to change it.",
+    "ar": "المشروع ده مؤرشف، فهو للقراءة بس. لغي الأرشفة عشان تعدّل فيه.",
+}
+ARCHIVE_BACKUP_FAILED = {
+    "en": "The project is archived, but its final backup was not made. Back it up from Backup.",
+    "ar": "المشروع اتأرشف، بس آخر نسخة احتياطية ليه ماتعملتش. اعمله نسخة من «النسخة الاحتياطية».",
+}
+AI_CONSENT_NEEDED = {
+    "en": "Before One uses AI, say yes to the note on where your text goes. Open “Connect AI”.",
+    "ar": (
+        "قبل ما One يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين. "
+        "افتح «وصّل الذكاء الاصطناعي»."
+    ),
+}
+CLAUDE_CODE_NOT_FOUND = {
+    "en": (
+        "Claude Code was not found on this computer. Install it, sign in to it once in a "
+        "terminal, then press Check."
+    ),
+    "ar": (
+        "مالقيناش Claude Code على الجهاز ده. نزّله، وسجّل دخولك فيه مرة من الـ terminal، "
+        "وبعدين دوس «اتأكد»."
+    ),
+}
+
+# The QS Mind account.
+ACCOUNT_OFFLINE = {
+    "en": "Could not reach the QS Mind account. Check the internet connection, then try again.",
+    "ar": "مقدرناش نوصل لحساب QS Mind. اتأكد إن النت شغال وجرّب تاني.",
+}
+ACCOUNT_REFUSED = {
+    "en": "The QS Mind account did not accept this sign-in. Sign in again.",
+    "ar": "حساب QS Mind ماقبلش الدخول ده. سجّل دخولك تاني.",
+}
+ACCOUNT_DENIED = {
+    "en": "Sign-in was cancelled in the browser. Sign in again when you are ready.",
+    "ar": "الدخول اتلغى من المتصفح. سجّل دخولك تاني لما تكون جاهز.",
+}
+ACCOUNT_EXPIRED = {
+    "en": "The sign-in ran out of time. Sign in again.",
+    "ar": "وقت الدخول خلص. سجّل دخولك تاني.",
+}
+ACCOUNT_KEY_STORE_DOWN = {
+    "en": (
+        "The system key store is not available, so One cannot keep you signed in. "
+        "Unlock it or turn it on, then sign in again."
+    ),
+    "ar": (
+        "مخزن المفاتيح في الجهاز مش متاح، فـ One مش هيقدر يفضّل دخولك متسجّل. "
+        "افتحه أو شغّله وسجّل دخولك تاني."
+    ),
+}
+ACCOUNT_SIGNED_IN = {  # the loopback page in the browser, after the sign-in
+    "en": "Signed in. Go back to One.",
+    "ar": "دخولك اتسجّل. ارجع لـ One.",
+}
+
+# Backups, the Backup key and recovery codes.
+BACKUP_FOLDER_UNREACHABLE = {
+    "en": (
+        "The backup folder cannot be reached. The last good backup is from {date}. "
+        "Connect its drive, or pick another folder."
+    ),
+    "ar": (
+        "مقدرناش نوصل لفولدر النسخة الاحتياطية. آخر نسخة سليمة بتاريخ {date}. "
+        "وصّل الهارد بتاعه، أو اختار فولدر تاني."
+    ),
+}
+BACKUP_FOLDER_NOT_WRITABLE = {
+    "en": "One cannot save files in this folder. Pick an existing folder you can write in.",
+    "ar": "One مش قادر يحفظ ملفات في الفولدر ده. اختار فولدر موجود تقدر تكتب فيه.",
+}
+BACKUP_KEY_WRONG = {
+    "en": "This backup was made with another Backup key, so this key cannot open it.",
+    "ar": "النسخة دي اتعملت بمفتاح نسخة احتياطية تاني، فالمفتاح ده مش هيفتحها.",
+}
+BACKUP_NEEDS_SIGN_IN = {
+    "en": (
+        "To open this backup, sign in to the QS Mind account that keeps its Backup key, "
+        "or type its recovery code."
+    ),
+    "ar": (
+        "عشان تفتح النسخة دي، سجّل دخولك بحساب QS Mind اللي فيه مفتاح النسخة الاحتياطية، "
+        "أو اكتب كود الاسترجاع بتاعها."
+    ),
+}
+BACKUP_NEEDS_CODE = {
+    "en": "Type the recovery code for this backup to open it.",
+    "ar": "اكتب كود الاسترجاع بتاع النسخة دي عشان تفتحها.",
+}
+RECOVERY_CODE_WRONG = {
+    "en": (
+        "This recovery code does not open this backup. Check each group of five, then try again."
+    ),
+    "ar": "كود الاسترجاع ده مش بيفتح النسخة دي. راجع كل مجموعة من الخمسة وجرّب تاني.",
+}
+RECOVERY_LAST_GROUP_WRONG = {
+    "en": "That is not the code's last group. Look at the code you saved and type its last five.",
+    "ar": "دي مش آخر مجموعة في الكود. بص على الكود اللي حفظته واكتب آخر خمسة فيه.",
+}
+PROJECT_KEY_RESTORED = {
+    "en": (
+        "The project's key was missing from the system key store, so One put it back from "
+        "the project's own key file."
+    ),
+    "ar": (
+        "مفتاح المشروع ماكانش في مخزن المفاتيح في الجهاز، فـ One رجّعه من ملف المفتاح "
+        "بتاع المشروع نفسه."
+    ),
+}
+
+# Tender folder import and the "I understood this" card. FACT_* and COUNT_* go back to the Lead
+# QS from the card's check, so they say exactly what to send.
+ZIP_TOO_BIG = {
+    "en": (
+        "This zip holds more than 2 GB once opened, so One kept it as a file and did not "
+        "open it. Unzip it and add the folder instead."
+    ),
+    "ar": (
+        "الملف المضغوط ده بعد ما يتفك أكبر من 2 جيجا، فـ One حفظه زي ما هو ومافتحهوش. "
+        "فكّه وضيف الفولدر بداله."
+    ),
+}
+ZIP_UNSAFE = {
+    "en": (
+        "This zip looks unsafe to open (too many files, or packed far too tightly), so One "
+        "kept it as a file and did not open it."
+    ),
+    "ar": (
+        "الملف المضغوط ده شكله مش أمان يتفتح (ملفات كتير قوي، أو مضغوط بزيادة)، فـ One "
+        "حفظه زي ما هو ومافتحهوش."
+    ),
+}
+FACT_NEEDS_SOURCE = {
+    "en": (
+        "{fact} has no source. Send the file_id of the file it comes from and a locator, "
+        'such as {{"page": 3}} or {{"sheet": "BOQ", "row": 12}}.'
+    ),
+    "ar": (
+        "{fact} مالوش مصدر. ابعت الـ file_id بتاع الملف اللي جاي منه ومكانه فيه، "
+        'زي {{"page": 3}} أو {{"sheet": "BOQ", "row": 12}}.'
+    ),
+}
+FACT_FILE_UNKNOWN = {
+    "en": "There is no current file with file_id {file_id}. Use an id that files_list gives.",
+    "ar": "مفيش ملف حالي الـ file_id بتاعه {file_id}. استخدم id من اللي files_list بيديه.",
+}
+FACT_LOCATOR_UNKNOWN = {
+    "en": (
+        "The locator for {fact} names no page or row of file {file_id}. Read the file with "
+        "files_read, then send a page, or a sheet and row, that it has."
+    ),
+    "ar": (
+        "مكان {fact} مش بيشاور على صفحة أو صف موجود في الملف {file_id}. اقرا الملف بـ "
+        "files_read، وبعدين ابعت صفحة، أو شيت وصف، موجودين فيه."
+    ),
+}
+FACT_DATE_BAD = {
+    "en": "{fact} must be a real date written as YYYY-MM-DD, such as 2026-12-01.",
+    "ar": "{fact} لازم يكون تاريخ حقيقي مكتوب YYYY-MM-DD، زي 2026-12-01.",
+}
+COUNT_NEEDS_TRACE = {
+    "en": (
+        "items_count must come from code, never be typed: count the items with a tool such as "
+        "find_items and send the trace_id of that result."
+    ),
+    "ar": (
+        "items_count لازم ييجي من الكود، ومايتكتبش باليد: اعدّ البنود بأداة زي find_items "
+        "وابعت الـ trace_id بتاع النتيجة دي."
+    ),
+}
+
+# The updater.
+UPDATE_FAILED = {
+    "en": (
+        "The update did not install, so One is still on this version and your projects are "
+        "as they were. Try again later."
+    ),
+    "ar": "التحديث ماتسطبش، فـ One لسه على النسخة دي ومشاريعك زي ما هي. جرّب تاني بعدين.",
+}
+UPDATE_OFFLINE = {
+    "en": "Could not check for updates. Check the internet connection, then try again.",
+    "ar": "مقدرناش ندوّر على تحديثات. اتأكد إن النت شغال وجرّب تاني.",
+}
