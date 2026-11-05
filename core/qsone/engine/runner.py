@@ -111,6 +111,7 @@ from qsone.engine.types import (
     Unsourced,
     brief_language,
     choice_of,
+    reply_line,
 )
 from qsone.engine.worklog import WorkLog
 from qsone.journey import engineer, understand
@@ -795,8 +796,12 @@ class _Brief:
         return found
 
     def _instructions(self, choice: ModelChoice) -> str:
-        said = f"You run on the model {choice.model}; say so when asked which model you are."
-        found = (said, self.instruction, selection.line(self.selection))
+        # a small model repeated "you run on …" in every reply (audit R15): only when asked
+        said = (
+            f"The AI model you run on is {choice.model}. Say it only if the engineer asks which "
+            "model answers; never mention it otherwise."
+        )
+        found = (said, reply_line(self.text), self.instruction, selection.line(self.selection))
         return "\n\n".join(part for part in found if part)
 
     async def _lead(self, *, report: bool = False) -> Any:
@@ -1006,7 +1011,7 @@ class _Brief:
         self._agent(run_id, state="working", model=choice.model)
         # Claude Code reads only its instructions file: a Brief from code's own instruction
         # (Plan 8) and the canvas selection go there.
-        for extra in (self.instruction, selection.line(self.selection)):
+        for extra in (reply_line(self.text), self.instruction, selection.line(self.selection)):
             if extra:
                 spec = replace(spec, instructions=f"{spec.instructions}\n\n{extra}")
         return await self._job(run_id, spec, choice, self.text)
@@ -1024,7 +1029,11 @@ class _Brief:
         agent = agents.build_agent(
             spec, self._costed(run_id, spec.tier, choice), self._toolset(spec, ctx), output_type=str
         )
-        async with agent.iter(prompt, message_history=own or None, retries=TOOL_RETRIES) as run:
+        # what a specialist writes for the engineer is in the engineer's language (audit C6)
+        extra = reply_line(self.text) if spec.role == "specialist" else None
+        async with agent.iter(
+            prompt, message_history=own or None, instructions=extra, retries=TOOL_RETRIES
+        ) as run:
             async for node in run:
                 if Agent.is_call_tools_node(node):
                     self._say_tools(run_id, spec, node.model_response)

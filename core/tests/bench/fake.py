@@ -47,7 +47,7 @@ _LATIN = re.compile(r"[A-Za-z]")
 # a files_list line: file:<id> | <name> | [in folder <folder> |] <kind> | …
 _FILE = re.compile(r"file:([0-9a-f]{32}) \| ([^|]+?) \| (?:in folder [^|]+ \| )?(\w+)")
 _NEXT_IMPORT = re.compile(r"Next: boq_import (\{.*\})")
-_MODEL = re.compile(r"You run on the model ([\w.:-]+)")
+_MODEL = re.compile(r"The AI model you run on is ([\w.:/-]+?)\. ")
 
 
 # What the brain sees -------------------------------------------------------------------------
