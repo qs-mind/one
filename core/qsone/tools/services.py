@@ -14,12 +14,15 @@ import ssl
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any, Protocol
 
 import httpx
 import truststore
 
 from qsone.records.project import Records
+from qsone.sandbox import runtime
+from qsone.sandbox.runner import SandboxRunner
 
 TIMEOUT = 20  # seconds, for any one web request (decision 8)
 
@@ -54,7 +57,8 @@ class Services:
     native_search: SearchProvider | None = None  # the connected AI's own search, in a Brief
     prices: Any = None  # Task 10's `PricesClient`
     transcriber: Transcriber | None = None  # in a Brief, the engineer's image model
-    sandbox: Any = None  # Task 11's `SandboxRunner`
+    sandbox: Any = None  # the app's one `SandboxRunner`, shared by every Brief (one run at a
+    # time); its runtime is downloaded the first time a script runs
     connectors: Any = None  # Task 12's `ConnectorHub`
     robots: dict = field(default_factory=dict, repr=False)  # robots.txt by site, for a day
     # (Task 6); shared by every run's copy of these services
@@ -81,16 +85,19 @@ def utc_now() -> datetime:
 
 def services_for(app_state: Any) -> Services:
     """The app's services, built once in the lifespan (Task 15); `close` them on shutdown.
-    `app_state.engine` holds the Engineer Records file."""
+    `app_state.engine` holds the Engineer Records file. The Sandbox runner is made here once,
+    so every Brief shares it."""
     http = httpx.AsyncClient(
         verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),  # office networks work too
         follow_redirects=False,
         timeout=TIMEOUT,
         headers={"User-Agent": "QS Mind One (qsmind.app)"},
     )
+    base = runtime.root()
     return Services(
         http=http,
         resolve=resolve,
         clock=utc_now,
         engineer=app_state.engine.engineer_records,
+        sandbox=SandboxRunner(runtime.folder(base), install=partial(runtime.ensure, base)),
     )
