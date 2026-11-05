@@ -1,7 +1,7 @@
 // The message box's two quiet chips, for the Lead QS of the next Brief: the model (a small card of the models the
 // engineer's AI links give, above the box) and the effort (each click moves to the next level: no list). Both are real:
 // what they show is what the message sends. A model that takes no effort shows no effort chip.
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, type RefObject, useRef, useState } from "react";
 import { fill, t } from "../i18n";
 import { type Choice, type Effort, keyOf, type ModelCard } from "../settings/AiSettings";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -33,14 +33,23 @@ export function ModelChip({
   current,
   onPick,
   onOpenChange,
+  above,
 }: {
   sheet: ModelCard[];
   current: ModelCard | undefined;
   onPick(choice: Choice): void;
   onOpenChange(open: boolean): void;
+  /** The card opens above this (the whole box), so it never covers what is written. */
+  above: RefObject<HTMLElement | null>;
 }) {
   const [open, setOpen] = useState(false);
+  const [offset, setOffset] = useState(8);
+  const trigger = useRef<HTMLButtonElement>(null);
   const change = (next: boolean) => {
+    // 8px above the box's top edge, not the chip's
+    const box = above.current?.getBoundingClientRect().top;
+    const own = trigger.current?.getBoundingClientRect().top;
+    if (next && box !== undefined && own !== undefined) setOffset(own - box + 8);
     setOpen(next);
     onOpenChange(next);
   };
@@ -58,7 +67,7 @@ export function ModelChip({
   return (
     <Popover open={open} onOpenChange={change}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label={fill(t("modelChip"), { name })} title={name} className={chip}>
+        <button ref={trigger} type="button" aria-label={fill(t("modelChip"), { name })} title={name} className={chip}>
           <ModelGlyph />
           <span dir="auto" className="truncate">
             {name}
@@ -68,7 +77,7 @@ export function ModelChip({
       <PopoverContent
         side="top"
         align="start"
-        sideOffset={8}
+        sideOffset={offset}
         data-composer-pop
         className="composer-pop w-64 p-1.5!"
         onOpenAutoFocus={(event) => {

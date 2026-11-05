@@ -53,13 +53,14 @@ test("plain replies in the General chat and a project, in Arabic", async ({ walk
 
 test("the message box's model and effort reach the Lead QS, in English", async ({ walk }) => {
   await walk.start("en");
+  await walk.createProject("Sample model and effort - test bench"); // a project's Lead QS
   const page = walk.page;
   const box = page.getByRole("textbox", { name: walk.w.message });
   await box.click();
   // the card lists every bench model; the specialist one takes an effort with no known default
   await page.getByRole("button", { name: "Model: Bench lead (fake AI). Choose another" }).click();
   await page.getByRole("menuitemradio", { name: "Bench specialist (fake AI)" }).click();
-  await page.getByRole("button", { name: "Effort: Auto. Click for Low" }).click();
+  await page.getByRole("button", { name: "Effort: Auto (the model's own). Click for Low" }).click();
   await page.getByRole("button", { name: "Effort: Low. Click for Medium" }).click();
   await walk.shot("model-and-effort-picked");
   await walk.brief("bench:chat Which model?");

@@ -40,7 +40,8 @@ test("the chrome mirrors in Arabic: the chat at the left, the zoom controls at t
   const box = centreX(await page.locator("[data-command-box]").boundingBox());
   expect(chat).toBeLessThan(canvas);
   expect(zoom).toBeGreaterThan(canvas);
-  expect(box).toBeGreaterThan(chat); // the command bar sits between the chat and the zoom controls
+  // the message box sits at the open chat's foot, away from the zoom controls
+  await expect(page.locator('aside[data-region="chat"] [data-command-box]')).toBeVisible();
   expect(box).toBeLessThan(zoom);
   // the pane itself never flips: world coordinates are the same in both languages
   await expect(page.locator('section[aria-label="كانفاس المشروع"]')).toHaveAttribute("dir", "ltr");

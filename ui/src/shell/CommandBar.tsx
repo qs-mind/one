@@ -70,6 +70,7 @@ export function CommandBar({
   const [dismissed, setDismissed] = useState(false); // Escape folded it while it keeps the focus
   const [picking, setPicking] = useState(false);
   const text = useRef<HTMLTextAreaElement>(null);
+  const composer = useRef<HTMLDivElement>(null);
   const kinds = new Set(selection.map((item) => item.kind));
   const quick = kinds.size === 1 ? actions[selection[0]!.kind] : [];
   const placeholder = t(selection.length ? "commandBox" : "commandBoxEmpty");
@@ -102,6 +103,7 @@ export function CommandBar({
 
   const box = (
     <div
+      ref={composer}
       data-composer
       data-open={open || undefined}
       onFocus={() => {
@@ -203,6 +205,7 @@ export function CommandBar({
                 current={card || undefined}
                 onPick={(choice) => ai?.pick({ lead: choice })}
                 onOpenChange={setPicking}
+                above={composer}
               />
             )}
             {levels.length > 0 && <EffortChip levels={levels} shown={shown} onNext={(next) => ai?.pick({ effort: next })} />}
