@@ -11,6 +11,7 @@ import { StatusChips } from "../sheet/SheetViewer";
 import { SourcePopover } from "../sheet/SourcePopover";
 import { opsFor, pendingBlocks, type SlateElement } from "./blockOps";
 import { DocEditor, type DocComment, type TextAnchor } from "./plate";
+import { workspaceApi } from "../../workspace/api";
 
 /** A block, or a range of its text (Plan 7's anchor, its document fields: `row` is the block id). */
 export type DocumentAnchor = { row?: string; text?: [number, number] };
@@ -158,8 +159,12 @@ export function DocumentViewer(props: DocumentViewerProps) {
     [projectId, view.id, onChanged],
   );
 
+  const workspaceMode = props.mode === "workspace";
   const onOpenRef = useCallback(
     (cell: NumberCell, el: HTMLElement, focus: boolean) => {
+      // the open document's place is the number's paragraph, so Back from its source file comes back to it
+      const block = el.closest("[data-block-id]")?.getAttribute("data-block-id");
+      if (workspaceMode && block) workspaceApi.at({ row: block });
       const box = boxOf(el.getBoundingClientRect());
       if (!box) return;
       const width = root.current?.offsetWidth ?? 0;
@@ -167,7 +172,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
       const side = direction === "rtl" ? { right: Math.max(width - box.right, 0) } : { left: box.left };
       setPopover({ cell, style: { top: box.bottom, ...side }, from: el, focus });
     },
-    [direction],
+    [direction, workspaceMode],
   );
 
   function closeSource() {
