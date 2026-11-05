@@ -243,7 +243,9 @@ def test_the_reject_answers_an_undo_and_undo_makes_the_change_wait_again(client)
     d = sample_sheet(rec)
     path = f"/projects/{project}/deliverables/{d}"
     before = client.get(path, headers=AUTH).json()
-    [ch] = propose(rec, d, [set_number(row_by_code_in(before, "03/02"), "rate", "40000")], actor="engineer")
+    [ch] = propose(
+        rec, d, [set_number(row_by_code_in(before, "03/02"), "rate", "40000")], actor="engineer"
+    )
 
     answer = client.post(f"{path}/changes/reject", json={"ids": [ch.id]}, headers=AUTH).json()
     assert answer["rejected"] == [ch.id]
@@ -253,7 +255,9 @@ def test_the_reject_answers_an_undo_and_undo_makes_the_change_wait_again(client)
     assert client.post(f"/undo/{answer['undo']}", headers=AUTH).status_code == 204
     assert [c.id for c in pending(rec, d)] == [ch.id]
     now = client.get(path, headers=AUTH).json()
-    assert now["version"] == before["version"] and shown(now) == shown(before) and now["pending"] == 1
+    assert (
+        now["version"] == before["version"] and shown(now) == shown(before) and now["pending"] == 1
+    )
     assert client.post(f"/undo/{answer['undo']}", headers=AUTH).status_code == 404  # once only
 
 

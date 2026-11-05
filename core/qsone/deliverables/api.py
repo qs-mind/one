@@ -251,7 +251,9 @@ def router(projects: Projects, trash: Trash | None = None) -> APIRouter:
             return e.text
         return True
 
-    trash.kind("rejected", restore=wait_again, purge=lambda entry: None)  # a reject keeps nothing aside
+    trash.kind(
+        "rejected", restore=wait_again, purge=lambda entry: None
+    )  # a reject keeps nothing aside
 
     async def answer(project_id: str, fn, *args, status: int = 200, ids=()) -> Response:
         """Runs `fn(rec, *args)` in the thread pool: JSON (or the file) on success, else the
