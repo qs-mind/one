@@ -783,8 +783,9 @@ CARD_CHOICE = {
 _EXTENSION = re.compile(r"(\.[A-Za-z0-9]{1,8})$")
 
 
-_ARABIC = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u0870-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
-_STRONG = re.compile(r"[A-Za-z\u00C0-\u024F\u0600-\u06FF\u0750-\u077F\u0870-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
+_ARABIC_LETTERS = r"\u0600-\u06FF\u0750-\u077F\u0870-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF"
+_ARABIC = re.compile(f"[{_ARABIC_LETTERS}]")
+_STRONG = re.compile(f"[A-Za-z\u00c0-\u024f{_ARABIC_LETTERS}]")
 _LATIN = re.compile(r"[A-Za-z]")
 
 
@@ -796,7 +797,8 @@ def file_name(name: str) -> str:
     English words, never «.docx(sample spec». Only for text shown to the engineer, never to a
     model. The UI's own file names do the same (ui/src/ui/FileName.tsx)."""
     found = _EXTENSION.search(name)
-    stem, extension = (name, "") if found is None or found.start() == 0 else (name[: found.start()], found.group(1))
+    whole = found is None or found.start() == 0
+    stem, extension = (name, "") if whole else (name[: found.start()], found.group(1))
     first = _STRONG.search(stem)
     last = max((m.end() for m in _ARABIC.finditer(stem)), default=0)
     rest = stem[last:]
