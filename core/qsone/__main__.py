@@ -7,6 +7,7 @@ from pathlib import Path
 
 import uvicorn
 
+from qsone import settings, usage
 from qsone.app import create_app
 
 
@@ -42,6 +43,8 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.data_dir is not None:
         os.environ["QSONE_DATA_DIR"] = str(args.data_dir)  # settings.json follows it too
+    usage.install_hooks()  # a crash outside a request is reported too (class and line only)
+    usage.core_stopped(settings.data_dir())  # the last run's core died with the window open
     config = uvicorn.Config(
         create_app(secret, data_dir=args.data_dir),
         host="127.0.0.1",

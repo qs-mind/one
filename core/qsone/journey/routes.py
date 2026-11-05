@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from qsone import chat
+from qsone import chat, usage
 from qsone.engine import connectors as engine_connectors
 from qsone.engine.connectors import claude_code as claude_link
 from qsone.journey import claude_code, engineer, setup_state
@@ -69,9 +69,15 @@ def router(engine: Any) -> APIRouter:
         try:
             if step == "language" and body.lang is not None:
                 setup_state.set_language(body.lang)
-            return JSONResponse(setup_state.mark(step, body.state))
+            if step == "usage" and body.state == "skipped" and usage.is_on() is None:
+                usage.set_on(False)  # skipping means don't share
+            answer = setup_state.mark(step, body.state)
         except OSError:
             return _not_saved()
+        usage.track("setup_step", step=step, state=body.state)
+        if step == "ai" and body.state == "skipped":
+            usage.track("ai_link", via="none")
+        return JSONResponse(answer)
 
     @r.get("/settings/ai-consent")
     def get_consent() -> dict:
@@ -100,7 +106,10 @@ def router(engine: Any) -> APIRouter:
         found = list(engine.connectors())
         if body.via == "api_key":
             failed = await engine_connectors.check(f"anthropic/{chat.lead_model_id()}", among=found)
-            return JSONResponse({"error": failed}, 409) if failed else JSONResponse({"ok": True})
+            if failed:
+                return JSONResponse({"error": failed}, 409)
+            usage.track("ai_link", via="api_key")
+            return JSONResponse({"ok": True})
         saved = claude_link.saved()["path"]
         picked = None  # a Claude Code found outside PATH is saved by its path
         if saved is None and claude_code.on_path() is None:
@@ -115,6 +124,7 @@ def router(engine: Any) -> APIRouter:
             claude_link.save(path=saved or picked, on=True)
         except OSError:
             return _not_saved()
+        usage.track("ai_link", via="claude_code")
         return JSONResponse({"ok": True})
 
     @r.get("/engineer/card")

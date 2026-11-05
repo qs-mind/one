@@ -32,6 +32,7 @@ import shutil
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -63,7 +64,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from qsone import activity, copy
+from qsone import activity, copy, usage
 from qsone.deliverables import tools as outputs
 from qsone.engine import (
     agents,
@@ -1093,6 +1094,22 @@ class _Brief:
             self.emit(Data(self.brief_id, "card", card.id, {"status": "withdrawn"}))
         self.store.withdraw_pending(self.brief_id)
 
+    def _track_done(self) -> None:
+        """Usage Stats' one `brief_done`: counts only, never a Desk's name (Plan 8)."""
+        specialists = [
+            r["spec"] for r in self.store.runs(self.brief_id) if r["spec"].role == "specialist"
+        ]
+        cost = self.engine.book.spent(brief_id=self.brief_id, count_equivalent=True)
+        started = datetime.fromisoformat(self.store.brief(self.brief_id)["created_at"])
+        usage.track(
+            "brief_done",
+            desks=len({s.desk or self.brief_id for s in specialists}),
+            specialists=len(specialists),
+            off_desk=bool(specialists),  # every Desk is Temporary or Draft until Plan 9
+            cost_usd_cents=int((cost * 100).to_integral_value(ROUND_HALF_UP)),
+            minutes=max(0, round((utc_now() - started).total_seconds() / 60)),
+        )
+
     async def main(self) -> None:
         try:
             if self.step is None:
@@ -1117,6 +1134,7 @@ class _Brief:
                 await self._finish(output)
                 self.output = output
                 self.set_state("done", copy.STEP_DONE)
+                self._track_done()
         except asyncio.CancelledError:
             if self.cancel_mode == "crash":
                 raise
@@ -1133,8 +1151,9 @@ class _Brief:
         except RecordsError as failed:
             log.warning("brief %s: records error", self.brief_id)
             self.set_state("failed", failed.text)
-        except Exception:
+        except Exception as error:
             log.exception("brief %s failed", self.brief_id)
+            usage.crash(error)  # a bug in One: its class and line, never the message
             self._withdraw()
             provider = "One"
             if self.lead_run_id is not None:
