@@ -33,6 +33,7 @@ LEAD_TOOLS = (
     "note_lesson",
     "connector_tools",
     "understood",  # Plan 8: the "I understood this" card
+    "show",  # decision 16.1: a view built from ONE's blocks (qsone/view.py)
 )
 CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
 

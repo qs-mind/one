@@ -1,0 +1,489 @@
+"""Generative UI, first step (decision 16.1): the Lead QS shows the engineer a `View` in the chat,
+built only from ONE's own blocks, through the `show` tool.
+
+The model chooses what to show and how to lay it out; the core checks it and the screen draws it
+from vetted blocks (ui/src/chat/parts/view). Rules:
+- blocks: heading, prose, figures (label + number), table (columns + rows) and group (one level);
+  at most 24 in all;
+- a number is never typed: it is a reference, `{"number": <number id>}` or a Sheet's cell
+  `{"deliverable", "row", "column"}`, which the core resolves to its value, source and date
+  (followed through corrections, as a Document's references are). An unknown reference, or a
+  cell with no sourced number, is refused naming its place;
+- every text goes through the numbers guard, as the Lead's reply does: a number no tool gave is
+  marked on screen, never removed;
+- `sample` is the model's flag, and always true when a shown number comes from a sample source;
+- no HTML, ever: text with a tag is refused, and the screen renders words only;
+- a block of a kind ONE does not have is dropped, with a note back to the model.
+
+A refusal is one `ModelRetry` per Brief. After that, `show` answers "not shown" as an ordinary
+result, so the model writes its reply in words and the Brief never fails on a view.
+
+The view goes out as `Data("view")`, a `data-view` part. Its tool result keeps the view's id, the
+moment it was resolved and its unsourced numbers, so `stored_views` rebuilds the same view from
+the stored history after a reload."""
+
+import json
+import re
+from typing import Annotated, Literal
+from uuid import uuid4
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
+from pydantic_ai import ModelRetry
+
+from qsone import copy
+from qsone.deliverables import calc, store
+from qsone.engine import numbers_guard
+from qsone.engine.tools import Tool, ToolContext, register
+from qsone.engine.types import Data
+from qsone.records.project import Records, RecordsError
+
+TOOL = "show"
+MAX_BLOCKS = 24
+LEAVES = ("heading", "prose", "figures", "table")
+KINDS = (*LEAVES, "group")
+
+Id = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
+Key = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
+Short = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+Words = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
+
+
+class _Closed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class NumberRef(_Closed):
+    """A number in this project's Source Ledger."""
+
+    number: Id
+
+
+class CellRef(_Closed):
+    """A number in a Sheet: its row id (or "total" for the bill) and its column key."""
+
+    deliverable: Id
+    row: Id | Literal["total"]
+    column: Key
+
+
+Num = NumberRef | CellRef
+
+
+class Heading(_Closed):
+    kind: Literal["heading"]
+    text: Short
+
+
+class Prose(_Closed):
+    """Plain words, or a light Markdown (bold, lists); never HTML."""
+
+    kind: Literal["prose"]
+    text: Words
+
+
+class Figure(_Closed):
+    label: Short
+    value: Num
+
+
+class Figures(_Closed):
+    """A row of key figures."""
+
+    kind: Literal["figures"]
+    items: list[Figure] = Field(min_length=1, max_length=8)
+
+
+class Column(_Closed):
+    key: Key
+    label: Short
+    type: Literal["text", "number"] = "text"
+
+
+class Table(_Closed):
+    """Rows by column key: a number column takes references only, a text column words only."""
+
+    kind: Literal["table"]
+    columns: list[Column] = Field(min_length=1, max_length=8)
+    rows: list[dict[Key, Short | Num]] = Field(min_length=1, max_length=50)
+
+
+Leaf = Annotated[Heading | Prose | Figures | Table, Field(discriminator="kind")]
+
+
+class Group(_Closed):
+    """Blocks shown together under a title; a group holds no group."""
+
+    kind: Literal["group"]
+    title: Short | None = None
+    blocks: list[Leaf] = Field(min_length=1, max_length=12)
+
+
+Block = Annotated[Heading | Prose | Figures | Table | Group, Field(discriminator="kind")]
+
+
+class View(_Closed):
+    title: Short
+    sample: bool = False  # the view shows sample data, labelled as such
+    blocks: list[Block] = Field(min_length=1, max_length=MAX_BLOCKS)
+
+
+class ShowArgs(BaseModel):
+    """The tool's arguments as they came: `call` lets them through and `_show` checks them against
+    `View`, so a refusal keeps to the Brief's one retry. The model is given `View`'s schema."""
+
+    model_config = ConfigDict(extra="allow")
+
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs) -> dict:
+        return View.model_json_schema(*args, **kwargs)
+
+
+class _Refused(Exception):
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self.text = text
+
+
+# Checking ---------------------------------------------------------------------------------------
+
+_HTML = re.compile(r"<\s*/?\s*[A-Za-z!][^>]*>")
+_REF_HINT = (
+    'A number is never typed: give {"number": "<number id>"} from the Source Ledger, or '
+    '{"deliverable": "<sheet id>", "row": "<row id>" or "total", "column": "<column key>"}.'
+)
+
+
+def _kind(block) -> str | None:
+    return block.get("kind") if isinstance(block, dict) else None
+
+
+def _drop_unknown(args: dict) -> tuple[dict, list[str]]:
+    """The arguments without blocks of a kind ONE does not have, and a note for each one dropped.
+    A group left with no blocks goes too."""
+    notes: list[str] = []
+
+    def note(place: str, kind) -> None:
+        if kind == "group":
+            notes.append(f"{place}: a group holds no group; it was left out.")
+        else:
+            notes.append(
+                f"{place}: ONE has no block «{kind}» (only {', '.join(KINDS)}); it was left out."
+            )
+
+    blocks = args.get("blocks")
+    if not isinstance(blocks, list):
+        return args, notes
+    kept = []
+    for i, block in enumerate(blocks):
+        kind = _kind(block)
+        if kind is not None and kind not in KINDS:
+            note(f"blocks[{i}]", kind)
+            continue
+        if kind == "group" and isinstance(block.get("blocks"), list):
+            inner = []
+            for j, leaf in enumerate(block["blocks"]):
+                if _kind(leaf) is not None and _kind(leaf) not in LEAVES:
+                    note(f"blocks[{i}].blocks[{j}]", _kind(leaf))
+                else:
+                    inner.append(leaf)
+            if not inner and block["blocks"]:
+                continue
+            block = block | {"blocks": inner}
+        kept.append(block)
+    return args | {"blocks": kept}, notes
+
+
+_TAGS = {*KINDS, "str", "dict", "list", "bool", "int"}  # union tags in a pydantic error's place
+
+
+def _place(loc: tuple) -> str:
+    """A pydantic error's place as the model wrote it: blocks[1].items[0].value. The union tags
+    pydantic adds (a block's kind, a reference's model name) are left out."""
+    out = ""
+    for part in loc:
+        if isinstance(part, int):
+            out += f"[{part}]"
+        elif part in _TAGS or not re.fullmatch(r"[a-z][a-z0-9_]*", part):
+            continue
+        else:
+            out += f".{part}" if out else part
+    return out or "the arguments"
+
+
+def _validated(args: dict) -> View:
+    try:
+        return View.model_validate(args)
+    except ValidationError as e:
+        first = e.errors()[0]
+        where = _place(first["loc"])
+        hint = f" {_REF_HINT}" if where.endswith(".value") else ""
+        raise _Refused(f"«{where}»: {first['msg']}.{hint}") from None
+
+
+def _blocks(blocks: list[dict], base: str = "blocks"):
+    for i, block in enumerate(blocks):
+        here = f"{base}[{i}]"
+        if block["kind"] == "group":
+            yield from _blocks(block["blocks"], f"{here}.blocks")
+        else:
+            yield here, block
+
+
+def _check(data: dict) -> None:
+    """The rules a schema cannot hold: at most 24 blocks in all, each table's cells by its
+    columns, and no HTML in any text."""
+    count = sum(1 + len(b.get("blocks", ())) for b in data["blocks"])
+    if count > MAX_BLOCKS:
+        raise _Refused(f"«blocks»: {count} blocks, groups' blocks included; at most {MAX_BLOCKS}.")
+    for here, block in _blocks(data["blocks"]):
+        if block["kind"] != "table":
+            continue
+        types = {c["key"]: c["type"] for c in block["columns"]}
+        for j, row in enumerate(block["rows"]):
+            for key, value in row.items():
+                at = f"«{here}.rows[{j}].{key}»"
+                if key not in types:
+                    raise _Refused(f"{at}: the table has no column «{key}»: {', '.join(types)}.")
+                if types[key] == "number" and not isinstance(value, dict):
+                    raise _Refused(f"{at}: a number column takes a reference. {_REF_HINT}")
+                if types[key] == "text" and isinstance(value, dict):
+                    raise _Refused(f"{at}: a text column takes words; put numbers in a number one.")
+    for place, text in _texts(data):
+        if _HTML.search(text):
+            raise _Refused(f"«{place}»: no HTML or code; write plain words.")
+
+
+def _texts(data: dict):
+    """(place, text) for every text in the view."""
+    yield "title", data["title"]
+    for i, block in enumerate(data["blocks"]):
+        if block["kind"] == "group" and block.get("title"):
+            yield f"blocks[{i}].title", block["title"]
+    for here, block in _blocks(data["blocks"]):
+        if block["kind"] in ("heading", "prose"):
+            yield f"{here}.text", block["text"]
+        elif block["kind"] == "figures":
+            for j, item in enumerate(block["items"]):
+                yield f"{here}.items[{j}].label", item["label"]
+        else:
+            for j, column in enumerate(block["columns"]):
+                yield f"{here}.columns[{j}].label", column["label"]
+            for j, row in enumerate(block["rows"]):
+                for key, value in row.items():
+                    if isinstance(value, str):
+                        yield f"{here}.rows[{j}].{key}", value
+
+
+def _refs(data: dict):
+    """(place, holder, key) for every number reference: holder[key] is the reference."""
+    for here, block in _blocks(data["blocks"]):
+        if block["kind"] == "figures":
+            for j, item in enumerate(block["items"]):
+                yield f"{here}.items[{j}].value", item, "value"
+        elif block["kind"] == "table":
+            for j, row in enumerate(block["rows"]):
+                for key, value in row.items():
+                    if isinstance(value, dict):
+                        yield f"{here}.rows[{j}].{key}", row, key
+
+
+# Resolving --------------------------------------------------------------------------------------
+
+
+def _resolve(rec: Records, data: dict, at: str) -> list[dict]:
+    """Puts each reference's cell (value, unit, currency, number id, source id, date) in its
+    place, and the sources and the sample flag on the view. Returns the cells."""
+    refs = list(_refs(data))
+    sources: dict[str, dict] = {}
+    cells: list[dict] = []
+    sample = data["sample"]
+    with rec.read() as conn:
+        ids = [holder[key]["number"] for _, holder, key in refs if "number" in holder[key]]
+        followed = store._numbers_followed(conn, ids, at) if ids else {}
+        if ids:
+            sample = sample or store._sample(conn, [f[2] for f in followed.values()], {})
+        sheets: dict[str, dict | None] = {}
+        for place, holder, key in refs:
+            ref = holder[key]
+            if "number" in ref:
+                found = followed.get(ref["number"])
+                if found is None:
+                    raise _Refused(
+                        f"«{place}»: there is no number {ref['number']} in this project's Source "
+                        "Ledger. Use an id that ledger_numbers or another tool gave you."
+                    )
+                _, _, cell, source_id, source = found
+            else:
+                d = ref["deliverable"]
+                if d not in sheets:
+                    sheets[d] = store._sheet_then(conn, d, at)
+                sheet = sheets[d]
+                if sheet is None:
+                    raise _Refused(f"«{place}»: there is no Sheet {d} in this project.")
+                cell = _sheet_cell(sheet, ref["row"], ref["column"])
+                if cell is None or not cell.get("source") or cell["source"] not in sheet["sources"]:
+                    raise _Refused(
+                        f"«{place}»: the Sheet's cell {ref['row']}/{ref['column']} has no number "
+                        "with a source."
+                    )
+                source_id, source = cell["source"], sheet["sources"][cell["source"]]
+                sample = sample or sheet["sample"]
+            holder[key] = cell
+            sources[source_id] = source
+            cells.append(cell)
+    data["sources"] = sources
+    data["sample"] = sample or any(s["kind"] == "sample" for s in sources.values())
+    return cells
+
+
+def _sheet_cell(sheet: dict, row: str, column: str) -> dict | None:
+    if row == calc.BILL_ROW:  # the bill's total, under its calculated column (as a Document's)
+        calculated = {c["key"] for c in sheet["columns"] if c["kind"] == "calc"}
+        cell = sheet["total"] if column in calculated else None
+    else:
+        cell = next((r["cells"].get(column) for r in sheet["rows"] if r["id"] == row), None)
+    return cell if isinstance(cell, dict) and "value" in cell else None
+
+
+def _build(rec: Records, args: dict, at: str) -> tuple[dict, list[dict], list[str]]:
+    """The view's data part (without its unsourced numbers), its cells and the notes on what
+    was dropped. Raises `_Refused`."""
+    cleaned, dropped = _drop_unknown(args)
+    data = _validated(cleaned).model_dump(mode="json")
+    _check(data)
+    cells = _resolve(rec, data, at)
+    return data, cells, dropped
+
+
+def _known(ctx: ToolContext) -> set[str]:
+    """Every number the Brief's tools gave, as the reply's guard counts them."""
+    from qsone.engine import agents, team
+
+    results = [
+        text
+        for run in ctx.store.runs(ctx.brief_id)
+        if run["history"]
+        for name, text in agents.tool_returns(run["history"])
+        if name not in team.TEAM_TOOLS
+    ]
+    return numbers_guard.known_values(results)
+
+
+def _unsourced(data: dict, known: set[str]) -> list[str]:
+    found: list[str] = []
+    for _, text in _texts(data):
+        found += [n for n in numbers_guard.unsourced(text, known) if n not in found]
+    return found
+
+
+# The tool ---------------------------------------------------------------------------------------
+
+_retried: set[str] = set()  # the Briefs whose one retry on a view is used
+
+
+def _refuse(ctx: ToolContext, text: str) -> str:
+    if ctx.brief_id not in _retried:
+        _retried.add(ctx.brief_id)
+        raise ModelRetry(f"show: {text} Fix it and call show again.")
+    note = f"Not shown: {text} Answer in words; do not call show again in this Brief."
+    return json.dumps({"shown": None, "note": note}, ensure_ascii=False)
+
+
+async def _show(ctx: ToolContext, parsed: BaseModel) -> str:
+    if ctx.rec is None:
+        raise RecordsError(copy.PROJECT_NOT_OPEN)
+    args = dict(parsed.model_extra or {})
+    at = ctx.rec.clock()
+    try:
+        data, cells, dropped = _build(ctx.rec, args, at)
+    except _Refused as refused:
+        return _refuse(ctx, refused.text)
+    known = _known(ctx) | numbers_guard.known_values(c["value"] for c in cells)
+    data["unsourced"] = _unsourced(data, known)
+    view_id = uuid4().hex
+    ctx.host.emit(Data(ctx.brief_id, "view", view_id, data))
+    out = {
+        "shown": view_id,
+        "at": at,
+        "numbers": len(cells),
+        "sample": data["sample"],
+        "unsourced": data["unsourced"],
+        "dropped": dropped,
+    }
+    return json.dumps(out, ensure_ascii=False)
+
+
+def stored_views(rec: Records | None, brief_id: str, history: bytes) -> list[Data]:
+    """The Brief's views again, from a run's stored history: each `show` that was shown, its
+    arguments resolved as of the moment it was shown, with the unsourced numbers it had then."""
+    from pydantic_ai.messages import (
+        ModelMessagesTypeAdapter,
+        ModelRequest,
+        ModelResponse,
+        ToolCallPart,
+        ToolReturnPart,
+    )
+
+    if rec is None:
+        return []
+    messages = ModelMessagesTypeAdapter.validate_json(history)
+    asked = {
+        p.tool_call_id: p.args_as_dict()
+        for m in messages
+        if isinstance(m, ModelResponse)
+        for p in m.parts
+        if isinstance(p, ToolCallPart) and p.tool_name == TOOL
+    }
+    found = []
+    for m in messages:
+        if not isinstance(m, ModelRequest):
+            continue
+        for p in m.parts:
+            if not (isinstance(p, ToolReturnPart) and p.tool_name == TOOL):
+                continue
+            try:
+                out = json.loads(p.content) if isinstance(p.content, str) else p.content
+                data, _, _ = _build(rec, asked[p.tool_call_id], out["at"])
+            except (ValueError, KeyError, TypeError, _Refused):
+                continue  # not shown, or not readable
+            data["unsourced"] = list(out.get("unsourced") or [])
+            found.append(Data(brief_id, "view", out["shown"], data))
+    return found
+
+
+_EXAMPLE = {
+    "title": "ملخص التسعير",
+    "blocks": [
+        {"kind": "heading", "text": "فئة الخرسانة المسلحة"},
+        {
+            "kind": "figures",
+            "items": [{"label": "الفئة", "value": {"number": "6f1c0d2e9a4b4c7e8f3a2b1c0d9e8f7a"}}],
+        },
+        {"kind": "prose", "text": "الفئة من عرض سعر المورد."},
+    ],
+}
+
+_DOC = f"""Show the engineer a view in the chat when figures or a table say it better than \
+words. Blocks: heading, prose, figures (label, value), table (columns; rows by column key) and \
+group (title, blocks; one level); 24 at most. A number is never typed: \
+{{"number": "<number id>"}}, or a Sheet's cell \
+{{"deliverable": "<sheet id>", "row": "<row id>" or "total", "column": "<key>"}}; \
+ONE adds its value, source and date. Number columns take only these; text columns take \
+words. No HTML. sample: true for sample data.
+Example:
+{json.dumps(_EXAMPLE, ensure_ascii=False)}"""
+
+register(
+    Tool(
+        name=TOOL,
+        description=_DOC,
+        args=ShowArgs,
+        risk="read",
+        run=_show,
+        activity=lambda _: copy.tool_step(TOOL),
+        lead_only=True,
+        example=_EXAMPLE,
+        roles=frozenset({"lead"}),
+        group="records",  # it reads Project Records: not in the General chat
+    )
+)

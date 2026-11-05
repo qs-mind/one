@@ -14,12 +14,20 @@ from qsone import view
 from qsone.engine import agents, general
 from qsone.engine.tools import REGISTRY, call
 from qsone.engine.types import Data
-from tests.engine_fakes import calls, scripted
 from tests.engine_fakes import call as step
+from tests.engine_fakes import calls, scripted
 from tests.engine_fakes import text as said
 from tests.samples import sample_sheet
 from tests.team_samples import BRIEF, DATED, TeamFakeHost, lead_ctx, quote_source, sample_ledger
-from tests.test_engine_runner import finish, links, started
+from tests.test_engine_runner import (  # noqa: F401 - the runner's fixtures
+    finish,
+    links,
+    make_engine,
+    no_budget_card,
+    project,
+    registry,
+    started,
+)
 
 MISSING = "0" * 32
 
@@ -202,7 +210,8 @@ async def test_an_unknown_block_kind_is_dropped_with_a_note(ledger):
 async def test_a_group_holds_one_level_only(ledger):
     ctx, host, _ = ledger
     inner = {"kind": "group", "title": None, "blocks": [{"kind": "prose", "text": "نص"}]}
-    blocks = [{"kind": "group", "title": "خارج", "blocks": [inner, {"kind": "prose", "text": "نص"}]}]
+    outer = {"kind": "group", "title": "خارج", "blocks": [inner, {"kind": "prose", "text": "نص"}]}
+    blocks = [outer]
     out = await show(ctx, blocks=blocks)
     [shown] = views(host)
     assert [b["kind"] for b in shown.data["blocks"][0]["blocks"]] == ["prose"]
@@ -223,7 +232,7 @@ def _number_id(messages) -> str:
     raise AssertionError("no number recorded")
 
 
-def _ledger_steps(registry, project):
+def _ledger_steps(registry, project):  # noqa: F811
     source = quote_source(registry.get(project))
     number = {"item": "03/02", "dated": DATED, "name": "rate", "value": "39850.50"}
 
@@ -255,7 +264,7 @@ def _show_step(messages, info):
     return step("show", {"title": "ملخص - عينة", "blocks": blocks})
 
 
-async def test_a_view_streams_and_a_reload_shows_the_same_view(make_engine, registry, project):
+async def test_a_view_streams_and_a_reload_shows_the_same_view(make_engine, registry, project):  # noqa: F811, E501
     lead = scripted(*_ledger_steps(registry, project), _show_step, said("دي الفئة - عينة"))
     engine = await started(make_engine(links(lead=lead)))
     brief = await engine.start_brief(project, BRIEF)
@@ -268,7 +277,7 @@ async def test_a_view_streams_and_a_reload_shows_the_same_view(make_engine, regi
     assert stored == [{"type": "data-view", "id": live.id, "data": live.data}]
 
 
-async def test_a_brief_whose_view_fails_twice_ends_in_plain_words(make_engine, project):
+async def test_a_brief_whose_view_fails_twice_ends_in_plain_words(make_engine, project):  # noqa: F811
     lead = scripted(
         step("show", {"blocks": []}), step("show", {"title": "x"}), said("الرد بالكلام - عينة")
     )

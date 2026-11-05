@@ -65,7 +65,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.settings import ModelSettings
 
-from qsone import activity, copy, usage
+from qsone import activity, copy, usage, view
 from qsone.deliverables import tools as outputs
 from qsone.engine import (
     agents,
@@ -1583,6 +1583,7 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
         returns = agents.tool_returns(lead["history"])
         events += general.stored_cards(brief_id, returns)
         events += understand.stored_cards(brief_id, returns)  # Plan 8's card
+        events += view.stored_views(store.rec, brief_id, lead["history"])  # decision 16.1
     for run in runs:  # the Deliverable cards, from whichever agent made them (Plan 6)
         if run["history"]:
             events += outputs.stored_cards(brief_id, agents.tool_returns(run["history"]))
