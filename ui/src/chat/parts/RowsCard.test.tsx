@@ -63,7 +63,7 @@ describe("RowsCard", () => {
     await user.click(screen.getByRole("checkbox", { name: "احفظ الصف 1" }));
     await user.click(keep);
     expect(bodyOf(fetch, "POST", "/api/cards/c2")).toEqual([{ choice: "keep", rows_ok: [0, 2] }]);
-    expect(await screen.findByText("اتحفظ 2 من 3 صف.")).toBeInTheDocument();
+    expect(await screen.findByText("اتحفظ 2 من 3 صفوف.")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.getByText("رمل - عينة").closest("tr")).toHaveClass("line-through"); // left out
   });
@@ -85,7 +85,7 @@ describe("RowsCard", () => {
     expect(container.querySelector("section")).toHaveClass("border-copper");
     for (const n of [1, 2, 3]) await user.click(screen.getByRole("checkbox", { name: `احفظ الصف ${n}` }));
     await user.click(screen.getByRole("button", { name: texts.keepTicked.ar }));
-    const line = await screen.findByRole("button", { name: /أحفظ الأسعار دي؟.*اتحفظ 3 من 3 صف\./ });
+    const line = await screen.findByRole("button", { name: /أحفظ الأسعار دي؟.*اتحفظ 3 من 3 صفوف\./ });
     expect(container.querySelector("section")).not.toHaveClass("border-copper");
     expect(screen.queryByRole("table")).toBeNull(); // folded: the next card is in sight
     await user.click(line);

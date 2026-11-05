@@ -1,14 +1,14 @@
 // The conversation with the Lead QS, as a list: the engineer's messages (with the canvas selection they were sent
 // with) and each Brief's reply with its Progress Line, Coordination Room, cards, costs, Review codes and Deliverable
 // cards. The shell owns the chat itself (ui/src/shell/useChats.ts) and its composer, the command bar.
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SelectionItem } from "../canvas/types";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
 import { fill, type Language, language, languageOf, pick, t, type Text, useLanguage } from "../i18n";
 import { HandOffCards } from "../shell/HandOffCard";
 import type { ChatState } from "../shell/useChats";
 import { textOf } from "../shell/useChats";
-import { ApprovalCard } from "./parts/ApprovalCard";
+import { ApprovalCard, CARD_ANSWERED } from "./parts/ApprovalCard";
 import { ContinueBriefs } from "./parts/ContinueBriefs";
 import { CoordinationRoom } from "./parts/CoordinationRoom";
 import { CostNotice } from "./parts/CostNotice";
@@ -131,6 +131,14 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
     atEnd.current = true;
     setBelow(false);
   };
+
+  useEffect(() => {
+    // an answered card: the engineer is done here, so the chat follows the Brief again, to its next words
+    const log = ref.current;
+    const follow = () => requestAnimationFrame(toEnd);
+    log?.addEventListener(CARD_ANSWERED, follow);
+    return () => log?.removeEventListener(CARD_ANSWERED, follow);
+  }, []);
 
   useLayoutEffect(() => {
     const log = ref.current;

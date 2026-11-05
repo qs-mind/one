@@ -176,6 +176,42 @@ describe("a card that comes mid-Brief", () => {
     expect(screen.queryByRole("button", { name: texts.newBelow.ar })).not.toBeInTheDocument();
   });
 
+  it("once a card is answered the chat follows the Brief again, to the Lead QS's closing words", async () => {
+    setCurrentProject(P1);
+    const live = liveStream();
+    core({ routes: { "POST /api/chat": () => live.response(), "POST /api/cards/c1": () => new Response(null, { status: 204 }) } });
+    Element.prototype.scrollIntoView = vi.fn();
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole("textbox", { name: texts.message.ar }), "استورد الـ BOQ{enter}");
+    act(() => {
+      live.send({ type: "start", messageId: "a1" });
+      live.send(status("waiting_engineer"));
+      live.send({ type: "data-card", id: "c1", data: { ...rows, payload: { ...rows.payload, tick: false } } });
+    });
+    await screen.findByText("الصفوف من 5 لـ 200.");
+    const log = screen.getByRole("log");
+    const scrollTo = vi.fn();
+    Object.assign(log, { scrollTo });
+    Object.defineProperties(log, {
+      scrollHeight: { value: 2000, configurable: true },
+      clientHeight: { value: 300, configurable: true },
+      scrollTop: { value: 100, configurable: true, writable: true },
+    });
+    act(() => void log.dispatchEvent(new Event("scroll"))); // the card was brought into view: not at the end
+    await user.click(screen.getByRole("button", { name: texts.keepTicked.ar }));
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ top: 2000 }));
+    scrollTo.mockClear();
+    act(() => {
+      live.send(status("running"));
+      live.send({ type: "text-start", id: "t1" });
+      live.send({ type: "text-delta", id: "t1", delta: "اتحفظت الصفوف - عينة" });
+    });
+    await screen.findByText(/اتحفظت الصفوف/);
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ top: 2000 })); // its closing words in view
+    expect(screen.queryByRole("button", { name: texts.newBelow.ar })).not.toBeInTheDocument();
+  });
+
   it("the engineer's own Arabic message with English in it: one block per line, the English isolated", async () => {
     setCurrentProject(P1);
     const live = liveStream();

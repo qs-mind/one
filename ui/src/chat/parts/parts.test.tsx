@@ -80,7 +80,7 @@ describe("CoordinationRoom", () => {
         ]}
       />,
     );
-    const summary = screen.getByText("غرفة التنسيق، 2 رسالة");
+    const summary = screen.getByText("غرفة التنسيق، رسالتين");
     const first = screen.getByText("سعّر بند 03/02 - عينة");
     expect(first).not.toBeVisible();
     expect(first).toHaveAttribute("dir", "auto");

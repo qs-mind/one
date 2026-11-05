@@ -155,7 +155,7 @@ describe("the chat in the shell", () => {
     await user.type(await box(), "سعّر{enter}");
     const line = await screen.findByRole("list", { name: texts.progressLine.ar });
     expect(within(line).getByRole("listitem")).toHaveTextContent("بيقرا صفحة 12");
-    expect(await screen.findByText("غرفة التنسيق، 1 رسالة")).toBeInTheDocument();
+    expect(await screen.findByText("غرفة التنسيق، رسالة واحدة")).toBeInTheDocument();
     expect(screen.getByText("كبير مهندسي الكميات: بيبعت المقايسة بالإيميل.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: texts.allowOnce.ar })).toBeInTheDocument();
     expect(screen.getByText("1.20 من 3.00 دولار")).toBeInTheDocument();

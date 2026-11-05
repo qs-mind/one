@@ -133,7 +133,6 @@ export const texts = {
   recommendedAmount: { en: "Recommended: {value} USD", ar: "الموصى بيه: {value} دولار" },
   capsNotSaved: { en: "The caps were not saved. Try again.", ar: "السقف ماتحفظش. جرّب تاني." },
   progressLine: { en: "Progress Line", ar: "سطر التقدم" },
-  coordinationRoom: { en: "Coordination Room, {n} messages", ar: "غرفة التنسيق، {n} رسالة" },
   fromTo: { en: "{sender} to {recipient}", ar: "من {sender} لـ{recipient}" },
   steering: { en: "Steering the Brief", ar: "توجيه للتكليف" },
   steerFailed: { en: "The message did not reach the Brief. Try again.", ar: "الرسالة موصلتش للتكليف. جرّب تاني." },
@@ -255,7 +254,6 @@ export const texts = {
   sourceDatedRead: { en: "Date read: {date}", ar: "تاريخ القراية: {date}" },
   yourReply: { en: "Your reply", ar: "ردّك" },
   tickRow: { en: "Keep row {n}", ar: "احفظ الصف {n}" },
-  rowsKept: { en: "{n} of {total} rows kept.", ar: "اتحفظ {n} من {total} صف." },
   answered: { en: "Your answer: {choice}", ar: "ردّك: {choice}" },
   withdrawn: { en: "No longer needed.", ar: "مبقاش له لازمة." },
   answerNotSent: { en: "Your answer was not sent. Try again.", ar: "ردّك موصلش. جرّب تاني." },
@@ -712,6 +710,24 @@ export const counted = {
       two: "رقمين من غير مصدر (تحتهم خط منقّط): مش مربوطين بسجلات المشروع.",
       few: "{n} أرقام من غير مصدر (تحتها خط منقّط): مش مربوطة بسجلات المشروع.",
       other: "{n} رقم من غير مصدر (تحتهم خط منقّط): مش مربوطين بسجلات المشروع.",
+    },
+  },
+  rowsKept: {
+    en: { one: "{kept} of {n} row kept.", other: "{kept} of {n} rows kept." },
+    ar: {
+      one: "اتحفظ {kept} من صف واحد.",
+      two: "اتحفظ {kept} من صفين.",
+      few: "اتحفظ {kept} من {n} صفوف.",
+      other: "اتحفظ {kept} من {n} صف.",
+    },
+  },
+  coordinationRoom: {
+    en: { one: "Coordination Room, {n} message", other: "Coordination Room, {n} messages" },
+    ar: {
+      one: "غرفة التنسيق، رسالة واحدة",
+      two: "غرفة التنسيق، رسالتين",
+      few: "غرفة التنسيق، {n} رسائل",
+      other: "غرفة التنسيق، {n} رسالة",
     },
   },
   deskSummary: {

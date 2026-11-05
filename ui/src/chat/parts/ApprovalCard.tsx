@@ -4,12 +4,15 @@
 // the answers or the ticked rows with the choice. Once answered or withdrawn it is no longer waiting: it drops the
 // copper border and folds to one line (its title and the answer), which opens again on a click, so the next card
 // that waits is in sight without scrolling.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { coreLine, send } from "../../core";
-import { dir, fill, type Language, pick, t, type Text, texts, useLanguage } from "../../i18n";
+import { count, dir, fill, type Language, pick, t, type Text, texts, useLanguage } from "../../i18n";
 import { CapsForm } from "../../settings/AiSettings";
 import { type CardAnswer, cardKinds } from "./cardKinds";
 import type { CardData } from "./types";
+
+/** The event an answered card sends up to the chat. */
+export const CARD_ANSWERED = "qsone:card-answered";
 
 type Labels = Record<string, keyof typeof texts>;
 const allow: Labels = { yes: "allowOnce", brief: "allowBrief", no: "dontAllow" };
@@ -47,6 +50,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
   const [failed, setFailed] = useState<Text>();
   const [sent, setSent] = useState<CardAnswer>({});
   const [unfolded, setUnfolded] = useState(false);
+  const box = useRef<HTMLElement>(null);
   const settled = card.status === "settled" ? (card.choice ?? chosen) : chosen;
   const payload = card.payload;
   const Kind = payload ? cardKinds[card.kind] : undefined;
@@ -60,7 +64,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
     card.status === "withdrawn"
       ? t("withdrawn", lang)
       : kept && settled && settled !== "no"
-        ? fill(t("rowsKept", lang), { n: kept.length, total: payload!.rows!.length })
+        ? count("rowsKept", payload!.rows!.length, { kept: kept.length }, lang)
         : settled && fill(t("answered", lang), { choice: optionLabel(card.kind, settled, lang) });
 
   async function answer(choice: string, extra: CardAnswer = {}) {
@@ -72,6 +76,8 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
       setSent(extra);
       setChosen(choice);
       setRaising(false);
+      // the chat follows the Brief again: what the Lead QS says next shows (ChatLog)
+      box.current?.dispatchEvent(new CustomEvent(CARD_ANSWERED, { bubbles: true }));
     } else {
       setFailed(await coreLine(response, texts.answerNotSent));
     }
@@ -84,6 +90,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
 
   return (
     <section
+      ref={box}
       lang={lang}
       dir={dir(lang)}
       className={`flex min-w-0 flex-col gap-2 rounded-md border px-3 py-2 ${done ? "border-ink/10" : "border-copper"}`}

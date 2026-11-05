@@ -39,7 +39,7 @@ import { deskCounts, startActivity, useDeskCounts, workedOn } from "./live/activ
 import { isMac, isMod, isTyping, matches } from "./keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
-import { freeArea, readable, worldOf } from "./cover";
+import { freeArea, READABLE, readable, worldOf } from "./cover";
 import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
 import { select } from "./selection";
 import { SourceError } from "./sources";
@@ -252,9 +252,10 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
 
   /** Shows these frames in the middle of the free area. Computed from the layout itself, not from React Flow's
    * measured nodes: with onlyRenderVisibleElements a frame off screen is never measured, so fitView would leave it
-   * out. With `keepZoom`, only pans, unless the frames do not fit at the zoom there is. */
+   * out. With `keepZoom`, only pans, unless the frames do not fit at the zoom there is. With `minZoom`, never zooms out
+   * below it: what does not fit then shows from its top and its start (a tall Document opens readable, at its top). */
   const fitTo = useCallback(
-    (frames: readonly Placed[], { padding = 0.1, maxZoom = 1, animate = true, keepZoom = false } = {}) => {
+    (frames: readonly Placed[], { padding = 0.1, maxZoom = 1, minZoom = 0.1, animate = true, keepZoom = false } = {}) => {
       if (!frames.length) return;
       const area = free();
       const minX = Math.min(...frames.map((f) => f.x));
@@ -263,11 +264,17 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       const h = Math.max(...frames.map((f) => f.y + (f.collapsed ? STRIP_H : f.h))) - minY || 1;
       const fit = Math.min((area.w * (1 - 2 * padding)) / w, (area.h * (1 - 2 * padding)) / h);
       const now = store.getState().transform[2];
-      const zoom = keepZoom && now <= fit ? now : Math.min(maxZoom, 2, Math.max(0.1, fit));
-      void flow.setViewport(
-        { x: area.x + area.w / 2 - (minX + w / 2) * zoom, y: area.y + area.h / 2 - (minY + h / 2) * zoom, zoom },
-        { duration: animate ? duration() : 0 },
-      );
+      const zoom = keepZoom && now <= fit ? now : Math.min(maxZoom, 2, Math.max(minZoom, fit));
+      const across = w * zoom > area.w * (1 - 2 * padding);
+      const down = h * zoom > area.h * (1 - 2 * padding);
+      const edge = Math.min(padding, 0.04); // a frame that does not fit starts close to the edge
+      const x = !across
+        ? area.x + area.w / 2 - (minX + w / 2) * zoom
+        : dir() === "rtl"
+          ? area.x + area.w * (1 - edge) - (minX + w) * zoom
+          : area.x + area.w * edge - minX * zoom;
+      const y = down ? area.y + area.h * edge - minY * zoom : area.y + area.h / 2 - (minY + h / 2) * zoom;
+      void flow.setViewport({ x, y, zoom }, { duration: animate ? duration() : 0 });
     },
     [flow, store, free],
   );
@@ -412,7 +419,8 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       const node = nodesRef.current.find((n) => n.id === key);
       if (!node) return;
       setNodes(nodesRef.current.map((n) => (n.selected === (n.id === key) ? n : { ...n, selected: n.id === key })));
-      fitTo([placedOf(node)], { padding: 0.2, maxZoom: opts?.zoom ?? 1 });
+      // at a zoom it can be read at: a frame never opens on its poster (lod.ts)
+      fitTo([placedOf(node)], { padding: 0.2, maxZoom: Math.max(opts?.zoom ?? 1, READABLE), minZoom: READABLE });
       requestAnimationFrame(() => {
         document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
       });

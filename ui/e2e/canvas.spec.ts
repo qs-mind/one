@@ -3,7 +3,7 @@
 // Arabic, the layout comes back from the core after a reload, the keyboard reaches everything, shortcuts go by
 // KeyboardEvent.code, Arabic titles fit their strips, and nothing is kept in web storage.
 import { expect, test, type Page } from "@playwright/test";
-import { canvasReady, frame, mockCore, positionOf, small } from "./fixtures";
+import { canvasReady, frame, mockCore, positionOf, small, showAll } from "./fixtures";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -22,6 +22,7 @@ test("opening a project from the switcher shows its files, Deliverables and team
   await page.getByRole("button", { name: core.scene.project.name }).click();
 
   await canvasReady(page);
+  await showAll(page); // every frame on screen, not only the readable first view
   for (const key of ["files:all", "file:spec", "team:core", "desk:pricing", "deliverable:takeoff", "deliverable:pricing", "deliverable:quotes", "deliverable:letter"] as const)
     await expect(frame(page, key)).toBeVisible();
   await expect(page.locator(".react-flow__node")).toHaveCount(8);
@@ -58,6 +59,7 @@ test("a dragged frame is saved to the core and is where it was after a reload", 
   const core = await mockCore(page, small());
   await page.goto("/");
   await canvasReady(page);
+  await showAll(page); // every frame on screen, not only the readable first view
   const key = "deliverable:pricing";
   await expect(frame(page, key)).toBeVisible();
   const before = await positionOf(page, key);
@@ -178,6 +180,7 @@ test("a Deliverable that arrives on the live stream gets a frame, and no frame m
   const core = await mockCore(page, small());
   await page.goto("/");
   await canvasReady(page);
+  await showAll(page); // every frame on screen, not only the readable first view
   await expect(page.locator(".react-flow__node")).toHaveCount(8);
   const keys = ["files:all", "deliverable:pricing", "deliverable:letter", "team:core"] as const;
   const before = await Promise.all(keys.map((key) => positionOf(page, key)));
@@ -192,6 +195,7 @@ test("Delete and Backspace never remove a frame", async ({ page }) => {
   await mockCore(page, small());
   await page.goto("/");
   await canvasReady(page);
+  await showAll(page); // every frame on screen, not only the readable first view
   await frame(page, "deliverable:letter").locator("header h3").click();
   await page.keyboard.press("Delete");
   await page.keyboard.press("Backspace");
@@ -202,6 +206,7 @@ test("Arabic titles fit their name strips", async ({ page }) => {
   await mockCore(page, small());
   await page.goto("/");
   await canvasReady(page);
+  await showAll(page); // every frame on screen, not only the readable first view
   await expect(page.locator(".react-flow__node")).toHaveCount(8);
   const overflowing = await page.evaluate(() =>
     [...document.querySelectorAll<HTMLElement>(".react-flow__node [data-frame] > header")].flatMap((strip) => {
