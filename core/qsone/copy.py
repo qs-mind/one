@@ -1171,6 +1171,24 @@ AMOUNT_IS_COMPUTED = {
 }
 
 # Suggested changes.
+UNDO_ACCEPT_REASON = {
+    "en": "Undo of an accepted change in «{title}»",
+    "ar": "تراجع عن تعديل اتقبل في «{title}»",
+}
+
+UNDO_TOO_LATE = {
+    "en": "Too late to undo: this Deliverable changed since. Its Saved versions show what moved.",
+    "ar": "مينفعش تتراجع: المُخرَج ده اتغيّر من ساعتها. النسخ المحفوظة بتوضّح إيه اللي اتغيّر.",
+}
+
+UNDO_RECORDS = {
+    "en": (
+        "An Update from Project Records cannot be undone here: correct the number in "
+        "Project Records."
+    ),
+    "ar": "تحديث من سجلات المشروع مايتلغيش من هنا: صحّح الرقم في سجلات المشروع.",
+}
+
 CHANGE_STALE = {
     "en": "This cell changed after the change was suggested. Ask ONE again, or edit it yourself.",
     "ar": "الخلية دي اتغيرت بعد ما التعديل اتقترح. اطلب من ONE تاني، أو عدّلها بنفسك.",

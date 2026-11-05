@@ -948,6 +948,20 @@ export const texts = {
   undoDone: { en: "Back as it was.", ar: "رجع زي ما كان." },
   removedName: { en: "Removed «{name}»", ar: "اتشال «{name}»" },
   undoFailed: { en: "It was not put back. Add it again if you need it.", ar: "مارجعش. ضيفه تاني لو محتاجه." },
+  // The BOQ change review (ui/src/review/ChangesPanel.tsx)
+  reviewAcceptedShort: { en: "Accepted", ar: "اتقبل" },
+  changeSource: { en: "Source: {title}", ar: "المصدر: {title}" },
+  changeTyped: { en: "Typed in by the engineer", ar: "كتبه المهندس بنفسه" },
+  reviewKeys: { en: "J K or ↑ ↓ to move · A accept · R reject", ar: "J K أو ↑ ↓ للتنقل · A اقبل · R ارفض" },
+  // The message queue while ONE works (ui/src/shell/MessageQueue.tsx)
+  queueLabel: { en: "Queued messages", ar: "رسايل في الطابور" },
+  queueCount: { en: "Queued: {n}", ar: "في الطابور: {n}" },
+  queueAdd: { en: "Add to the queue", ar: "ضيفها للطابور" },
+  queueRemove: { en: "Remove from the queue: {text}", ar: "شيلها من الطابور: {text}" },
+  queueEdit: { en: "Edit: {text}", ar: "عدّل: {text}" },
+  queueEditField: { en: "Queued message", ar: "رسالة في الطابور" },
+  queueResume: { en: "Carry on with the queue", ar: "كمّل الطابور" },
+  queueHint: { en: "{keys} interrupts ONE", ar: "{keys} يقاطع ONE" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";

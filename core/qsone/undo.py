@@ -9,7 +9,8 @@ then. While the engineer points at the Undo (or it has focus) the screen pauses 
 window here pauses with it, so the time shown is the time there is. Each kind of thing says how it
 is put back and how it is purged.
 
-- `POST /undo/{token}` → 204, or 404 `{"error": UNDO_GONE}` once the window has ended.
+- `POST /undo/{token}` → 204, or 404 `{"error": UNDO_GONE}` once the window has ended, or 409
+  `{"error": text}` when the kind's restore says why it cannot be put back.
 - `POST /undo/{token}/pause` and `/resume` → 204 (404 once it has ended)."""
 
 import asyncio
@@ -47,15 +48,19 @@ class Trash:
         self.grace_s = grace_s
         self._later = later
         self._clock = clock
-        self._kinds: dict[str, tuple[Callable[[dict], bool], Callable[[dict], None]]] = {}
+        self._kinds: dict[str, tuple[Callable[[dict], bool | dict], Callable[[dict], None]]] = {}
         # token -> (purge handle, deadline) while it runs, or (None, seconds left) while paused
         self._windows: dict[str, tuple[object | None, float]] = {}
 
     def kind(
-        self, name: str, *, restore: Callable[[dict], bool], purge: Callable[[dict], None]
+        self,
+        name: str,
+        *,
+        restore: Callable[[dict], bool | dict],
+        purge: Callable[[dict], None],
     ) -> None:
         """`restore(entry)` puts it back (False when it cannot be, e.g. its name was taken
-        again); `purge(entry)` drops what was kept aside."""
+        again, or the {en, ar} words that say why); `purge(entry)` drops what was kept aside."""
         self._kinds[name] = (restore, purge)
 
     def _held(self) -> dict[str, dict]:
@@ -82,8 +87,9 @@ class Trash:
         self._run(token, self.window_s)
         return {"undo": token, "window_ms": round(self.window_s * 1000)}
 
-    def undo(self, token: str) -> bool:
-        """Puts it back; False when the window has ended (or it was undone already)."""
+    def undo(self, token: str) -> bool | dict:
+        """Puts it back; False when the window has ended (or it was undone already), or the
+        restore's own words when it could not be."""
         held = self._held()
         found = held.pop(token, None)
         if found is None or found["kind"] not in self._kinds:
@@ -142,7 +148,10 @@ def router(trash: Trash) -> APIRouter:
 
     @r.post("/undo/{token}")
     async def undo(token: str) -> Response:
-        return Response(status_code=204) if trash.undo(token) else gone()
+        done = trash.undo(token)
+        if isinstance(done, dict):
+            return JSONResponse({"error": done}, status_code=409)
+        return Response(status_code=204) if done else gone()
 
     @r.post("/undo/{token}/pause")
     async def pause(token: str) -> Response:

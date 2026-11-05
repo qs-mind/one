@@ -352,6 +352,10 @@ WORKLOG_SQL = (
     "ALTER TABLE briefs ADD COLUMN worklog TEXT CHECK (worklog IS NULL OR json_valid(worklog))"
 )
 
+# Undo after an accept: the audit trail's last row before the accept's own writes, so an Undo
+# takes back exactly what that accept wrote (`deliverables.revert`). NULL for any other version.
+UNDO_SQL = "ALTER TABLE versions ADD COLUMN audit_from INTEGER"
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -362,4 +366,5 @@ MIGRATIONS: list[str] = [
     FOLDERS_SQL,
     EFFORT_SQL,
     WORKLOG_SQL,
+    UNDO_SQL,
 ]

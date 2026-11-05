@@ -14,6 +14,7 @@ export function UndoNotice({
   windowMs,
   onUndone,
   onEnd,
+  takeFocus = true,
 }: {
   /** What was removed: «اتشال «عينة»». */
   label: string;
@@ -22,6 +23,8 @@ export function UndoNotice({
   windowMs: number;
   onUndone: () => void;
   onEnd: () => void;
+  /** Off when the focus is still somewhere useful (a keyboard review going on); else it comes here. */
+  takeFocus?: boolean;
 }) {
   useLanguage();
   const box = useRef<HTMLDivElement>(null);
@@ -54,7 +57,7 @@ export function UndoNotice({
         fill: "forwards",
       });
     }
-    box.current?.focus({ preventScroll: true }); // the removed row's button is gone: focus stays here, not lost
+    if (takeFocus) box.current?.focus({ preventScroll: true }); // the removed row's button is gone: focus stays here
     run();
     return () => {
       clearTimeout(timer.current);

@@ -50,6 +50,8 @@ export type GridProps<R extends SheetRow> = {
   editText: (row: R, column: SheetColumn) => string;
   /** A click on a cell, or Space on the active one (byKey): the source of a number. */
   onActivate?: (row: R, column: SheetColumn, element: HTMLElement, byKey: boolean) => void;
+  /** A class for a row of the owner's (the change review dims the rows with no change). */
+  rowClass?: (row: R) => string | undefined;
   /** One row pinned at the bottom: the bill total. */
   summary?: (column: SheetColumn) => ReactNode;
   label?: string;
@@ -235,7 +237,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
         enableVirtualization={props.virtualize ?? true}
         bottomSummaryRows={summary ? [{}] : undefined}
         style={theme}
-        rowClass={(g) => (g.row.kind === "section" ? "bg-stone/60" : undefined)}
+        rowClass={(g) => [g.row.kind === "section" ? "bg-stone/60" : "", props.rowClass?.(g.row) ?? ""].join(" ").trim() || undefined}
         onCellMouseDown={onCellMouseDown}
         onCellClick={({ row, column }, event) => {
           const target = columns[column.idx];

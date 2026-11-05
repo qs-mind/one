@@ -1,15 +1,22 @@
-// The Suggested changes of one Deliverable: "Update from Project Records" first, then each pending change with who
-// made it, why, its old value struck and its new one beside it, what the QS Calc Engine would recalculate with it,
-// and ✓ ✗. The engineer decides; nothing here computes. Changes that no longer apply are listed in plain words.
-import { useState } from "react";
-import { deliverablesApi } from "../deliverables/api";
+// The Suggested changes of one Deliverable, the BOQ change review: "Update from Project Records" first, then each
+// pending change with who made it, why, the source of its new number, its new value in Copper over the old one struck
+// in Slate, what the QS Calc Engine would recalculate with it, and ✓ ✗. The engineer decides; nothing here computes.
+// Accepting applies at once, and the owner shows «اتقبل · تراجع» (`onAccepted`). J/K or ↑/↓ move between changes
+// (by the key's place, so the Arabic layout works too), A accepts and R rejects; the change moved to reveals its new
+// value (220 ms, ONE's ease; at once with reduced motion) and the viewer scrolls to it. Changes that no longer apply
+// are listed in plain words.
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { deliverablesApi, type Accepted } from "../deliverables/api";
 import type { Anchor } from "../canvas/types";
 import type { CellChange, Change, RecordsCell, Segment, View } from "../deliverables/types";
-import { asCell } from "../deliverables/types";
+import { asCell, isNumber } from "../deliverables/types";
 import { fill, pick, t, type Text } from "../i18n";
+import { useSourceCard } from "../sources/useSourceCard";
+import { DUR, play } from "../ui/motion";
+import { REVEAL } from "../viewers/sheet/cells";
 import { fieldKey, numberName } from "../viewers/sheet/clipboard";
 import { titleColumnOf } from "../viewers/sheet/heights";
-import { authorName, cellPlace, cellValue, rowName, when } from "./place";
+import { authorName, cellPlace, cellValue, columnName, rowName, when } from "./place";
 
 const FOLD = 5; // more recalculated cells than this are folded
 
@@ -24,7 +31,14 @@ export type ChangesPanelProps = {
   onLocate?: (anchor: Anchor) => void;
   /** Says a finished accept or reject in the viewer's one status region. */
   announce?: (line: string) => void;
+  /** After an accept: its answer (with its Undo), and whether it came from the keyboard (the focus stays here). */
+  onAccepted?: (answer: Accepted, how: { keys: boolean }) => void;
+  /** The change the engineer is on, for the viewer to show it; null when none waits. */
+  onCurrent?: (change: Change | null) => void;
 };
+
+/** Keys by their place on the keyboard, not the letter they type: J is «ت» on an Arabic layout. */
+const MOVES: Record<string, 1 | -1> = { KeyJ: 1, ArrowDown: 1, KeyK: -1, ArrowUp: -1 };
 
 /** The column a sheet op edits, so the change can name its cell. */
 function columnOf(view: View, change: Change): string | undefined {
@@ -42,20 +56,18 @@ function targetOf(change: Change): string | null {
   return op.row ?? op.block ?? null;
 }
 
+/** The new value in Copper, then the old one struck through in Slate. */
 function OldNew({ before, after }: { before: string | null; after: string | null }) {
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-2">
+      <ins data-reveal className="inline-block font-semibold text-copper no-underline">
+        <bdi dir="auto">{after ?? "—"}</bdi>
+      </ins>
       {before !== null && (
         <del className="text-slate">
           <bdi dir="auto">{before}</bdi>
         </del>
       )}
-      <span aria-hidden className="text-slate">
-        →
-      </span>
-      <ins className="font-semibold text-ink no-underline">
-        <bdi dir="auto">{after ?? "—"}</bdi>
-      </ins>
     </span>
   );
 }
@@ -178,7 +190,28 @@ function What({ view, change, onLocate }: { view: View; change: Change; onLocate
   }
 }
 
-export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLocate, announce }: ChangesPanelProps) {
+/** Where the change's new number comes from: its source, which opens its card; or that the engineer typed it. */
+function SourceOf({ view, change, open }: { view: View; change: Change; open: (from: HTMLElement, label: string, focus: boolean) => void }) {
+  const after = asCell(change.after);
+  if (!isNumber(after)) return null;
+  const source = after.source ? change.sources?.[after.source] : undefined;
+  if (!source) return change.author === "engineer" ? <span className="text-sm text-slate">{t("changeTyped")}</span> : null;
+  const label = fill(t("changeSource"), { title: source.title });
+  const column = columnOf(view, change);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="self-start rounded-md bg-stone px-2 py-0.5 text-sm hover:text-copper focus-visible:outline-2 focus-visible:outline-ink"
+      onClick={(event) => open(event.currentTarget, column ? columnName(view, column) : "", event.detail === 0)}
+    >
+      <bdi dir="auto">{label}</bdi>
+      {(after.dated ?? source.dated) && <span className="text-slate"> · {after.dated ?? source.dated}</span>}
+    </button>
+  );
+}
+
+export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLocate, announce, onAccepted, onCurrent }: ChangesPanelProps) {
   const [failed, setFailed] = useState<Text | null>(null);
   const [updateFirst, setUpdateFirst] = useState<string[] | null>(null); // ids refused until the update joins them
   const [busy, setBusy] = useState(false);
@@ -187,8 +220,53 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
     .sort((a, b) => Number(b.op.op === "update_from_records") - Number(a.op.op === "update_from_records"));
   const update = pending.find((c) => c.op.op === "update_from_records");
   const mine = pending.filter((c) => c.author === "engineer");
+  const sourceCard = useSourceCard(projectId);
 
-  async function accept(which: { ids: string[] } | { mine: true }) {
+  // The change the engineer is on: kept by its place in the list, so after an accept the next one takes it
+  const [at, setAt] = useState(0);
+  const index = Math.min(at, Math.max(pending.length - 1, 0));
+  const currentChange = pending[index] ?? null;
+  const items = useRef(new Map<string, HTMLLIElement>());
+  const moved = useRef(false);
+  const reported = useRef(onCurrent);
+  reported.current = onCurrent;
+  useEffect(() => reported.current?.(currentChange), [currentChange?.id]); // only when the change moves
+  useLayoutEffect(() => {
+    if (!moved.current || !currentChange) return;
+    moved.current = false;
+    const item = items.current.get(currentChange.id);
+    for (const el of item?.querySelectorAll("[data-reveal]") ?? []) void play(el, REVEAL, DUR.base);
+  }, [currentChange?.id]); // only when the change moves
+
+  function moveTo(next: number) {
+    const change = pending[next];
+    if (!change) return;
+    moved.current = next !== index;
+    setAt(next);
+    items.current.get(change.id)?.focus();
+    const target = targetOf(change);
+    if (target) onLocate?.({ row: target, column: columnOf(view, change) });
+  }
+
+  function onKeys(event: KeyboardEvent<HTMLOListElement>) {
+    const target = event.target as HTMLElement;
+    if (event.ctrlKey || event.metaKey || event.altKey || target.matches("input, textarea, select")) return;
+    const step = MOVES[event.code];
+    if (step) {
+      event.preventDefault();
+      return moveTo(Math.min(Math.max(index + step, 0), pending.length - 1));
+    }
+    if (!currentChange || busy) return;
+    if (event.code === "KeyA") {
+      event.preventDefault();
+      void accept({ ids: [currentChange.id] }, true);
+    } else if (event.code === "KeyR") {
+      event.preventDefault();
+      void reject([currentChange.id]);
+    }
+  }
+
+  async function accept(which: { ids: string[] } | { mine: true }, keys = false) {
     setBusy(true);
     setFailed(null);
     setUpdateFirst(null);
@@ -203,6 +281,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
     }
     const { version } = answer.data;
     announce?.(version === null ? t("reviewNothingAccepted") : fill(t("reviewAccepted"), { n: version }));
+    if (version !== null) onAccepted?.(answer.data, { keys });
     onChanged();
   }
 
@@ -219,7 +298,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
 
   const button = "rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone disabled:opacity-40";
   return (
-    <section aria-label={t("reviewChanges")} className="flex flex-col gap-3">
+    <section ref={sourceCard.host} aria-label={t("reviewChanges")} className="relative flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         <button type="button" className={button} disabled={busy || pending.length === 0} onClick={() => void accept({ ids: pending.map((c) => c.id) })}>
           {t("reviewAcceptAll")}
@@ -245,12 +324,32 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
           )}
         </div>
       )}
-      {pending.length === 0 && <p className="text-slate">{t("reviewNoChanges")}</p>}
-      <ol className="flex flex-col gap-3">
-        {pending.map((change) => {
+      {pending.length === 0 ? (
+        <p className="text-slate">{t("reviewNoChanges")}</p>
+      ) : (
+        <p className="text-xs text-slate">{t("reviewKeys")}</p>
+      )}
+      <ol aria-label={t("reviewChanges")} className="flex flex-col gap-3" onKeyDown={onKeys}>
+        {pending.map((change, i) => {
           const records = change.op.op === "update_from_records";
+          const current = i === index;
           return (
-            <li key={change.id} className={`flex flex-col gap-2 rounded-xl border bg-paper px-4 py-3 ${records ? "border-ink" : "border-stone"}`}>
+            <li
+              key={change.id}
+              ref={(el) => {
+                if (el) items.current.set(change.id, el);
+                else items.current.delete(change.id);
+              }}
+              data-change
+              aria-current={current || undefined}
+              tabIndex={current ? 0 : -1}
+              onFocus={(event) => {
+                if (event.target === event.currentTarget && i !== index) setAt(i);
+              }}
+              className={`flex flex-col gap-2 rounded-xl border bg-paper px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ink/30 ${
+                records || current ? "border-ink" : "border-stone"
+              }`}
+            >
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="font-semibold">{records ? t("reviewRecordsMoved") : authorName(change.author)}</span>
                 {records && <span className="text-slate">{authorName(change.author)}</span>}
@@ -286,6 +385,14 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
                 </p>
               )}
               {change.note && <p className="text-copper">{pick(change.note)}</p>}
+              <SourceOf
+                view={view}
+                change={change}
+                open={(from, label, focus) => {
+                  const after = asCell(change.after);
+                  if (isNumber(after)) sourceCard.open(from, after, change.sources ?? {}, { label, focus });
+                }}
+              />
               <What view={view} change={change} onLocate={onLocate} />
               {change.follows.length > 0 && (
                 <div className="flex flex-col gap-0.5 ps-3 text-sm">
@@ -297,6 +404,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
           );
         })}
       </ol>
+      {sourceCard.card}
       {stale.length > 0 && (
         <details>
           <summary className="cursor-pointer text-slate">

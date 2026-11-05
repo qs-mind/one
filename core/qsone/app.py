@@ -196,7 +196,7 @@ def create_app(
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
     app.include_router(calc_routes.router(registry))
-    app.include_router(deliverables_api.router(registry))
+    app.include_router(deliverables_api.router(registry, trash))
     app.include_router(engine_routes.settings_router(ai_http, trash=trash))
     app.include_router(engine_routes.briefs_router(engine))
     app.include_router(canvas.router(registry, engine.waiting))

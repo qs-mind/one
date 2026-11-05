@@ -5,7 +5,8 @@
 // card or a Brief at work, it grows into a rounded box with a quiet row under the words: the Lead QS's model and its
 // effort for the next Brief, which the message carries. It folds back once it is empty and left (or on Escape).
 // Its motion is short and eases out, on transforms, opacity and the row's height only; none with reduced motion.
-import { type FocusEvent, useRef, useState } from "react";
+// While a Brief runs, Enter queues the message (./MessageQueue.tsx) and Ctrl/⌘+Enter steers the Brief now.
+import { type FocusEvent, useEffect, useRef, useState } from "react";
 import { select, useSelection } from "../canvas/selection";
 import type { SelectionItem } from "../canvas/types";
 import { SelectionText } from "../chat/Chat";
@@ -13,6 +14,7 @@ import { sentFrom, takeSentFrom } from "../chat/sent";
 import { dir, t, type texts, useLanguage } from "../i18n";
 import { type Ai, keyOf } from "../settings/AiSettings";
 import { chip, EffortChip, ModelChip } from "./ComposerChips";
+import { MessageQueue, QueueHint, useMessageQueue } from "./MessageQueue";
 import type { ChatState } from "./useChats";
 
 const actions: Record<SelectionItem["kind"], (keyof typeof texts)[]> = {
@@ -85,6 +87,36 @@ export function CommandBar({
   const effort = settings?.effort && levels.includes(settings.effort) ? settings.effort : undefined;
   const shown = effort ?? card?.effort_default ?? "auto";
   const picked = ai?.picked.lead;
+
+  const queue = useMessageQueue(chat.chatId);
+
+  /** The words in the box go on the queue, with the selection they were written for. */
+  function enqueue() {
+    queue.add(draft, selection);
+    setDraft("");
+  }
+
+  /** The next queued message goes, as if sent now: a new Brief. One that does not go waits at the head. */
+  async function sendNext() {
+    const item = queue.take();
+    if (!item) return;
+    const model = picked && settings?.sheet.some((x) => keyOf(x) === keyOf(picked)) ? picked : undefined;
+    if (await chat.send(item.text, item.selection, { model, effort })) onSent?.();
+    else queue.putBack(item);
+  }
+
+  // When the Brief ends (and the queue is not paused by Stop), the next queued message goes by itself.
+  const wasRunning = useRef(chat.running);
+  useEffect(() => {
+    const was = wasRunning.current;
+    wasRunning.current = chat.running;
+    if (was && !chat.running) void sendNext();
+  }, [chat.running]); // sendNext reads the queue as it is then
+
+  function stop() {
+    queue.pause(); // the queue waits; «كمّل الطابور» carries on
+    void chat.halt();
+  }
 
   async function submit(words: string, typed: boolean) {
     if (!words.trim() || !chat.canSend) return;
@@ -185,7 +217,9 @@ export function CommandBar({
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
-              void submit(draft, true);
+              // while ONE works, Enter queues; Ctrl/⌘+Enter interrupts: it steers the Brief now
+              if (chat.running && !(event.ctrlKey || event.metaKey) && draft.trim()) enqueue();
+              else void submit(draft, true);
             } else if (event.key === "Escape" && draft === "" && open) {
               event.preventDefault();
               setDismissed(true);
@@ -221,19 +255,19 @@ export function CommandBar({
       </div>
       <div className="absolute bottom-1.5 end-1.5 flex items-center gap-1.5">
         {chat.running && hasWords && (
-          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={() => void chat.halt()} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
+          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
             <Square />
           </button>
         )}
         {stopOnly ? (
-          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={() => void chat.halt()} className={`${round} bg-ink text-paper`}>
+          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-ink text-paper`}>
             <Square />
           </button>
         ) : (
           <button
             type="submit"
-            aria-label={t("send")}
-            title={t("send")}
+            aria-label={chat.running ? t("queueAdd") : t("send")}
+            title={chat.running ? t("queueAdd") : t("send")}
             disabled={!hasWords || !chat.canSend}
             className={`${round} bg-ink text-paper disabled:cursor-default disabled:opacity-20 disabled:active:scale-100`}
           >
@@ -261,10 +295,16 @@ export function CommandBar({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void submit(draft, true);
+          if (chat.running) enqueue();
+          else void submit(draft, true);
         }}
       >
+        <MessageQueue queue={queue} canResume={!chat.running} onResume={() => {
+          queue.resume();
+          void sendNext();
+        }} />
         {box}
+        <QueueHint queue={queue} />
       </form>
     </section>
   );

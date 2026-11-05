@@ -144,7 +144,7 @@ describe("CommandBar", () => {
     render(<App />);
     await user.type(await box(), "سعّر{enter}");
     await screen.findByText(/مرحبا/);
-    await user.type(await box(), "كمان{enter}");
+    await user.type(await box(), "كمان{Control>}{enter}{/Control}"); // Ctrl+Enter steers; Enter would queue
     expect(await screen.findByRole("alert")).toHaveTextContent("مش شغال.");
     expect(await box()).toHaveValue("كمان");
   });
