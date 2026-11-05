@@ -1,6 +1,7 @@
 """The journey's routes (Plan 8): the first launch's steps, the AI consent, Claude Code, the AI
 check, the introduction card and the outside links the core opens for the page (decision 6);
-and a tender folder's "I understood this" card."""
+a tender folder's "I understood this" card; and closing a project: the checklist, its lessons
+and the archive."""
 
 import asyncio
 import webbrowser
@@ -10,10 +11,10 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from qsone import chat, usage
+from qsone import chat, copy, usage
 from qsone.engine import connectors as engine_connectors
 from qsone.engine.connectors import claude_code as claude_link
-from qsone.journey import claude_code, engineer, setup_state, understand
+from qsone.journey import claude_code, closing, engineer, setup_state, understand
 from qsone.journey.setup_state import Language, State
 
 LINKS = {
@@ -66,6 +67,12 @@ class FactsIn(BaseModel):
 
     facts: dict[FactName, FactIn] = Field(default_factory=dict)
     approve: bool = False
+
+
+class CarryIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    carry: bool
 
 
 def _not_saved() -> JSONResponse:
@@ -165,6 +172,50 @@ def router(engine: Any) -> APIRouter:
         except NoAI as none:
             return JSONResponse({"error": none.text}, status_code=409)
         return JSONResponse({"brief_id": brief_id}, status_code=202)
+
+    @r.get("/projects/{project_id}/closing")
+    async def get_closing(project_id: str) -> dict:
+        rec = engine.projects.get(project_id)
+        return await asyncio.to_thread(closing.checklist, rec, engine.engineer_records())
+
+    @r.post("/projects/{project_id}/lessons/propose", status_code=202)
+    async def propose_lessons(project_id: str) -> JSONResponse:
+        """The lessons Brief (202); a Confidential Project has none to propose (409)."""
+        from qsone.engine.runner import BriefBusy, NoAI
+
+        rec = engine.projects.get(project_id)
+        try:
+            brief_id = await closing.propose_lessons(rec, engine)
+        except BriefBusy as busy:
+            return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
+        except NoAI as none:
+            return JSONResponse({"error": none.text}, status_code=409)
+        if brief_id is None:
+            return JSONResponse({"error": copy.LESSON_STAYS_CONFIDENTIAL}, status_code=409)
+        return JSONResponse({"brief_id": brief_id}, status_code=202)
+
+    @r.post("/projects/{project_id}/lessons/{lesson_id}")
+    async def carry_lesson(project_id: str, lesson_id: str, body: CarryIn) -> dict:
+        rec, mine = engine.projects.get(project_id), engine.engineer_records()
+        carried = await asyncio.to_thread(closing.carry, rec, mine, lesson_id, carry=body.carry)
+        return {"carried": carried}
+
+    @r.post("/projects/{project_id}/archive")
+    async def archive(project_id: str) -> JSONResponse:
+        """{"archived_at", "backed_up", "note"}; refused (409) while a Brief runs in it."""
+        rec = engine.projects.get(project_id)
+        busy = engine.active(project_id)
+        if busy is not None:
+            body = {"brief_id": busy, "error": copy.ARCHIVE_WAITS_FOR_BRIEF}
+            return JSONResponse(body, status_code=409)
+        done = await asyncio.to_thread(closing.archive, rec, engine.projects.backups)
+        return JSONResponse(done)
+
+    @r.post("/projects/{project_id}/unarchive")
+    async def unarchive(project_id: str) -> dict:
+        rec = engine.projects.get(project_id)
+        await asyncio.to_thread(closing.unarchive, rec)
+        return {"archived_at": rec.archived_at}
 
     @r.get("/projects/{project_id}/facts")
     async def get_facts(project_id: str) -> dict:

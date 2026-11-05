@@ -2089,6 +2089,22 @@ UNDERSTAND_BRIEF = {
     "en": "Read the tender folder I just added and fill in the “I understood this” card.",
     "ar": "اقرا فولدر المناقصة اللي لسه ضايفه واملا بطاقة «فهمت كده».",
 }
+LESSONS_BRIEF = {
+    "en": "Before I close this project, propose the lessons learned from how we worked on it.",
+    "ar": "قبل ما أقفل المشروع ده، اقترح الدروس المستفادة من طريقة شغلنا فيه.",
+}
+LESSON_STAYS_CONFIDENTIAL = {
+    "en": "This is a Confidential Project, so its lessons stay in it.",
+    "ar": "ده مشروع سري، فدروسه بتفضل جوّاه.",
+}
+LESSON_NOT_FOUND = {
+    "en": "This lesson is not in the project.",
+    "ar": "الدرس ده مش موجود في المشروع.",
+}
+ARCHIVE_WAITS_FOR_BRIEF = {
+    "en": "A Brief is still running in this project. Let it finish or stop it, then archive.",
+    "ar": "فيه تكليف لسه شغال في المشروع ده. استنى لما يخلص أو وقّفه، وبعدين أرشف.",
+}
 
 # The updater.
 UPDATE_FAILED = {

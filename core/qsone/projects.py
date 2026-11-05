@@ -121,6 +121,7 @@ class Projects:
             "name": meta["name"],
             "created_at": meta["created_at"],
             "confidential": meta.get("confidential") == "1",  # a Confidential Project
+            "archived_at": meta.get("archived_at"),  # read-only while set (Plan 8)
         }
         return self._known[rec.id]
 
