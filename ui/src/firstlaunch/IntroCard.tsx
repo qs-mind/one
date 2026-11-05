@@ -2,8 +2,8 @@
 // reads one line of it. The currency follows the country and can be changed; a city is kept as typed, in any language.
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { api } from "../api";
-import { send } from "../core";
-import { t, texts, useLanguage } from "../i18n";
+import { coreLine, send } from "../core";
+import { pick, t, type Text, texts, useLanguage } from "../i18n";
 import { field, type Nav, option, primary, StepScreen } from "./parts";
 
 type Role = "contractor" | "consultant" | "owner" | "procurement";
@@ -25,13 +25,21 @@ const countries: [Country, keyof typeof texts][] = [
 const CURRENCY: Partial<Record<Country, string>> = { EG: "EGP", SA: "SAR", AE: "AED" };
 const CODE = /^[A-Z]{3}$/;
 
+// The core's own words for a refusal; the currency hint only when the core refused the currency (a 422 on that field).
+async function notSaved(response: Response | undefined): Promise<Text> {
+  if (response?.status !== 422) return coreLine(response, texts.cardNotSavedRetry);
+  const body = (await response.json().catch(() => undefined)) as { detail?: { loc?: unknown[] }[] } | undefined;
+  const currency = body?.detail?.some((d) => Array.isArray(d.loc) && d.loc.at(-1) === "currency");
+  return currency ? texts.cardNotSaved : texts.cardNotSavedRetry;
+}
+
 export function IntroCard({ nav }: { nav: Nav }) {
   useLanguage();
   const [role, setRole] = useState<Role>();
   const [country, setCountry] = useState<Country | "">("");
   const [city, setCity] = useState("");
   const [currency, setCurrency] = useState("");
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<Text>();
   const [saving, setSaving] = useState(false);
   const ids = { role: useId(), help: useId() };
 
@@ -62,10 +70,10 @@ export function IntroCard({ nav }: { nav: Nav }) {
     event.preventDefault();
     if (!role || !country) return;
     setSaving(true);
-    setFailed(false);
+    setFailed(undefined);
     const response = await send("/engineer/card", "PUT", { role, country, city: city.trim(), currency });
     setSaving(false);
-    if (!response?.ok) return setFailed(true);
+    if (!response?.ok) return setFailed(await notSaved(response));
     await nav.pass("done");
   }
 
@@ -76,7 +84,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
         title={t("cardTitle")}
         help={t("cardHelp")}
         nav={nav}
-        failed={failed && t("cardNotSaved")}
+        failed={failed && pick(failed)}
         next={
           <button type="submit" disabled={!ready} className={primary}>
             {t("setupNext")}

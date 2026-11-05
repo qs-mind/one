@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import secrets
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -258,6 +259,32 @@ def ensure_key_doc(
         doc = wrap(key, project_id=project_id, backup_key=current)
         write_doc(path, doc)
     return doc
+
+
+def recover(doc: dict | None, escrow: Callable[[], Escrow | None]) -> bytes:
+    """The key in a key.json wrapped by the Backup key, with this computer's Backup key (current
+    or kept) or the account's (`escrow`, asked only when this computer has not got it; it becomes
+    this computer's when there is none). Raises `RecordsError` PROJECT_KEY_MISSING (no Backup key
+    wrap, as for a Confidential Project), `BackupError` BACKUP_NEEDS_SIGN_IN or BACKUP_KEY_WRONG,
+    and `KeyringError`."""
+    if doc is None or doc.get("kind") != KIND_KEY:
+        raise RecordsError(copy.PROJECT_KEY_MISSING)
+    wanted = str(doc.get("key_id"))
+    found = known_key(wanted)
+    account = escrow() if found is None else None
+    if account is not None:
+        try:
+            kept = account.get()
+        except Exception as e:  # noqa: BLE001 - offline: the engineer is told what is needed
+            log.warning("The Backup key escrow failed (%s)", type(e).__name__)
+            kept = None
+        if kept is not None and key_id(kept) == wanted:
+            found = kept
+            if backup_key() is None:
+                set_backup_key(kept)
+    if found is None:
+        raise BackupError(copy.BACKUP_NEEDS_SIGN_IN)
+    return unwrap(doc, backup_key=found)
 
 
 def _key_files(data_dir: Path, base: Path | None) -> list[Path]:

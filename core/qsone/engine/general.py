@@ -11,6 +11,7 @@ show a card (`data-hand-off`): nothing moves and nothing is created until the en
 Importing this module registers the three tools."""
 
 import json
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Annotated
@@ -19,24 +20,25 @@ from uuid import uuid4
 from pydantic import StringConstraints
 
 from qsone import copy
+from qsone.backup.keys import Escrow
 from qsone.engine import agents
 from qsone.engine.tools import REGISTRY, ToolContext, register_functions
 from qsone.engine.tools_records import RECORDS_TOOLS
 from qsone.engine.types import AgentSpec, Data
-from qsone.records.project import FILE_NAME, Records, RecordsError
+from qsone.records import engineer as engineer_file
+from qsone.records.project import Records, RecordsError
 
-FOLDER = "engineer"
-NAME = "Engineer Records"
+FOLDER = engineer_file.FOLDER
+NAME = engineer_file.NAME
 HAND_OFF = "hand-off"  # the card's data part: `data-hand-off`
 
 
-def open_engineer_records(data_dir: Path) -> Records:
-    """Creates the file on first use and opens it otherwise. Raises what `Records.create` and
-    `Records.open` raise. Close it when done."""
-    folder = Path(data_dir) / FOLDER
-    if (folder / FILE_NAME).is_file():
-        return Records.open(folder)
-    return Records.create(folder, name=NAME, actor="engineer")
+def open_engineer_records(
+    data_dir: Path, escrow: Callable[[], Escrow | None] = lambda: None
+) -> Records:
+    """Creates the file on first use and opens it otherwise (`records/engineer.py`, with its own
+    key per data folder). Raises `RecordsError`. Close it when done."""
+    return engineer_file.open_records(Path(data_dir), escrow)
 
 
 # The three tools -------------------------------------------------------------------------------

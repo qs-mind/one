@@ -10,19 +10,20 @@ import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 from keyring.errors import KeyringError
 
 from qsone import copy
 from qsone.backup import keys
 from qsone.backup.keys import BackupError
-from qsone.records import db, vault
+from qsone.records import db, engineer, vault
 from qsone.records.project import FILE_NAME, Records
 
 log = logging.getLogger(__name__)
 
 BACKUP_DIR = "QS Mind One Backup"
-ENGINEER = "engineer"  # the Engineer Records folder, backed up as one more id
+ENGINEER = engineer.FOLDER  # the Engineer Records folder, backed up as one more id
 _ID = re.compile(r"[0-9a-f]{32}")
 _STAMP = "%Y-%m-%dT%H%M%SZ"  # no colons: a valid file name on every system
 
@@ -71,13 +72,14 @@ def _remove(part: Path) -> None:
         path.unlink(missing_ok=True)
 
 
-def _name(path: Path, key: bytes) -> str:
-    """Opens a copy read-only, checks it, and gives the project's name. Raises `DatabaseError`."""
+def _name(path: Path, key: bytes, field: str = "name") -> str:
+    """Opens a copy read-only, checks it, and gives the project's name (or another meta field,
+    "" when it has none). Raises `DatabaseError`."""
     conn = db.connect(path, key, readonly=True)
     try:
         if conn.execute("PRAGMA user_version").fetchone()[0] < 1:
             raise db.DatabaseError("no schema")
-        row = conn.execute("SELECT value FROM meta WHERE key = 'name'").fetchone()
+        row = conn.execute("SELECT value FROM meta WHERE key = ?", (field,)).fetchone()
         return row[0] if row else ""
     finally:
         conn.close()
@@ -226,13 +228,19 @@ def restore(
             name = _name(part, key)
         except db.DatabaseError:
             raise BackupError(copy.PROJECT_DAMAGED) from None
-        vault.put_key(project_id, key)
+        if project_id == ENGINEER:  # its key goes under the id in its meta (a new one if none)
+            engineer_id = _name(part, key, engineer.META) or uuid4().hex
+            vault.put_key(engineer.key_id(engineer_id), key)
+        else:
+            vault.put_key(project_id, key)
         for side in ("-wal", "-shm", "-journal"):
             (home / f"{FILE_NAME}{side}").unlink(missing_ok=True)
         os.replace(part, home / FILE_NAME)
     except BaseException:
         _remove(part)
         raise
+    if project_id == ENGINEER:
+        engineer.write_id(home, engineer_id)
     if doc.get("kind") == keys.KIND_CODE:
         keys.write_doc(home / keys.KEY_FILE, doc)  # a Confidential Project keeps its code wrap
     else:
