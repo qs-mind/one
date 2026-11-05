@@ -233,6 +233,7 @@ def test_team_and_activity_routes(serve_app):
                         break
     [agent] = team_now["agents"]
     assert agent["role"] == copy.ROLE_LEAD and agent["state"] in ("thinking", "working")
+    assert agent["kind"] == "lead" and got[0]["agent"]["kind"] == "lead"
     assert got[0]["agent"]["id"] == agent["id"] and got[-1] == {
         "type": "agent-gone",
         "id": agent["id"],
