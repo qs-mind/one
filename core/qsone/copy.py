@@ -264,8 +264,7 @@ NUMBER_SUPERSEDED = {
 TOOL_REFUSED = {
     "en": "ONE refused this step: {why} The team is fixing it; if it keeps happening, tell the "
     "Lead QS what to do.",
-    "ar": "ONE رفض الخطوة دي: {why} الفريق بيصلّحها؛ ولو اتكررت، قول لكبير مهندسي الكميات يعمل "
-    "إيه.",
+    "ar": "ONE رفض الخطوة دي: {why} الفريق بيصلّحها؛ ولو اتكررت، قول لكبير مهندسي الكميات يعمل إيه.",
 }
 
 # A row whose item has two current numbers of one name (written before 5 Nov 2026).
@@ -330,6 +329,13 @@ AI_BUSY = {
 AI_FAILED = {
     "en": "The work stopped because of a problem with {provider}. The work so far is saved.",
     "ar": "الشغل وقف بسبب مشكلة في {provider}. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
+}
+# A bug inside ONE itself: never the provider's fault (tender day, 5 Nov 2026).
+CORE_FAILED = {
+    "en": "The work stopped because of a problem inside ONE, not with the AI. The work so far is "
+    "saved. Send the same request again; if it stops again, tell the QS Mind team.",
+    "ar": "الشغل وقف بسبب مشكلة جوّه ONE نفسه، مش في الذكاء الاصطناعي. الشغل اللي اتعمل لحد "
+    "دلوقتي محفوظ. ابعت نفس الطلب تاني؛ ولو وقف تاني، بلّغ فريق كيو إس مايند.",
 }
 # The provider's own reason, in plain words (audit B7): a model it retired, and the one it names.
 MODEL_GONE_TRY = {
@@ -1788,11 +1794,13 @@ BOQ_WHY_HEADER = {"en": "the column headings again", "ar": "عناوين الأ�
 BOQ_FIELDS = {
     "code": {"en": "Item no.", "ar": "رقم البند"},
     "description": {"en": "Description", "ar": "الوصف"},
+    "description_2": {"en": "Description, other language", "ar": "الوصف باللغة التانية"},
     "unit": {"en": "Unit", "ar": "الوحدة"},
     "quantity": {"en": "Quantity", "ar": "الكمية"},
     "rate": {"en": "Rate", "ar": "الفئة"},
     "amount": {"en": "Amount", "ar": "الإجمالي"},
 }
+BOQ_NOT_USED = {"en": "Not used", "ar": "مش مستخدم"}
 BOQ_FILE = {"en": "the BOQ file", "ar": "ملف المقايسة"}
 DOING_BOQ_PREVIEW = {
     "en": "Look at the BOQ columns in {name}",
@@ -1824,8 +1832,9 @@ BOQ_CONFIRM_DETAIL = {
 }
 BOQ_CONFIRM_SKIPPED = {"en": "Left out: {count}.", "ar": "واتساب {count}."}
 BOQ_CONFIRM_TICK = {
-    "en": "Tick each column that is right. An unticked rate or amount is left out.",
-    "ar": "علّم على كل عمود صح. الفئة أو الإجمالي اللي مش متعلّم عليه مش هيتستورد.",
+    "en": "Check what each column holds and change any that is wrong. A column set to «Not used» "
+    "is left out.",
+    "ar": "راجع كل عمود فيه إيه، وغيّر اللي غلط. العمود اللي «مش مستخدم» مش هيتستورد.",
 }
 BOQ_CONFIRM_HIDDEN = {
     "en": "Hidden in Excel and left out: {count}.",
@@ -1842,7 +1851,7 @@ BOQ_CONFIRM_FLAGGED = {
     "{count}. بيتستورد كبيانات بس.",
 }
 BOQ_CARD_COLUMNS = {
-    "field": {"en": "What", "ar": "البيان"},
+    "meaning": {"en": "What it holds", "ar": "فيه إيه"},
     "column": {"en": "Column", "ar": "العمود"},
     "header": {"en": "Its heading in the file", "ar": "عنوانه في الملف"},
     "example": {"en": "First values", "ar": "أول القيم"},
@@ -1852,8 +1861,12 @@ BOQ_NOT_CONFIRMED = {
     "ar": "المهندس ماأكدش الأعمدة، فمااتستوردش حاجة.",
 }
 BOQ_REQUIRED_UNTICKED = {
-    "en": "The engineer did not tick the {fields} column, so nothing was imported.",
-    "ar": "المهندس ماعلّمش على عمود {fields}، فمااتستوردش حاجة.",
+    "en": "The engineer did not set the {fields} column, so nothing was imported.",
+    "ar": "المهندس ماحددش عمود {fields}، فمااتستوردش حاجة.",
+}
+BOQ_MEANING_TWICE = {
+    "en": "The engineer set {fields} on more than one column, so nothing was imported.",
+    "ar": "المهندس حدد {fields} لأكتر من عمود، فمااتستوردش حاجة.",
 }
 
 # Evidence for numbers.

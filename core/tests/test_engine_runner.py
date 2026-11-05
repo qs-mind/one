@@ -766,6 +766,22 @@ async def test_no_to_a_costlier_model_fails_plainly(make_engine, project):
     assert seen[-1].step == copy.fill(copy.AI_FAILED, provider="Claude")
 
 
+def core_bug(messages, info):
+    raise KeyError("unit")  # tender day: deliverables/ops.py:115, blamed on Google Gemini
+
+
+async def test_a_bug_in_one_is_never_blamed_on_the_provider(make_engine, project):
+    claude = links(only_anthropic=True)[0]
+    claude.models[HAIKU.choice.model] = scripted(core_bug)
+    roles.choose("lead", HAIKU.choice)
+    engine = await started(make_engine([claude]))
+    brief = await engine.start_brief(project, BRIEF)
+    seen = [event async for event in engine.events(brief)]
+    assert states(seen)[-1] == "failed"
+    assert seen[-1].step == copy.CORE_FAILED
+    assert "Claude" not in seen[-1].step["en"]
+
+
 async def test_no_internet_waits_then_continues(make_engine, project, fake_sleep):
     lead = scripted(offline, offline, offline, offline, offline, said("رجع النت - عينة"))
     engine = await started(make_engine(links(lead=lead)))
