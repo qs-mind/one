@@ -541,13 +541,19 @@ def brain(messages: list, info: AgentInfo) -> Step:
     seen = read(messages, info)
     if info.output_tools:  # the Checking QS: its verdict is the output tool
         tool = info.output_tools[0]
+        checked = ["(bench check) each number's source and date", "(bench check) the totals"]
         verdict = {
             "code": "A",
             "comments": [{"about": "bench", "text": "(bench check) Sample review, no finding."}],
+            "checked": checked,
         }
         if "not in the client's imported BOQ" in seen.brief:  # One's code found such rows
             text = "(bench check) Rows not in the client's BOQ: the engineer keeps or removes each."
-            verdict = {"code": "B", "comments": [{"about": EXTRA_CODE, "text": text}]}
+            verdict = {
+                "code": "B",
+                "comments": [{"about": EXTRA_CODE, "text": text}],
+                "checked": checked,
+            }
         part = ToolCallPart(tool.name, verdict, tool_call_id=f"bench-verdict-{uuid4().hex[:8]}")
         return Step((part,), USAGE)
     if "boq_import" in seen.tools and "ask_engineer" in seen.tools:

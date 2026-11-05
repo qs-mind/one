@@ -10,11 +10,13 @@ reasoning reaches the checker. Its tools only read; its output is a `Review` wit
 After `MAX_ROUNDS` Code C rounds on one Deliverable the engineer decides (`team`)."""
 
 import json
+import re
+from dataclasses import replace
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from qsone.engine import agents
+from qsone.engine import agents, truth
 from qsone.engine.data_text import as_data, new_fence
 from qsone.engine.numbers_guard import numbers_in
 from qsone.engine.store import Store
@@ -41,6 +43,11 @@ class ReviewOut(BaseModel):
 
     code: Literal["A", "B", "C"]
     comments: list[ReviewComment] = Field(default_factory=list, max_length=100)
+    checked: list[str] = Field(
+        min_length=1,
+        max_length=30,
+        description="each thing you checked, one line each (coverage, sources, units, maths…)",
+    )
 
 
 def _json(value) -> str:
@@ -157,6 +164,8 @@ def packet_for(
     numbers: list[dict] = []
     formulas: list[dict] = []
     sources: list[dict] = []
+    citations: list[dict] = []
+    coverage: dict | None = None
     if rec is not None:
         number_ids, calc_ids = refs(draft)
         with rec.read() as conn:
@@ -170,6 +179,9 @@ def packet_for(
                 if n["source_id"] not in source_ids:
                     source_ids.append(n["source_id"])
             sources = _sources(conn, source_ids)
+            cited = [*numbers, *(i for f in formulas for i in f["inputs"])]
+            citations = _citations(conn, cited)
+            coverage = _coverage(conn, draft)
     earlier = store.reviews(draft.id)
     previous = (
         ()
@@ -187,7 +199,85 @@ def packet_for(
         sources=tuple(sources),
         unsourced=tuple(unsourced),
         previous_comments=previous,
+        coverage=coverage,
+        citations=tuple(citations),
     )
+
+
+def _citations(conn, numbers: list[dict]) -> list[dict]:
+    """Each file-sourced number looked for at the place its source cites (`truth.value_at`)."""
+    out, seen = [], set()
+    for n in numbers:
+        key = (n.get("number_id") or n.get("id"), n["source_id"])
+        if key in seen or not n.get("source_id") or n.get("value") is None:
+            continue
+        seen.add(key)
+        found = truth.value_at(conn, n["source_id"], str(n["value"]))
+        if found is not None:
+            ok, where, there = found
+            out.append(
+                {"number_id": key[0], "value": n["value"], "where": where, "found": ok}
+                | ({} if ok else {"there": there})
+            )
+    return out
+
+
+_DIVISION = re.compile(r"[-/.\s]")
+
+
+def _division(code: str) -> str:
+    return _DIVISION.split(code.strip(), maxsplit=1)[0]
+
+
+def _coverage(conn, draft: DeliverableDraft) -> dict | None:
+    """How many of the client's BOQ items, in the divisions the Deliverable's rows touch, it
+    has (found by code). None when it has no row with a client item's code."""
+    codes = {
+        str(r["code"]).strip()
+        for r in draft.rows
+        if isinstance(r, dict) and isinstance(r.get("code"), str | int) and str(r["code"]).strip()
+    }
+    client = [
+        c
+        for (c,) in conn.execute("SELECT code FROM items WHERE kind = 'boq_item' AND code IS NOT NULL")
+    ]
+    have = codes & set(client)
+    if not have:
+        return None
+    divisions = {_division(c) for c in have}
+    wanted = [c for c in client if _division(c) in divisions]
+    missing = [c for c in wanted if c not in have]
+    return {"client_items": len(wanted), "in_deliverable": len(have), "missing": missing[:10]}
+
+
+def capped(packet: CheckPacket, review: Review) -> Review:
+    """The review under ONE's own checks: Code C when a number is not at the place its source
+    cites, at best B when the Deliverable leaves out client items in its divisions (a «كود A:
+    معتمد» on 4 rows of about 90 items, 5 Nov 2026). What it checked, `ReviewOut` requires."""
+    code, comments = review.code, list(review.comments)
+    for c in packet.citations:
+        if not c["found"]:
+            code = "C"
+            there = ", ".join(c.get("there") or []) or "no numbers"
+            comments.append(
+                {
+                    "about": "ONE",
+                    "text": f"{c['value']} is not at {c['where']} (that place has {there}).",
+                }
+            )
+    cov = packet.coverage
+    if cov and cov["in_deliverable"] < cov["client_items"]:
+        code = max(code, "B")
+        missing = ", ".join(cov["missing"])
+        comments.append(
+            {
+                "about": "ONE",
+                "text": f"It has {cov['in_deliverable']} of the client's {cov['client_items']} "
+                f"items in its divisions; missing: {missing}"
+                + ("…" if cov["client_items"] - cov["in_deliverable"] > len(cov["missing"]) else ""),
+            }
+        )
+    return replace(review, code=code, comments=tuple(comments))
 
 
 def packet_text(packet: CheckPacket, fence: str) -> str:
@@ -223,18 +313,25 @@ def packet_text(packet: CheckPacket, fence: str) -> str:
             "each for the engineer to keep it or remove it; mention them in your review:",
             data(list(packet.not_in_client_boq), "client-boq"),
         ]
+    if packet.coverage or packet.citations:
+        parts += [
+            "ONE's own checks, by code (no Code A while any fails: coverage short of the "
+            "client's items in its divisions, or a number not at the place its source cites):",
+            data({"coverage": packet.coverage, "citations": list(packet.citations)}, "one"),
+        ]
     if packet.previous_comments:
         parts += [
             "Comments from the previous check; confirm that each was fixed:",
             data(list(packet.previous_comments), "previous-check"),
         ]
-    parts.append("Give your code and comments.")
+    parts.append("Give your code, your comments, and in checked each thing you checked.")
     return "\n\n".join(parts)
 
 
 async def check(packet: CheckPacket, maker: ModelChoice, host: TeamHost) -> Review:
-    """A check through the Brief Runner, which runs `review` on the Checking QS's model."""
-    return await host.run_checker(packet, maker)
+    """A check through the Brief Runner, which runs `review` on the Checking QS's model, under
+    ONE's own checks (`capped`)."""
+    return capped(packet, await host.run_checker(packet, maker))
 
 
 async def review(
@@ -259,4 +356,5 @@ async def review(
         checker=checker.choice,
         same_provider=checker.provider == maker.provider,
         round=round,
+        checked=tuple(out.checked),
     )

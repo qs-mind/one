@@ -130,7 +130,7 @@ BUSY_WAIT = 5  # seconds before the one more try at a busy provider
 OFFLINE_WAITS = (5, 15, 30, 60)  # then every 60 s while the app runs
 REVIEW_AS_JSON = (  # the model reads it: a check on Claude Code answers in text
     'Answer with one JSON object only: {"code": "A" | "B" | "C", "comments": '
-    '[{"about": "...", "text": "..."}]}.'
+    '[{"about": "...", "text": "..."}], "checked": ["..."]}.'
 )
 _ROLE_NAMES: dict[str, Text] = {
     "lead": copy.ROLE_LEAD,
@@ -1186,6 +1186,7 @@ class _Brief:
                 checker=choice,
                 same_provider=mine.provider == theirs.provider,
                 round=1,
+                checked=tuple(out.checked),
             )
         return await checker.review(
             packet,

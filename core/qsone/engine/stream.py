@@ -128,6 +128,8 @@ class _Parts:
                 "same_provider": review.same_provider,
                 "round": review.round,
             }
+            if review.checked:
+                data["checked"] = list(review.checked)  # what the Checking QS says it checked
             return "data-review", event.deliverable_id, data
         if isinstance(event, Unsourced):
             return "data-unsourced", event.brief_id, {"values": list(event.values)}

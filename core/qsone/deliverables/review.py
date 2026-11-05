@@ -167,7 +167,7 @@ def record_review(
         code=review.code,
         checker=getattr(review.checker, "model", None) or str(review.checker),
         same_provider=review.same_provider,
-        summary=None,
+        summary="\n".join(getattr(review, "checked", ())) or None,  # what the Checking QS checked
         comments=comments,
     )
 

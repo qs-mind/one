@@ -7,10 +7,12 @@ from datetime import UTC, date, datetime
 import pytest
 from pydantic_ai import ModelRetry
 
-from qsone.engine import tools_records, truth  # noqa: F401 - registers the record tools
+from qsone.engine import checker, tools_records, truth  # noqa: F401 - registers the record tools
 from qsone.engine.tools import REGISTRY, call
 from qsone.engine.tools_records import NumberArgs, SourceArgs
 from qsone.engine.truth import Brief, Coverage
+from qsone.engine.types import CheckPacket, DeliverableDraft, Review
+from tests.engine_fakes import OPUS
 from qsone.records import ledger
 from qsone.records.files import add_file
 from tests.fakes_tools import tool_ctx
@@ -262,3 +264,39 @@ async def test_a_letter_takes_its_date_and_terms_from_the_files(ctx):
         "مدة سريان العرض 90 يوم، والأسعار غير شاملة ضريبة القيمة المضافة 14% - عينة",
     )
     assert json.loads(await call("deliverable_create", right, ctx))["version"] == 1
+
+
+# The Checking QS under ONE's own checks -------------------------------------------------------
+
+
+def _review(code: str) -> Review:
+    return Review(code, (), OPUS.choice, False, 1, checked=("sources",))
+
+
+def _packet(rows: tuple, **found) -> CheckPacket:
+    draft = DeliverableDraft(id="d", kind="table", title="مقايسة - عينة", body="", rows=rows)
+    return CheckPacket("سعّر - عينة", draft, (), (), (), (), (), **found)
+
+
+def test_no_code_a_over_four_rows_of_ninety(rec):
+    # «كود A: معتمد» on a 4-row Deliverable covering about 4 of 90 items
+    with rec.write("t") as c:
+        for i in range(1, 91):
+            ledger.write_item(c, at=rec.clock(), actor="t", kind="boq_item", code=f"04-{i:02}",
+                              fields={})  # fmt: skip
+        rows = tuple({"code": f"04-{i:02}"} for i in range(1, 5))
+        cov = checker._coverage(c, _packet(rows).deliverable)
+    assert cov == {"client_items": 90, "in_deliverable": 4, "missing": [f"04-{i:02}" for i in
+                   range(5, 15)]}  # fmt: skip
+    capped = checker.capped(_packet(rows, coverage=cov), _review("A"))
+    assert capped.code == "B" and "4 of the client's 90 items" in capped.comments[-1]["text"]
+    full = {"client_items": 4, "in_deliverable": 4, "missing": []}
+    assert checker.capped(_packet(rows, coverage=full), _review("A")).code == "A"
+
+
+def test_a_number_not_at_its_place_is_code_c():
+    wrong = {"number_id": "n", "value": "2500", "where": "عرض.pdf, page 1", "found": False,
+             "there": ["2600", "3450"]}  # fmt: skip
+    capped = checker.capped(_packet((), citations=(wrong,)), _review("A"))
+    assert capped.code == "C" and "2500 is not at عرض.pdf, page 1" in capped.comments[0]["text"]
+    assert "checked" in checker.ReviewOut.model_json_schema()["required"]
