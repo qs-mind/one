@@ -19,12 +19,17 @@ export type ProgressData = { agent: Text; text: Text };
 export type TeamData = { sender: Text; recipient: Text; text: string };
 /** One question on a card, written by the agent in the engineer's language. */
 export type CardQuestion = { id: string; text: string; options?: string[]; free_text?: boolean };
-/** What a card shows beyond its words (Plan 5): questions to answer, and a table whose rows may be ticked. */
+/** One tool of a Connector, with the hints its server gives (core/qsone/connectors/hub.py). */
+export type ConnectorTool = { name: string; purpose: string; read_only: boolean; destructive: boolean; open_world: boolean };
+/** What a card shows beyond its words (Plan 5): questions to answer, a table whose rows may be ticked, and a
+ * Connector being added with its tools. */
 export type CardPayload = {
   questions?: CardQuestion[];
   columns?: { key: string; label: Text }[];
   rows?: Record<string, string>[];
   tick?: boolean;
+  connector?: { name: string; transport: "stdio" | "http"; runs: string };
+  tools?: ConnectorTool[];
 };
 /** data-card, id = the card: anything the engineer must answer. */
 export type CardData = {

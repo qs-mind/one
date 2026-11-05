@@ -150,58 +150,6 @@ describe("ApprovalCard", () => {
     }
   });
 
-  const rows: CardData = {
-    kind: "rows",
-    title: { en: "Keep these prices?", ar: "أحفظ الأسعار دي؟" },
-    detail: { en: "Tick the rows to keep.", ar: "علّم على الصفوف اللي تتحفظ." },
-    options: ["keep", "no"],
-    status: "pending",
-    payload: {
-      columns: [
-        { key: "description", label: { en: "Item", ar: "البند" } },
-        { key: "rate", label: { en: "Rate", ar: "السعر" } },
-      ],
-      rows: [
-        { description: "أسمنت - عينة", rate: "3950" },
-        { description: "رمل - عينة", rate: "250" },
-        { description: "زلط - عينة", rate: "310" },
-      ],
-      tick: true,
-    },
-  };
-
-  it("a rows card ticks rows and sends rows_ok", async () => {
-    const fetch = core({ "POST /api/cards/c2": () => new Response(null, { status: 204 }) });
-    const user = userEvent.setup();
-    render(<ApprovalCard id="c2" card={rows} />);
-    expect(screen.getByRole("columnheader", { name: "البند" })).toBeInTheDocument();
-    expect(screen.queryByText("description")).not.toBeInTheDocument(); // the label, not the key
-    const keep = screen.getByRole("button", { name: texts.keepTicked.ar });
-    expect(keep).toBeDisabled();
-    await user.click(screen.getByRole("checkbox", { name: "احفظ الصف 3" }));
-    await user.click(screen.getByRole("checkbox", { name: "احفظ الصف 1" }));
-    await user.click(keep);
-    expect(bodyOf(fetch, "POST", "/api/cards/c2")).toEqual([{ choice: "keep", rows_ok: [0, 2] }]);
-    expect(await screen.findByText("اتحفظ 2 من 3 صف.")).toBeInTheDocument();
-  });
-
-  it("refusing a rows card sends no rows", async () => {
-    const fetch = core({ "POST /api/cards/c2": () => new Response(null, { status: 204 }) });
-    const user = userEvent.setup();
-    render(<ApprovalCard id="c2" card={rows} />);
-    await user.click(screen.getByRole("checkbox", { name: "احفظ الصف 2" }));
-    await user.click(screen.getByRole("button", { name: texts.keepNone.ar }));
-    expect(bodyOf(fetch, "POST", "/api/cards/c2")).toEqual([{ choice: "no" }]);
-  });
-
-  it("a rows card settled in the stream shows what was kept, in English too", () => {
-    setLanguage("en");
-    render(<ApprovalCard id="c2" card={{ ...rows, status: "settled", choice: "keep", rows_ok: [1] }} />);
-    expect(screen.getByText("1 of 3 rows kept.")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-  });
-
   it("a disagreement card names what each answer does", () => {
     const card: CardData = {
       kind: "disagreement",

@@ -119,11 +119,13 @@ def _provider(ctx: ToolContext):
     services = ctx.services
     if services.search is not None:
         return services.search
+    hub = services.connectors
     return choose_provider(
         services.http,
         setting=settings.load().get("search_provider"),
         own_key=keys.get_key(KEY_USER),
         native=services.native_search,
+        connector=None if hub is None else hub.search_provider(),
     )
 
 
