@@ -115,7 +115,7 @@ describe("ApprovalCard", () => {
   it("a card settled in the stream shows its choice, with no buttons", () => {
     render(<ApprovalCard id="c1" card={{ ...online, status: "settled", choice: "no" }} />);
     expect(screen.getByText(`ردّك: ${texts.dontAllow.ar}`)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
   });
 
   it("a refused answer keeps the buttons and says so", async () => {

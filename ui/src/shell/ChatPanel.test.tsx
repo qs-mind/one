@@ -385,4 +385,22 @@ describe("the chat in the shell", () => {
     await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));
     expect(screen.getByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument();
   });
+
+  it("one message box: at the open chat's foot, floating over the canvas only while the chat is folded", async () => {
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
+    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(1);
+    expect(chat).toContainElement(await box()); // below the conversation, in the chat itself
+    expect(chat).toHaveAttribute("data-canvas-cover"); // the canvas keeps its frames out from under it
+    await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
+    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(1);
+    const floating = screen.getByRole("region", { name: texts.commandBar.ar });
+    expect(floating).toContainElement(await box());
+    expect(floating).toHaveAttribute("data-canvas-cover");
+    await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));
+    expect(screen.getByRole("complementary", { name: texts.projectChat.ar })).toContainElement(await box());
+  });
 });

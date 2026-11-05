@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../../i18n";
@@ -76,16 +76,31 @@ describe("RowsCard", () => {
     await user.click(screen.getByRole("button", { name: texts.keepNone.ar }));
     expect(bodyOf(fetch, "POST", "/api/cards/c2")).toEqual([{ choice: "no" }]);
     expect(await screen.findByText(`ردّك: ${texts.keepNone.ar}`)).toBeInTheDocument();
-    expect(screen.getByText("اتحفظ 0 من 3 صف.")).toBeInTheDocument();
+  });
+
+  it("answered, it stops waiting and folds to one line, which opens again on a click", async () => {
+    core({ "POST /api/cards/c2": () => new Response(null, { status: 204 }) });
+    const user = userEvent.setup();
+    const { container } = render(<ApprovalCard id="c2" card={rows} />);
+    expect(container.querySelector("section")).toHaveClass("border-copper");
+    for (const n of [1, 2, 3]) await user.click(screen.getByRole("checkbox", { name: `احفظ الصف ${n}` }));
+    await user.click(screen.getByRole("button", { name: texts.keepTicked.ar }));
+    const line = await screen.findByRole("button", { name: /أحفظ الأسعار دي؟.*اتحفظ 3 من 3 صف\./ });
+    expect(container.querySelector("section")).not.toHaveClass("border-copper");
+    expect(screen.queryByRole("table")).toBeNull(); // folded: the next card is in sight
+    await user.click(line);
+    expect(line).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("table")).toBeInTheDocument();
   });
 
   it("a card settled in the stream shows what was kept, in English too", () => {
     setLanguage("en");
     render(<ApprovalCard id="c2" card={{ ...rows, status: "settled", choice: "keep", rows_ok: [1] }} />);
     expect(screen.getByText("1 of 3 rows kept.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
     expect(screen.getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "true"); // only its line, opened
   });
 
   it("a withdrawn card shows its table with nothing to tick or press", () => {
@@ -93,7 +108,7 @@ describe("RowsCard", () => {
     expect(screen.getByText(texts.withdrawn.ar)).toBeInTheDocument();
     expect(screen.getByText("أسمنت - عينة")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
   });
 
   it("each cell finds its own direction; a long value shows two lines, all of it in the title; the table scrolls", () => {

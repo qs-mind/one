@@ -1,6 +1,8 @@
 // The top bar, 48 px: the mark, the project (or the General chat) with its switcher, the project's status, the agent
 // the view follows, who is working now, "Waiting for you", search, then AI settings, the other language, the Deliverables and Project Records. Below 900 px the
-// status folds into one Status button and the rest into More. The chrome mirrors in Arabic.
+// status folds into one Status button and the rest into More; below 1280 px search, the panels, AI settings and the
+// other language fold into More, and the status folds what does not fit into More status: the project's name is
+// never cut. The chrome mirrors in Arabic.
 import { useRef } from "react";
 import type { ProjectSources, ProjectStatus } from "../canvas/types";
 import { isMac } from "../canvas/keys";
@@ -8,6 +10,7 @@ import { Following, TeamNow } from "../canvas/live/TeamNow";
 import { fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { useCompact } from "./regions";
 import { StatusStrip } from "./StatusStrip";
 
 export type PanelKind = "ai" | "projects" | "records" | "deliverables";
@@ -57,6 +60,7 @@ export function TopBar(props: TopBarProps) {
   const { project, narrow, panel, onPanel } = props;
   const more = useRef<HTMLButtonElement>(null);
   const keys = isMac() ? "⌘K" : "Ctrl K";
+  const compact = useCompact(); // the tools fold into More before the project name or the status would be cut
 
   const search = (
     <button type="button" className={button} onClick={props.onPalette}>
@@ -118,10 +122,11 @@ export function TopBar(props: TopBarProps) {
         data-region-start
         aria-expanded={panel === "projects"}
         title={t("projects")}
-        className={`${button} flex min-w-0 items-center gap-1 font-semibold text-ink`}
+        className={`${button} flex shrink-0 items-center gap-1 font-semibold text-ink`}
         onClick={(event) => onPanel("projects", event.currentTarget)}
       >
-        <span dir="auto" className="max-w-48 truncate">
+        {/* the project's name is never cut: the status folds before it does */}
+        <span dir="auto">
           {project?.name ?? t("generalChat")}
         </span>
         <span aria-hidden="true">▾</span>
@@ -148,9 +153,9 @@ export function TopBar(props: TopBarProps) {
             {fill(t("waitingForYou"), { n: props.waiting })}
           </button>
         )}
-        {narrow ? (
+        {narrow || compact ? (
           <>
-            {project && (
+            {project && narrow && (
               <button type="button" aria-expanded={props.chatOpen} className={button} onClick={props.onChat}>
                 {t("projectChat")}
               </button>

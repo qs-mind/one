@@ -1,6 +1,6 @@
 // A table card (kind "rows"): prices to keep (prices_propose), the columns of a BOQ import (boq_import). With `tick`, the
 // engineer ticks the rows to take, and Keep sends them as rows_ok; Refuse sends none. Once sent, or settled in the
-// stream, the rows left out are struck through (never by colour alone) and a line says how many were kept.
+// stream, the rows left out are struck through (never by colour alone); the card's folded line says how many were kept.
 // The card is narrow (the chat): the table keeps its columns readable and scrolls sideways inside the card; each cell
 // finds its own direction, and a long value shows two lines with the whole of it as the cell's title.
 import { useState } from "react";
@@ -81,9 +81,6 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
             </tbody>
           </table>
         </div>
-      )}
-      {settled && tickable && (
-        <p className="text-slate">{fill(t("rowsKept", lang), { n: shownTicked.length, total: rows.length })}</p>
       )}
       {open && (
         <div className="flex flex-wrap gap-2">

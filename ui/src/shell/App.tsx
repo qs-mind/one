@@ -43,8 +43,10 @@ const projectSources = (projectId: string) => (sampleMode() ? sampleSources() : 
 // the chat's width lasts for the session only (decision 4: nothing in web storage)
 let sessionWidth = CHAT_WIDTH.start;
 
-/** The zoom controls take the bottom inline start; the command bar sits between them and the chat. */
+/** The zoom controls take the bottom inline start; with the chat folded, the command bar floats between them and the
+ * window's end. With the chat open it sits at the chat's foot instead: one message box. */
 const ZOOM_SPACE = 272;
+const CHAT_BUTTON_SPACE = 16;
 const STATUS_RELOAD_MS = 1000;
 const WAITING_SYNC_MS = 1500;
 const WAITING_FRAMES = 30;
@@ -254,6 +256,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               </div>
               <ChatPanel
                 {...body}
+                composer={ai.connected !== false && <CommandBar chat={chat} inPanel />}
                 projectId={project.id}
                 onOpenDeliverable={openDeliverable}
                 open={chatShown}
@@ -266,11 +269,11 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
                   setWidth(next);
                 }}
               />
-              {ai.connected !== false && (
+              {ai.connected !== false && !chatShown && (
                 <CommandBar
                   chat={chat}
                   onSent={() => setChatShown(true)}
-                  floating={narrow ? { start: 8, end: 8, bottom: 64 } : { start: ZOOM_SPACE, end: chatShown ? width + 32 : 16, bottom: 16 }}
+                  floating={narrow ? { start: 8, end: 8, bottom: 64 } : { start: ZOOM_SPACE, end: CHAT_BUTTON_SPACE, bottom: 16 }}
                 />
               )}
               {floatingPanel}

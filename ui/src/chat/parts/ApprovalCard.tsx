@@ -1,7 +1,9 @@
 // A card the engineer must answer: an approval, a Spending Cap pause, a Brief Budget and the like. The core stored it
 // before it was shown; the answer goes to POST /cards/{id}. Raising a cap saves the new caps first. A card with a
 // payload (Plan 5) is drawn by its kind's renderer in cardKinds (questions: QuestionCard, tables: RowsCard), which sends
-// the answers or the ticked rows with the choice.
+// the answers or the ticked rows with the choice. Once answered or withdrawn it is no longer waiting: it drops the
+// copper border and folds to one line (its title and the answer), which opens again on a click, so the next card
+// that waits is in sight without scrolling.
 import { useState } from "react";
 import { coreLine, send } from "../../core";
 import { dir, fill, type Language, pick, t, type Text, texts, useLanguage } from "../../i18n";
@@ -44,12 +46,22 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
   const [raising, setRaising] = useState(false);
   const [failed, setFailed] = useState<Text>();
   const [sent, setSent] = useState<CardAnswer>({});
+  const [unfolded, setUnfolded] = useState(false);
   const settled = card.status === "settled" ? (card.choice ?? chosen) : chosen;
   const payload = card.payload;
   const Kind = payload ? cardKinds[card.kind] : undefined;
   // The card as it stands: settled with what was sent as soon as the core took it, before the stream says so.
   const shown: CardData =
     chosen && card.status !== "settled" ? { ...card, status: "settled", choice: chosen, ...sent } : card;
+
+  const done = shown.status === "settled" || shown.status === "withdrawn";
+  const kept = shown.kind === "rows" && payload?.tick && payload.rows?.length ? (shown.rows_ok ?? []) : undefined;
+  const outcome =
+    card.status === "withdrawn"
+      ? t("withdrawn", lang)
+      : kept && settled && settled !== "no"
+        ? fill(t("rowsKept", lang), { n: kept.length, total: payload!.rows!.length })
+        : settled && fill(t("answered", lang), { choice: optionLabel(card.kind, settled, lang) });
 
   async function answer(choice: string, extra: CardAnswer = {}) {
     setSending(true);
@@ -71,43 +83,64 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
   }
 
   return (
-    <section lang={lang} dir={dir(lang)} className="flex min-w-0 flex-col gap-2 rounded-md border border-copper px-3 py-2">
-      <h3 dir="auto" className="font-semibold">
-        {pick(card.title, lang)}
-      </h3>
-      <p dir="auto">{pick(card.detail, lang)}</p>
-      {Kind && (
-        <Kind
-          card={shown}
-          sending={sending}
-          onAnswer={(choice, extra) => void answer(choice, extra)}
-          label={(option) => optionLabel(card.kind, option, lang)}
-          lang={lang}
-        />
+    <section
+      lang={lang}
+      dir={dir(lang)}
+      className={`flex min-w-0 flex-col gap-2 rounded-md border px-3 py-2 ${done ? "border-ink/10" : "border-copper"}`}
+    >
+      {done ? (
+        <h3 className="min-w-0">
+          <button
+            type="button"
+            aria-expanded={unfolded}
+            onClick={() => setUnfolded(!unfolded)}
+            className="flex w-full min-w-0 items-baseline gap-2 text-start focus-visible:outline-2 focus-visible:outline-ink"
+          >
+            <span aria-hidden="true" className="shrink-0 text-slate">
+              {unfolded ? "▾" : lang === "ar" ? "◂" : "▸"}
+            </span>
+            <span dir="auto" className="min-w-0 truncate font-semibold">
+              {pick(card.title, lang)}
+            </span>
+            <span className="shrink-0 text-slate">{outcome}</span>
+          </button>
+        </h3>
+      ) : (
+        <h3 dir="auto" className="font-semibold">
+          {pick(card.title, lang)}
+        </h3>
       )}
-      {card.status === "withdrawn" ? (
-        <p className="text-slate">{t("withdrawn", lang)}</p>
-      ) : settled ? (
-        <p className="text-slate">{fill(t("answered", lang), { choice: optionLabel(card.kind, settled, lang) })}</p>
-      ) : Kind ? null : (
-        <>
-          <div className="flex flex-wrap gap-2">
-            {card.options.map((option) => (
-              <button
-                key={option}
-                type="button"
-                disabled={sending}
-                aria-expanded={option === "raise" ? raising : undefined}
-                onClick={() => choose(option)}
-                className={`rounded-md px-3 py-1 disabled:opacity-40 ${option === "no" ? "border border-ink" : "bg-ink text-paper"}`}
-              >
-                {optionLabel(card.kind, option, lang)}
-              </button>
-            ))}
-          </div>
-          {raising && <CapsForm onSaved={() => void answer("raise")} />}
-        </>
-      )}
+      <div hidden={done && !unfolded} className="flex min-w-0 flex-col gap-2">
+        <p dir="auto">{pick(card.detail, lang)}</p>
+        {Kind && (
+          <Kind
+            card={shown}
+            sending={sending}
+            onAnswer={(choice, extra) => void answer(choice, extra)}
+            label={(option) => optionLabel(card.kind, option, lang)}
+            lang={lang}
+          />
+        )}
+        {done || Kind ? null : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {card.options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  disabled={sending}
+                  aria-expanded={option === "raise" ? raising : undefined}
+                  onClick={() => choose(option)}
+                  className={`rounded-md px-3 py-1 disabled:opacity-40 ${option === "no" ? "border border-ink" : "bg-ink text-paper"}`}
+                >
+                  {optionLabel(card.kind, option, lang)}
+                </button>
+              ))}
+            </div>
+            {raising && <CapsForm onSaved={() => void answer("raise")} />}
+          </>
+        )}
+      </div>
       {failed && (
         <p role="alert" className="text-copper">
           {pick(failed, lang)}

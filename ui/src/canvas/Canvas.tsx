@@ -39,7 +39,8 @@ import { deskCounts, startActivity, useDeskCounts } from "./live/activity";
 import { isMac, isMod, isTyping, matches } from "./keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
-import { place, sizeFor, STRIP_H, type Incoming } from "./place";
+import { freeArea, worldOf } from "./cover";
+import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
 import { select } from "./selection";
 import { SourceError } from "./sources";
 import type {
@@ -243,7 +244,39 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     if (changed) setNodes(next);
   }, [store, setNodes]);
 
-  /** Brings the frames in line with the project's data: new things placed, gone things removed, data refreshed. */
+  /** The part of the pane the engineer sees, less the open chat, the command bar, the minimap and the zoom controls. */
+  const free = useCallback(() => {
+    const { width, height, domNode } = store.getState();
+    return freeArea(domNode?.querySelector(".react-flow__pane") ?? domNode, { width, height });
+  }, [store]);
+
+  /** Shows these frames in the middle of the free area. Computed from the layout itself, not from React Flow's
+   * measured nodes: with onlyRenderVisibleElements a frame off screen is never measured, so fitView would leave it
+   * out. With `keepZoom`, only pans, unless the frames do not fit at the zoom there is. */
+  const fitTo = useCallback(
+    (frames: readonly Placed[], { padding = 0.1, maxZoom = 1, animate = true, keepZoom = false } = {}) => {
+      if (!frames.length) return;
+      const area = free();
+      const minX = Math.min(...frames.map((f) => f.x));
+      const minY = Math.min(...frames.map((f) => f.y));
+      const w = Math.max(...frames.map((f) => f.x + f.w)) - minX || 1;
+      const h = Math.max(...frames.map((f) => f.y + (f.collapsed ? STRIP_H : f.h))) - minY || 1;
+      const fit = Math.min((area.w * (1 - 2 * padding)) / w, (area.h * (1 - 2 * padding)) / h);
+      const now = store.getState().transform[2];
+      const zoom = keepZoom && now <= fit ? now : Math.min(maxZoom, 2, Math.max(0.1, fit));
+      void flow.setViewport(
+        { x: area.x + area.w / 2 - (minX + w / 2) * zoom, y: area.y + area.h / 2 - (minY + h / 2) * zoom, zoom },
+        { duration: animate ? duration() : 0 },
+      );
+    },
+    [flow, store, free],
+  );
+
+  /** The free area in world coordinates: where a new frame can go and be seen. */
+  const seen = useCallback(() => worldOf(free(), store.getState().transform), [free, store]);
+
+  /** Brings the frames in line with the project's data: new things placed, gone things removed, data refreshed. A
+   * frame added while the engineer works goes in the free area they see, or the view pans to show it. */
   const rebuild = useCallback(() => {
     const kept: FrameNode[] = [];
     const removed: FrameKey[] = [];
@@ -257,8 +290,12 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     }
     const have = new Set(kept.map((n) => n.id));
     const incoming = wanted(things.current).filter((i) => !have.has(i.key));
-    const all = place(kept.map(placedOf), incoming, opts());
-    const added = all.slice(kept.length);
+    const added: Placed[] = [];
+    const view = seen();
+    for (const item of incoming) {
+      const frames = [...kept.map(placedOf), ...added];
+      added.push(placeInView(frames, item, view, opts()) ?? place(frames, [item], opts()).at(-1)!);
+    }
     for (const p of added) {
       const node = nodeFor(p, things.current);
       if (node) kept.push(node);
@@ -267,7 +304,8 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     for (const key of removed) committed.current.delete(key);
     if (added.length || removed.length || kept.some((n, i) => n !== nodesRef.current[i])) setNodes(kept);
     if (added.length || removed.length) saver.frames(added, removed);
-  }, [saver, setNodes]);
+    if (added.length && !added.every((p) => inView({ ...p, h: p.collapsed ? STRIP_H : p.h }, view))) fitTo(added, { keepZoom: true });
+  }, [saver, setNodes, seen, fitTo]);
 
   /** Moves frames to a layout (arrange, undo, redo, fold); saves what changed. */
   const applyLayout = useCallback(
@@ -336,26 +374,6 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     applyLayout(step);
   }, [applyLayout]);
 
-  /** Shows these frames in the middle of the pane. Computed from the layout itself, not from React Flow's measured
-   * nodes: with onlyRenderVisibleElements a frame off screen is never measured, so fitView would leave it out. */
-  const fitTo = useCallback(
-    (frames: readonly Placed[], { padding = 0.1, maxZoom = 1, animate = true } = {}) => {
-      if (!frames.length) return;
-      const { width, height } = store.getState();
-      const minX = Math.min(...frames.map((f) => f.x));
-      const minY = Math.min(...frames.map((f) => f.y));
-      const w = Math.max(...frames.map((f) => f.x + f.w)) - minX || 1;
-      const h = Math.max(...frames.map((f) => f.y + (f.collapsed ? STRIP_H : f.h))) - minY || 1;
-      const fit = Math.min((width * (1 - 2 * padding)) / w, (height * (1 - 2 * padding)) / h);
-      const zoom = Math.min(maxZoom, 2, Math.max(0.1, fit));
-      void flow.setViewport(
-        { x: width / 2 - (minX + w / 2) * zoom, y: height / 2 - (minY + h / 2) * zoom, zoom },
-        { duration: animate ? duration() : 0 },
-      );
-    },
-    [flow, store],
-  );
-
   const doArrange = useCallback(
     (mode: "stage" | "tidy") => {
       const status = new Map<FrameKey, DeliverableInfo["status"]>();
@@ -392,9 +410,10 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
           setNodes(nodesRef.current.map((n) => (n === existing ? { ...existing, data: { ...existing.data, page } } : n)));
       } else {
         const size = sizeFor(key);
+        const frames = nodesRef.current.map(placedOf);
         const p: Placed = at
           ? { key, x: at.x, y: at.y, ...size, z: 0, collapsed: false }
-          : place(nodesRef.current.map(placedOf), [{ key, ...size }], opts()).at(-1)!;
+          : (placeInView(frames, { key, ...size }, seen(), opts()) ?? place(frames, [{ key, ...size }], opts()).at(-1)!);
         const node = nodeFor(p, things.current);
         if (!node) return;
         if (page && node.type === "file") node.data = { ...node.data, page };
@@ -404,7 +423,7 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       }
       focusFrame(key);
     },
-    [focusFrame, saver, setNodes],
+    [focusFrame, saver, setNodes, seen],
   );
 
   const addFiles = useCallback(
@@ -751,6 +770,7 @@ function ZoomBar({ onArrange }: { onArrange(): void }) {
     <div
       role="toolbar"
       aria-label={t("zoomControls")}
+      data-canvas-cover
       dir={dir()}
       style={{ [dir() === "rtl" ? "right" : "left"]: 16 }}
       className="absolute bottom-4 z-10 flex items-center gap-1 rounded-[14px] border border-ink/10 bg-paper p-1 shadow-[0_1px_4px_rgb(14_15_18/0.08)]"
