@@ -1961,6 +1961,10 @@ ACCOUNT_KEY_STORE_DOWN = {
         "افتحه أو شغّله وسجّل دخولك تاني."
     ),
 }
+ACCOUNT_UNAVAILABLE = {  # a build without One's client id at the account (O1)
+    "en": "Signing in to the QS Mind account is not ready in this version of One yet.",
+    "ar": "تسجيل الدخول لحساب QS Mind لسه مش جاهز في النسخة دي من One.",
+}
 ACCOUNT_SIGNED_IN = {  # the loopback page in the browser, after the sign-in
     "en": "Signed in. Go back to One.",
     "ar": "دخولك اتسجّل. ارجع لـ One.",
