@@ -209,7 +209,8 @@ const focusables = 'button, [href], input, select, textarea, [contenteditable="t
 
 export function Canvas(props: CanvasProps) {
   return (
-    <ReactFlowProvider>
+    <ReactFlowProvider key={props.projectId}>
+      {/* a project of its own: its layout and frames never meet another project's sources */}
       <Pane {...props} />
     </ReactFlowProvider>
   );

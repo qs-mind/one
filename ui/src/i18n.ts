@@ -35,6 +35,7 @@ export const texts = {
     ar: "محرك ون لا يعمل، لذلك لا تعمل المحادثة. سجله موجود هنا:",
   },
   retry: { en: "Retry", ar: "إعادة المحاولة" },
+  coreDownTitle: { en: "ONE's core stopped", ar: "محرك ONE وقف" },
   screenFailed: {
     en: "Something went wrong on this screen. Your work is saved in the project; reload to carry on.",
     ar: "حصلت مشكلة في الشاشة دي. شغلك محفوظ في المشروع؛ اعمل إعادة تحميل وكمّل.",
