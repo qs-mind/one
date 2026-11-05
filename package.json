@@ -14,6 +14,7 @@
     "test:ui": "vitest run",
     "test:core": "node scripts/python.mjs -m pytest core",
     "lint:core": "node scripts/python.mjs -m ruff check core && node scripts/python.mjs -m ruff format --check core",
+    "sandbox:fetch": "node scripts/python.mjs -m qsone.sandbox.runtime",
     "check": "npm run typecheck && npm run lint:core && cargo clippy --manifest-path desktop/Cargo.toml -- -D warnings",
     "tauri": "tauri"
   },
