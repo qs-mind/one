@@ -1039,6 +1039,58 @@ ANCHOR_NOT_FOUND = {
     "ar": "المكان اللي الملاحظة بتشاور عليه مش موجود في المُخرَج. اختار خلية أو نص.",
 }
 
+COMMENT_KIND_NOT_ALLOWED = {
+    "en": (
+        "One's team writes notes, with no code. Review comments come from you or the "
+        "Checking QS, with Code B or C."
+    ),
+    "ar": (
+        "فريق One بيكتب ملاحظات بس، من غير كود. ملاحظات المراجعة بتيجي منك أو من مهندس "
+        "المراجعة، بكود B أو C."
+    ),
+}
+
+# "Fix it": the message the screen sends to the Lead QS for one Review comment.
+FIX_REQUEST = {
+    "en": (
+        "Fix Review comment {comment} on «{title}» (Deliverable {deliverable}, {at}), "
+        "at {place}: «{body}». Propose the fix with deliverable_propose and comment_id {comment}."
+    ),
+    "ar": (
+        "صلّح ملاحظة المراجعة {comment} في «{title}» (المُخرَج {deliverable}، {at})، "
+        "عند {place}: «{body}». اقترح التصليح بـ deliverable_propose ومعاه comment_id {comment}."
+    ),
+}
+
+FIX_AT_REVISION = {"en": "Rev {no}, version {n}", "ar": "Rev {no}، النسخة {n}"}
+
+FIX_AT_VERSION = {"en": "version {n}", "ar": "النسخة {n}"}
+
+FIX_PLACE_CELL = {
+    "en": "item «{row}», column «{column}» (row {id})",
+    "ar": "البند «{row}»، عمود «{column}» (الصف {id})",
+}
+
+FIX_PLACE_RANGE = {
+    "en": "from item «{start}» to item «{end}», columns «{first}» to «{last}» (rows {ids})",
+    "ar": "من البند «{start}» للبند «{end}»، الأعمدة من «{first}» لـ «{last}» (الصفوف {ids})",
+}
+
+FIX_PLACE_ROW = {
+    "en": "«{row}» (row {id})",
+    "ar": "«{row}» (الصف {id})",
+}
+
+FIX_PLACE_TEXT = {
+    "en": "the words «{quote}» (block {id})",
+    "ar": "الكلام «{quote}» (الفقرة {id})",
+}
+
+FIX_PLACE_DELIVERABLE = {
+    "en": "the whole Deliverable",
+    "ar": "المُخرَج كله",
+}
+
 # Close-out and Sign-off.
 SIGNOFF_PENDING_CHANGES = {
     "en": "Accept or reject every Suggested change first.",
