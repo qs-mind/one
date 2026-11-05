@@ -46,6 +46,7 @@ def main(argv: list[str] | None = None) -> None:
     usage.install_hooks()  # a crash outside a request is reported too (class and line only)
     keystore.choose()  # before anything uses a key: the system key store, or One's key file
     usage.core_stopped(settings.data_dir())  # the last run's core died with the window open
+    usage.updated()  # the last update installed, or failed and One came back
     config = uvicorn.Config(
         create_app(secret, data_dir=args.data_dir),
         host="127.0.0.1",

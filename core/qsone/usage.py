@@ -218,6 +218,28 @@ def core_stopped(data_dir: Path) -> None:
     track("core_stopped", code=code if type(code) is int else -1)  # -1: a signal ended it
 
 
+VERSION_SETTING = "version"  # the version of One that started last
+UPDATE_SETTING = "update_to"  # the version an update was about to install (/app/prepare-update)
+
+
+def updated() -> None:
+    """At the core's start, after an update: the `update` event, from the versions in
+    settings.json. A new version means the update installed; the same version with an update
+    still pending means it failed and One came back on this one. Never raises."""
+    now = qsone.__version__
+    saved = settings.load()
+    before, pending = saved.get(VERSION_SETTING), saved.get(UPDATE_SETTING)
+    if isinstance(before, str) and before != now:
+        track("update", **{"from": before, "to": now, "ok": True})
+    elif isinstance(pending, str) and pending != now:
+        track("update", **{"from": now, "to": pending, "ok": False})
+    with suppress(OSError):
+        if before != now:
+            settings.save(VERSION_SETTING, now)
+        if pending is not None:
+            settings.remove(UPDATE_SETTING)
+
+
 def install_hooks() -> None:
     """Crashes outside a request: the main thread's and every other thread's."""
     before_sys, before_thread = sys.excepthook, threading.excepthook

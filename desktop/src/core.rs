@@ -9,8 +9,8 @@ use std::io::Write;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -235,24 +235,45 @@ impl Phase {
 
 /// The core as the shell sees it.
 pub struct Core {
-    pub target: Target,
+    /// Where it answers now: a restart gives it a fresh port and secret.
+    target: RwLock<Arc<Target>>,
     process: Mutex<Process>,
     pub log: PathBuf,
     phase: AtomicU8,
     stopping: AtomicBool,
+    /// Each start's watcher ends once a later start has its own.
+    generation: AtomicU64,
     /// Written when the core dies while the window is open (exit code only); the next core reports it.
     exit_note: PathBuf,
+    /// The program and arguments it was started with, to start it again after an update that did not install.
+    command: Option<(PathBuf, Vec<OsString>)>,
 }
 
 impl Core {
     pub fn new(target: Target, process: Process, log: PathBuf, exit_note: PathBuf) -> Self {
         Self {
-            target,
+            target: RwLock::new(Arc::new(target)),
             process: Mutex::new(process),
             log,
             phase: AtomicU8::new(Phase::Starting as u8),
             stopping: AtomicBool::new(false),
+            generation: AtomicU64::new(0),
             exit_note,
+            command: None,
+        }
+    }
+
+    /// How `restart` starts it again: `program args… --port <p> --exit-with-stdin`, as `launch` did.
+    pub fn started_by(mut self, program: PathBuf, args: Vec<OsString>) -> Self {
+        self.command = Some((program, args));
+        self
+    }
+
+    /// Where the core answers now, and its secret.
+    pub fn target(&self) -> Arc<Target> {
+        match self.target.read() {
+            Ok(target) => Arc::clone(&target),
+            Err(poisoned) => Arc::clone(&poisoned.into_inner()),
         }
     }
 
@@ -274,28 +295,71 @@ impl Core {
         }
     }
 
-    /// Stops the core on purpose (the window closes, or an update installs): no exit note.
+    /// Stops the core on purpose (the window closes, or an update installs): no exit note. Once stopped, a second
+    /// stop does nothing.
     pub fn stop(&self) -> Result<(), String> {
-        self.stopping.store(true, Ordering::Release);
         let mut process = self.process.lock().map_err(|e| e.to_string())?;
+        if self.stopping.swap(true, Ordering::AcqRel) && self.phase() == Phase::Stopped {
+            return Ok(());
+        }
         let stopped = stop(&mut process);
         self.set(Phase::Stopped);
         stopped
+    }
+
+    /// Starts the core again after `stop` (an update that did not install), on a fresh port with a fresh secret,
+    /// and watches it as at the first start. Calls that come meanwhile wait for it (`started`). A core that
+    /// outlived its stop is kept.
+    pub fn restart(self: &Arc<Self>) -> Result<(), String> {
+        let (program, args) = self
+            .command
+            .as_ref()
+            .ok_or("this core was not started by the shell")?;
+        let mut process = self.process.lock().map_err(|e| e.to_string())?;
+        self.generation.fetch_add(1, Ordering::AcqRel);
+        self.stopping.store(false, Ordering::Release);
+        self.set(Phase::Starting);
+        if process.exited().is_some() {
+            let started = fresh_target()
+                .and_then(|target| Ok((launch(program, args, &target, &self.log)?, target)));
+            match started {
+                Ok((started, target)) => {
+                    *process = started;
+                    match self.target.write() {
+                        Ok(mut kept) => *kept = Arc::new(target),
+                        Err(poisoned) => *poisoned.into_inner() = Arc::new(target),
+                    }
+                }
+                Err(why) => {
+                    self.set(Phase::Failed);
+                    return Err(why);
+                }
+            }
+        }
+        drop(process);
+        self.watch();
+        Ok(())
     }
 
     /// Watches the core in a thread: up once `/health` answers, failed if it has not within STARTING (it is still
     /// asked after that, as a slow first start on Windows can pass the minute), stopped when it exits.
     pub fn watch(self: &Arc<Self>) {
         let core = Arc::clone(self);
+        let generation = self.generation.load(Ordering::Acquire);
         thread::spawn(move || {
             let deadline = Instant::now() + STARTING;
+            // Still this start's watcher: not stopped on purpose, and not replaced by a restart.
+            let mine = || {
+                !core.stopping.load(Ordering::Acquire)
+                    && core.generation.load(Ordering::Acquire) == generation
+            };
             loop {
-                if core.stopping.load(Ordering::Acquire) {
+                if !mine() {
                     return;
                 }
                 let exited = core.process.lock().ok().and_then(|mut p| p.exited());
                 if let Some(status) = exited {
-                    if !core.stopping.load(Ordering::Acquire) {
+                    if mine() {
                         core.set(Phase::Stopped);
                         let _ = fs::write(&core.exit_note, exit_note(status.code()));
                     }
@@ -303,7 +367,11 @@ impl Core {
                 }
                 let phase = core.phase();
                 if phase != Phase::Up {
-                    if healthy(&core.target) {
+                    let up = healthy(&core.target());
+                    if !mine() {
+                        return;
+                    }
+                    if up {
                         core.set(Phase::Up);
                     } else if phase == Phase::Starting && Instant::now() >= deadline {
                         core.set(Phase::Failed);
@@ -388,13 +456,15 @@ fn start_with(app: &AppHandle, log: &Path) -> Result<Core, String> {
         "--data-dir".into(),
         data.clone().into(),
     ];
-    let process = launch(&python_path(&resources), &args, &target, log)?;
+    let python = python_path(&resources);
+    let process = launch(&python, &args, &target, log)?;
     Ok(Core::new(
         target,
         process,
         log.to_path_buf(),
         data.join("last-core-exit.json"),
-    ))
+    )
+    .started_by(python, args))
 }
 
 #[tauri::command]

@@ -341,7 +341,7 @@ pub async fn core_fetch(
             headers,
             body: body.map(String::into_bytes),
         };
-        send_call(&agent, &core.target, call, send);
+        send_call(&agent, &core.target(), call, send);
         calls.end(&id);
     })
     .await
@@ -430,7 +430,7 @@ pub async fn core_upload(app: AppHandle, request: Request<'_>) -> Result<Respons
     };
     let (headers, body) = (request.headers().clone(), bytes.clone());
     let answer = tauri::async_runtime::spawn_blocking(move || match running(&app) {
-        Ok(core) => send_upload(&core::agent(), &core.target, &headers, body),
+        Ok(core) => send_upload(&core::agent(), &core.target(), &headers, body),
         Err(_) => refused(503),
     })
     .await

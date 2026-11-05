@@ -1,7 +1,8 @@
 # Packages the core as an embedded Python on Linux, Windows and macOS and smoke-tests it (Plan 8 Task 3): the pinned
 # python-build-standalone runtime, the hashed runtime.lock, trimmed and bytecode only, the licence gate, then the
 # packaged core started from a clean environment (/health, /about, /about/native, exit when stdin closes). It runs
-# only when something that changes the package changes; the installers themselves are built by the release workflow.
+# only when something that changes the package changes (package-lock.json too: the notices list the screen's npm
+# packages); the installers themselves are built, signed and released by release.yml.
 # Actions are pinned to commit SHAs; the comment names the release.
 name: Package
 
@@ -12,8 +13,10 @@ on:
       - "scripts/package-*"
       - "scripts/smoke-core.mjs"
       - "scripts/notices.mjs"
+      - "scripts/version.mjs"
       - "core/runtime.*"
       - "core/pyproject.toml"
+      - "package-lock.json"
       - "desktop/**"
       - ".github/workflows/**"
   pull_request:
@@ -21,8 +24,10 @@ on:
       - "scripts/package-*"
       - "scripts/smoke-core.mjs"
       - "scripts/notices.mjs"
+      - "scripts/version.mjs"
       - "core/runtime.*"
       - "core/pyproject.toml"
+      - "package-lock.json"
       - "desktop/**"
       - ".github/workflows/**"
   workflow_dispatch:
@@ -66,6 +71,10 @@ jobs:
         run: rustup toolchain install && rustc --version
 
       - run: npm ci --ignore-scripts
+
+      # The installer and the core it carries must say the same version (scripts/version.mjs).
+      - name: One version everywhere
+        run: node scripts/version.mjs check
 
       - name: The core's runtime, cached by its pin
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

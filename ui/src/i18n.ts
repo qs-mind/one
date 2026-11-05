@@ -878,6 +878,11 @@ export const texts = {
   },
   updateDownloading: { en: "Downloading: {percent}%", ar: "بينزّل: {percent}%" },
   updateInstalling: { en: "Installing… One restarts by itself.", ar: "بيتسطّب… One هيفتح تاني لوحده." },
+  // the same words as the core's UPDATE_FAILED (core/qsone/copy.py): the shell, not the core, says this one
+  updateFailed: {
+    en: "The update did not install, so One is still on this version and your projects are as they were. Try again later.",
+    ar: "التحديث ماتسطبش، فـ One لسه على النسخة دي ومشاريعك زي ما هي. جرّب تاني بعدين.",
+  },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";

@@ -1,0 +1,233 @@
+# Builds a release of QS Mind One on four free GitHub runners, signs its update files with the founder's approval,
+# and makes a GitHub release (Plan 8 Task 13). Started by hand only (Actions → Release build → Run workflow), from
+# main, with the version and whether the release is a draft (stage 1) or the latest.
+#
+# 1. check: every version file says the version, releases/<version>.md has an English and an Arabic section, and
+#    the updater's public key is in desktop/tauri.release.conf.json (ops step O3). Nothing builds otherwise.
+# 2. build: Windows (NSIS, per user), Linux (AppImage on the oldest glibc we support), Apple silicon and Intel Macs
+#    (ad hoc signed .app and DMG). Each runs the core's and the screen's tests, packages the core with its smoke test,
+#    and builds the installers; on macOS the .app is verified and its packaged core is started from inside it.
+# 3. sign-and-publish: in the protected environment `release`, so it waits for the founder's approval and is the only
+#    job that can read the updater's private key. It runs no project code and no third-party action: GitHub's own
+#    checkout and Node, then the pinned Tauri CLI from package-lock.json (installed without its scripts) signs the
+#    four update files for this version, scripts/release.mjs names the files, checks every signature against the
+#    app's public key and writes SHA256SUMS.txt and latest.json, and gh creates the release at the built commit.
+#
+# Actions are pinned to commit SHAs; the comment names the release. Free runners only (public repository).
+name: Release build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, as in package.json (e.g. 0.1.0)
+        required: true
+        type: string
+      publish:
+        description: draft (only collaborators see it; stage 1) or latest (public, and the feed the apps check)
+        type: choice
+        options: [draft, latest]
+        default: draft
+
+# One release at a time; a release that has started always finishes.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Versions, release notes and the updater's public key
+        run: node scripts/release.mjs check "$VERSION"
+
+  build:
+    name: build (${{ matrix.target }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          # the oldest glibc the AppImage is built on, so it runs on older Linux too
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-15
+            target: aarch64-apple-darwin
+            arch: aarch64
+          # Intel Macs: until GitHub retires this runner (2027)
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Tauri Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            patchelf build-essential file libxdo-dev libssl-dev
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.7"
+
+      # rustup reads the version and components from rust-toolchain.toml.
+      - name: Rust from rust-toolchain.toml
+        run: rustup toolchain install && rustc --version
+
+      # cryptography builds its Rust part against a static OpenSSL wherever no wheel fits the Intel Mac.
+      - name: Static OpenSSL on the Intel Mac
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: echo "OPENSSL_STATIC=1" >> "$GITHUB_ENV"
+
+      # As in ci.yml: the exact versions and their hashes from the universal lock.
+      - name: Core in core/.venv
+        run: |
+          python -m venv core/.venv
+          if [ "$RUNNER_OS" = Windows ]; then py=core/.venv/Scripts/python.exe; else py=core/.venv/bin/python; fi
+          "$py" -m pip install --require-hashes -r core/requirements.lock
+          "$py" -m pip install --no-deps -e "./core[dev]"
+
+      - run: npm ci
+      - run: npm run test:core
+      - run: npm run test:ui
+
+      - name: The core's runtime, cached by its pin
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache
+          key: python-runtime-${{ matrix.target }}-${{ hashFiles('core/runtime.json') }}
+
+      # The core as an embedded Python and its smoke test, then the installers (tauri.release.conf.json).
+      - run: npm run package
+
+      # The updater installs a Mac update from a .app.tar.gz; the build makes none without the signing key, so it is
+      # made here, then unpacked and its packaged core started from inside the .app.
+      - name: Verify the .app, pack it for the updater and start its core
+        if: runner.os == 'macOS'
+        env:
+          ARCH: ${{ matrix.arch }}
+          COPYFILE_DISABLE: "1" # no ._ files in the archive
+        run: |
+          bundle=desktop/target/release/bundle/macos
+          codesign --verify --deep --strict --verbose=2 "$bundle/QS Mind One.app"
+          archive="$bundle/QS Mind One_${VERSION}_${ARCH}.app.tar.gz"
+          tar -C "$bundle" -czf "$archive" "QS Mind One.app"
+          unpacked="$RUNNER_TEMP/unpacked"
+          mkdir -p "$unpacked"
+          tar -C "$unpacked" -xzf "$archive"
+          codesign --verify --deep --strict "$unpacked/QS Mind One.app"
+          node scripts/smoke-core.mjs "$unpacked/QS Mind One.app/Contents/Resources/core/bin/python3"
+
+      - name: Installer sizes
+        run: ls -l desktop/target/release/bundle/*/
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-${{ matrix.target }}
+          path: |
+            desktop/target/release/bundle/nsis/*-setup.exe
+            desktop/target/release/bundle/appimage/*.AppImage
+            desktop/target/release/bundle/dmg/*.dmg
+            desktop/target/release/bundle/macos/*.app.tar.gz
+          if-no-files-found: error
+          compression-level: 0 # installers are compressed already
+          retention-days: 7
+
+  sign-and-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Required reviewer: the founder. Only this job can read the updater's private key.
+    environment: release
+    permissions:
+      contents: write # the release and its tag
+      actions: read # this run's build files
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: The updater's private key is in this environment
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
+            echo "::error::The updater's private key or its password is not in the GitHub environment 'release' (secrets TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD, ops step O3). Nothing was signed or published."
+            exit 1
+          fi
+
+      # The Tauri CLI at the version package-lock.json pins, checked against its integrity hash; no package's install
+      # scripts run.
+      - run: npm ci --ignore-scripts
+
+      - name: This run's build files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern "bundle-*" --dir bundles
+
+      # The four files the updater installs, each signed for this version (requireSignedVersion in the app).
+      - name: Sign the update files
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          find bundles -type f \( -name '*-setup.exe' -o -name '*.AppImage' -o -name '*.app.tar.gz' \) -print0 |
+            while IFS= read -r -d '' file; do
+              npx --no-install tauri signer sign --app-version "$VERSION" "$file" > /dev/null
+              echo "signed: $(basename "$file")"
+            done
+
+      - name: Release files, SHA256SUMS.txt and latest.json
+        run: node scripts/release.mjs bundles "$VERSION"
+
+      - name: The GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          if [ "$PUBLISH" = latest ]; then kind=--latest; else kind=--draft; fi
+          gh release create "v$VERSION" bundles/upload/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "QS Mind One $VERSION" --notes-file "releases/$VERSION.md" "$kind"
