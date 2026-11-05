@@ -344,6 +344,7 @@ class _Brief:
         self.agents: dict[str, _AgentState] = {}
         self.tokens: set[str] = set()
         self.setup: TeamSetup | None = None
+        self.saved_roles: set[Role] = set()  # the roles the engineer chose in Settings
         self.sheet: list[ModelCard] = []
         self.found: dict[str, Any] = {}
         self._given_sheet = sheet
@@ -500,11 +501,12 @@ class _Brief:
         assert self.setup is not None
         spec = agents.checker_spec()
         choice = self.setup.roles.get("checker") or maker
-        if choice == maker:
+        if choice == maker and "checker" not in self.saved_roles:
+            # Only a default Checking QS moves off the maker's model, and never to a costlier
+            # one: the engineer's own choice always wins (a Same-provider check, still blind).
             others = [
                 c for c in roles.same_or_cheaper(self.sheet, maker, {maker}) if self._model(c)
             ]
-            others += [c for c in roles.costlier(self.sheet, maker, {maker}) if self._model(c)]
             choice = others[0] if others else maker
         run_id = self.store.new_run(self.brief_id, spec, choice, self.lead_run_id)
         async with self.engine._agent_slots:
@@ -962,8 +964,9 @@ class _Brief:
         self.sheet, self.found = sheet, {c.id: c for c in found}
         allowed = {c.choice for c in sheet}
         defaults = roles.defaults(sheet)
-        chosen = {r: c for r, c in roles.chosen(sheet).items() if c in allowed}
-        picked: dict[Role, ModelChoice] = defaults | chosen
+        saved = {r: c for r, c in roles.saved().items() if c in allowed}
+        self.saved_roles = set(saved)
+        picked: dict[Role, ModelChoice] = defaults | saved
         if "lead" not in picked:
             picked["lead"] = sheet[0].choice
         for role in roles.ROLES:
