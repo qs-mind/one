@@ -4,7 +4,7 @@
    Thmanyah files never go in this public repo). WebKitGTK 2.54, the Linux app's engine, misplaces a mark that ends
    a word, such as the tanween in «حالياً»: it lifts the whole word by the mark's offset. Zain draws that tanween
    where it belongs (offset near zero) and its dots are part of each letter; IBM Plex Sans Arabic lifted the word.
-   The type scale: 13 px for meta, 15 px body (16 px on an Arabic page), 18 px frame titles, 22 px page titles; nothing
+   The type scale (dense, 5 Nov): 13 px for meta, 14 px body (15 px on an Arabic page), 18 px frame titles, 22 px page titles; nothing
    under 12 px at 100%. The spacing scale is Tailwind's 1, 2, 3, 4, 6, 8 (4, 8, 12, 16, 24, 32 px). */
 @theme {
   --color-*: initial;
@@ -63,13 +63,13 @@
   body {
     background: var(--color-paper);
     color: var(--color-ink);
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: 14px;
+    line-height: 1.5;
   }
   /* Arabic needs more room between its lines for its dots and marks */
   html:lang(ar) body {
-    font-size: 16px;
-    line-height: 1.75;
+    font-size: 15px;
+    line-height: 1.65;
   }
   button:not(:disabled) {
     cursor: pointer;

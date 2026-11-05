@@ -32,7 +32,7 @@ export function WorkingLine(props: {
     const view = box.getBoundingClientRect();
     const found: Line[] = [];
     for (const a of busy) {
-      const at = handle.locate(a.focus!.anchor!);
+      const at = handle.locate(a.focus!.anchor!, { scroll: false }); // only measure: the engineer's scroll stays his
       if (!at || root.top + at.y + at.height <= view.top || root.top + at.y >= view.bottom) continue;
       const role = pick(a.role, lang);
       const line = found.find((l) => l.y === at.y && l.h === at.height);

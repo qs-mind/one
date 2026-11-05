@@ -1,16 +1,14 @@
-// Plan 4's chat, as the shell wraps it: the General chat and a project's floating chat. Moved from Chat.test.tsx;
-// every behaviour there still holds, with the command bar as the composer.
+// Plan 4's chat, as the shell wraps it: the General chat and a project's chat, a column beside the document. Moved
+// from Chat.test.tsx; every behaviour there still holds, with the command bar as the composer.
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { canvasApi } from "../canvas/api";
 import { D, entry, sheet } from "../deliverables/fixtures";
-import { setLanguage, texts } from "../i18n";
+import { count, fill, setLanguage, texts } from "../i18n";
+import { fakeSources } from "../project/fake";
 import { setCurrentProject } from "../records/project";
 import { App } from "./App";
 import { bodyOf, calls, core, P1, reply, running, streamed } from "./testing";
-
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
 /** A reply's paragraph by its whole text (its English runs sit in their own <bdi>). */
@@ -38,13 +36,13 @@ describe("the chat in the shell", () => {
     expect(body.messages[0]!.parts[0]!.text).toBe("سعّر البند ده");
   });
 
-  it("a project's chat has the project's id, and floats beside the canvas", async () => {
+  it("a project's chat has the project's id, and sits beside the document", async () => {
     setCurrentProject(P1);
     const fetch = core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
     const user = userEvent.setup();
-    render(<App />);
+    render(<App sourcesFor={() => fakeSources({})} />);
     await waitFor(() => expect(calls(fetch, "GET", "/api/chat/p1/messages")).toHaveLength(1));
-    expect(screen.getByRole("region", { name: "canvas stand-in" })).toBeInTheDocument();
+    expect(document.querySelector('[data-region="document"]')).not.toBeNull();
     expect(screen.getByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument();
     await user.type(await box(), "hello{enter}");
     await screen.findByText(/مرحبا/);
@@ -395,27 +393,7 @@ describe("the chat in the shell", () => {
     expect(await screen.findByRole("button", { name: texts.send.en })).toBeInTheDocument();
   });
 
-  it("a Deliverable card's Open focuses its frame on the canvas", async () => {
-    setCurrentProject(P1);
-    const parts = [reply[0]!, { type: "data-deliverable", id: D, data: { id: D } }, ...reply.slice(1)];
-    core({
-      routes: {
-        "POST /api/chat": (init) => streamed(parts, init),
-        "GET /api/projects/p1/deliverables": () => Response.json({ deliverables: [entry()] }),
-      },
-    });
-    vi.spyOn(canvasApi, "frames").mockReturnValue([{ key: `deliverable:${D}`, x: 0, y: 0, w: 960, h: 640, z: 0, collapsed: false }]);
-    const focus = vi.spyOn(canvasApi, "focusFrame").mockImplementation(() => {});
-    const user = userEvent.setup();
-    render(<App />);
-    await user.type(await box(), "اعمل المقايسة{enter}");
-    const card = await screen.findByRole("article", { name: "جدول الكميات - عينة" });
-    await user.click(within(card).getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) }));
-    expect(focus).toHaveBeenCalledWith(`deliverable:${D}`, { mark: true });
-    expect(screen.queryByRole("tablist", { name: texts.reviewPanels.ar })).toBeNull();
-  });
-
-  it("a Deliverable not on the canvas opens beside it; focus goes to Close, and Esc gives it back", async () => {
+  it("a Deliverable card's Open shows it as the document, with its review in the viewer", async () => {
     setCurrentProject(P1);
     const parts = [reply[0]!, { type: "data-deliverable", id: D, data: { id: D } }, ...reply.slice(1)];
     const d = `/api/projects/p1/deliverables/${D}`;
@@ -430,62 +408,130 @@ describe("the chat in the shell", () => {
       },
     });
     const user = userEvent.setup();
-    render(<App />);
+    render(<App sourcesFor={() => fakeSources({ deliverables: [entry()] })} />);
     await user.type(await box(), "اعمل المقايسة{enter}");
     const card = await screen.findByRole("article", { name: "جدول الكميات - عينة" });
-    const open = within(card).getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) });
-    await user.click(open);
-    expect(await screen.findByText("03/02")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) }));
+    const sheetBox = await screen.findByText("03/02");
+    expect(sheetBox.closest('[data-region="document"]')).not.toBeNull();
     expect(screen.getByRole("tablist", { name: texts.reviewPanels.ar })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: texts.close.ar })).toHaveFocus();
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("tablist")).toBeNull());
-    await waitFor(() => expect(open).toHaveFocus());
+    expect(screen.getByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument(); // the chat stays beside it
   });
 
-  it("“Deliverables” in the top bar opens the Project Index of the open project", async () => {
-    setCurrentProject(P1);
-    core({ routes: { "GET /api/projects/p1/deliverables": () => Response.json({ deliverables: [entry()] }) } });
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(await screen.findByRole("button", { name: texts.deliverablesButton.ar }));
-    expect(await screen.findByRole("button", { name: "جدول الكميات - عينة" })).toBeInTheDocument();
-  });
-
-  it("the chat folds to a button and opens again; its width can be changed from the keyboard", async () => {
+  it("the chat is a column beside the document, 320 px to start, 280 to 480 from the keyboard", async () => {
     setCurrentProject(P1);
     core();
     const user = userEvent.setup();
-    render(<App />);
-    const handle = await screen.findByRole("separator", { name: texts.chatWidth.ar });
-    expect(handle).toHaveAttribute("aria-valuenow", "420");
+    render(<App sourcesFor={() => fakeSources({})} />);
+    const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
+    expect(chat.parentElement).toBe(document.querySelector('[data-region="document"]')!.parentElement); // a flex sibling
+    expect(chat).not.toHaveClass("absolute");
+    const handle = screen.getByRole("separator", { name: texts.chatWidth.ar });
+    expect(handle).toHaveAttribute("aria-valuenow", "320");
+    expect(handle).toHaveAttribute("aria-valuemin", "280");
+    expect(handle).toHaveAttribute("aria-valuemax", "480");
     handle.focus();
     await user.keyboard("{ArrowRight}"); // in Arabic the chat is at the left: its edge moves right to widen it
-    expect(handle).toHaveAttribute("aria-valuenow", "436");
-    // focused, the handle shows the brand ring; the chat never takes more than a third of the window (1000 px)
+    expect(handle).toHaveAttribute("aria-valuenow", "336");
+    for (let i = 0; i < 12; i++) await user.keyboard("{ArrowRight}");
+    expect(handle).toHaveAttribute("aria-valuenow", "480");
+    for (let i = 0; i < 14; i++) await user.keyboard("{ArrowLeft}");
+    expect(handle).toHaveAttribute("aria-valuenow", "280");
     expect(handle).toHaveClass("focus-visible:outline-2", "focus-visible:outline-ink");
-    expect(screen.getByRole("complementary", { name: texts.projectChat.ar })).toHaveClass("max-w-[max(320px,33.333vw)]");
-    await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
-    expect(screen.queryByRole("log")).toBeNull();
-    await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));
-    expect(screen.getByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument();
   });
 
-  it("one message box: at the open chat's foot, floating over the canvas only while the chat is folded", async () => {
+  it("folding leaves the edge with the dot; the edge opens it again", async () => {
     setCurrentProject(P1);
     core();
     const user = userEvent.setup();
-    const { container } = render(<App />);
-    const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
-    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(1);
-    expect(chat).toContainElement(await box()); // below the conversation, in the chat itself
-    expect(chat).toHaveAttribute("data-canvas-cover"); // the canvas keeps its frames out from under it
+    const { container } = render(<App sourcesFor={() => fakeSources({ status: { waiting: 1 } })} />);
+    await box();
     await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
-    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(1);
-    const floating = screen.getByRole("region", { name: texts.commandBar.ar });
-    expect(floating).toContainElement(await box());
-    expect(floating).toHaveAttribute("data-canvas-cover");
-    await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));
+    expect(screen.queryByRole("log")).toBeNull();
+    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(0); // the composer is only in the chat
+    const edge = screen.getByRole("button", { name: texts.openChat.ar });
+    expect(edge).toHaveClass("w-3"); // 12 px
+    await waitFor(() => expect(edge.querySelector("[data-waiting-dot]")).not.toBeNull());
+    await user.click(edge);
+    expect(screen.getByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: texts.projectChat.ar })).toContainElement(await box());
+    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(1);
+  });
+
+  it("below 1000 px the chat opens over the document from the top bar's chat button and closes on Esc", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("999px"),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({ status: { waiting: 1 } })} />);
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("complementary", { name: texts.projectChat.ar })).toBeNull();
+    const button = within(screen.getByRole("banner")).getByRole("button", { name: texts.projectChat.ar });
+    await waitFor(() => expect(button.querySelector("[data-waiting-dot]")).not.toBeNull()); // the dot rides on it
+    await user.click(button);
+    const chat = screen.getByRole("complementary", { name: texts.projectChat.ar });
+    expect(chat).toHaveClass("fixed");
+    await user.click(await box());
+    await user.keyboard("{Escape}"); // Esc unwinds one step at a time: the open message box folds first
+    expect(chat).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: texts.projectChat.ar })).toBeNull());
+    expect(button).toHaveFocus();
+    vi.unstubAllGlobals();
+  });
+
+  it("below 1000 px, Esc with words in the box only leaves the box: the panel stays open and the draft stays", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("999px"),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(within(screen.getByRole("banner")).getByRole("button", { name: texts.projectChat.ar }));
+    const chat = screen.getByRole("complementary", { name: texts.projectChat.ar });
+    await user.click(await box());
+    await user.keyboard("سعر الخرسانة");
+    await user.keyboard("{Escape}");
+    expect(chat).toBeInTheDocument();
+    expect(chat).toHaveFocus(); // out of the box, still in the chat
+    expect(await box()).toHaveValue("سعر الخرسانة");
+    vi.unstubAllGlobals();
+  });
+
+  it("its head names the role it talks to and who is working now; pressing that lists the team, Desks folded", async () => {
+    setCurrentProject(P1);
+    core();
+    const est = {
+      id: "est", kind: "specialist" as const, role: { en: "Estimator - sample", ar: "مهندس التسعير - عينة" }, desk_id: "pd",
+      model: "claude-sonnet-5", state: "working" as const, line: null, brief_id: "b1",
+      focus: { frame: "deliverable:dA" as const, anchor: null }, at: "",
+    };
+    const sources = fakeSources({
+      deliverables: [entry({ id: "dA", title: "تسعير - عينة" })],
+      team: { desks: [{ id: "pd", name: { en: "Pricing Desk", ar: "قسم التسعير - عينة" }, stage: "temporary" }], agents: [est] },
+    });
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => sources} />);
+    const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
+    expect(within(chat).getByRole("heading", { level: 2 })).toHaveTextContent(texts.roleLead.ar);
+    const now = await within(chat).findByRole("button", { name: fill(texts.workingNow.ar, { role: "مهندس التسعير - عينة" }) });
+    await user.click(now);
+    const team = await screen.findByRole("dialog");
+    const desk = within(team).getByRole("button", { name: count("deskSummary", 1, { desk: "قسم التسعير - عينة" }) });
+    expect(desk).toHaveAttribute("aria-expanded", "false");
+    expect(team.querySelector('[data-agent="est"]')).toBeNull();
+    expect(team).toHaveTextContent(texts.roleLead.ar); // the project team: the Lead QS and the Checking QS
+    await user.click(desk);
+    expect(team.querySelector('[data-agent="est"]')).not.toBeNull();
   });
 });

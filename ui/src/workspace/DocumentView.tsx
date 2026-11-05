@@ -17,7 +17,7 @@ export function DocumentView(props: {
 }) {
   const { projectId, sources, opened } = props;
   const viewer = useRef<ViewerHandle>(null);
-  useImperativeHandle(props.ref, () => ({ locate: (anchor) => viewer.current?.locate(anchor) ?? null }), []);
+  useImperativeHandle(props.ref, () => ({ locate: (anchor, options) => viewer.current?.locate(anchor, options) ?? null }), []);
 
   const at = opened.key.indexOf(":");
   const kind = opened.key.slice(0, at) as DocKind;

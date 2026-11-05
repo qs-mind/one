@@ -5,8 +5,10 @@ import type { ViewColumn, ViewRow } from "../../deliverables/types";
 import { isNumber } from "../../deliverables/types";
 import { formatDecimal } from "./format";
 
-const LINE = 24; // 15px text at line-height 1.6
+const LINE = 24; // one line of cell text: the body's 14px at 1.5 is 21 px, Arabic's 15px at 1.65 about 25 px (styles.css)
 const PAD = 16; // block padding inside a cell: a one-line row is 40 px
+/** The open document's (mode "workspace") denser rows: a one-line row is 32 px, so more of the bill shows. */
+export const COMPACT_PAD = 8;
 const INLINE_PAD = 24; // the cells' 12px inline padding on each side (styles.css)
 const FIT_SLACK = 4; // a pixel or so of rounding, and room for a pending mark beside the value
 export const FONT = `15px "Kumbh Sans Variable", "Zain", system-ui, sans-serif`;
@@ -19,7 +21,7 @@ const BOLD = `700 ${FONT}`;
 export type Measure = (text: string, font: string) => number;
 
 /** The height of a row whose tallest cell holds n lines. */
-export const linesHeight = (lines: number) => lines * LINE + PAD;
+export const linesHeight = (lines: number, pad = PAD) => lines * LINE + pad;
 
 function lineCount(text: string, width: number, font: string, measure: Measure): number {
   const space = measure(" ", font);
@@ -43,7 +45,7 @@ export function titleColumnOf(columns: ViewColumn[]): string | undefined {
   return (columns.find((c) => c.key === "description") ?? columns.find((c) => c.kind === "text" && c.wrap))?.key;
 }
 
-export function rowHeight(row: ViewRow, columns: ViewColumn[], measure: Measure): number {
+export function rowHeight(row: ViewRow, columns: ViewColumn[], measure: Measure, pad = PAD): number {
   const titleColumn = titleColumnOf(columns);
   const font = row.kind === "section" ? BOLD : FONT;
   let most = 1;
@@ -60,7 +62,7 @@ export function rowHeight(row: ViewRow, columns: ViewColumn[], measure: Measure)
           : "";
     if (text) most = Math.max(most, lineCount(text, shownWidth(column.width) - INLINE_PAD, font, measure));
   }
-  return linesHeight(most);
+  return linesHeight(most, pad);
 }
 
 /** The text a one-line cell shows: a code, a unit's words, or a number as the grid formats it. */

@@ -265,7 +265,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
         event.preventDefault(); // the window must not open the file itself
         void add(Array.from(event.dataTransfer.files));
       }}
-      className={asDocument ? "h-full overflow-auto bg-paper px-5 py-4 text-ink" : "border-b border-stone px-4 py-4"}
+      className={asDocument ? "h-full overflow-auto bg-paper p-3 text-ink" : "border-b border-stone px-4 py-4"}
     >
       <div className={asDocument ? "flex flex-col gap-3" : "mx-auto flex max-w-2xl flex-col gap-3"}>
         {!asDocument && (
@@ -290,13 +290,18 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
           </div>
         ) : (
           <>
-            <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-slate px-4 py-5 text-center">
+            {/* as the open document, one line: the room is the files' (dense, 5 Nov) */}
+            <div
+              className={`rounded-md border border-dashed border-slate ${
+                asDocument ? "flex items-center justify-between gap-3 px-3 py-1.5" : "flex flex-col items-center gap-2 px-4 py-5 text-center"
+              }`}
+            >
               <p className="text-slate">{t("dropHere")}</p>
               <button
                 type="button"
                 disabled={adding}
                 onClick={() => chooser.current?.click()}
-                className="rounded-md border border-ink px-4 py-2 disabled:opacity-40"
+                className={`rounded-md border border-ink disabled:opacity-40 ${asDocument ? "h-8 shrink-0 px-3" : "px-4 py-2"}`}
               >
                 {t("addFiles")}
               </button>

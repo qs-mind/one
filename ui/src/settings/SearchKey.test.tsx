@@ -6,7 +6,7 @@ import { App } from "../shell/App";
 import { calls, core } from "../shell/testing";
 import { SearchKey } from "./SearchKey";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const KEY = "BSA-sample-key-not-a-real-0000"; // not a real key
 type Status = { provider: "brave" | "native" | "connector" | "none"; own_key: boolean };

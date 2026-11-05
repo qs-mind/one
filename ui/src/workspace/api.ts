@@ -31,6 +31,11 @@ export const workspaceApi = {
   current(): Opened | null {
     return current;
   },
+  /** The place in the open document moved (the engineer selected there): Back comes back to it. Not a step of its
+   * own, and nothing re-renders or scrolls for it. */
+  at(anchor: Anchor) {
+    if (current) current.anchor = anchor;
+  },
   /** On project open: the saved document, or Project files when there is none or it is gone. Clears the history. */
   reset(opened: Opened | null, check: (key: DocKey) => boolean) {
     exists = check;

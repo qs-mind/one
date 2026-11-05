@@ -8,7 +8,7 @@ import { setCurrentProject } from "../records/project";
 import { App } from "./App";
 import { calls, core, P1, reply, running, streamed } from "./testing";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("./testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
 

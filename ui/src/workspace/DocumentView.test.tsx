@@ -4,8 +4,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { createRef, type Ref } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { columns, core, D, DOC, entry, json, letter, sheet, viewRoutes } from "../deliverables/fixtures";
-import { fill, setLanguage, texts } from "../i18n";
+import { change, columns, core, D, DOC, entry, json, letter, sheet, viewRoutes } from "../deliverables/fixtures";
+import { count, fill, setLanguage, texts } from "../i18n";
 import { fakeSources, type FakeOptions } from "../project/fake";
 import type { Opened, ViewerHandle } from "../project/types";
 import { setCurrentProject } from "../records/project";
@@ -51,21 +51,58 @@ describe("DocumentView", () => {
     await waitFor(() => expect(ref.current!.locate({ row: "p3", column: "rate" })).toBeInstanceOf(DOMRect));
   });
 
-  it("the workspace's head line says the status and the Revision: the viewer does not say them again", async () => {
+  it("the top bar says the title, state, Revision and sample: the viewer's own row and sample notice are gone", async () => {
     const revision = { no: 2, version: 3, signed_off: false };
     core({ ...viewRoutes(sheet({ revision })), ...viewRoutes(letter({ revision })) });
     const sources = fakeSources({ deliverables: [entry({ revision: 2 }), entry({ id: DOC, kind: "document", revision: 2 })] });
     const { rerender } = render(<DocumentView projectId="p1" sources={sources} opened={{ key: `deliverable:${D}`, anchor: null }} />);
     await screen.findByText("03/02");
     const header = () => screen.getByRole("heading", { level: 2, hidden: true }).closest("header")!;
-    expect(header()).toHaveTextContent(fill(texts.reviewVersion.ar, { n: 3 })); // the version stays
+    expect(header()).toHaveClass("sr-only"); // nothing the bar does not say: no row («نسخة 1» was all it held)
+    expect(header()).not.toHaveTextContent(fill(texts.reviewVersion.ar, { n: 3 }));
     expect(header()).not.toHaveTextContent(texts.statusDraft.ar);
     expect(header()).not.toHaveTextContent(fill(texts.reviewRev.ar, { n: 2 }));
+    expect(screen.queryByText(texts.sheetSample.ar)).toBeNull(); // said once, in the switcher's facts
     rerender(<DocumentView projectId="p1" sources={sources} opened={{ key: `deliverable:${DOC}`, anchor: null }} />);
-    await screen.findByRole("heading", { name: letter().title });
-    expect(header()).toHaveTextContent(fill(texts.reviewVersion.ar, { n: letter().version }));
-    expect(header()).not.toHaveTextContent(texts.statusDraft.ar);
-    expect(header()).not.toHaveTextContent(fill(texts.reviewRev.ar, { n: 2 }));
+    await screen.findByRole("heading", { name: letter().title, hidden: true });
+    expect(header()).toHaveClass("sr-only");
+    expect(header()).not.toHaveTextContent(fill(texts.reviewVersion.ar, { n: letter().version }));
+    expect(screen.queryByText(texts.sheetSample.ar)).toBeNull();
+  });
+
+  it("the viewer's row shows when it carries something the bar does not: what waits for review", async () => {
+    core(viewRoutes(sheet({ pending: 1 }), { pending: [change("c1")] }));
+    show({ key: `deliverable:${D}`, anchor: null }, { deliverables: [entry()] });
+    await screen.findByText("03/02");
+    const header = screen.getByRole("heading", { level: 2, hidden: true }).closest("header")!;
+    expect(header).not.toHaveClass("sr-only");
+    expect(header).toHaveTextContent(count("sheetPending", 1));
+    expect(header).not.toHaveTextContent(fill(texts.reviewVersion.ar, { n: 3 }));
+  });
+
+  it("an empty review is only its tab row, with no Accept or Reject; another tab opens it", async () => {
+    core(viewRoutes(sheet({ pending: 0 })));
+    show({ key: `deliverable:${D}`, anchor: null }, { deliverables: [entry({ pending: 0 })] });
+    await screen.findByText("03/02");
+    const panel = () => document.querySelector("[data-review-panel]")!;
+    await waitFor(() => expect(panel()).toHaveAttribute("data-review-panel", "folded"));
+    expect(screen.getByRole("tab", { name: texts.reviewChanges.ar })).toBeInTheDocument(); // the one line
+    expect(screen.getByRole("tabpanel", { hidden: true })).not.toBeVisible();
+    expect(screen.queryByRole("button", { name: texts.reviewAcceptAll.ar })).toBeNull();
+    expect(screen.queryByRole("button", { name: texts.reviewAcceptMine.ar })).toBeNull();
+    expect(screen.queryByRole("button", { name: texts.reviewRejectAll.ar })).toBeNull();
+    expect(document.querySelector("[data-review-panel]")!.previousElementSibling).toHaveClass("flex-1"); // the sheet's
+    await userEvent.click(screen.getByRole("tab", { name: new RegExp(`^${texts.reviewComments.ar}`) }));
+    expect(panel()).toHaveAttribute("data-review-panel", "open");
+    expect(screen.getByRole("tabpanel")).toBeVisible();
+  });
+
+  it("a review with a change waiting is open, with its Accept all", async () => {
+    core(viewRoutes(sheet({ pending: 1 }), { pending: [change("c1")] }));
+    show({ key: `deliverable:${D}`, anchor: null }, { deliverables: [entry()] });
+    await screen.findByText("03/02");
+    expect(await screen.findByRole("button", { name: texts.reviewAcceptAll.ar })).toBeInTheDocument();
+    expect(document.querySelector("[data-review-panel]")).toHaveAttribute("data-review-panel", "open");
   });
 
   it("a file loads the wider page image when its room grows", async () => {

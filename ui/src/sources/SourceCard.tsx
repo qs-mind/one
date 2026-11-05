@@ -19,7 +19,7 @@ import { flipFrom } from "./flip";
 import { formulaText, termText } from "./formula";
 import { readingDirection } from "./mark";
 import { placeCard } from "./place";
-import { workspaceApi } from "../workspace/api";
+import { openSourceFile } from "../workspace/reveal";
 
 /** Who entered a number, in words: the core records a role ("engineer", "calc_engine") or an agent's English name. */
 const enteredBy: Record<string, Text> = {
@@ -154,10 +154,12 @@ function Level({
   // worked out by the Calc Engine: it says so, in place of a formula as a title and whoever asked for the number
   const calculated = source?.kind === "calculation" || Boolean(calc);
 
+  const value = explained?.number.value ?? cell?.value;
+
   function openSource() {
     if (!fileId) return;
-    // the file opens as the document, at its page; the card has done its job
-    workspaceApi.open(`file:${fileId}`, typeof sourcePage === "number" ? { page: sourcePage } : {});
+    // the file opens as the document, at its page, and the quoted place is marked there; the card has done its job
+    openSourceFile(fileId, source?.locator, value ? figuresOf(value) : []);
     onClose();
   }
 

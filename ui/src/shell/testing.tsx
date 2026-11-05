@@ -1,7 +1,6 @@
 // For the shell's tests: a core behind a mocked fetch, the AI SDK stream as the core sends it, and a stand-in for
-// the canvas (the real one has its own tests), which records what the shell asks of it.
+// the workspace (the real one has its own tests).
 import { vi } from "vitest";
-import type { CanvasProps } from "../canvas/Canvas";
 
 export const reply = [
   { type: "start", messageId: "m1" },
@@ -108,6 +107,8 @@ export function core({ keySet = true, routes = {} }: { keySet?: boolean; routes?
     const opened = /^POST \/api\/projects\/(p\d)\/open$/.exec(key)?.[1];
     if (opened) return Response.json(opened === "p1" ? P1 : P2);
     if (/^POST \/api\/projects\/[^/]+\/close$/.test(key)) return Response.json({ ok: true });
+    // Project files, the document a project opens on: none unless a test gives some
+    if (/^GET \/api\/projects\/[^/]+\/files$/.test(key)) return Response.json({ files: [] });
     if (/^GET \/api\/chat\/[^/]+\/messages$/.test(key)) return Response.json({ messages: [] });
     if (/^GET \/api\/chat\/[^/]+\/stream$/.test(key)) return new Response(null, { status: 204 });
     return new Response("not found", { status: 404 });
@@ -121,16 +122,12 @@ export const calls = (fetch: ReturnType<typeof core>, method: string, url: strin
 
 export const bodyOf = (init: RequestInit | undefined) => JSON.parse(String(init!.body)) as Record<string, unknown>;
 
-/** What the canvas stand-in was given, so a test can open a Deliverable full screen as the canvas would. */
-export const shown: { props?: CanvasProps } = {};
-
-/** Replaces ../canvas/Canvas in a test file:
- * `vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }))`. */
-export function CanvasStandIn(props: CanvasProps) {
-  shown.props = props;
+/** Replaces ../workspace/Workspace in a test file about something else (the chat, its cards):
+ * `vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("./testing")).WorkspaceStandIn }))`. */
+export function WorkspaceStandIn() {
   return (
-    <section aria-label="canvas stand-in">
-      <button type="button">frame</button>
+    <section aria-label="workspace stand-in">
+      <button type="button">document</button>
     </section>
   );
 }

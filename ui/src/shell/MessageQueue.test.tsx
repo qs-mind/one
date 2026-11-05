@@ -9,7 +9,7 @@ import { setCurrentProject } from "../records/project";
 import { App } from "./App";
 import { bodyOf, calls, core, reply } from "./testing";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("./testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
 const queueRegion = () => screen.queryByRole("list", { name: texts.queueLabel.ar });

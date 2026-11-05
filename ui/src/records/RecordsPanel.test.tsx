@@ -6,7 +6,7 @@ import { App } from "../shell/App";
 import { setCurrentProject } from "./project";
 import { RecordsPanel } from "./RecordsPanel";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const school = { id: "p1", name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00.000000+00:00" };
 const files = `/api/projects/${school.id}/files`;
@@ -375,12 +375,15 @@ describe("RecordsPanel", () => {
     expect(pick).toHaveBeenCalled();
   });
 
-  it("opens from the top bar beside the canvas, the message box stays, and Close closes it", async () => {
+  it("opens from the palette over the document, the message box stays, and Close closes it", async () => {
     core();
     const user = userEvent.setup();
     render(<App />);
-    await user.click(within(screen.getByRole("banner")).getByRole("button", { name: texts.records.ar }));
-    const records = screen.getByRole("region", { name: texts.records.ar });
+    await screen.findByRole("textbox", { name: texts.message.ar });
+    fireEvent.keyDown(document, { code: "KeyK", ctrlKey: true });
+    const palette = await screen.findByRole("dialog", { name: texts.palette.ar });
+    await user.click(within(palette).getByRole("option", { name: texts.records.ar }));
+    const records = await screen.findByRole("region", { name: texts.records.ar });
     expect(screen.getByRole("textbox", { name: texts.message.ar })).toBeInTheDocument();
     await user.click(within(records).getByRole("button", { name: texts.close.ar }));
     await waitFor(() => expect(screen.queryByRole("region", { name: texts.records.ar })).not.toBeInTheDocument());

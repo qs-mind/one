@@ -1,20 +1,17 @@
-// The screen. With a project open: the top bar, and under it the Project Canvas filling the window, with the
-// project chat, the command bar and the zoom controls floating over it. With none: the General chat. One chat per
-// chat id (the project's id, or "general"); switching project switches the chat. The screen saves nothing itself:
-// the core keeps the chats with their Briefs, and the canvas keeps its layout in the project's own file.
+// The screen. With a project open: the top bar, and under it one document at the inline start (right in Arabic) and
+// the project chat beside it at the inline end, both on the Stone ground; the command bar is at the chat's foot. With
+// none: the General chat. One chat per chat id (the project's id, or "general"); switching project switches the chat
+// and restores that project's open document. The screen saves nothing in the browser: the core keeps the chats with
+// their Briefs, and the project's open document in the project's own file (workspace/documents.tsx).
 import { DirectionProvider } from "@radix-ui/react-direction";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { canvasApi } from "../canvas/api";
-import { Canvas } from "../canvas/Canvas";
-import { CHAT_STARTS_OPEN, DELIVERABLE_CARD_OPENS } from "../canvas/choices";
 import { sampleSources } from "../project/fake";
 import { isMod, isTyping, matches } from "../project/keys";
 import { leadFromChat, useWaiting } from "../project/live/activity";
 import { Announcer } from "../project/live/Announcer";
-import { Cursors } from "../canvas/live/Cursors";
 import { currentSelection, select } from "../project/selection";
 import { httpSources } from "../project/sources";
-import type { FrameKey, ProjectSources, ProjectStatus } from "../project/types";
+import type { ProjectSources, ProjectStatus } from "../project/types";
 import { BackupPanel } from "../backup/BackupPanel";
 import { Confidential } from "../backup/Confidential";
 import { ProjectIndex } from "../deliverables/ProjectIndex";
@@ -28,20 +25,22 @@ import { RecordsPanel } from "../records/RecordsPanel";
 import { AiSettings, useAiSettings } from "../settings/AiSettings";
 import { Connectors } from "../settings/Connectors";
 import { SearchKey } from "../settings/SearchKey";
+import { useOpened, workspaceApi } from "../workspace/api";
+import { DocumentsContext, useDocuments } from "../workspace/documents";
+import { DocumentHead, Workspace } from "../workspace/Workspace";
 import { CHAT_WIDTH, ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
-import { DeliverablePanel, useDeliverablePanel } from "./DeliverablePanel";
 import { GENERAL, useActivity } from "./chatActivity";
 import { onOpenPanel } from "./FixAction";
 import { FloatingPanel } from "./FloatingPanel";
 import { GeneralChat } from "./GeneralChat";
 import { useNoticeCount } from "./Notices";
 import { Palette } from "./Palette";
-import { moveRegion, useNarrow } from "./regions";
+import { moveRegion, useNarrow, useSmall } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
 import { showsWaitingCard, useChats } from "./useChats";
 
-/** The dev-only sample mode (?sample=1): the canvas shows sample data, labelled. Release builds drop it. */
+/** The dev-only sample mode (?sample=1): the screen shows sample data, labelled. Release builds drop it. */
 function sampleMode(): boolean {
   return import.meta.env.DEV && new URLSearchParams(window.location.search).has("sample");
 }
@@ -51,10 +50,6 @@ const projectSources = (projectId: string) => (sampleMode() ? sampleSources() : 
 // the chat's width lasts for the session only (decision 4: nothing in web storage)
 let sessionWidth = CHAT_WIDTH.start;
 
-/** The zoom controls take the bottom inline start; with the chat folded, the command bar floats between them and the
- * window's end. With the chat open it sits at the chat's foot instead: one message box. */
-const ZOOM_SPACE = 272;
-const CHAT_BUTTON_SPACE = 16;
 const STATUS_RELOAD_MS = 1000;
 const WAITING_SYNC_MS = 1500;
 const WAITING_FRAMES = 30;
@@ -64,10 +59,16 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   useLanguage();
   const project = useProject();
   const narrow = useNarrow();
+  const small = useSmall();
   const chat = useChats(project?.id ?? "general");
   const ai = useAiSettings();
   const sample = sampleMode();
   const sources = useMemo(() => (project ? sourcesFor(project.id) : undefined), [project?.id, sourcesFor, sample]);
+  const documents = useDocuments(sources);
+  // sample numbers are said once: in the open Deliverable's facts («الأرقام عينة»), else by the top bar
+  const opened = useOpened();
+  const factsSaySample =
+    !!project && !!documents?.deliverables.some((d) => d.sample && opened?.key === `deliverable:${d.id}`);
 
   // AI settings in place of the chat: nothing connected yet, or the first AI just connected (it stays open to say so)
   const [aiMainOpen, setAiMainOpen] = useState(false);
@@ -81,22 +82,21 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
 
   const [panel, setPanel] = useState<PanelKind | null>(null);
   const opener = useRef<HTMLElement | null>(null);
-  const [wideChat, setWideChat] = useState(CHAT_STARTS_OPEN);
+  const [wideChat, setWideChat] = useState(true);
   const [sheetChat, setSheetChat] = useState(false);
   const chatShown = narrow ? sheetChat : wideChat || aiMain;
   const setChatShown = (shown: boolean) => (narrow ? setSheetChat(shown) : setWideChat(shown));
   const [width, setWidth] = useState(sessionWidth);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteOrigin, setPaletteOrigin] = useState<DOMRect>(); // the search field's place, when opened from it
-  const deliverable = useDeliverablePanel(project?.id);
   const [status, setStatus] = useState<ProjectStatus>({});
   const liveWaiting = useWaiting(); // the live stream's count, once it has said one; until then the status's
   const waiting = liveWaiting ?? status.waiting ?? 0;
   // "Waiting for you" counts every chat that waits: this project's cards, and each other chat waiting on the engineer
   const waitingElsewhere = useActivity().filter((c) => c.state === "waiting" && c.chat_id !== (project?.id ?? GENERAL));
 
-  // The import reports and the backup question are cards at the chat's foot (Notices), never over the canvas: a new
-  // one opens a folded chat, so it is seen.
+  // The import reports and the backup question are cards at the chat's foot (Notices), never over the document: a
+  // new one opens a folded chat, so it is seen.
   const notices = useNoticeCount();
   const noticesSeen = useRef(notices);
   useEffect(() => {
@@ -150,7 +150,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   }, []);
 
   useEffect(() => {
-    select([]); // a selection belongs to its project's canvas
+    select([]); // a selection belongs to its project's document
   }, [project?.id]);
 
   useEffect(() => {
@@ -227,16 +227,17 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     requestAnimationFrame(go);
   }
 
-  function openDeliverable(id: string, card?: HTMLElement) {
-    const key: FrameKey = `deliverable:${id}`;
-    if (DELIVERABLE_CARD_OPENS === "frame" && canvasApi.frames().some((frame) => frame.key === key)) {
-      if (narrow) setSheetChat(false);
-      canvasApi.focusFrame(key, { mark: true }); // it glides there, and the frame says "here"
-    } else {
-      deliverable.show(id, false, card); // from its chat card, it grows from there
-    }
+  /** A Deliverable's card (or the Close Project screen): it opens as the document; the narrow panel gives way. */
+  function openDeliverable(id: string) {
+    if (narrow) setSheetChat(false);
+    workspaceApi.open(`deliverable:${id}`);
   }
 
+  const openChatRef = useRef(() => setChatShown(true));
+  openChatRef.current = () => setChatShown(true);
+  // full screen: the chat folds and the document takes the width; the second press brings the chat back
+  const toggleFullScreen = useRef(() => setChatShown(!chatShown));
+  toggleFullScreen.current = () => setChatShown(!chatShown);
   useEffect(() => {
     // shortcuts by KeyboardEvent.code, so they work with the Arabic layout too (decision 10)
     function onKey(event: KeyboardEvent) {
@@ -244,6 +245,10 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         event.preventDefault();
         setPaletteOrigin(undefined);
         setPaletteOpen((open) => !open);
+      } else if (isMod(event) && event.shiftKey && !event.altKey && event.code === "KeyF") {
+        if (!document.querySelector("[data-region='document']")) return;
+        event.preventDefault();
+        toggleFullScreen.current();
       } else if (
         event.key === "Escape" &&
         !event.defaultPrevented &&
@@ -255,10 +260,23 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         event.preventDefault();
         moveRegion(event.shiftKey);
       } else if (event.code === "Slash" && !event.shiftKey && !event.altKey && !isMod(event) && !isTyping(event.target)) {
+        if (document.querySelector("[role='dialog']")) return;
         const box = document.querySelector<HTMLElement>("[data-command-box]");
-        if (!box || document.querySelector("[role='dialog']")) return;
+        if (box) {
+          event.preventDefault();
+          return box.focus();
+        }
+        if (!document.querySelector("[data-region='document']")) return;
+        // the message box is in the chat only: a folded chat opens, to write there
         event.preventDefault();
-        box.focus();
+        openChatRef.current();
+        let frames = WAITING_FRAMES;
+        const go = () => {
+          const opened = document.querySelector<HTMLElement>("[data-command-box]");
+          if (opened) opened.focus();
+          else if (frames-- > 0) requestAnimationFrame(go);
+        };
+        requestAnimationFrame(go);
       }
     }
     document.addEventListener("keydown", onKey);
@@ -289,10 +307,9 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         <ProjectIndex
           projectId={project.id}
           onOpen={(id) => {
-            // the index closes, so it never sits over the board; the board's Close gives focus back to its button
-            opener.current?.focus();
+            // the index closes, so it never sits over the document it opened
             setPanel(null);
-            deliverable.show(id);
+            openDeliverable(id);
           }}
           onClose={closePanel}
         />
@@ -305,95 +322,93 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     </FloatingPanel>
   );
 
-  const fullScreen = deliverable.open !== null && deliverable.full;
-
   return (
     <DirectionProvider dir={dir()}>
-      <div className="flex h-dvh flex-col bg-paper text-ink">
-        <TopBar
-          project={project}
-          status={status}
-          sources={sources}
-          sample={sample}
-          narrow={narrow}
-          panel={panel}
-          onPanel={togglePanel}
-          aiExpanded={panel === "ai" || aiMain}
-          waiting={waiting + waitingElsewhere.length}
-          onWaiting={() => (waiting > 0 || !waitingElsewhere[0] ? showWaiting() : void openChat(waitingElsewhere[0].chat_id))}
-          onPalette={(origin) => {
-            setPaletteOrigin(origin);
-            setPaletteOpen(true);
-          }}
-          chatOpen={chatShown}
-          onChat={() => setChatShown(!chatShown)}
-        />
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          {project && sources ? (
-            <main className="relative min-h-0 flex-1 overflow-hidden">
-              <div data-region="canvas" tabIndex={-1} className="absolute inset-0 outline-none" inert={fullScreen}>
-                <Canvas projectId={project.id} sources={sources} onOpenFull={(id) => deliverable.show(id, true)}>
-                  <Cursors />
-                </Canvas>
-              </div>
-              <ChatPanel
-                {...body}
-                composer={ai.connected !== false && <CommandBar chat={chat} ai={ai} onConnectAi={connectAi} inPanel />}
-                projectId={project.id}
-                onOpenDeliverable={openDeliverable}
-                open={chatShown}
-                onOpen={() => setChatShown(true)}
-                onClose={() => setChatShown(false)}
-                narrow={narrow}
-                width={width}
-                onWidth={(next) => {
-                  sessionWidth = next;
-                  setWidth(next);
-                }}
-              />
-              {ai.connected !== false && !chatShown && (
-                <CommandBar
-                  chat={chat}
-                  ai={ai}
-                  onConnectAi={connectAi}
-                  onSent={() => setChatShown(true)}
-                  floating={narrow ? { start: 8, end: 8, bottom: 64 } : { start: ZOOM_SPACE, end: CHAT_BUTTON_SPACE, bottom: 16 }}
+      <DocumentsContext.Provider value={documents}>
+        <div className={`flex h-dvh flex-col text-ink ${project ? "bg-stone" : "bg-paper"}`}>
+          <TopBar
+            project={project}
+            status={status}
+            sources={sources}
+            sample={sample && !factsSaySample}
+            narrow={narrow}
+            panel={panel}
+            onPanel={togglePanel}
+            aiExpanded={panel === "ai" || aiMain}
+            waiting={waiting + waitingElsewhere.length}
+            onWaiting={() => (waiting > 0 || !waitingElsewhere[0] ? showWaiting() : void openChat(waitingElsewhere[0].chat_id))}
+            onPalette={(origin) => {
+              setPaletteOrigin(origin);
+              setPaletteOpen(true);
+            }}
+            chatOpen={chatShown}
+            onChat={() => setChatShown(!chatShown)}
+            document={project && documents && <DocumentHead documents={documents} />}
+            fullScreen={!chatShown}
+            onFullScreen={() => toggleFullScreen.current()}
+          />
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {project && sources ? (
+              // dense (5 Nov): the room is the data's: 8 px under the top bar and above the window's foot, 12 px at
+              // the sides and between the document and the chat
+              // below 640 px the document loses its side gutters: the phone's width is all the data's
+              <main className={`relative flex min-h-0 flex-1 gap-3 py-2 ${small ? "px-0" : "px-3"}`}>
+                {documents ? (
+                  <Workspace projectId={project.id} sources={sources} documents={documents} />
+                ) : (
+                  <div className="min-w-0 flex-1" aria-busy="true" />
+                )}
+                <ChatPanel
+                  {...body}
+                  composer={ai.connected !== false && <CommandBar chat={chat} ai={ai} onConnectAi={connectAi} inPanel />}
+                  projectId={project.id}
+                  onOpenDeliverable={openDeliverable}
+                  open={chatShown}
+                  onOpen={() => setChatShown(true)}
+                  onClose={() => setChatShown(false)}
+                  narrow={narrow}
+                  small={small}
+                  waiting={waiting + waitingElsewhere.length > 0}
+                  width={width}
+                  onWidth={(next) => {
+                    sessionWidth = next;
+                    setWidth(next);
+                  }}
                 />
-              )}
-              {floatingPanel}
-              <DeliverablePanel panel={deliverable} projectId={project.id} onSend={(text) => void chat.send(text)} />
-            </main>
-          ) : (
-            <>
-              <FolderDrop className="flex min-h-0 flex-1 flex-col">
-                <GeneralChat {...body} onConnectAi={connectAi} />
-              </FolderDrop>
-              {floatingPanel}
-            </>
-          )}
-          <FolderChooser />
+                {floatingPanel}
+              </main>
+            ) : (
+              <>
+                <FolderDrop className="flex min-h-0 flex-1 flex-col">
+                  <GeneralChat {...body} onConnectAi={connectAi} />
+                </FolderDrop>
+                {floatingPanel}
+              </>
+            )}
+            <FolderChooser />
+          </div>
+          <Palette
+            open={paletteOpen}
+            origin={paletteOrigin}
+            onOpenChange={setPaletteOpen}
+            project={project}
+            documents={documents}
+            chatOpen={chatShown}
+            onToggleChat={() => setChatShown(!chatShown)}
+            onGeneralChat={leaveProject}
+            onNewProject={() => {
+              opener.current = projectsButton();
+              setPanel("projects");
+            }}
+            onPanel={(kind) => {
+              if (kind === "ai" && aiMain) return setChatShown(true); // the settings are already where the chat is
+              opener.current = document.querySelector<HTMLElement>("[data-search-field]") ?? projectsButton();
+              setPanel(kind);
+            }}
+          />
+          <Announcer />
         </div>
-        <Palette
-          open={paletteOpen}
-          origin={paletteOrigin}
-          onOpenChange={setPaletteOpen}
-          project={project}
-          sources={sources}
-          chatOpen={chatShown}
-          onToggleChat={() => setChatShown(!chatShown)}
-          onGeneralChat={leaveProject}
-          onNewProject={() => {
-            opener.current = projectsButton();
-            setPanel("projects");
-          }}
-          onPanel={(kind) => {
-            if (kind === "ai" && aiMain) return setChatShown(true); // the settings are already where the chat is
-            opener.current = document.querySelector<HTMLElement>("[data-search-field]") ?? projectsButton();
-            setPanel(kind);
-          }}
-        />
-        <Announcer />
-      </div>
+      </DocumentsContext.Provider>
     </DirectionProvider>
   );
 }

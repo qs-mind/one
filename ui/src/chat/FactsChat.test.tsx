@@ -10,7 +10,7 @@ import { App } from "../shell/App";
 import { core, streamed } from "../shell/testing";
 import { withoutRedone } from "./parts/FactsLine";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const claimed = "تم الانتهاء من تسعير كافة بنود المقايسة.";
 const fixed = "اتسعّر 8 بنود من 325، والباقي لسه.";

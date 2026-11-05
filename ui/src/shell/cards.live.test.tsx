@@ -8,7 +8,7 @@ import { setCurrentProject } from "../records/project";
 import { App } from "./App";
 import { core, P1 } from "./testing";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("./testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 beforeEach(() => {
   setLanguage("ar");

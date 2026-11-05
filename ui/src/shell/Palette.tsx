@@ -1,40 +1,38 @@
-// Search and commands (Ctrl/Cmd+K): the frames on the canvas by title (Enter focuses one), the shell's commands and
-// the projects, and a search of Project Records (a hit opens its file's frame at its page). For now this is also the
-// Project Index's quick way in: every Deliverable is a frame. Opened from the top bar's search field, it grows from
-// the field in place (scaled and clipped from its rect, 220 ms) and closes back into it; from Ctrl K, it just opens.
+// Search and commands (Ctrl/Cmd+K): the project's documents by title (Enter opens one as the document), the shell's
+// commands and the projects, and a search of Project Records (a hit opens its file as the document, at its page).
+// Opened from the top bar's search field, it grows from the field in place (scaled and clipped from its rect, 220 ms)
+// and closes back into it; from Ctrl K, it just opens.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { canvasApi } from "../canvas/api";
-import type { FrameKey, ProjectSources } from "../project/types";
+import type { DocKey } from "../project/types";
 import { openSetup } from "../firstlaunch/parts";
-import { fill, language, pick, setLanguage, t, useLanguage } from "../i18n";
+import { fill, language, setLanguage, t, useLanguage } from "../i18n";
 import { type Project, switchProject } from "../records/project";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { FileName } from "../ui/FileName";
 import { DUR, play } from "../ui/motion";
 import { withTransition } from "../ui/viewTransition";
+import { workspaceApi } from "../workspace/api";
+import { titleOf, type Documents } from "../workspace/documents";
+import { openSourceFile } from "../workspace/reveal";
 
 type Hit = { file_id: string; file_name: string; locator: Record<string, string | number>; text: string };
 
 const SEARCH_DELAY = 250;
 
-/** Each frame's title in the page language, from the project's own lists. */
-async function frameTitles(sources: ProjectSources): Promise<Map<FrameKey, string>> {
-  const [files, deliverables, team, layout] = await Promise.all([
-    sources.files().catch(() => []),
-    sources.deliverables().catch(() => []),
-    sources.team().catch(() => ({ desks: [], agents: [] })),
-    sources.layout().catch(() => undefined),
-  ]);
-  const titles = new Map<FrameKey, string>([
-    ["files:all", t("projectFiles")],
-    ["team:core", t("projectTeam")],
-  ]);
-  for (const f of files) titles.set(`file:${f.id}`, f.name);
-  for (const d of deliverables) titles.set(`deliverable:${d.id}`, d.title);
-  for (const d of team.desks) titles.set(`desk:${d.id}`, pick(d.name));
-  for (const b of layout?.client_boqs ?? []) titles.set(`clientboq:${b.file_id}`, fill(t("clientBoqTitle"), { name: b.name }));
-  return titles;
+/** Every document of the project with its title in the page language: Project files, the Deliverables, the client
+ * BOQs, then the files. */
+function documentsList(docs: Documents): { key: DocKey; title: string }[] {
+  const keys: DocKey[] = [
+    "files:all",
+    ...docs.deliverables.map((d): DocKey => `deliverable:${d.id}`),
+    ...docs.clientBoqs.map((b): DocKey => `clientboq:${b.file_id}`),
+    ...docs.files.map((f): DocKey => `file:${f.id}`),
+  ];
+  return keys.flatMap((key) => {
+    const title = titleOf(docs, key);
+    return title ? [{ key, title }] : [];
+  });
 }
 
 /** The palette's box as if it stood in `field`: moved there and scaled to its width, showing only its top band. */
@@ -62,7 +60,7 @@ export function Palette({
   origin,
   onOpenChange,
   project,
-  sources,
+  documents,
   chatOpen,
   onToggleChat,
   onGeneralChat,
@@ -74,7 +72,8 @@ export function Palette({
   origin?: DOMRect;
   onOpenChange(open: boolean): void;
   project: Project | undefined;
-  sources: ProjectSources | undefined;
+  /** The open project's documents, once read. */
+  documents: Documents | null;
   chatOpen: boolean;
   onToggleChat(): void;
   onGeneralChat(): void;
@@ -84,7 +83,6 @@ export function Palette({
 }) {
   useLanguage();
   const [query, setQuery] = useState("");
-  const [frames, setFrames] = useState<{ key: FrameKey; title: string }[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [hits, setHits] = useState<Hit[]>([]);
   const projectId = project?.id;
@@ -140,16 +138,10 @@ export function Palette({
       .then((r) => (r.ok ? (r.json() as Promise<{ projects: (Project | { id: string; error: unknown })[] }>) : undefined))
       .then((body) => live && body && setProjects(body.projects.filter((p): p is Project => "name" in p)))
       .catch(() => undefined);
-    if (sources) {
-      const keys = canvasApi.frames().map((f) => f.key);
-      void frameTitles(sources).then(
-        (titles) => live && setFrames(keys.flatMap((key) => (titles.has(key) ? [{ key, title: titles.get(key)! }] : []))),
-      );
-    }
     return () => {
       live = false;
     };
-  }, [open, sources]);
+  }, [open]);
 
   useEffect(() => {
     // Project Records search, once the engineer stops typing
@@ -194,19 +186,16 @@ export function Palette({
       <CommandInput ref={grow} value={query} onValueChange={setQuery} placeholder={t(project ? "paletteSearch" : "paletteSearchGeneral")} />
       <CommandList>
         <CommandEmpty>{t("noResults")}</CommandEmpty>
-        {project && frames.length > 0 && (
-          <CommandGroup heading={t("paletteFrames")}>
-            {frames.map((frame) => (
-              <CommandItem key={frame.key} value={`${frame.title} ${frame.key}`} onSelect={() => run(() => canvasApi.focusFrame(frame.key))}>
-                <FileName name={frame.title} fit />
+        {project && documents && (
+          <CommandGroup heading={t("docSwitch")}>
+            {documentsList(documents).map((doc) => (
+              <CommandItem key={doc.key} value={`${doc.title} ${doc.key}`} onSelect={() => run(() => workspaceApi.open(doc.key))}>
+                <FileName name={doc.title} fit />
               </CommandItem>
             ))}
           </CommandGroup>
         )}
         <CommandGroup heading={t("paletteCommands")}>
-          {project && command(t("fitAll"), () => canvasApi.fitAll())}
-          {project && command(t("arrangeByStageCommand"), () => canvasApi.arrange("stage"))}
-          {project && command(t("tidy"), () => canvasApi.arrange("tidy"))}
           {project && command(t(chatOpen ? "closeChat" : "openChat"), onToggleChat)}
           {project && command(t("records"), () => onPanel("records"))}
           {project && command(t("deliverablesButton"), () => onPanel("deliverables"))}
@@ -237,7 +226,7 @@ export function Palette({
                   key={index}
                   forceMount
                   value={`hit ${index} ${hit.file_id}`}
-                  onSelect={() => run(() => canvasApi.openFile(hit.file_id, page))}
+                  onSelect={() => run(() => openSourceFile(hit.file_id, hit.locator, []))} // opened at the hit, and marked
                   className="flex-col items-start"
                 >
                   <span className="flex max-w-full items-baseline text-slate">

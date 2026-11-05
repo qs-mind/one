@@ -211,7 +211,7 @@ export function ApprovalCard({
       data-answered={done || undefined}
       lang={lang}
       dir={dir(lang)}
-      className={`flex min-w-0 flex-col rounded-[14px] ${done ? "gap-3 bg-stone/70 px-4 py-2.5" : "gap-3 border border-copper bg-paper px-5 py-4"}`}
+      className={`flex min-w-0 flex-col rounded-[10px] ${done ? "gap-2 bg-stone/70 px-3 py-2" : "gap-2 border border-copper bg-paper p-3"}`}
     >
       {done ? (
         <h3 id={titleId} className="min-w-0">
@@ -248,7 +248,7 @@ export function ApprovalCard({
           {pick(card.title, lang)}
         </h3>
       )}
-      <div hidden={done && !unfolded} className="flex min-w-0 flex-col gap-4">
+      <div hidden={done && !unfolded} className="flex min-w-0 flex-col gap-2">
         <p dir="auto">{pick(card.detail, lang)}</p>
         {!done && <FixAction fix={fixOf(card.fix)} lang={lang} />}
         {Kind && (
@@ -264,7 +264,7 @@ export function ApprovalCard({
           <>
             <div className="flex flex-wrap gap-2 pt-1">
               {card.options.map((option) => {
-                const look = `rounded-lg px-4 py-2 disabled:opacity-40 ${option === "no" ? "border border-ink" : "bg-ink text-paper"}`;
+                const look = `flex h-8 items-center rounded-lg px-3 disabled:opacity-40 ${option === "no" ? "border border-ink" : "bg-ink text-paper"}`;
                 return card.hold?.options.includes(option) ? (
                   <HoldButton
                     key={option}

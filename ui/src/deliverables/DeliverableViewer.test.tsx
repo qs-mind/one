@@ -49,6 +49,19 @@ describe("viewerFor", () => {
     expect(screen.queryByRole("group", { name: texts.exportMenu.ar })).toBeNull();
   });
 
+  it("locate brings the block into view; with scroll false it only measures", async () => {
+    core(viewRoutes(letter()));
+    const ref = createRef<ViewerHandle>();
+    render(<DeliverableViewer projectId="p1" deliverableId={DOC} mode="frame" ref={ref} subscribe={fakeLive().subscribe} />);
+    await waitFor(() => expect(document.querySelector('[data-block-id="b2"]')).not.toBeNull());
+    const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
+    expect(ref.current!.locate({ row: "b2" }, { scroll: false })).toBeInstanceOf(DOMRect);
+    expect(scrolled).not.toHaveBeenCalled();
+    ref.current!.locate({ row: "b2" });
+    expect(scrolled).toHaveBeenCalledOnce();
+    scrolled.mockRestore();
+  });
+
   it("reports a selection with its label once, even when the owner passes a new callback each render", async () => {
     core(viewRoutes(sheet()));
     const live = fakeLive();
