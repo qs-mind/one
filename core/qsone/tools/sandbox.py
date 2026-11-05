@@ -470,7 +470,7 @@ for _tool in (
         RerunArgs,
         "read",
         _sandbox_rerun,
-        lambda _: copy.fill(copy.TOOL_WORKING, tool="sandbox_rerun"),
+        lambda _: copy.tool_step("sandbox_rerun"),
         example=_RERUN_EXAMPLE,
         group="sandbox",
     ),

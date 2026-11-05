@@ -5,7 +5,7 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 import { deliverablesApi } from "../../deliverables/api";
 import type { Change, NumberCell, Op, SheetView, Thread, ViewRow } from "../../deliverables/types";
 import { isNumber } from "../../deliverables/types";
-import { dir, fill, language, pick, t, texts, useLanguage, type Text } from "../../i18n";
+import { count, dir, fill, language, pick, t, texts, useLanguage, type Text } from "../../i18n";
 import { cellText, pasteOps, parseTsv, toHtml, toTsv, why } from "./clipboard";
 import { cellKey, cellName, commentMarks, pendingCells, SheetCell, Value } from "./cells";
 import { loadCollapsed, saveCollapsed, visibleRows } from "./collapse";
@@ -291,7 +291,7 @@ export function SheetViewer(props: SheetViewerProps) {
         <StatusChips view={view} />
         <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
         {view.revision && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
-        {view.pending > 0 && <span>{fill(t("sheetPending"), { n: view.pending })}</span>}
+        {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
         {props.onToggleFullScreen && (
           <button
             type="button"

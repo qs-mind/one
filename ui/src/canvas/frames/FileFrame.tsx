@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { dir, fill, t, useLanguage } from "../../i18n";
 import type { FilePiece } from "../types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type FileData } from "./Frame";
+import { FileName } from "../../ui/FileName";
 
 /** Page images come in two widths: enough for the frame on screen, never more (decision 13). */
 const SMALL = 600;
@@ -95,9 +96,7 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
     >
       {detail !== "live" ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-          <bdi dir="auto" className="text-lg font-semibold break-all">
-            {file.name}
-          </bdi>
+          <FileName name={file.name} className="text-lg font-semibold break-all" />
           {pageOf && <span className="text-slate">{pageOf}</span>}
         </div>
       ) : (

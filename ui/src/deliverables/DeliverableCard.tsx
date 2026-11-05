@@ -2,7 +2,7 @@
 // pending changes and open comments, kept up to date by the project's live stream, and "Open".
 import { useEffect, useState } from "react";
 import { subscribeActivity } from "../activity";
-import { fill, pick, t, texts, useLanguage, type Text } from "../i18n";
+import { count, fill, pick, t, texts, useLanguage, type Text } from "../i18n";
 import { StatusChips } from "../viewers/sheet/SheetViewer";
 import { deliverablesApi } from "./api";
 import type { DeliverableInfo } from "./types";
@@ -17,8 +17,8 @@ export function Facts({ d }: { d: DeliverableInfo }) {
   return (
     <>
       <span className="text-slate">{d.revision !== null ? fill(t("reviewRev"), { n: d.revision }) : t("deliverableNoRevision")}</span>
-      {(d.pending ?? 0) > 0 && <span>{fill(t("sheetPending"), { n: d.pending ?? 0 })}</span>}
-      {d.open_comments > 0 && <span className="text-copper">{fill(t("openCommentsCount"), { n: d.open_comments })}</span>}
+      {(d.pending ?? 0) > 0 && <span>{count("sheetPending", d.pending ?? 0)}</span>}
+      {d.open_comments > 0 && <span className="text-copper">{count("openComments", d.open_comments)}</span>}
       {d.sample && <span className="rounded-full border border-slate px-2 text-xs leading-5">{t("sampleData")}</span>}
     </>
   );

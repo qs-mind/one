@@ -7,6 +7,7 @@ import { deliverablesApi } from "../../deliverables/api";
 import type { Explained, NumberCell, Source } from "../../deliverables/types";
 import { fill, language, pick, t, texts, type Text } from "../../i18n";
 import { formatDecimal } from "./format";
+import { FileName } from "../../ui/FileName";
 
 const roles: Record<string, Text> = {
   engineer: texts.sheetTheEngineer,
@@ -126,7 +127,7 @@ export function SourcePopover({
       <section aria-label={t("sheetSource")} className="flex flex-col">
         <span className="text-xs text-slate">{t("sheetSource")}</span>
         {source ? (
-          <span dir="auto">{source.title}</span>
+          <FileName name={source.title} />
         ) : (
           !failed && <span className="text-slate">{t("noSource")}</span>
         )}
@@ -159,7 +160,7 @@ export function SourcePopover({
                       </span>
                     )}
                     <span dir="auto" className="text-slate">
-                      {input.source.title}
+                      <FileName name={input.source.title} />
                       {input.dated ? ` · ${fill(t("sheetDated"), { date: input.dated })}` : ""}
                     </span>
                   </li>

@@ -186,7 +186,7 @@ describe("SheetViewer", () => {
     expect(screen.queryByRole("dialog")).toBeNull(); // the source of the clicked number gives way to the editor
     await user.clear(editor);
     await user.type(editor, "٤٠٠٠٠{Enter}");
-    await waitFor(() => expect(screen.getByText("1 تعديلات مقترحة")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("تعديل واحد مقترح")).toBeInTheDocument());
     expect(bodies(fetch, "POST", `${base}/deliverables/${D}/changes`)).toEqual([
       { ops: [{ op: "set_number", row: "p4", name: "rate", value: "40000", unit: "m3", currency: "EGP", expect: "n-rate" }], reason: null },
     ]);

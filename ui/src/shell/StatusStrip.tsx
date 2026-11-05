@@ -3,7 +3,7 @@
 // guessed.
 import { useState } from "react";
 import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../canvas/types";
-import { fill, language, pick, t, useLanguage } from "../i18n";
+import { count, fill, language, pick, t, useLanguage } from "../i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 const locale = () => (language() === "ar" ? "ar-EG-u-nu-latn" : "en-GB");
@@ -88,7 +88,7 @@ export function StatusStrip({
         </Popover>
       )}
       {status.open_comments !== undefined && status.open_comments > 0 && (
-        <span className={`${chip} text-copper`}>{fill(t("openCommentsCount"), { n: status.open_comments })}</span>
+        <span className={`${chip} text-copper`}>{count("openComments", status.open_comments)}</span>
       )}
     </div>
   );

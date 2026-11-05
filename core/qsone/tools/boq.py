@@ -51,7 +51,8 @@ def _json(value) -> str:
 
 
 def _name(file_id: str) -> str | dict:
-    return _names.get(file_id, copy.BOQ_FILE)
+    found = _names.get(file_id)
+    return copy.BOQ_FILE if found is None else copy.file_name(found)
 
 
 def _actor(ctx: ToolContext) -> str:
@@ -264,7 +265,7 @@ def _card(ctx: ToolContext, p: boq.Plan) -> Card:
     return Card(
         id=uuid4().hex,
         kind="rows",
-        title=copy.fill(copy.BOQ_CONFIRM_TITLE, name=p.file_name, sheet=p.sheet),
+        title=copy.fill(copy.BOQ_CONFIRM_TITLE, name=copy.file_name(p.file_name), sheet=p.sheet),
         detail={lang_: " ".join(part[lang_] for part in parts) for lang_ in ("en", "ar")},
         options=(KEEP, "no"),
         payload={

@@ -11,6 +11,9 @@ vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testi
 const school = { id: "p1", name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00.000000+00:00" };
 const files = `/api/projects/${school.id}/files`;
 const boqName = "جدول الكميات - عينة.xlsx";
+// A file name is shown in its own isolate (ui/FileName.tsx), its extension in an inner one: match the whole name.
+const named = (name: string) => (_: string, el: Element | null) =>
+  el?.tagName === "BDI" && el.getAttribute("dir") === "auto" && el.textContent === name;
 
 // A file as the core describes it after an upload or in its list.
 function fileInfo(name: string, more: object = {}) {
@@ -99,7 +102,7 @@ describe("RecordsPanel", () => {
         }),
     });
     panel();
-    const name = await screen.findByText(boqName);
+    const name = await screen.findByText(named(boqName));
     expect(name).toHaveAttribute("dir", "auto");
     expect(screen.getByText(texts.fileRead.ar)).toBeInTheDocument();
     expect(screen.getByText(texts.filePartlyRead.ar)).toBeInTheDocument();
@@ -113,7 +116,7 @@ describe("RecordsPanel", () => {
     const file = new File(["x"], boqName);
     await user.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, file);
 
-    expect(await screen.findByText(boqName)).toBeInTheDocument();
+    expect(await screen.findByText(named(boqName))).toBeInTheDocument();
     expect(screen.getByText(texts.fileRead.ar)).toBeInTheDocument();
     const [url, init] = posts(fetch)[0]!;
     expect(url).toBe(`${files}?name=${encodeURIComponent(boqName)}`);
@@ -171,8 +174,8 @@ describe("RecordsPanel", () => {
       dataTransfer: { files: [new File(["a"], "أ - عينة.csv"), new File(["b"], "ب - عينة.csv")] },
     });
 
-    expect(await screen.findByText("ب - عينة.csv")).toBeInTheDocument();
-    expect(screen.getByText("أ - عينة.csv")).toBeInTheDocument();
+    expect(await screen.findByText(named("ب - عينة.csv"))).toBeInTheDocument();
+    expect(screen.getByText(named("أ - عينة.csv"))).toBeInTheDocument();
     expect(posts(fetch).map(([url]) => decodeURIComponent(String(url).split("?name=")[1]!))).toEqual([
       "أ - عينة.csv",
       "ب - عينة.csv",
@@ -228,7 +231,7 @@ describe("RecordsPanel", () => {
     expect(await screen.findByText("صفحة 3")).toBeInTheDocument();
     expect(screen.getByText("ورقة BOQ، صف 23")).toBeInTheDocument();
     expect(screen.getByText("03/02 | خرسانة")).toHaveAttribute("dir", "auto");
-    expect(screen.getByText("مواصفات - عينة.pdf")).toHaveAttribute("dir", "auto");
+    expect(screen.getByText(named("مواصفات - عينة.pdf"))).toHaveAttribute("dir", "auto");
     const search = fetch.mock.calls.find(([url]) => String(url).includes("/search"))!;
     expect(search[0]).toBe(`/api/projects/${school.id}/search?q=${encodeURIComponent("03/02")}&k=30`);
 
@@ -480,7 +483,7 @@ describe("hidden-text warnings", () => {
     expect(mark.querySelector("svg")).toHaveAttribute("aria-hidden", "true"); // an icon beside the words
     // only the flagged file has the mark
     expect(screen.getAllByRole("button", { name: texts.hiddenText.ar })).toHaveLength(1);
-    const plain = screen.getByText(boqName).closest("li")!;
+    const plain = screen.getByText(named(boqName)).closest("li")!;
     expect(within(plain).queryByRole("button", { name: texts.hiddenText.ar })).toBeNull();
   });
 
