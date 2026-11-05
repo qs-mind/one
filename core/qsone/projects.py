@@ -200,6 +200,14 @@ def router(projects: Projects, meaning: Meaning | None = None) -> APIRouter:
         rec = projects.get(project_id)
         return {"files": [_file(f) for f in files.list_files(rec, include_old=include_old)]}
 
+    @r.get("/projects/{project_id}/files/{file_id}/flags")
+    def list_flags(project_id: str, file_id: str) -> dict:
+        """The file's hidden-text flags, for the warning on screen."""
+        flags = files.list_flags(projects.get(project_id), file_id)
+        if flags is None:
+            raise RecordsError(copy.FILE_NOT_FOUND, status=404)
+        return {"flags": flags}
+
     @r.post("/projects/{project_id}/files")
     async def add_file(
         project_id: str,

@@ -24,6 +24,13 @@ function where(locator: Record<string, string | number> | undefined): string | u
   return undefined;
 }
 
+/** A source with no date of its own is dated the day One received it or read it (Plan 5 Task 7), and says so. */
+function datedLabel(how: string | number | undefined) {
+  if (how === "received") return "sourceDatedReceived";
+  if (how === "read") return "sourceDatedRead";
+  return "sheetDated";
+}
+
 const shown = (value: string, unit?: string | null) => (
   <bdi dir="ltr">
     {formatDecimal(value)}
@@ -124,7 +131,7 @@ export function SourcePopover({
           !failed && <span className="text-slate">{t("noSource")}</span>
         )}
         {place && <span dir="auto" className="text-slate">{place}</span>}
-        {dated && <span>{fill(t("sheetDated"), { date: dated })}</span>}
+        {dated && <span>{fill(t(datedLabel(source?.locator?.dated_how)), { date: dated })}</span>}
         {by && <span>{fill(t("sheetEnteredBy"), { who: roles[by] ? pick(roles[by]) : by })}</span>}
       </section>
       {failed && <p role="alert" className="text-copper">{pick(failed)}</p>}
