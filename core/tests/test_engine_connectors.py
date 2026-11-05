@@ -235,6 +235,63 @@ def test_engineer_choice_wins_over_defaults(data_dir):
     }
 
 
+GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+
+
+def google(model: str, connector: str = "standard:g") -> ModelCard:
+    """A Google card as the Standard Link lists it, priced by the price book."""
+    return cards.priced(bare_card(connector, f"models/{model}", provider="google"))
+
+
+def test_a_refused_retired_or_latest_alias_model_is_never_a_default():
+    """Finding 12: Google's list made "Gemini Pro Latest" (an alias, $2/$12) the Lead and the
+    retired gemini-2.5-flash-lite the quick role."""
+    alias, pro = google("gemini-pro-latest"), google("gemini-3.1-pro-preview")
+    lite, gone = google("gemini-3.1-flash-lite"), google("gemini-2.5-flash-lite")
+    old = google("gemini-2.0-flash-lite")  # the price book marks it deprecated
+    assert old.retired and not lite.retired and alias.price_in == pro.price_in
+    connectors.note_refused(gone.choice)  # Google's 404: "no longer available"
+    r = roles.defaults([alias, pro, lite, gone, old])
+    assert r["lead"] == pro.choice and r["quick"] == lite.choice
+    assert not {alias.choice, gone.choice, old.choice} & set(r.values())
+
+
+def test_a_saved_role_on_a_refused_model_falls_back_to_the_default():
+    roles.choose("quick", HAIKU.choice)
+    connectors.note_refused(HAIKU.choice)
+    sheet = [OPUS, SONNET, DEEPSEEK]
+    assert roles.chosen(sheet)["quick"] == roles.defaults(sheet)["quick"] == DEEPSEEK.choice
+
+
+def test_the_model_typed_with_the_link_leads_and_nothing_costs_more(data_dir):
+    """Finding 12: the engineer typed gemini-3.1-flash-lite; no role goes to a costlier model."""
+    link = standard.add("Google", GOOGLE_URL, STANDARD_KEY, model="gemini-3.1-flash-lite")
+    saved = json.loads((data_dir / "settings.json").read_text(encoding="utf-8"))
+    assert saved["ai"]["standard"][0]["model"] == "gemini-3.1-flash-lite"
+    pro, flash = google("gemini-3.1-pro-preview", link.id), google("gemini-2.5-flash", link.id)
+    lite, older = google("gemini-3.1-flash-lite", link.id), google("gemini-2.5-flash-lite", link.id)
+    sheet = [pro, flash, lite, older, HAIKU]
+    r = roles.defaults(sheet)
+    assert r["lead"] == r["specialist"] == lite.choice
+    # quick: the cheapest of its provider; checking: another model, never costlier than typed
+    assert r["quick"] == older.choice and r["checker"] == older.choice
+    # another provider at or under the typed model's price checks it
+    assert roles.defaults([*sheet, DEEPSEEK])["checker"] == DEEPSEEK.choice
+    connectors.note_refused(older.choice)
+    r = roles.defaults(sheet)
+    assert set(r.values()) == {lite.choice}  # one model left: it does every job
+    connectors.note_refused(lite.choice)
+    assert roles.defaults(sheet)["lead"] == pro.choice  # a typed model refused: the usual ranking
+
+
+def test_a_typed_model_with_no_price_still_leads():
+    """The engineer named it: that is their choice, not ONE's, so its price may be unknown."""
+    link = standard.add("Office", "https://ai.example.com/v1", STANDARD_KEY, model="big-model")
+    big = bare_card(link.id, "big-model", provider="ai.example.com")
+    r = roles.defaults([big, HAIKU])
+    assert r["lead"] == r["specialist"] == r["quick"] == big.choice
+
+
 def test_fallbacks_same_or_cheaper_first_and_never_the_maker():
     assert roles.same_or_cheaper(SAMPLE_SHEET, OPUS.choice, avoid={OPUS.choice})[0] == SONNET.choice
     assert OPUS.choice not in roles.same_or_cheaper(
@@ -513,6 +570,14 @@ def test_a_failed_list_is_plain_and_the_rest_still_shows():
     assert claude["error"] == copy.KEY_REFUSED  # the Claude key: Anthropic's own words
     assert ds["error"] is None and not ds["key_set"]
     assert {c["connector"] for c in body["sheet"]} == {ds["id"]}
+
+
+def test_the_model_typed_when_adding_a_link_is_the_leads_default():
+    client = client_with(providers())
+    link = {"name": "DeepSeek", "base_url": DEEPSEEK_URL, "model": "deepseek-reasoner"}
+    added = client.post("/settings/ai/standard", json=link, headers=AUTH).json()
+    body = client.get("/settings/ai", headers=AUTH).json()
+    assert body["defaults"]["lead"] == {"connector": added["id"], "model": "deepseek-reasoner"}
 
 
 def test_ai_settings_need_the_secret():

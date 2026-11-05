@@ -1,8 +1,9 @@
 """The Standard Link: any OpenAI-compatible provider (DeepSeek, Mistral, Qwen, Ollama, llama.cpp).
 
-The engineer may add several, each with a name, a base URL and an optional key; local servers
-have no key. A base URL on this computer makes it `on_device`. Entries live in settings.json
-"ai.standard"; keys only in the key store, under "standard:<id>".
+The engineer may add several, each with a name, a base URL, an optional key (local servers
+have none) and an optional model name: the one the engineer typed leads (`roles.defaults`). A
+base URL on this computer makes it `on_device`. Entries live in settings.json "ai.standard";
+keys only in the key store, under "standard:<id>".
 """
 
 import ipaddress
@@ -150,8 +151,19 @@ def links(*, http_client: httpx2.AsyncClient | None = None) -> list[StandardLink
     ]
 
 
-def add(name: str, base_url: str, key: str | None) -> StandardLink:
-    """Saves a new entry; its key goes to the key store only.
+def typed() -> list[ModelChoice]:
+    """The model the engineer typed for each link, in the links' order (as typed: Google's own
+    list adds "models/")."""
+    return [
+        ModelChoice(PREFIX + e["id"], e["model"])
+        for e in _entries()
+        if isinstance(e.get("model"), str) and e["model"]
+    ]
+
+
+def add(name: str, base_url: str, key: str | None, model: str | None = None) -> StandardLink:
+    """Saves a new entry, with the model the engineer typed when there is one; its key goes to
+    the key store only.
 
     Raises `ValueError` for a URL that is not http(s) with a host, `KeyInTheClear`,
     `keyring.errors.KeyringError` (then nothing is saved) and `OSError`."""
@@ -164,6 +176,8 @@ def add(name: str, base_url: str, key: str | None) -> StandardLink:
     if key:
         keys.set_key(link.id, key)
     entry = {"id": link.id.removeprefix(PREFIX), "name": link.name, "base_url": link.base_url}
+    if model:
+        entry["model"] = model
     settings.save_ai("standard", [*_entries(), entry | {"provider": link.provider}])
     return link
 

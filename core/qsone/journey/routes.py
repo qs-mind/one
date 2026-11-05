@@ -12,8 +12,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from qsone import chat, copy, usage
+from qsone.engine import cards, roles
 from qsone.engine import connectors as engine_connectors
-from qsone.engine import roles
 from qsone.engine.connectors import claude_code as claude_link
 from qsone.journey import claude_code, closing, engineer, setup_state, understand
 from qsone.journey.setup_state import Language, State
@@ -81,6 +81,22 @@ def _not_saved() -> JSONResponse:
     return JSONResponse({}, status_code=503)  # the screen says it in its own words
 
 
+DEFAULT_CHECKS = 3  # rounds: a provider that refused one model may refuse the next one too
+
+
+async def _check_defaults(listed: list, checked: set, found: list) -> None:
+    """The same tiny check, once, on each other role's default on the link: a model the
+    provider lists but refuses (Google's retired ones, finding 12) is noted, so it is no default
+    and the next one is checked. Any other failure is left for the Brief to meet."""
+    for _ in range(DEFAULT_CHECKS):
+        todo = set(roles.defaults(listed).values()) - checked
+        if not todo:
+            return
+        checked |= todo
+        vias = [f"{c.connector}/{c.model}" for c in todo]
+        await asyncio.gather(*(engine_connectors.check(via, among=found) for via in vias))
+
+
 def router(engine: Any) -> APIRouter:
     """`engine` is the app's Brief Runner: its Engineer Records hold the card, and its
     connectors are the ones the check goes through."""
@@ -136,9 +152,11 @@ def router(engine: Any) -> APIRouter:
                 return JSONResponse(copy.error(failed), 409)
             usage.track("ai_link", via="api_key")
             return JSONResponse({"ok": True})
-        if body.via == "standard":  # its own model: the Lead's, if it is on this link
+        if body.via == "standard":  # its own model: the Lead's (the typed one), if on this link
             link = next((c for c in found if c.id == body.connector), None)
-            listed = [] if link is None else await link.cards()
+            listed, errors = ([], {}) if link is None else await cards.listed([link])
+            if errors:
+                return JSONResponse(copy.error(errors[link.id]), 409)
             lead = roles.chosen(listed).get("lead")
             model = lead if lead is not None and lead.connector == body.connector else None
             if model is None and listed:
@@ -148,6 +166,7 @@ def router(engine: Any) -> APIRouter:
             failed = await engine_connectors.check(f"{model.connector}/{model.model}", among=found)
             if failed:
                 return JSONResponse(copy.error(failed), 409)
+            await _check_defaults(listed, {model}, found)
             usage.track("ai_link", via="standard")
             return JSONResponse({"ok": True})
         saved = claude_link.saved()["path"]
