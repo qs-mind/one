@@ -5,7 +5,7 @@
 import { useLayoutEffect, useRef } from "react";
 import type { Change, Thread, ViewCell, ViewColumn, ViewRow } from "../../deliverables/types";
 import { asCell, isNumber } from "../../deliverables/types";
-import { t } from "../../i18n";
+import { pick, t } from "../../i18n";
 import { sourceLineHandlers } from "../../sources/line";
 import { TARGET } from "../../sources/targets";
 import { DUR, play } from "../../ui/motion";
@@ -197,7 +197,14 @@ export function SheetCell(p: CellProps) {
       row.kind === "section" ? (
         <FoldButton {...p} />
       ) : (
-        <bdi className="truncate">{row.code}</bdi>
+        <>
+          <bdi className="truncate">{row.code}</bdi>
+          {row.problem && (
+            <span role="img" aria-label={pick(row.problem)} title={pick(row.problem)} className="ms-1 shrink-0 font-bold text-copper">
+              !
+            </span>
+          )}
+        </>
       );
   } else if (isNumber(cell)) {
     content = (
