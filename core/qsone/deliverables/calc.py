@@ -16,6 +16,7 @@ from qsone import copy
 from qsone.calc.engine import calculate
 from qsone.calc.formula import names, parse
 from qsone.calc.spec import CalcRequest, ListRef
+from qsone.records import audit
 from qsone.records.project import Records, RecordsError
 
 CALC_ACTOR = "calc_engine"  # shown as "QS Calc Engine"
@@ -227,6 +228,39 @@ def _cell(conn, number_id: str) -> dict:
     )
 
 
+def _end_total(conn, rec: Records, target: _Target, actor: str) -> dict | None:
+    """A section or the bill with no amounts under it any more (every priced row removed or moved
+    away) has no total, as when it was made with none. Its saved total is ended: kept in the
+    ledger, marked `valid_until`, with an audit row, so the bill stops counting it and a past
+    version still shows it. Only a total the QS Calc Engine saved is ended, never a typed one.
+    The Engine itself cannot save "the sum of nothing": a saved result needs a ledger input and
+    its date. Returns the ended cell, or None when there was nothing to end."""
+    name = _number_name(target.column)
+    cursor = conn.execute(
+        "SELECT n.* FROM numbers n JOIN sources s ON s.id = n.source_id WHERE n.item_id = ?"
+        " AND n.name = ? AND n.valid_until IS NULL AND s.kind = 'calculation'",
+        (target.item_id, name),
+    )
+    found = cursor.fetchone()
+    if found is None:
+        return None
+    old = dict(zip([d[0] for d in cursor.description], found, strict=True))
+    cell = _cell(conn, old["id"])
+    at = rec.clock()
+    conn.execute("UPDATE numbers SET valid_until = ? WHERE id = ?", (at, old["id"]))
+    audit.record(
+        conn,
+        at=at,
+        actor=actor,
+        action="end",
+        table="numbers",
+        row_id=old["id"],
+        before=old,
+        after={**old, "valid_until": at},
+    )
+    return cell
+
+
 def bring_up_to_date(
     rec: Records,
     deliverable_id: str,
@@ -237,8 +271,9 @@ def bring_up_to_date(
 ) -> list[dict]:
     """Runs `calculate(save)` for each request, in one write (it joins the caller's), and
     returns the cells it wrote: `[{"row", "column", "before", "after"}]`, where `before` is the
-    cell's number before (None when there was none) and `row` is a part id or "total". The
-    reason defaults to «calculated in "<title>"» in the Deliverable's language."""
+    cell's number before (None when there was none), `after` is None for a total that was ended
+    (nothing left under it), and `row` is a part id or "total". The reason defaults to
+    «calculated in "<title>"» in the Deliverable's language."""
     changed = []
     with rec.write(actor) as conn:
         sheet = _sheet(conn, deliverable_id)
@@ -246,6 +281,16 @@ def bring_up_to_date(
         for target in _plan(sheet, rows):
             req = _request(conn, target, reason)
             if req is None:
+                ended = None if target.children is None else _end_total(conn, rec, target, actor)
+                if ended is not None:
+                    changed.append(
+                        {
+                            "row": target.row,
+                            "column": target.column["key"],
+                            "before": ended,
+                            "after": None,
+                        }
+                    )
                 continue
             old = _current(conn, [target.item_id], req.save.name).get(target.item_id)
             [result] = calculate(rec, req, actor=actor).results
