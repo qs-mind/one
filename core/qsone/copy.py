@@ -106,6 +106,37 @@ FILE_UNREADABLE = {
     "ar": "اتحفظ، بس One مقدرش يقراه (يا إما بايظ، يا إما مقفول بباسورد).",
 }
 
+FILE_NOT_FOUND = {
+    "en": "This file is not in Project Records.",
+    "ar": "الملف ده مش موجود في سجلات المشروع.",
+}
+
+# The Project Canvas (Plan 7).
+CANVAS_BAD_LAYOUT = {
+    "en": "The canvas layout was not saved: a frame's place or size is out of range.",
+    "ar": "ترتيب الكانفاس ماتحفظش: مكان أو مقاس إطار برّه الحدود.",
+}
+
+PAGE_NOT_FOUND = {
+    "en": "The file has no page with this number.",
+    "ar": "الملف مفيهوش صفحة بالرقم ده.",
+}
+
+FILE_HAS_NO_PAGES = {
+    "en": "Only a PDF file shows its pages; this file shows its text.",
+    "ar": "ملف الـ PDF بس هو اللي بيعرض صفحاته؛ الملف ده بيعرض النص بتاعه.",
+}
+
+PROJECT_IS_CONFIDENTIAL = {
+    "en": "This is a Confidential Project, so the General chat cannot hand anything to it.",
+    "ar": "ده مشروع سري، فالشات العام مايقدرش يحوّل له أي حاجة.",
+}
+
+CHAT_BAD_SELECTION = {
+    "en": "What was selected on the canvas could not be read, so the message was not sent.",
+    "ar": "اللي اتحدد على الكانفاس ماتقراش، فالرسالة ماتبعتتش.",
+}
+
 SEARCH_WORDS_ONLY = {
     "en": "Searching by words only until search by meaning is ready.",
     "ar": "البحث بالكلمات بس لحد ما البحث بالمعنى يجهز.",

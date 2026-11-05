@@ -42,6 +42,7 @@ from qsone.engine.types import AgentSpec, Risk, TeamHost, Text
 from qsone.records.project import Records, RecordsError
 
 if TYPE_CHECKING:
+    from qsone.projects import Projects
     from qsone.tools.services import Services
 
 log = logging.getLogger(__name__)
@@ -94,6 +95,7 @@ class ToolContext:
     embedder: object | None = None
     reranker: object | None = None
     services: "Services | None" = None  # Plan 5: the only way a tool reaches the outside world
+    projects: "Projects | None" = None  # Plan 7: the General chat's tools list the projects
 
 
 class Denied(Exception):

@@ -14,7 +14,7 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import activity, chat, copy, keys, models, projects, settings
+from qsone import activity, canvas, chat, copy, keys, models, projects, settings
 from qsone.calc import routes as calc_routes
 from qsone.deliverables import api as deliverables_api
 from qsone.deliverables import events as deliverable_events
@@ -129,6 +129,8 @@ def create_app(
     app.include_router(deliverables_api.router(registry))
     app.include_router(engine_routes.settings_router(ai_http))
     app.include_router(engine_routes.briefs_router(engine))
+    app.include_router(canvas.router(registry, engine.waiting))
+    app.add_middleware(canvas.no_store)
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):
