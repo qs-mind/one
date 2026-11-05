@@ -41,6 +41,7 @@ from qsone.tools.cite import SourceRef
 
 FRESH_DAYS = {"daily": 21, "weekly": 21, "monthly": 45}  # QS Mind Prices' own freshness rule
 OWN_FRESH_DAYS = FRESH_DAYS["monthly"]  # an own price or a project rate has no cadence
+OWN_REF = tools_records.OWN_PRICE_REF  # "prices:own/<number id>": an own price, cited anywhere
 TEXT_CHARS = 120  # of a description in a result
 _TEXT_FIELDS = ("description", "name", "spec", "title")
 _ROLES = frozenset({"lead", "specialist"})
@@ -118,7 +119,7 @@ prices and this project's rates, each with its source, date, age in days and old
 - item: the item in the market's words; also: the same in the other language.
 - country: EG, SA or AE; the project's when left out. unit: listed first when it matches.
 It never picks or converts: show the candidates to the engineer, compute with the Calc Engine. \
-value null means no price. Cite a QS Mind price with add_source kind prices and its ref.
+value null means no price. Cite a QS Mind or own price with add_source kind prices and its ref.
 Example:
 {_json(_LOOKUP_EXAMPLE)}"""
 
@@ -190,8 +191,12 @@ def _words(text: str) -> set[str]:
     return set(arabic.normalise(text).split())
 
 
-def _ledger(rec: Records, texts: list[str], today: date) -> list[tuple[float, dict, SourceRef]]:
-    """Current rates in `rec` whose item matches any of `texts`, with their scores."""
+def _ledger(
+    rec: Records, texts: list[str], today: date, *, own: bool = False
+) -> list[tuple[float, dict, SourceRef]]:
+    """Current rates in `rec` whose item matches any of `texts`, with their scores. With `own`
+    (`rec` is Engineer Records), each ref is `prices:own/<number id>`, which add_source finds
+    from any project."""
     wanted = [w for w in map(_words, texts) if w]
     with rec.read() as c:
         rows = c.execute(_RATES).fetchall()
@@ -204,7 +209,9 @@ def _ledger(rec: Records, texts: list[str], today: date) -> list[tuple[float, di
         if not score:
             continue
         source_id, kind, title, file_id, locator = source
-        ref = _ref_of(source_id, kind, file_id, json.loads(locator))
+        ref = (
+            f"{OWN_REF}{number_id}" if own else _ref_of(source_id, kind, file_id, json.loads(locator))
+        )
         age = _age(today, dated)
         candidate = {
             "ref": ref,
@@ -278,7 +285,7 @@ async def _lookup(ctx: ToolContext, args: LookupArgs) -> str:
                 )
                 qsmind.append((found, line))
     texts = [args.item, *args.also]
-    own = await asyncio.to_thread(_ledger, eng, texts, today)
+    own = await asyncio.to_thread(_ledger, eng, texts, today, own=True)
     project = await asyncio.to_thread(_ledger, ctx.rec, texts, today) if ctx.rec else []
     own = [(c, s) for _, c, s in _units_first(own, args.unit, lambda f: f[1]["unit"])]
     project = [(c, s) for _, c, s in _units_first(project, args.unit, lambda f: f[1]["unit"])]
