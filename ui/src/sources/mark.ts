@@ -11,7 +11,7 @@ const COPPER = "var(--color-copper, #a6491b)";
 const STONE = "var(--color-stone, #f2eee7)";
 /** How long the mark stays before it fades. */
 export const MARK_HOLD_MS = 1500;
-/** How long a source that is opening (a canvas frame gliding there, a file's text loading) is waited for. */
+/** How long a source that is opening (the document switching, a file's text loading) is waited for. */
 export const REVEAL_WAIT_MS = 2000;
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -103,11 +103,10 @@ export async function markSource(el: Element, { shape = "box", figures = [], row
   remove();
 }
 
-/** Keys a mark can go round: a cell, a file's sheet row or line, a chip. Not a whole frame (the canvas marks that
- * itself), nor a PDF page: no place on a page is known yet. */
+/** Keys a mark can go round: a cell, a file's sheet row or line, a chip. Not a whole file, nor a PDF page: no place on a page is known yet. */
 const markable = (key: string) => !/^file:[^#]+$/.test(key) && !/^file:[^#]+#page=[^&]+$/.test(key);
 
-/** After a source is opened: waits for it to show (the canvas gliding to its frame, its text loading), then marks
+/** After a source is opened: waits for it to show (the document switching, its text loading), then marks
  * it and flashes its row. Resolves false when there was nothing to mark. */
 export async function revealSource(keys: string[], figures: string[] = []): Promise<boolean> {
   const wanted = keys.filter(markable);
@@ -120,8 +119,8 @@ export async function revealSource(keys: string[], figures: string[] = []): Prom
     await nextFrame();
   }
   if (!el) return false;
-  if (!el.closest(".react-flow")) el.scrollIntoView?.({ block: "nearest", inline: "nearest" }); // the canvas moves itself
-  // still moving (the canvas's view gliding): marked once it has stopped
+  el.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  // still moving (scrolling into view): marked once it has stopped
   let before = el.getBoundingClientRect();
   for (let i = 0; i < 60; i++) {
     await nextFrame();

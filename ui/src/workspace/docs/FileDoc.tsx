@@ -1,6 +1,5 @@
 // One file of Project Records. A PDF shows its page as an image the core renders in memory, with page buttons and a
-// switch to the page's text; other files show the text pieces ONE read, with their sheet and row. The canvas frame
-// shows the same body, with the same page state (the hook), when zoomed in.
+// switch to the page's text; other files show the text pieces ONE read, with their sheet and row.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { dir, fill, t, useLanguage } from "../../i18n";
 import type { FilePiece, ProjectSources } from "../../project/types";
@@ -60,20 +59,17 @@ export function useFilePage(sources: ProjectSources, fileId: string, asked?: num
 
 type Image = { url: string } | "failed" | null;
 
-/** The file's live body: the page buttons and the image, or the text ONE read. `inFrame`: on the canvas, where the
- * switch must not drag the frame. */
+/** The file's live body: the page buttons and the image, or the text ONE read. */
 export function FilePages({
   sources,
   fileId,
   state,
   width,
-  inFrame = false,
 }: {
   sources: ProjectSources;
   fileId: string;
   state: FilePage;
   width: number;
-  inFrame?: boolean;
 }) {
   useLanguage();
   const { pages, page, setPage, mode, setMode, pageOf } = state;
@@ -130,7 +126,7 @@ export function FilePages({
             ]}
             value={mode}
             onChange={setMode}
-            className={inFrame ? "nodrag ms-auto" : "ms-auto"}
+            className="ms-auto"
           />
         </div>
       )}

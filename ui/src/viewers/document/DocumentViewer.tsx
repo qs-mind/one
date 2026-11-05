@@ -27,7 +27,7 @@ export type DocumentViewerProps = {
   changes?: Change[];
   comments?: Thread[];
   /** "workspace" is "full" without its title shown: the workspace names the open document. */
-  mode?: "frame" | "full" | "workspace";
+  mode?: "full" | "workspace";
   /** An older version or a Revision: shown, not edited. */
   readOnly?: boolean;
   /** After a change is sent, accepted or rejected: the owner refetches the view and the changes. */
@@ -106,7 +106,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
     null,
   );
 
-  /** A box inside the viewer, in its own unscaled pixels (the viewer may sit in a CSS-scaled canvas frame). */
+  /** A box inside the viewer, in its own unscaled pixels (the viewer may sit in a CSS-scaled box). */
   function boxOf(rect: DOMRect): DOMRect | null {
     const box = root.current;
     if (!box) return null;
@@ -203,7 +203,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
           {view.title}
         </h2>
         {/* in the workspace, its head line already says the status and the Revision */}
-        <StatusChips view={view} status={props.mode !== "frame" && props.mode !== "workspace"} />
+        <StatusChips view={view} status={props.mode !== "workspace"} />
         {!workspace && <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>}
         {view.revision && !workspace && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
         {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}

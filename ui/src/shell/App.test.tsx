@@ -211,12 +211,11 @@ describe("projects and the General chat", () => {
 });
 
 describe("the open document", () => {
-  it("no canvas renders: no data-canvas, no React Flow", async () => {
+  it("the screen is the open document", async () => {
     setCurrentProject(P1);
     core();
-    const { container } = render(<App sourcesFor={() => fakeSources({ files: [fileA] })} />);
+    render(<App sourcesFor={() => fakeSources({ files: [fileA] })} />);
     await head();
-    expect(container.querySelector("[data-canvas], [data-canvas-cover], .react-flow")).toBeNull();
     expect(document.querySelector('[data-region="document"]')).not.toBeNull();
   });
 
@@ -348,7 +347,6 @@ describe("the palette", () => {
     let dialog = await screen.findByRole("dialog", { name: texts.palette.ar });
     const names = within(dialog).getAllByRole("option").map((o) => o.textContent ?? "");
     for (const key of ["records", "deliverablesButton", "ai", "backupTitle", "usageTitle"] as const) expect(names, key).toContain(texts[key].ar);
-    for (const key of ["fitAll", "arrangeByStageCommand", "tidy"] as const) expect(names, key).not.toContain(texts[key].ar);
     expect(new Set(names).size).toBe(names.length);
     await user.click(within(dialog).getByRole("option", { name: texts.backupTitle.ar }));
     expect(await screen.findByRole("heading", { name: texts.backupTitle.ar })).toBeInTheDocument();

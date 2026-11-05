@@ -39,20 +39,17 @@ describe("viewerFor", () => {
     const live = fakeLive();
     const Viewer = viewerFor("sheet")!;
     const ref = createRef<ViewerHandle>();
-    render(<Viewer projectId="p1" deliverableId={D} mode="frame" ref={ref} {...({ subscribe: live.subscribe } as object)} />);
+    render(<Viewer projectId="p1" deliverableId={D} mode="workspace" ref={ref} {...({ subscribe: live.subscribe } as object)} />);
     await screen.findByText("03/02");
     // the grid's ref is attached a tick after its first rows draw, so wait for it under a loaded test run
     await waitFor(() => expect(ref.current!.locate({ row: "p3", column: "rate" })).toBeInstanceOf(DOMRect));
     expect(ref.current!.locate({ row: "nope", column: "rate" })).toBeNull();
-    // the frame is the viewer only: no review panels, no exports
-    expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByRole("group", { name: texts.exportMenu.ar })).toBeNull();
   });
 
   it("locate brings the block into view; with scroll false it only measures", async () => {
     core(viewRoutes(letter()));
     const ref = createRef<ViewerHandle>();
-    render(<DeliverableViewer projectId="p1" deliverableId={DOC} mode="frame" ref={ref} subscribe={fakeLive().subscribe} />);
+    render(<DeliverableViewer projectId="p1" deliverableId={DOC} mode="workspace" ref={ref} subscribe={fakeLive().subscribe} />);
     await waitFor(() => expect(document.querySelector('[data-block-id="b2"]')).not.toBeNull());
     const scrolled = vi.spyOn(Element.prototype, "scrollIntoView");
     expect(ref.current!.locate({ row: "b2" }, { scroll: false })).toBeInstanceOf(DOMRect);
@@ -67,7 +64,7 @@ describe("viewerFor", () => {
     const live = fakeLive();
     const seen: [unknown, string | null][] = [];
     const { rerender } = render(
-      <DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={live.subscribe} onSelection={(a, l) => seen.push([a, l])} />,
+      <DeliverableViewer projectId="p1" deliverableId={D} mode="workspace" subscribe={live.subscribe} onSelection={(a, l) => seen.push([a, l])} />,
     );
     await screen.findByText("03/02");
     fireEvent.mouseDown(cellOf("03/01", "rate"), { button: 0 });
@@ -75,7 +72,7 @@ describe("viewerFor", () => {
     fireEvent.mouseUp(window);
     expect(seen.at(-1)).toEqual([{ row: "p2", column: "rate" }, "البنود 03/01–03/04"]);
     const count = seen.length;
-    rerender(<DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={live.subscribe} onSelection={(a, l) => seen.push([a, l])} />);
+    rerender(<DeliverableViewer projectId="p1" deliverableId={D} mode="workspace" subscribe={live.subscribe} onSelection={(a, l) => seen.push([a, l])} />);
     expect(seen).toHaveLength(count);
   });
 
@@ -85,7 +82,7 @@ describe("viewerFor", () => {
     const routes = viewRoutes(sheet());
     core({ ...routes, [`GET ${base}/deliverables/${D}`]: () => json(versions[Math.min(views++, 1)]) });
     const live = fakeLive();
-    render(<DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={live.subscribe} />);
+    render(<DeliverableViewer projectId="p1" deliverableId={D} mode="workspace" subscribe={live.subscribe} />);
     await screen.findByText("03/02");
     act(() => live.emit({ type: "deliverable", deliverable: entry({ id: "other" }) }));
     expect(views).toBe(1);
@@ -96,7 +93,7 @@ describe("viewerFor", () => {
 
   it("an empty section shows its total as —, never 0", async () => {
     core(viewRoutes(sheet()));
-    render(<DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={fakeLive().subscribe} />);
+    render(<DeliverableViewer projectId="p1" deliverableId={D} mode="workspace" subscribe={fakeLive().subscribe} />);
     await screen.findByText("أعمال العزل");
     expect(within(cellOf("أعمال العزل", "amount")).getByText("—")).toBeInTheDocument();
   });
@@ -149,11 +146,8 @@ describe("viewerFor", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("اعتمد الأول.");
   });
 
-  it("a frame and a Document never ask for Fill Plans", async () => {
+  it("a Document never asks for Fill Plans", async () => {
     const fetch = core({ ...viewRoutes(sheet()), ...viewRoutes(letter()) });
-    const { unmount } = render(<DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={fakeLive().subscribe} />);
-    await screen.findByText("03/02");
-    unmount();
     render(<DeliverableViewer projectId="p1" deliverableId={DOC} mode="full" subscribe={fakeLive().subscribe} />);
     await screen.findByRole("tablist", { name: texts.reviewPanels.ar });
     expect(fetch.mock.calls.some(([u]) => String(u).includes("fill-plans"))).toBe(false);

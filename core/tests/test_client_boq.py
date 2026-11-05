@@ -143,7 +143,7 @@ async def test_the_import_tells_the_canvas_live_and_says_where_the_items_went(re
     [(project, event)] = events
     assert project == rec.id and event["type"] == "client_boq"
     assert event["client_boq"]["file_id"] == file_id and event["client_boq"]["items"] == 2
-    assert "Client BOQ frame" in out
+    assert "read-only document, the client BOQ" in out
     await run_import(rec, file_id)  # the same import again writes nothing and tells nobody
     assert len(events) == 1
 

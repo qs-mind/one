@@ -1,4 +1,4 @@
-// The Project Canvas's contracts (Plan 7): what is on the canvas, where it sits, and what the core says about the
+// The workspace's contracts: what the core says about the
 // project's files, Deliverables, Desks and agents. `sources.ts` is the only file that knows the routes behind them.
 import type { Ref } from "react";
 import type { DeliverableInfo, SheetView } from "../deliverables/types";
@@ -9,9 +9,6 @@ export type { DeliverableInfo }; // Plan 6 declares it (plus pending, total, sam
 export type FrameKind = "files" | "file" | "deliverable" | "desk" | "team" | "clientboq";
 /** `files:all`, `file:<id>`, `deliverable:<id>`, `desk:<id>`, `team:core`, `clientboq:<file id>`. */
 export type FrameKey = `${FrameKind}:${string}`;
-/** Where a frame sits, in world coordinates (the same in both languages). */
-export type Placed = { key: FrameKey; x: number; y: number; w: number; h: number; z: number; collapsed: boolean };
-export type View = { x: number; y: number; zoom: number };
 
 /** A place inside a frame: a sheet row and column, a document block (`row`) and text range, a PDF page. */
 export type Anchor = { row?: string; column?: string; page?: number; text?: [number, number]; point?: [number, number] };
@@ -32,7 +29,7 @@ export type FileInfo = {
   duplicate?: boolean;
 };
 
-/** A client BOQ imported from a file (GET /projects/{id}/canvas -> client_boqs): one read-only frame each. `at` is the
+/** A client BOQ imported from a file (GET /projects/{id}/workspace -> client_boqs): one read-only document each. `at` is the
  * newest import of the file. */
 export type ClientBoqInfo = { file_id: string; name: string; items: number; headings: number; at: string };
 
@@ -98,15 +95,12 @@ export type SelectionItem = { kind: FrameKind | "agent"; id: string; title: stri
 /** A text piece One read from a file, with where it is (sheet, row, page). */
 export type FilePiece = { locator: Record<string, string | number>; text: string };
 
-/** Everything the canvas reads and writes for one project. */
+/** Everything the screen reads and writes for one project. */
 export interface ProjectSources {
   files(): Promise<FileInfo[]>;
   deliverables(): Promise<DeliverableInfo[]>;
   team(): Promise<Team>;
   status(): Promise<ProjectStatus>;
-  layout(): Promise<{ frames: Placed[]; view: View | null; client_boqs?: ClientBoqInfo[] }>;
-  saveFrames(frames: Placed[], removed: FrameKey[], keepalive?: boolean): Promise<void>;
-  saveView(view: View, keepalive?: boolean): Promise<void>;
   workspace(): Promise<{ open: DocKey | null; anchor: Anchor | null; client_boqs: ClientBoqInfo[] }>;
   saveWorkspace(opened: Opened, keepalive?: boolean): Promise<void>;
   /** Live events until `signal` aborts; reconnects by itself and then calls `onReconnect`. */
@@ -135,7 +129,7 @@ export interface ViewerProps {
   projectId: string;
   deliverableId: string;
   /** "workspace": the review board as the open document shows it, without the board's own title. */
-  mode: "frame" | "full" | "workspace";
+  mode: "full" | "workspace";
   /** The engineer's selection inside the viewer, with a label in the page language («البنود 03/01–03/04»). */
   onSelection?(anchor: Anchor | null, label: string | null): void;
   /** React 19: the ref is a prop. */

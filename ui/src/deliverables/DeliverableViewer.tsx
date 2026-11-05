@@ -1,6 +1,5 @@
-// One Deliverable, as the viewer registry gives it to the canvas and the chat's side panel. It loads its own data
-// and loads it again when the project's live stream says the Deliverable changed. In `mode="frame"` it is the
-// Sheet or Document viewer only, filling its container; in `mode="full"` it is the review board: the viewer, then
+// One Deliverable, as the viewer registry gives it to the workspace and the chat's side panel. It loads its own data
+// and loads it again when the project's live stream says the Deliverable changed. In `mode="full"` it is the review board: the viewer, then
 // Changes, Comments, Versions and Close-out, with the exports; `mode="workspace"` is the same board as the open
 // document of the workspace, which names the document itself. Everything it draws stays inside its own box.
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -93,7 +92,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
 
   // The board finds the Sheet's newest Fill Plan, and looks again each time the Deliverable is loaded (a plan the
   // Lead QS saves is announced on the live stream).
-  const findPlan = mode !== "frame" && view?.kind === "sheet" && props.fillPlanId === undefined;
+  const findPlan = view?.kind === "sheet" && props.fillPlanId === undefined;
   useEffect(() => {
     if (!findPlan) return;
     let live = true;
@@ -105,7 +104,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
     };
   }, [projectId, deliverableId, findPlan, view]);
 
-  /** Where the anchor is, relative to this viewer's root, in its own unscaled pixels (it may sit in a scaled frame). */
+  /** Where the anchor is, relative to this viewer's root, in its own unscaled pixels (it may sit in a scaled box). */
   function locate(anchor: Anchor, options?: LocateOptions): DOMRect | null {
     const inner = (view?.kind === "sheet" ? sheet.current : doc.current)?.locate(anchor, options) ?? null;
     const outer = root.current;
@@ -175,7 +174,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         onSelection={onSheetSelection}
         onToggleFullScreen={props.onToggleFullScreen}
         fullScreen={props.fullScreen}
-        review={mode !== "frame" ? { active: tab === "changes" && !fillOpen && view.pending > 0, current } : undefined}
+        review={{ active: tab === "changes" && !fillOpen && view.pending > 0, current }}
         onAccepted={accepted}
         onRejected={rejected}
       />
@@ -235,8 +234,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         // Ctrl+Z (by the key's place, so the Arabic layout works too) takes back the last accept or reject
         if (!undo || !isMod(event) || event.code !== "KeyZ" || event.shiftKey || isTyping(event.target)) return;
         event.preventDefault();
-        event.stopPropagation(); // the canvas's own Ctrl+Z (frame moves) is not this
-        undoNotice.current?.undo();
+                undoNotice.current?.undo();
       }}
     >
       {/* full: a Sheet is as tall as its rows, up to 60% (75% as the open document: the room is the data's), and the
@@ -244,7 +242,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
       <div
         ref={body}
         className={
-          mode === "frame" || folded
+          folded
             ? "flex min-h-0 flex-1 flex-col"
             : view.kind === "sheet"
               ? `flex min-h-0 ${mode === "workspace" ? "max-h-[75%]" : "max-h-[60%]"} flex-[0_1_auto] flex-col`
@@ -253,91 +251,83 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
       >
         {viewer}
       </div>
-      {mode !== "frame" && (
-        <div data-review-panel={folded ? "folded" : "open"} className={`flex min-h-0 flex-col bg-stone/50 ${folded ? "shrink-0" : "flex-[2_1_0%]"}`}>
-          <div className={`flex flex-wrap items-center gap-3 ${mode === "workspace" ? "px-3 py-1" : "px-5 pb-1 pt-3"}`}>
-            <div role="tablist" aria-label={t("reviewPanels")} className="relative flex flex-wrap gap-1">
-              {tabs.map(([key, label]) => (
-                <button
-                  key={key}
-                  id={`${tabId(key)}-tab`}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === key}
-                  aria-controls={tabId(key)}
-                  className={`rounded-t-lg px-3 py-1.5 transition-colors duration-150 ${tab === key ? "text-ink" : "text-slate hover:text-ink"}`}
-                  onClick={() => {
-                    setTab(key);
-                    setFillOpen(null);
-                  }}
-                >
-                  {label}
-                  {key === "changes" && view.pending > 0 && <CountChip n={view.pending} />}
-                  {key === "comments" && view.open_comments > 0 && <CountChip n={view.open_comments} />}
-                </button>
-              ))}
-              <TabUnderline />
-            </div>
-            {undoLine}
-            <div className="ms-auto">
-              <ExportMenu
-                projectId={projectId}
-                view={view}
-                fillPlanId={props.fillPlanId !== undefined ? props.fillPlanId : (plan?.id ?? null)}
-                fillFileName={props.fillPlanId !== undefined ? null : (plan?.file_name ?? null)}
-                onFill={(id) => setFillOpen(id)}
-                announce={announce}
-              />
-            </div>
+      <div data-review-panel={folded ? "folded" : "open"} className={`flex min-h-0 flex-col bg-stone/50 ${folded ? "shrink-0" : "flex-[2_1_0%]"}`}>
+        <div className={`flex flex-wrap items-center gap-3 ${mode === "workspace" ? "px-3 py-1" : "px-5 pb-1 pt-3"}`}>
+          <div role="tablist" aria-label={t("reviewPanels")} className="relative flex flex-wrap gap-1">
+            {tabs.map(([key, label]) => (
+              <button
+                key={key}
+                id={`${tabId(key)}-tab`}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                aria-controls={tabId(key)}
+                className={`rounded-t-lg px-3 py-1.5 transition-colors duration-150 ${tab === key ? "text-ink" : "text-slate hover:text-ink"}`}
+                onClick={() => {
+                  setTab(key);
+                  setFillOpen(null);
+                }}
+              >
+                {label}
+                {key === "changes" && view.pending > 0 && <CountChip n={view.pending} />}
+                {key === "comments" && view.open_comments > 0 && <CountChip n={view.open_comments} />}
+              </button>
+            ))}
+            <TabUnderline />
           </div>
-          <div
-            id={tabId(tab)}
-            role="tabpanel"
-            aria-labelledby={`${tabId(tab)}-tab`}
-            dir={language() === "ar" ? "rtl" : "ltr"}
-            hidden={folded}
-            className={`min-h-0 flex-1 overflow-auto ${mode === "workspace" ? "p-3" : "px-5 py-4"}`}
-          >
-            {folded ? null : fillOpen ? (
-              <FillPreview projectId={projectId} planId={fillOpen} announce={announce} onClose={() => setFillOpen(null)} />
-            ) : tab === "changes" ? (
-              <ChangesPanel
-                projectId={projectId}
-                view={view}
-                changes={state.changes}
-                stale={state.stale}
-                onChanged={changed}
-                onLocate={onLocate}
-                announce={announce}
-                onAccepted={accepted}
-                onRejected={rejected}
-                onCurrent={onCurrent}
-              />
-            ) : tab === "comments" ? (
-              <CommentsPanel
-                projectId={projectId}
-                view={view}
-                comments={state.comments}
-                selection={selected?.comment ?? null}
-                onChanged={changed}
-                onSend={props.onSend}
-                onLocate={onLocate}
-                announce={announce}
-              />
-            ) : tab === "versions" ? (
-              <VersionsPanel projectId={projectId} view={view} />
-            ) : (
-              <SignOff projectId={projectId} view={view} onChanged={changed} announce={announce} />
-            )}
-          </div>
-        </div>
-      )}
-      {mode === "frame" && undoLine && (
-        // in a frame, under the sheet: a decision made in a cell is taken back from there
-        <div data-frame-undo className="absolute inset-x-0 bottom-0 z-10 border-t border-stone bg-paper px-4 pt-2">
           {undoLine}
+          <div className="ms-auto">
+            <ExportMenu
+              projectId={projectId}
+              view={view}
+              fillPlanId={props.fillPlanId !== undefined ? props.fillPlanId : (plan?.id ?? null)}
+              fillFileName={props.fillPlanId !== undefined ? null : (plan?.file_name ?? null)}
+              onFill={(id) => setFillOpen(id)}
+              announce={announce}
+            />
+          </div>
         </div>
-      )}
+        <div
+          id={tabId(tab)}
+          role="tabpanel"
+          aria-labelledby={`${tabId(tab)}-tab`}
+          dir={language() === "ar" ? "rtl" : "ltr"}
+          hidden={folded}
+          className={`min-h-0 flex-1 overflow-auto ${mode === "workspace" ? "p-3" : "px-5 py-4"}`}
+        >
+          {folded ? null : fillOpen ? (
+            <FillPreview projectId={projectId} planId={fillOpen} announce={announce} onClose={() => setFillOpen(null)} />
+          ) : tab === "changes" ? (
+            <ChangesPanel
+              projectId={projectId}
+              view={view}
+              changes={state.changes}
+              stale={state.stale}
+              onChanged={changed}
+              onLocate={onLocate}
+              announce={announce}
+              onAccepted={accepted}
+              onRejected={rejected}
+              onCurrent={onCurrent}
+            />
+          ) : tab === "comments" ? (
+            <CommentsPanel
+              projectId={projectId}
+              view={view}
+              comments={state.comments}
+              selection={selected?.comment ?? null}
+              onChanged={changed}
+              onSend={props.onSend}
+              onLocate={onLocate}
+              announce={announce}
+            />
+          ) : tab === "versions" ? (
+            <VersionsPanel projectId={projectId} view={view} />
+          ) : (
+            <SignOff projectId={projectId} view={view} onChanged={changed} announce={announce} />
+          )}
+        </div>
+      </div>
       <p role="status" className="sr-only">
         {status}
       </p>

@@ -19,39 +19,40 @@ function core(route: Route) {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const missing = () => json({ detail: "Not Found" }, 404);
 
-describe("the canvas's sources over /api", () => {
+describe("the project's sources over /api", () => {
   it("routes of later plans answer empty while they are missing", async () => {
     core((url) => (url.endsWith("/files") ? json({ files: [] }) : missing()));
     const s = httpSources("p1");
     expect(await s.deliverables()).toEqual([]);
     expect(await s.team()).toEqual({ desks: [], agents: [] });
     expect(await s.status()).toEqual({});
-    expect(await s.layout()).toEqual({ frames: [], view: null });
     expect(await s.pages("f1")).toBe(0);
     expect(await s.fileText("f1", 2)).toEqual([]);
-    await expect(s.saveFrames([], ["file:x"])).resolves.toBeUndefined();
-    await expect(s.saveView({ x: 0, y: 0, zoom: 1 })).resolves.toBeUndefined();
   });
 
-  it("a refused call is an error with the core's line, so the canvas never saves over a layout it did not read", async () => {
+  it("the workspace route is there: a 404 is an error like any other", async () => {
+    core(missing);
+    const s = httpSources("p1");
+    await expect(s.workspace()).rejects.toBeInstanceOf(SourceError);
+    await expect(s.saveWorkspace({ key: "files:all", anchor: null })).rejects.toBeInstanceOf(SourceError);
+  });
+
+  it("a refused call is an error with the core's line, so the screen never saves over a document it did not read", async () => {
     const line = { en: "Open the project first.", ar: "افتح المشروع الأول." };
     core(() => json({ error: line }, 409));
     const s = httpSources("p1");
-    await expect(s.layout()).rejects.toEqual(new SourceError(line));
-    await expect(s.saveFrames([], [])).rejects.toBeInstanceOf(SourceError);
+    await expect(s.workspace()).rejects.toEqual(new SourceError(line));
+    await expect(s.saveWorkspace({ key: "files:all", anchor: null })).rejects.toBeInstanceOf(SourceError);
     core(() => new Response("", { status: 500 }));
     await expect(httpSources("p1").files()).rejects.toMatchObject({ line: texts.canvasFailed });
   });
 
-  it("saves the layout to the project with keepalive when asked", async () => {
+  it("saves the open document to the project with keepalive when asked", async () => {
     const calls = core(() => json({ ok: true }));
     const s = httpSources("p 1");
-    const frame = { key: "files:all" as const, x: 0, y: 0, w: 360, h: 520, z: 0, collapsed: false };
-    await s.saveFrames([frame], ["file:gone"], true);
-    await s.saveView({ x: 1, y: 2, zoom: 0.85 });
-    expect(calls[0]).toMatchObject({ url: "/api/projects/p%201/canvas/frames", init: { method: "PUT", keepalive: true } });
-    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ frames: [frame], removed: ["file:gone"] });
-    expect(calls[1]).toMatchObject({ url: "/api/projects/p%201/canvas/view", init: { keepalive: false } });
+    await s.saveWorkspace({ key: "files:all", anchor: null }, true);
+    expect(calls[0]).toMatchObject({ url: "/api/projects/p%201/workspace", init: { method: "PUT", keepalive: true } });
+    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ key: "files:all", anchor: null });
   });
 
   it("asks for page images by width and keeps at most 64 object URLs", async () => {

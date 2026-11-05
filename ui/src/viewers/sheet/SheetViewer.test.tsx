@@ -245,15 +245,15 @@ describe("SheetViewer", () => {
       width.mockRestore();
       vi.unstubAllGlobals();
     }
-    // in a frame the columns keep their own widths
-    const { container } = render(<SheetViewer projectId={P} view={sheet()} mode="frame" />);
+    // outside the board the columns keep their own widths
+    const { container } = render(<SheetViewer projectId={P} view={sheet()} />);
     expect(container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns).toContain("432px");
   });
 
   it("a long item code shows whole: its column is as wide as the longest code (tender day: «…01-01» on every row)", () => {
     core({});
     const long = rows.map((r) => (r.id === "p4" ? { ...r, code: "02-01-001-B" } : r));
-    const { container } = render(<SheetViewer projectId={P} view={sheet({ rows: long })} mode="frame" />);
+    const { container } = render(<SheetViewer projectId={P} view={sheet({ rows: long })} />);
     const widths = (container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns ?? "").match(/\d+(?=px)/g)!.map(Number);
     // jsdom measures 7 px a character: 11 characters, the cell's 24 px padding, and the 12 px the screen adds
     expect(widths[0]).toBeGreaterThanOrEqual(11 * 7 + 24);
@@ -280,16 +280,6 @@ describe("SheetViewer", () => {
     }
   });
 
-  it("in a frame the status is not said twice: the frame's strip says it; the board shows it", () => {
-    const view = sheet({ status: "checked", code: "A", off_desk: true });
-    const { rerender } = render(<SheetViewer projectId={P} view={view} mode="frame" />);
-    const status = fill(texts.statusChecked.ar, { code: "A" });
-    expect(screen.queryByText(status)).toBeNull();
-    expect(screen.getByText(texts.statusOffDesk.ar)).toBeInTheDocument(); // the strip does not say this one
-    rerender(<SheetViewer projectId={P} view={view} mode="full" />);
-    expect(screen.getByText(status)).toBeInTheDocument();
-  });
-
   it("read only (the client's BOQ): nothing opens an editor or posts a change, each number opens its file", async () => {
     const user = userEvent.setup();
     const fetch = core({});
@@ -300,10 +290,7 @@ describe("SheetViewer", () => {
       total: null,
       sources: { s1: { kind: "boq", title: "BOQ", file_name: "مقايسة العميل - عينة.xlsx", file_id: "f1", locator: { sheet: "BOQ", row: 5, column: "E" }, url: null, dated: null } },
     });
-    const { rerender } = render(<SheetViewer projectId={P} view={client} mode="frame" readOnly />);
-    // in its frame, the frame's strip says it: the viewer does not say it again
-    expect(screen.queryByText(texts.clientBoqReadOnly.ar)).toBeNull();
-    rerender(<SheetViewer projectId={P} view={client} readOnly />);
+    render(<SheetViewer projectId={P} view={client} readOnly />);
     expect(screen.getByText(texts.clientBoqReadOnly.ar)).toBeInTheDocument();
     expect(screen.queryByText(texts.statusDraft.ar)).toBeNull();
     await user.dblClick(cellOf("03/02", "rate"));
@@ -586,7 +573,7 @@ describe("SheetViewer", () => {
   it("the full-screen toggle says which way it goes", async () => {
     const user = userEvent.setup();
     const toggle = vi.fn();
-    const { rerender } = render(<SheetViewer projectId={P} view={sheet()} mode="frame" onToggleFullScreen={toggle} />);
+    const { rerender } = render(<SheetViewer projectId={P} view={sheet()} onToggleFullScreen={toggle} />);
     await user.click(screen.getByRole("button", { name: texts.sheetFullScreen.ar }));
     expect(toggle).toHaveBeenCalled();
     rerender(<SheetViewer projectId={P} view={sheet()} mode="full" onToggleFullScreen={toggle} />);

@@ -9,13 +9,10 @@ import type {
   DocKey,
   FileInfo,
   FilePiece,
-  FrameKey,
   Opened,
-  Placed,
   ProjectSources,
   ProjectStatus,
   Team,
-  View,
 } from "./types";
 
 export type FakeOptions = {
@@ -23,7 +20,6 @@ export type FakeOptions = {
   deliverables?: DeliverableInfo[];
   team?: Team;
   status?: ProjectStatus;
-  layout?: { frames: Placed[]; view: View | null };
   /** The saved open document. */
   workspace?: Opened | null;
   /** Page counts by file id; a file not listed has no pages. */
@@ -40,8 +36,6 @@ export type FakeSources = ProjectSources & {
   /** Tells every live listener that the stream came back. */
   reconnect(): void;
   saved: {
-    frames: { frames: Placed[]; removed: FrameKey[]; keepalive: boolean }[];
-    views: { view: View; keepalive: boolean }[];
     workspace: { opened: Opened; keepalive: boolean }[];
   };
   uploads: File[];
@@ -49,11 +43,9 @@ export type FakeSources = ProjectSources & {
 
 export function fakeSources(options: FakeOptions): FakeSources {
   const files = [...(options.files ?? [])];
-  const frames = new Map((options.layout?.frames ?? []).map((f) => [f.key, f]));
-  let view = options.layout?.view ?? null;
   const listeners = new Set<{ onEvent: (event: ActivityEvent) => void; onReconnect?: () => void }>();
   let opened = options.workspace ?? null;
-  const saved: FakeSources["saved"] = { frames: [], views: [], workspace: [] };
+  const saved: FakeSources["saved"] = { workspace: [] };
   const uploads: File[] = [];
 
   return {
@@ -61,20 +53,6 @@ export function fakeSources(options: FakeOptions): FakeSources {
     deliverables: async () => [...(options.deliverables ?? [])],
     team: async () => options.team ?? { desks: [], agents: [] },
     status: async () => options.status ?? {},
-    layout: async () => ({
-      frames: [...frames.values()],
-      view,
-      ...(options.clientBoqs ? { client_boqs: [...options.clientBoqs] } : {}),
-    }),
-    async saveFrames(changed, removed, keepalive = false) {
-      saved.frames.push({ frames: changed, removed, keepalive });
-      for (const key of removed) frames.delete(key);
-      for (const f of changed) frames.set(f.key, f);
-    },
-    async saveView(next, keepalive = false) {
-      saved.views.push({ view: next, keepalive });
-      view = next;
-    },
     workspace: async () => ({
       open: (opened?.key ?? null) as DocKey | null,
       anchor: opened?.anchor ?? null,
