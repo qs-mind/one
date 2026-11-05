@@ -16,9 +16,18 @@ from qsone import activity, copy
 from qsone.deliverables import review as deliverable_review
 from qsone.deliverables import store as deliverables
 from qsone.engine import costs, roles
-from qsone.engine.runner import GENERAL, WORK, Engine
+from qsone.engine.runner import GENERAL, WORK, Engine, _stored_events
 from qsone.engine.store import Store
-from qsone.engine.types import Asked, Progress, Reviewed, Settled, Status, TextDelta, Unsourced
+from qsone.engine.types import (
+    Asked,
+    Data,
+    Progress,
+    Reviewed,
+    Settled,
+    Status,
+    TextDelta,
+    Unsourced,
+)
 from qsone.projects import Projects
 from tests.engine_fakes import DEEPSEEK, HAIKU, OPUS, SAMPLE_SHEET, SONNET, call, calls, scripted
 from tests.engine_fakes import text as said
@@ -238,6 +247,25 @@ async def test_reply_with_a_typed_number_is_marked(make_engine, project):
     events = await finish(engine, brief)
     [marked] = [e for e in events if isinstance(e, Unsourced)]
     assert marked.values == ("7,500",)
+
+
+async def test_a_reply_number_one_ledger_number_gave_names_it(make_engine, rec_ids):
+    """Decision 16.3: the reply's number opens into that ledger number's source card, also when
+    the Brief is read back."""
+    project, ids = rec_ids
+    lead = scripted(
+        call("explain_number", {"number": ids["rate"]}), said("الفئة 39,850.50 جنيه - عينة")
+    )
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, BRIEF)
+    events = await finish(engine, brief)
+    named = {"39,850.50": {"id": ids["rate"], "value": "39850.50"}}
+    [found] = [e for e in events if isinstance(e, Data) and e.name == "sourced"]
+    assert (found.id, found.data) == (brief, {"numbers": named})
+    assert not [e for e in events if isinstance(e, Unsourced)]
+    store = store_of(engine, project)
+    again = [e for e in _stored_events(store, store.brief(brief), engine) if isinstance(e, Data)]
+    assert [e.data for e in again if e.name == "sourced"] == [{"numbers": named}]
 
 
 async def test_unchecked_deliverable_with_numbers_is_checked_before_done(make_engine, rec_ids):

@@ -533,6 +533,36 @@ async def test_quote_rows_point_at_the_file(ctx):
         "locator": {"sheet": "Quote", "row": 2, "dated_how": "document"},
     }
     assert second["source"]["locator"]["row"] == 3 and first["fields"]["supplier"] == "مصنع - عينة"
+    # the card shows each rate's source as it will be kept: its quote's file and row (decision 16.3)
+    (card,) = ctx.host.cards
+    assert card.payload["number_column"] == "rate"
+    one, two = card.payload["row_sources"]
+    assert one["file_id"] == f and one["locator"] == {
+        "sheet": "Quote",
+        "row": 2,
+        "dated_how": "document",
+    }
+    assert (one["kind"], one["title"], one["supplier"], two["supplier"]) == (
+        "quote",
+        "عرض سعر - عينة.xlsx",
+        "مصنع - عينة",
+        None,
+    )
+
+
+async def test_a_price_said_in_the_chat_shows_the_chat_as_its_source(ctx, eng):
+    ctx.host.answers = {"rows": json.dumps({"choice": "no"})}
+    rows = [row("أسمنت - عينة", "طن", "3950", "EGP")]
+    await call("prices_propose", {"rows": rows, "from": "chat", "where": "engineer"}, ctx)
+    (card,) = ctx.host.cards
+    [said] = card.payload["row_sources"]
+    assert said == {
+        "kind": "chat",
+        "title": "",
+        "locator": {},
+        "dated": "2026-11-04",
+        "supplier": None,
+    }
 
 
 async def test_a_quote_row_must_exist_in_the_file(ctx):
