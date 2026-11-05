@@ -708,7 +708,7 @@ async def test_nothing_readable_on_disk_after_a_brief(make_engine, project, data
 async def test_stop_ends_a_claude_code_specialist(make_engine, project, tmp_path, data_dir):
     from qsone.engine.connectors.claude_code import ID, ClaudeCodeConnector
     from qsone.engine.types import ModelChoice
-    from tests.engine_fakes import fake_claude_command, read_fake_log
+    from tests.engine_fakes import fake_claude_command
 
     log = tmp_path / "claude.log"
     command = fake_claude_command(script=["init", {"sleep": 30}], log=log)
@@ -718,8 +718,14 @@ async def test_stop_ends_a_claude_code_specialist(make_engine, project, tmp_path
     engine = await started(make_engine([*links(lead=lead), claude]))
     engine.base_url = "http://127.0.0.1:9/"  # never reached: the fake only sleeps
     brief = await engine.start_brief(project, BRIEF)
-    await until(lambda: log.exists() and len(read_fake_log(log)) == 2, steps=4000)
+
+    def records(kind: str) -> list[dict]:
+        # The raw log: two fakes started at once may both count themselves run 0.
+        lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+        return [r for r in map(json.loads, lines) if r["kind"] == kind]
+
+    await until(lambda: len(records("stdin")) == 2, steps=4000)  # both read their task
     await engine.stop(brief)
-    assert [run["ended"] for run in read_fake_log(log)] == ["interrupted", "interrupted"]
+    assert [r["how"] for r in records("end")] == ["interrupted", "interrupted"]
     assert store_of(engine, project).brief(brief)["status"] == "stopped"
     assert not (data_dir / WORK).exists() or not any((data_dir / WORK).iterdir())
