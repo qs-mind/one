@@ -12,7 +12,8 @@ import { FolderPicker } from "./folder";
 
 type Found = { id: string; name: string | null; last_backup: string; needs: null | "sign_in" | "backup_code" | "project_code" };
 
-export function Restore() {
+/** `onChanged`: a project was restored, or the account was signed in to, so the Backup key may be here now. */
+export function Restore({ onChanged }: { onChanged?: () => void }) {
   useLanguage();
   const [path, setPath] = useState<string>();
   const [found, setFound] = useState<Found[]>();
@@ -24,7 +25,10 @@ export function Restore() {
 
   useEffect(() => {
     // back from signing in: the account may have brought the Backup key, so the folder is read again
-    if (wasSigningIn.current && !signingIn && path) void look(path);
+    if (wasSigningIn.current && !signingIn) {
+      onChanged?.();
+      if (path) void look(path);
+    }
     wasSigningIn.current = signingIn;
   }, [signingIn]);
 
@@ -69,6 +73,7 @@ export function Restore() {
                 project={project}
                 onRestored={(name) => {
                   setBack((now) => [...now, { id: project.id, name }]);
+                  onChanged?.(); // a code brings the Backup key here: the panel's ticks say so at once
                   void look(path!);
                 }}
               />

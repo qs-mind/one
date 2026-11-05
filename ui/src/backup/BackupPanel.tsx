@@ -169,7 +169,7 @@ export function BackupPanel({ onClose }: { onClose: () => void }) {
 
       <div className="flex flex-col gap-3 border-t border-stone pt-5">
         {restoring ? (
-          <Restore />
+          <Restore onChanged={() => void load()} />
         ) : (
           <button type="button" onClick={() => setRestoring(true)} className={`${secondary} self-start`}>
             {t("restoreTitle")}
@@ -193,7 +193,7 @@ export function BackupAsk() {
   return (
     <section
       aria-label={t("backupTitle")}
-      className="flex w-[min(420px,calc(100vw-32px))] flex-col gap-4 rounded-[14px] bg-paper px-5 py-4 shadow-[0_2px_12px_rgb(14_15_18/0.12)]"
+      className="flex w-full flex-col gap-4 rounded-[14px] border border-ink/[0.08] bg-paper px-5 py-4"
     >
       <p className="font-semibold">{t("backupAskFolder")}</p>
       <p className="text-slate">{t("backupNoFolder")}</p>

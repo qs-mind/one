@@ -222,6 +222,34 @@ describe("SheetViewer", () => {
     expect(within(amount).queryByRole("button")).toBeNull();
   });
 
+  it("full mode fills the board: the room the columns leave goes to the description, and the grid is as tall as its rows", () => {
+    core({});
+    // the board's width is read once at first, then on each resize (none here)
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1400);
+    try {
+      const { container } = render(<SheetViewer projectId={P} view={sheet()} mode="full" />);
+      const columns = () => (container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns ?? "");
+      // 952 px of columns (each 12 px wider than set) in 1400: the description takes the rest but for a scroll bar
+      expect(columns()).toContain(`${420 + 12 + (1400 - 952 - 16)}px`);
+      const box = container.querySelector<HTMLElement>(".rdg")!.parentElement!.parentElement!;
+      expect(box.style.height).not.toBe("");
+      expect(box).toHaveClass("flex-[0_1_auto]");
+    } finally {
+      width.mockRestore();
+      vi.unstubAllGlobals();
+    }
+    // in a frame the columns keep their own widths
+    const { container } = render(<SheetViewer projectId={P} view={sheet()} mode="frame" />);
+    expect(container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns).toContain("432px");
+  });
+
   it("read only (the client's BOQ): nothing opens an editor or posts a change, each number opens its file", async () => {
     const user = userEvent.setup();
     const fetch = core({});
@@ -232,7 +260,10 @@ describe("SheetViewer", () => {
       total: null,
       sources: { s1: { kind: "boq", title: "BOQ", file_name: "مقايسة العميل - عينة.xlsx", file_id: "f1", locator: { sheet: "BOQ", row: 5, column: "E" }, url: null, dated: null } },
     });
-    render(<SheetViewer projectId={P} view={client} readOnly />);
+    const { rerender } = render(<SheetViewer projectId={P} view={client} mode="frame" readOnly />);
+    // in its frame, the frame's strip says it: the viewer does not say it again
+    expect(screen.queryByText(texts.clientBoqReadOnly.ar)).toBeNull();
+    rerender(<SheetViewer projectId={P} view={client} readOnly />);
     expect(screen.getByText(texts.clientBoqReadOnly.ar)).toBeInTheDocument();
     expect(screen.queryByText(texts.statusDraft.ar)).toBeNull();
     await user.dblClick(cellOf("03/02", "rate"));

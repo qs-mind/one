@@ -539,11 +539,9 @@ export const texts = {
   selectedMany: { en: "{n} selected", ar: "{n} مختارين" },
   selectedRange: { en: "{title}, {label}", ar: "{title}، {label}" },
   clearSelection: { en: "Clear the selection", ar: "شيل الاختيار" },
-  commandBox: {
-    en: "Tell the Lead QS what to do with the selection",
-    ar: "قول لكبير مهندسي الكميات يعمل إيه باللي اخترته",
-  },
-  commandBoxEmpty: { en: "Tell the Lead QS what you want", ar: "قول لكبير مهندسي الكميات عايز إيه" },
+  // the message box's placeholders: one line in the narrowest chat (320 px), in both languages
+  commandBox: { en: "Ask about the selection", ar: "اطلب حاجة في اللي اخترته" },
+  commandBoxEmpty: { en: "Ask the Lead QS", ar: "اطلب من كبير مهندسي الكميات" },
   // The message box's model and effort, for the Lead QS of the next Brief
   modelChip: { en: "Model: {name}. Choose another", ar: "الموديل: {name}. اختار موديل تاني" },
   models: { en: "Models", ar: "الموديلات" },
@@ -732,7 +730,6 @@ export const texts = {
   cardCountryOther: { en: "Other", ar: "بلد تاني" },
   cardCity: { en: "City", ar: "المدينة" },
   cardSaving: { en: "Saving the card…", ar: "بنحفظ البطاقة…" },
-  cardNotSaved: { en: "The card was not saved. Check the currency, then try again.", ar: "البطاقة ماتحفظتش. راجع العملة وجرّب تاني." },
   cardNotSavedRetry: { en: "The card was not saved. Try again.", ar: "البطاقة ماتحفظتش. جرّب تاني." },
   usageTitle: { en: "Usage Stats", ar: "إحصائيات الاستخدام" },
   usageHelp: {

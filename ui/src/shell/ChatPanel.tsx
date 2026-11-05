@@ -10,6 +10,7 @@ import { ConsentNeeded } from "../firstlaunch/ConnectAi";
 import { dir, t, useLanguage } from "../i18n";
 import { type Ai, AiSettings } from "../settings/AiSettings";
 import { useScrollEdges } from "../ui/useScrollEdges";
+import { Notices } from "./Notices";
 import type { ChatState } from "./useChats";
 
 export const CHAT_WIDTH = { min: 320, max: 640, start: 420, step: 16 };
@@ -28,7 +29,8 @@ export type ChatBodyProps = {
 };
 
 /** AI settings while nothing is connected, else the conversation; above both, the way to the AI consent while the
- * engineer has not given it (until then the core refuses every AI call). */
+ * engineer has not given it (until then the core refuses every AI call); under them, the import reports and the
+ * backup question (Notices). */
 export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpenDeliverable }: ChatBodyProps) {
   const settings = useRef<HTMLDivElement>(null);
   useScrollEdges(settings);
@@ -43,6 +45,7 @@ export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpen
       {ai.connected !== false && (
         <ChatLog chat={chat} label={label} projectId={projectId} onOpenDeliverable={onOpenDeliverable} className="flex-1" />
       )}
+      <Notices />
     </>
   );
 }

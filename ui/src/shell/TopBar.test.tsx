@@ -55,6 +55,8 @@ describe("the language wipe", () => {
     await user.click(button);
     expect(start).toHaveBeenCalledTimes(1);
     expect(language()).toBe("en");
+    // the More menu closes with the switch: it does not stay open over the new page
+    await waitFor(() => expect(screen.queryByRole("button", { name: texts.otherLanguage.en })).toBeNull());
     await waitFor(() =>
       expect(animate).toHaveBeenCalledWith(
         { clipPath: [expect.stringContaining("at 1250px 78px"), expect.stringContaining("at 1250px 78px")] },

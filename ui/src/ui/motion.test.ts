@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DUR, EASE, play, reducedMotion, useReducedMotion } from "./motion";
+import { DUR, EASE, ease, play, reducedMotion, useReducedMotion } from "./motion";
 
 type Listener = (event: { matches: boolean }) => void;
 
@@ -33,6 +33,16 @@ describe("motion", () => {
   it("keeps the timings and the ease ONE already uses", () => {
     expect(EASE).toBe("cubic-bezier(0.2, 0.8, 0.2, 1)");
     expect(DUR).toEqual({ short: 150, base: 220, long: 300, roll: 400 });
+  });
+
+  it("gives EASE as a function for motion run in script: from 0 to 1, fast then settling", () => {
+    expect(ease(0)).toBe(0);
+    expect(ease(1)).toBe(1);
+    expect(ease(-1)).toBe(0);
+    expect(ease(2)).toBe(1);
+    // cubic-bezier(0.2, 0.8, 0.2, 1) at half time is most of the way there
+    expect(ease(0.5)).toBeCloseTo(0.95, 1);
+    for (let p = 0.1; p < 1; p += 0.1) expect(ease(p)).toBeGreaterThan(ease(p - 0.1));
   });
 
   it("reads reduced motion from the system, and is off where the query is missing", () => {

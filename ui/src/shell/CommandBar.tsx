@@ -158,14 +158,14 @@ export function CommandBar({
           ))}
         </div>
       )}
-      {/* The box grows with its words, or its placeholder while empty, so neither is ever cut: an invisible copy of
-          the text in the same grid cell sets its height (up to max-h-40, then it scrolls). */}
+      {/* The box grows with its words: an invisible copy of the text in the same grid cell sets its height (up to
+          max-h-40, then it scrolls). Empty, it is one line: a placeholder too long for a narrow box ends in "…". */}
       <div className="grid">
         <div
           aria-hidden="true"
           dir={draft ? "auto" : dir()}
           data-command-mirror
-          className={`invisible col-start-1 row-start-1 max-h-40 min-h-12 overflow-hidden whitespace-pre-wrap break-words py-2.5 ps-5 leading-7 ${open ? "pe-5" : "pe-14"}`}
+          className={`invisible col-start-1 row-start-1 max-h-40 min-h-12 overflow-hidden py-2.5 ps-5 leading-7 ${draft ? "whitespace-pre-wrap break-words" : "truncate"} ${open ? "pe-5" : "pe-14"}`}
         >
           {(draft || placeholder) + " "}
         </div>
@@ -191,7 +191,7 @@ export function CommandBar({
               setDismissed(true);
             }
           }}
-          className={`col-start-1 row-start-1 max-h-40 min-h-12 w-full resize-none overflow-y-auto bg-transparent py-2.5 ps-5 leading-7 outline-none placeholder:text-slate ${open ? "pe-5" : "pe-14"}`}
+          className={`col-start-1 row-start-1 max-h-40 min-h-12 w-full resize-none bg-transparent py-2.5 ps-5 leading-7 outline-none placeholder:text-slate ${draft ? "overflow-y-auto" : "truncate"} ${open ? "pe-5" : "pe-14"}`}
         />
       </div>
       {/* The quiet row: its height opens from nothing, and it fades in; folded, it takes no focus. */}

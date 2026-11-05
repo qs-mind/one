@@ -12,7 +12,7 @@ import { cellKey, cellName, commentMarks, pendingCells, SheetCell } from "./cell
 import { formatDecimal } from "./format";
 import { loadCollapsed, saveCollapsed, visibleRows } from "./collapse";
 import { Grid, type GridHandle, type SheetColumn } from "./grid";
-import { linesHeight, makeMeasure, rowHeight, titleColumnOf } from "./heights";
+import { linesHeight, makeMeasure, rowHeight, shownWidth, titleColumnOf } from "./heights";
 import { normalised, type Cell, type Range } from "./selection";
 import { SourcePopover } from "./SourcePopover";
 
@@ -42,6 +42,11 @@ export type SheetViewerProps = {
 };
 
 const NONE: never[] = [];
+/** Room kept for a scroll bar, in px. */
+const SCROLLBAR = 16;
+/** The grid's header row and its total row, in px (react-data-grid's summary row with a row-height function). */
+const HEADER_H = 44;
+const TOTAL_H = 35;
 
 /** The status chips with text labels (never colour alone); the Document viewer shows the same. */
 export function StatusChips({ view }: { view: Pick<SheetView, "status" | "code" | "same_provider" | "off_desk"> }) {
@@ -68,11 +73,28 @@ export function SheetViewer(props: SheetViewerProps) {
   const root = useRef<HTMLDivElement>(null);
   const grid = useRef<GridHandle>(null);
 
+  const full = props.mode === "full";
+  // In full mode the sheet fills the board's width: the room the columns leave goes to the description, so no empty
+  // band sits beside the last column (the rows then need fewer lines). In a frame the columns keep their widths.
+  const gridBox = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState(0);
+  useEffect(() => {
+    const el = gridBox.current;
+    if (!full || !el || typeof ResizeObserver === "undefined") return;
+    const sizes = new ResizeObserver(() => setRoom(el.clientWidth));
+    sizes.observe(el);
+    setRoom(el.clientWidth);
+    return () => sizes.disconnect();
+  }, [full]);
+
   // Frozen columns first: react-data-grid moves them to the start edge, so screen order matches indexes.
-  const columns = useMemo(
-    () => [...view.columns.filter((c) => c.frozen), ...view.columns.filter((c) => !c.frozen)],
-    [view.columns],
-  );
+  const columns = useMemo(() => {
+    const ordered = [...view.columns.filter((c) => c.frozen), ...view.columns.filter((c) => !c.frozen)];
+    const title = titleColumnOf(ordered);
+    const extra = room - ordered.reduce((sum, c) => sum + shownWidth(c.width), 0) - SCROLLBAR;
+    if (!full || !title || extra <= 0) return ordered;
+    return ordered.map((c) => (c.key === title ? { ...c, width: c.width + extra } : c));
+  }, [view.columns, full, room]);
   const byKey = useMemo(() => new Map(columns.map((c) => [c.key, c])), [columns]);
   const titleColumn = titleColumnOf(columns);
   const gridColumns = useMemo<SheetColumn[]>(
@@ -121,6 +143,8 @@ export function SheetViewer(props: SheetViewerProps) {
       rows.map((r) => [r.id, Math.max(rowHeight(r, columns, measure), changed.has(r.id) ? linesHeight(2) : 0)]),
     );
   }, [rows, columns, measure, pending, fontsLoaded]);
+  const contentHeight =
+    HEADER_H + [...heights.values()].reduce((sum, h) => sum + h, 0) + (view.total ? TOTAL_H : 0) + SCROLLBAR;
 
   const [selection, setSelection] = useState<Range | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -280,7 +304,10 @@ export function SheetViewer(props: SheetViewerProps) {
     [titleColumn, totalColumn, total, view.language, view.id],
   );
 
-  const full = props.mode === "full";
+  // in a frame, the frame's strip already says the client's document is read only: it is not said twice, and the
+  // header, with nothing left to show, keeps only the title for screen readers
+  const badge = readOnly && props.mode !== "frame";
+  const shown = !readOnly || badge || full || !!props.onToggleFullScreen;
   return (
     <div
       ref={root}
@@ -292,13 +319,13 @@ export function SheetViewer(props: SheetViewerProps) {
         if (popover && event.target.matches("input, textarea")) setPopover(null); // the cell editor opened
       }}
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+      <header className={shown ? "flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3" : "sr-only"}>
         {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
         <h2 dir="auto" className={full ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
         {readOnly ? (
-          <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
+          badge && <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
         ) : (
           <>
             <StatusChips view={view} />
@@ -331,7 +358,14 @@ export function SheetViewer(props: SheetViewerProps) {
           </button>
         </p>
       )}
-      <div lang={view.language} className="min-h-0 flex-1">
+      <div
+        ref={gridBox}
+        lang={view.language}
+        // in full mode the grid is as tall as its rows (and no taller than its room), so a short bill leaves no empty
+        // band above its total: the review panels under it take the room
+        className={full ? "min-h-0 flex-[0_1_auto]" : "min-h-0 flex-1"}
+        style={full ? { height: contentHeight } : undefined}
+      >
         <Grid<ViewRow>
           ref={grid}
           label={view.title}

@@ -3,7 +3,8 @@
 import type { Anchor, FrameKey, Placed } from "./types";
 
 export type CanvasApi = {
-  focusFrame(key: FrameKey, opts?: { anchor?: Anchor; zoom?: number }): void;
+  /** `mark`: the frame shows where the view went (a soft outline that fades), when sent there from elsewhere. */
+  focusFrame(key: FrameKey, opts?: { anchor?: Anchor; zoom?: number; mark?: boolean }): void;
   fitAll(): void;
   zoomTo(level: number): void;
   openFile(fileId: string, page?: number): void;

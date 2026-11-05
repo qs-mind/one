@@ -39,14 +39,6 @@ function systemCountry(): Country {
   return "EG";
 }
 
-// The core's own words for a refusal; the currency hint only when the core refused the currency (a 422 on that field).
-async function notSaved(response: Response | undefined): Promise<Text> {
-  if (response?.status !== 422) return coreLine(response, texts.cardNotSavedRetry);
-  const body = (await response.json().catch(() => undefined)) as { detail?: { loc?: unknown[] }[] } | undefined;
-  const currency = body?.detail?.some((d) => Array.isArray(d.loc) && d.loc.at(-1) === "currency");
-  return currency ? texts.cardNotSaved : texts.cardNotSavedRetry;
-}
-
 export function IntroCard({ nav }: { nav: Nav }) {
   useLanguage();
   const [role, setRole] = useState<Role>();
@@ -79,7 +71,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
     setFailed(undefined);
     const response = await send("/engineer/card", "PUT", { role, country, city: city.trim(), currency: CURRENCY[country] });
     setSaving(false);
-    if (!response?.ok) return setFailed(await notSaved(response));
+    if (!response?.ok) return setFailed(await coreLine(response, texts.cardNotSavedRetry)); // the core's own words
     await nav.pass("done");
   }
 

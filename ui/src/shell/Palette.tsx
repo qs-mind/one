@@ -231,9 +231,9 @@ export function Palette({
                   onSelect={() => run(() => canvasApi.openFile(hit.file_id, page))}
                   className="flex-col items-start"
                 >
-                  <span className="text-slate">
-                    <FileName name={hit.file_name} />
-                    {page !== undefined && <> · {fill(t("page"), { page })}</>}
+                  <span className="flex max-w-full items-baseline text-slate">
+                    <FileName name={hit.file_name} fit />
+                    {page !== undefined && <span className="shrink-0 whitespace-pre"> · {fill(t("page"), { page })}</span>}
                   </span>
                   <span dir="auto" className="line-clamp-2">
                     {hit.text}

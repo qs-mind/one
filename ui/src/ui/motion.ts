@@ -6,6 +6,22 @@ import { useSyncExternalStore } from "react";
 /** The ease the first launch and the message box already use. */
 export const EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 
+/** EASE as a function of progress (0 to 1), for motion run in script, such as the canvas's view gliding. */
+export function ease(progress: number): number {
+  if (progress <= 0) return 0;
+  if (progress >= 1) return 1;
+  // cubic-bezier(0.2, 0.8, 0.2, 1): find the curve's parameter whose x is `progress`, then give its y
+  const curve = (s: number, a: number, b: number) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 30; i++) {
+    const mid = (low + high) / 2;
+    if (curve(mid, 0.2, 0.2) < progress) low = mid;
+    else high = mid;
+  }
+  return curve((low + high) / 2, 0.8, 1);
+}
+
 /** Milliseconds: a quick change, most changes, a panel or screen, a number rolling. */
 export const DUR = { short: 150, base: 220, long: 300, roll: 400 } as const;
 

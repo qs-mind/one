@@ -122,7 +122,7 @@ export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenF
       />
       <header style={{ height: STRIP_H }} className="flex shrink-0 cursor-grab items-center gap-3 pe-3 ps-5">
         <h3 dir="auto" title={title} className="min-w-0 flex-1 truncate text-lg font-semibold">
-          <FileName name={title} />
+          <FileName name={title} fit />
         </h3>
         {meta}
         {onOpenFull && (

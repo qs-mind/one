@@ -60,6 +60,19 @@ describe("CommandBar", () => {
     expect(await box()).toHaveAttribute("placeholder", texts.commandBoxEmpty.ar);
   });
 
+  it("empty, the box keeps its placeholder to one line; with words it wraps them", async () => {
+    core();
+    const user = userEvent.setup();
+    render(<App />);
+    const field = await box();
+    const mirror = document.querySelector("[data-command-mirror]")!;
+    expect(field).toHaveClass("truncate");
+    expect(mirror).toHaveClass("truncate");
+    await user.type(field, "سطر أول");
+    expect(field).not.toHaveClass("truncate");
+    expect(mirror).toHaveClass("whitespace-pre-wrap");
+  });
+
   it("a quick action only sends a message to the Lead QS, with the selection", async () => {
     const fetch = core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
     const user = userEvent.setup();

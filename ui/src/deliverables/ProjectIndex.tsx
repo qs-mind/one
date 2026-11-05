@@ -49,7 +49,9 @@ export function ProjectIndex({ projectId, onOpen, onClose, subscribe = subscribe
     };
   }, [projectId, subscribe]);
 
-  const cell = "border-b border-stone px-2 py-1 text-start align-baseline";
+  // the title takes the room the other columns leave, at least 14 rem; the short values keep to one line
+  const cell = "border-b border-stone px-3 py-2 text-start align-baseline";
+  const small = `${cell} whitespace-nowrap`;
   return (
     <section aria-labelledby="project-index" className="flex flex-col gap-3 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -69,48 +71,50 @@ export function ProjectIndex({ projectId, onOpen, onClose, subscribe = subscribe
       )}
       {list?.length === 0 && <p className="text-slate">{t("deliverablesEmpty")}</p>}
       {list && list.length > 0 && (
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="text-slate">
-              <th className={`${cell} font-normal`}>{t("deliverableTitle")}</th>
-              <th className={`${cell} font-normal`}>{t("deliverableType")}</th>
-              <th className={`${cell} font-normal`}>{t("reviewRevisions")}</th>
-              <th className={`${cell} font-normal`}>{t("deliverableStatus")}</th>
-              <th className={`${cell} font-normal`}>{t("reviewChanges")}</th>
-              <th className={`${cell} font-normal`}>{t("reviewComments")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((d) => (
-              <tr key={d.id}>
-                <td className={cell}>
-                  <button
-                    type="button"
-                    dir="auto"
-                    lang={d.language}
-                    className="text-start font-semibold underline decoration-ink/20 hover:text-copper"
-                    onClick={() => onOpen(d.id)}
-                  >
-                    {d.title}
-                  </button>
-                </td>
-                <td className={cell}>{kindName(d.kind)}</td>
-                <td className={cell}>{d.revision !== null ? fill(t("reviewRev"), { n: d.revision }) : "—"}</td>
-                <td className={cell}>
-                  <span className="flex flex-wrap gap-1">
-                    <StatusChips view={d} />
-                  </span>
-                </td>
-                <td className={cell}>
-                  <bdi>{d.pending ?? 0}</bdi>
-                </td>
-                <td className={`${cell} ${d.open_comments > 0 ? "text-copper" : ""}`}>
-                  <bdi>{d.open_comments}</bdi>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="text-slate">
+                <th className={`${cell} min-w-56 font-normal`}>{t("deliverableTitle")}</th>
+                <th className={`${cell} font-normal`}>{t("deliverableType")}</th>
+                <th className={`${cell} font-normal`}>{t("reviewRevisions")}</th>
+                <th className={`${cell} font-normal`}>{t("deliverableStatus")}</th>
+                <th className={`${cell} font-normal`}>{t("reviewChanges")}</th>
+                <th className={`${cell} font-normal`}>{t("reviewComments")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {list.map((d) => (
+                <tr key={d.id}>
+                  <td className={`${cell} min-w-56`}>
+                    <button
+                      type="button"
+                      dir="auto"
+                      lang={d.language}
+                      className="text-start font-semibold underline decoration-ink/20 hover:text-copper"
+                      onClick={() => onOpen(d.id)}
+                    >
+                      {d.title}
+                    </button>
+                  </td>
+                  <td className={small}>{kindName(d.kind)}</td>
+                  <td className={small}>{d.revision !== null ? fill(t("reviewRev"), { n: d.revision }) : "—"}</td>
+                  <td className={cell}>
+                    <span className="flex flex-wrap gap-1">
+                      <StatusChips view={d} />
+                    </span>
+                  </td>
+                  <td className={small}>
+                    <bdi>{d.pending ?? 0}</bdi>
+                  </td>
+                  <td className={`${small} ${d.open_comments > 0 ? "text-copper" : ""}`}>
+                    <bdi>{d.open_comments}</bdi>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

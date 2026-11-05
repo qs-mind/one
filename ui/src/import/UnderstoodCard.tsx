@@ -40,26 +40,27 @@ function day(date: string): string {
   );
 }
 
-/** Where a fact comes from, in words: "BOQ.xlsx, BOQ, row 12", "Tender letter.pdf, page 3", "You, 5 Nov 2026". */
-/** A file name in a line of either language: isolated, with its extension kept left to right at its end, as the
- * core writes names (an Arabic name with a Latin part around ".xlsx" would otherwise come out of order). */
-function isolated(name: string): string {
-  const dot = name.lastIndexOf(".");
-  if (dot <= 0) return `\u2068${name}\u2069`;
-  return `\u2068${name.slice(0, dot)}\u2066${name.slice(dot)}\u2069\u2069`;
-}
-
-export function sourceText(source: Source): string {
-  if (source.kind === "engineer" && "date" in source) return fill(t("factSourceEngineer"), { date: day(source.date) });
-  if (source.kind === "count") return t("factSourceCount");
-  if (source.kind === "file" && "locator" in source) {
-    const file = source.file_name ? isolated(source.file_name) : "";
-    const at = source.locator ?? {};
-    if (at.page !== undefined) return fill(t("factSourcePage"), { file, page: at.page });
-    if (at.sheet !== undefined && at.row !== undefined) return fill(t("factSourceRow"), { file, sheet: at.sheet, row: at.row });
-    return fill(t("factSourceFile"), { file });
-  }
-  return "";
+/** Where a fact comes from, in words: "BOQ.xlsx, BOQ, row 12", "Tender letter.pdf, page 3", "You, 5 Nov 2026". A
+ * file's name keeps to one line, isolated, its extension whole (FileName), and the place in it follows. */
+function SourceLine({ source }: { source: Source }) {
+  if (source.kind === "engineer" && "date" in source) return <>{fill(t("factSourceEngineer"), { date: day(source.date) })}</>;
+  if (source.kind === "count") return <>{t("factSourceCount")}</>;
+  if (source.kind !== "file" || !("locator" in source)) return null;
+  const at = source.locator ?? {};
+  const [template, values]: [string, Record<string, string | number>] =
+    at.page !== undefined
+      ? [t("factSourcePage"), { page: at.page }]
+      : at.sheet !== undefined && at.row !== undefined
+        ? [t("factSourceRow"), { sheet: at.sheet, row: at.row }]
+        : [t("factSourceFile"), {}];
+  const [before = "", after = ""] = template.split("{file}");
+  return (
+    <span className="flex max-w-full items-baseline">
+      {before && <span className="shrink-0 whitespace-pre">{fill(before, values)}</span>}
+      {source.file_name && <FileName name={source.file_name} fit />}
+      {after && <span className="shrink-0 whitespace-pre">{fill(after, values)}</span>}
+    </span>
+  );
 }
 
 export function UnderstoodCard({ projectId }: { projectId: string }) {
@@ -176,7 +177,7 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
                     <span dir="auto" className="font-semibold">
                       {file.label}
                     </span>
-                    <FileName name={file.name} className="min-w-0 truncate text-sm" />
+                    <FileName name={file.name} fit className="text-sm" />
                   </span>
                   {file.folder && (
                     <span dir="auto" className="truncate text-xs text-slate">
@@ -283,7 +284,11 @@ function FactRow({
               ) : (
                 <span className="text-slate">{t("understoodNotFound")}</span>
               )}
-              {fact && <span className="text-sm text-slate">{sourceText(fact.source)}</span>}
+              {fact && (
+                <span className="text-sm text-slate">
+                  <SourceLine source={fact.source} />
+                </span>
+              )}
             </div>
             {!locked && (
               <button type="button" onClick={onEdit} aria-label={`${t("understoodChange")}: ${label}`} className={`${quiet} -me-3 shrink-0`}>
