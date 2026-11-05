@@ -1,8 +1,13 @@
-// The chrome around the canvas, measured in a real browser: the frames shown beside the open chat (never under it, in
-// both languages), one message box at the chat's foot, the placeholder whole at every width, the project's name never
-// cut and the status folding into "More status" before anything clips, a newly opened frame in visible free space.
-import { expect, test, type Locator, type Page } from "@playwright/test";
-import { canvasReady, frame, mockCore, small } from "./fixtures";
+// The workspace's layout, measured in a real browser: the open document at the inline start (right in Arabic) and
+// the chat beside it at the end, never under it; the sheet 8 px under the top bar and 8 px above the window's foot;
+// one message box at the chat's foot; the placeholder whole at every width, the project's name and (from 1000 px)
+// the document's title never cut, the status folding into More before anything clips, nothing in the top bar run
+// over another and «الأرقام عينة» said whole even with a long project name; More status shown at 1280 px; a document picked from the switcher shown in place, kept in the project
+// (a reload opens it) and left with Back; below 1000 px the chat a panel over the document; below 640 px the
+// document the window's width.
+import { expect, test, type Locator } from "@playwright/test";
+import { count, texts } from "../src/i18n";
+import { documentRegion, mockCore, openDocument, shownWhole, small, switcher, workspaceReady } from "./fixtures";
 
 type Box = { x: number; y: number; width: number; height: number };
 const box = async (l: Locator) => (await l.boundingBox())!;
@@ -11,40 +16,33 @@ const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width 
 /** Whether the element's text is all shown: nothing hidden past its edges. */
 const whole = (l: Locator) => l.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1);
 
-async function covers(page: Page): Promise<Box[]> {
-  return page.locator("[data-canvas-cover], .react-flow__minimap").evaluateAll((els) =>
-    els.map((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.x, y: r.y, width: r.width, height: r.height };
-    }),
-  );
-}
-
 for (const language of ["ar", "en"] as const) {
-  test(`a first open shows readable frames beside the open chat, ${language}`, async ({ page }) => {
+  test(`the document at the inline start, the chat beside it and never over it, ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    const scene = small();
-    scene.layout.frames = []; // a first open: every frame placed and fitted
-    await mockCore(page, scene, { language });
+    await mockCore(page, small(), { language });
     await page.goto("/");
-    await canvasReady(page);
+    await workspaceReady(page, page.getByRole("grid"));
+    const sheet = await box(page.locator("[data-document-sheet]"));
     const chat = await box(page.locator('aside[data-region="chat"]'));
-    // readable: never below 60%; what it shows is beside the chat, and the rest is a pan away
-    const zoom = Number(await page.evaluate(() => /scale\(([\d.]+)\)/.exec(document.querySelector<HTMLElement>(".react-flow__viewport")!.style.transform)?.[1]));
-    expect(zoom).toBeGreaterThanOrEqual(0.6);
-    // the Project files, always in a first view, whole and clear of the chat and every other overlay
-    const files = await box(frame(page, "files:all"));
-    const pane = await box(page.locator(".react-flow"));
-    expect(files.x >= pane.x && files.x + files.width <= pane.x + pane.width && files.y >= pane.y && files.y + files.height <= pane.y + pane.height).toBe(true);
-    expect(overlaps(files, chat)).toBe(false);
-    for (const cover of await covers(page)) expect(overlaps(files, cover)).toBe(false);
+    const bar = await box(page.locator('[data-region="topbar"]'));
+    expect(overlaps(sheet, chat)).toBe(false);
+    if (language === "ar") expect(sheet.x).toBeGreaterThan(chat.x);
+    else expect(sheet.x).toBeLessThan(chat.x);
+    // dense: 8 px under the top bar and above the window's foot, 12 px from the window's side
+    expect(Math.abs(sheet.y - (bar.y + bar.height) - 8)).toBeLessThanOrEqual(1);
+    expect(Math.abs(900 - (sheet.y + sheet.height) - 8)).toBeLessThanOrEqual(1);
+    const side = language === "ar" ? 1440 - (sheet.x + sheet.width) : sheet.x;
+    expect(Math.abs(side - 12)).toBeLessThanOrEqual(1);
+    // the document's title is in the top bar, after the project's name; its state beside it
+    await expect(switcher(page)).toContainText("تسعير المقايسة - عينة");
+    await expect(page.locator('[data-region="topbar"]')).toContainText(texts.sampleNumbers[language]);
   });
 
   test(`one message box, at the open chat's foot, ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockCore(page, small(), { language });
     await page.goto("/");
-    await canvasReady(page);
+    await workspaceReady(page);
     const chat = page.locator('aside[data-region="chat"]');
     await expect(page.locator("[data-command-box]")).toHaveCount(1);
     await expect(chat.locator("[data-command-box]")).toBeVisible();
@@ -53,22 +51,23 @@ for (const language of ["ar", "en"] as const) {
     expect(panel.y + panel.height - (input.y + input.height)).toBeLessThan(40);
   });
 
-  for (const width of [800, 940, 1024, 1440]) {
-    test(`the placeholder and the top bar are whole at ${width} px, ${language}`, async ({ page }) => {
+  for (const width of [1024, 1280, 1440]) {
+    test(`the placeholder, the top bar and the document's title are whole at ${width} px, ${language}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       const scene = small();
       scene.project.name = language === "ar" ? "برج إداري بالعاصمة الإدارية الجديدة - عينة" : "Administrative tower, New Capital (sample)";
       await mockCore(page, scene, { language });
       await page.goto("/");
-      await canvasReady(page);
-      // the box shows its whole placeholder, in the chat or floating (the chat folded)
+      await workspaceReady(page);
+      // the box shows its whole placeholder
       const input = page.locator("[data-command-box]");
       expect(await whole(input)).toBe(true);
       const mirror = await box(page.locator("[data-command-mirror]"));
       const shown = await box(input);
       expect(Math.abs(mirror.height - shown.height)).toBeLessThan(2);
-      // the project's name is never cut
+      // the project's name and the document's title are never cut
       expect(await whole(page.locator('[data-region="topbar"] [data-region-start] span[dir="auto"]'))).toBe(true);
+      expect(await whole(switcher(page))).toBe(true);
       // nothing in the top bar spills past its edges, and the status shows whole or folds into More status
       const bar = await box(page.locator('[data-region="topbar"]'));
       for (const item of await page.locator('[data-region="topbar"] button:visible').all()) {
@@ -82,30 +81,75 @@ for (const language of ["ar", "en"] as const) {
         expect(b.x).toBeGreaterThanOrEqual(strip.x - 1);
         expect(b.x + b.width).toBeLessThanOrEqual(strip.x + strip.width + 1);
       }
+      // at 1280 px the long name leaves the status no room: what folds is under More status, and that is seen whole
+      if (width === 1280) {
+        const more = page.locator('[data-region="topbar"] [data-status="more"]');
+        await expect(more).toBeVisible();
+        expect(await shownWhole(more), "More status is seen whole").toBe(true);
+      }
     });
   }
 
-  test(`a newly opened frame lands in visible free space, ${language}`, async ({ page }) => {
+  const names = {
+    short: { ar: "مبنى إداري - عينة", en: "Office building (sample)" },
+    long: { ar: "برج إداري بالعاصمة الإدارية الجديدة - عينة", en: "Administrative tower, New Capital (sample)" },
+  };
+  for (const width of [640, 1000])
+    for (const name of ["short", "long"] as const)
+    test(`at ${width} px with a ${name} project name nothing in the top bar runs over another, and «الأرقام عينة» is whole, ${language}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      const scene = small();
+      // the name and the waiting words take the bar's room: the state, then the title (to a few words), then the name give
+      scene.project.name = names[name][language];
+      scene.status = { ...scene.status, waiting: 1 };
+      await mockCore(page, scene, { language });
+      await page.goto("/");
+      await workspaceReady(page);
+      const bar = page.locator('[data-region="topbar"]');
+      // the bar's own items, side by side: the project, the document's title, what waits, search, the chat, More
+      const label = bar.locator("[data-sample-label]");
+      const items = [page.locator('[data-region="topbar"] [data-region-start]'), switcher(page), label, ...(await bar.locator("button:visible").all())];
+      const boxes = [];
+      for (const item of items) boxes.push(await box(item));
+      for (const [i, a] of boxes.entries())
+        for (const b of boxes.slice(i + 1)) {
+          const apart = a.x + a.width <= b.x + 1 || b.x + b.width <= a.x + 1;
+          const inside = (a.x >= b.x - 1 && a.x + a.width <= b.x + b.width + 1) || (b.x >= a.x - 1 && b.x + b.width <= a.x + a.width + 1);
+          expect(apart || inside, "two items of the top bar run over each other").toBe(true);
+        }
+      if (width >= 1000) await expect(bar).toContainText(count("decisionsWaiting", 1, {}, language));
+      await expect(label).toContainText(texts.sampleNumbers[language]);
+      expect(await shownWhole(label), "«الأرقام عينة» is seen whole").toBe(true);
+      // the title keeps a few words: its button never shrinks to the ▾ alone
+      expect((await box(switcher(page))).width, "the title keeps a few words").toBeGreaterThanOrEqual(80);
+    });
+
+  test(`a document picked from the switcher shows in place, is kept, and Back returns, ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    const scene = small();
-    // close enough for the Project files frame to show its list, with room left beside it
-    scene.layout.frames = [{ key: "files:all", x: 0, y: 0, w: 360, h: 520, z: 0, collapsed: false }];
-    scene.layout.view = { x: language === "ar" ? 900 : 120, y: 40, zoom: 0.8 };
-    await mockCore(page, scene, { language });
+    const core = await mockCore(page, small(), { language });
     await page.goto("/");
-    await canvasReady(page);
-    await frame(page, "files:all").getByRole("button", { name: /مقايسة العميل - عينة.xlsx/ }).click();
-    const opened = frame(page, "file:boq");
-    await expect(opened).toBeVisible();
-    await page.waitForTimeout(600); // the view's glide to it
-    const b = await box(opened);
-    const pane = await box(page.locator(".react-flow"));
-    expect(b.x).toBeGreaterThanOrEqual(pane.x);
-    expect(b.x + b.width).toBeLessThanOrEqual(pane.x + pane.width);
-    for (const cover of await covers(page)) expect(overlaps(b, cover)).toBe(false);
+    await workspaceReady(page, page.getByRole("grid"));
+    const saved = core.nextWorkspaceSave((w) => w.open === "deliverable:letter");
+    await openDocument(page, /خطاب العطاء - مسودة عينة/);
+    await expect(documentRegion(page)).toHaveAttribute("aria-label", "خطاب العطاء - مسودة عينة");
+    await expect(documentRegion(page).getByText("الأسعار سارية لمدة ٣٠ يوماً - نص عينة")).toBeVisible();
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    expect((await saved).open).toBe("deliverable:letter");
+
+    // the project keeps it: a reload opens on the letter
+    await page.reload();
+    await workspaceReady(page);
+    await expect(documentRegion(page)).toHaveAttribute("aria-label", "خطاب العطاء - مسودة عينة");
+
+    // Back, by the arrow that points back in the page's direction, from the BOQ to the letter
+    await openDocument(page, /تسعير المقايسة - عينة/);
+    await expect(page.getByRole("grid")).toBeVisible();
+    await page.locator("body").click({ position: { x: 4, y: 890 } }); // focus out of the menu, not in a field
+    await page.keyboard.press(language === "ar" ? "Alt+ArrowRight" : "Alt+ArrowLeft");
+    await expect(documentRegion(page)).toHaveAttribute("aria-label", "خطاب العطاء - مسودة عينة");
   });
 
-  test(`a five-column table card shows every column whole in the chat panel, ${language}`, async ({ page }) => {
+  test(`a five-column table card shows every column whole in the chat, ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const scene = small();
     await mockCore(page, scene, { language });
@@ -113,7 +157,7 @@ for (const language of ["ar", "en"] as const) {
       route.fulfill({ contentType: "application/json", body: JSON.stringify({ messages: priceProposal() }) }),
     );
     await page.goto("/");
-    await canvasReady(page);
+    await workspaceReady(page);
     const chat = await box(page.locator('aside[data-region="chat"]'));
     const card = page.locator('[data-card="c1"]');
     await expect(card).toBeVisible();
@@ -130,22 +174,63 @@ for (const language of ["ar", "en"] as const) {
     }
   });
 
-  test(`a Deliverable opened lands readable, never on its poster, ${language}`, async ({ page }) => {
+  test(`the first project's backup ask keeps its words one block in the chat, its buttons under them, ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
+    const scene = small();
+    scene.others = []; // the project about to be made is the only one, and no backup folder is picked: ONE asks once
+    await mockCore(page, scene, { language });
+    await page.route("**/api/backup", (route) => route.fulfill({ json: { folder: null } }));
+    await page.route("**/api/projects", (route) =>
+      route.request().method() === "POST" ? route.fulfill({ json: scene.project }) : route.fallback(),
+    );
+    await page.goto("/");
+    await workspaceReady(page);
+    await page.locator('[data-region="topbar"] [data-region-start]').click();
+    await page.getByRole("button", { name: texts.newProject[language] }).click();
+    await page.getByLabel(texts.projectName[language]).fill(scene.project.name);
+    await page.getByLabel(texts.projectName[language]).press("Enter");
+    const ask = page.getByRole("region", { name: texts.backupTitle[language] });
+    await expect(ask).toContainText(texts.backupAskFolder[language]);
+    const chat = await box(page.locator('aside[data-region="chat"]'));
+    expect(chat.width, "a chat about 320 px wide").toBeLessThanOrEqual(340);
+    const words = await box(ask.locator("p").first());
+    expect(words.width, "never a word a line").toBeGreaterThan(200);
+    for (const name of [texts.backupPickFolder[language], texts.backupLater[language]]) {
+      const button = await box(ask.getByRole("button", { name, exact: true }));
+      expect(button.y, `${name} wraps under the words`).toBeGreaterThanOrEqual(words.y + words.height - 1);
+    }
+  });
+
+  test(`below 1000 px the chat is a panel over the document, from the top bar, ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 800 });
     await mockCore(page, small(), { language });
     await page.goto("/");
-    await canvasReady(page);
-    const mod = await page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "Meta" : "Control"));
-    await page.keyboard.press(`${mod}+KeyK`);
-    await page.keyboard.type("خطاب العطاء");
-    await page.getByRole("option", { name: /خطاب العطاء/ }).first().click();
-    await page.waitForTimeout(700); // the glide
-    const zoom = Number(await page.evaluate(() => /scale\(([\d.]+)\)/.exec(document.querySelector<HTMLElement>(".react-flow__viewport")!.style.transform)?.[1]));
-    expect(zoom).toBeGreaterThanOrEqual(0.6); // lod.ts: from 0.6 a frame shows its live viewer
-    const strip = await box(frame(page, "deliverable:letter").locator("header").first());
-    const pane = await box(page.locator(".react-flow"));
-    expect(strip.y).toBeGreaterThanOrEqual(pane.y); // its top in view: a tall one opens at its start
-    for (const cover of await covers(page)) expect(overlaps(strip, cover)).toBe(false);
+    await workspaceReady(page);
+    await expect(page.locator('aside[data-region="chat"]')).toHaveCount(0);
+    const sheet = await box(page.locator("[data-document-sheet]"));
+    expect(sheet.width).toBeGreaterThan(900 - 2 * 12 - 2); // the document has the width
+    const button = page.locator("[data-chat-button]");
+    await button.click();
+    const chat = page.locator('aside[data-region="chat"]');
+    await expect(chat).toBeVisible();
+    const panel = await box(chat);
+    expect(overlaps(panel, sheet)).toBe(true); // over the document, at the inline end
+    if (language === "ar") expect(panel.x).toBeLessThan(sheet.x + sheet.width / 2);
+    else expect(panel.x + panel.width).toBeGreaterThan(sheet.x + sheet.width / 2);
+    await page.keyboard.press("Escape");
+    await expect(chat).toHaveCount(0);
+    await expect(button).toBeFocused();
+  });
+
+  test(`below 640 px the document takes the window's width, ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 800 });
+    await mockCore(page, small(), { language });
+    await page.goto("/");
+    await workspaceReady(page, page.getByRole("grid"));
+    const sheet = await box(page.locator("[data-document-sheet]"));
+    expect(sheet.x).toBeLessThanOrEqual(1);
+    expect(sheet.width).toBeGreaterThanOrEqual(598);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true); // no page scroll sideways
   });
 }
 

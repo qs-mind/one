@@ -588,11 +588,6 @@ export const texts = {
   // Plan 7 (the Project Canvas). Names proposed in glossary.md; never «لوحة» for the canvas (a drawing sheet in QS).
   commandBar: { en: "Command bar", ar: "شريط الأوامر" },
   topBar: { en: "Top bar", ar: "الشريط العلوي" },
-  zoomIn: { en: "Zoom in", ar: "كبّر" },
-  zoomOut: { en: "Zoom out", ar: "صغّر" },
-  zoomControls: { en: "Zoom controls", ar: "أدوات التكبير" },
-  fitAll: { en: "Show everything", ar: "اعرض كل حاجة" },
-  arrangeByStage: { en: "Arrange by stage", ar: "رتّب حسب المرحلة" },
   projectFiles: { en: "Project files", ar: "ملفات المشروع" },
   // The client BOQ as imported: a read-only document.
   clientBoqTitle: { en: "Client BOQ — {name}", ar: "مقايسة العميل — {name}" },
@@ -619,7 +614,6 @@ export const texts = {
   sourceSaidInChat: { en: "Said in the chat", ar: "اتقال في الشات" },
   sourceSupplier: { en: "Supplier: {name}", ar: "المورّد: {name}" },
   sourceOfNumber: { en: "Source of {value}", ar: "مصدر {value}" },
-  openFull: { en: "Open full screen", ar: "افتح ملء الشاشة" },
   selected: { en: "Selected: {name}", ar: "المختار: {name}" },
   selectedMany: { en: "{n} selected", ar: "{n} مختارين" },
   selectedRange: { en: "{title}, {label}", ar: "{title}، {label}" },

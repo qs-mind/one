@@ -147,6 +147,35 @@ def test_the_lead_shows_a_view_of_sourced_numbers(bench):
     assert stored == [{"type": "data-view", "id": view["id"], "data": data}]
 
 
+def test_the_workspace_screens_have_a_quoted_rate_a_letter_and_a_decision(bench, tmp_path):
+    """bench:workspace: the BOQ comes in unpriced; a supply-only item is priced from the
+    supplier's quote (supply only, its line quoted); the bid letter is written; one decision is
+    asked."""
+    client, _ = bench
+    project = client.post("/projects", json={"name": "مبنى إداري - عينة"}).json()["id"]
+    for path in samples.write_workspace(tmp_path / "workspace"):  # the client's BOQ and the quote
+        params = {"name": path.name}
+        client.post(f"/projects/{project}/files", params=params, content=path.read_bytes())
+    kinds, reply, _ = run(client, project, "bench:workspace سعّر الخرسانة من عرض المورد")
+    assert kinds == ["rows", "question"] and "رفضت" not in reply
+    made = client.get(f"/projects/{project}/deliverables").json()["deliverables"]
+    assert sorted(d["kind"] for d in made) == ["document", "sheet"]
+    sheet = next(d for d in made if d["kind"] == "sheet")
+    view = client.get(f"/projects/{project}/deliverables/{sheet['id']}").json()
+    rated = [r["cells"]["rate"] for r in view["rows"] if "rate" in r.get("cells", {})]
+    assert [c["value"] for c in rated] == [samples.QUOTE_RATE] and not rated[0].get("calculated")
+    explained = client.get(f"/projects/{project}/numbers/{rated[0]['number_id']}/explain").json()
+    source = explained["source"]
+    assert source["kind"] == "quote" and source["locator"]["covers"] == "supply"
+    quoted = view["sources"][rated[0]["source"]]["quote"]  # its line, as the source card shows it
+    assert samples.QUOTE_RATE in quoted
+    assert source["dated"] == samples.QUOTE_DATED
+    assert sheet["sample"] is True  # its quantity is cited as sample data, and the screen says so
+    # the BOQ so far counts the client's items: the sheet has each of them, no more
+    boq = client.get(f"/projects/{project}/status").json()["boq_value"]
+    assert boq["items"] == boq["of"] == len([r for r in samples.WORKSPACE_ROWS if r[0]])
+
+
 def test_the_tender_folder_is_understood(bench, tmp_path):
     """The Brief a tender folder's import starts: the BOQ comes in, then the card, every fact with
     its place in a file and the count from the import."""

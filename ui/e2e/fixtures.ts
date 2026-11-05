@@ -1,15 +1,14 @@
 // The core, as the screen sees it behind /api, for the end-to-end tests: every call is answered here with
 // `page.route`, so Playwright never starts the core and no test reaches the network. A scene is a project's data
-// (files, Deliverables, team, status, saved layout, live events); every name in it says it is a sample.
-// The mock keeps what the screen writes (layout saves, chat requests), so a test can check them and a reload sees
-// the saved layout, as it would from the project's own file.
-import type { Page, Request, Route } from "@playwright/test";
-import type { ActivityEvent, AgentInfo, FileInfo, FilePiece, FrameKey, ProjectStatus, Team } from "../src/project/types";
-
-// The canvas layout the e2e mock still serves (Task 11 rewrites the specs and this file).
-type Placed = { key: FrameKey; x: number; y: number; w: number; h: number; z: number; collapsed: boolean };
-type View = { x: number; y: number; zoom: number };
+// (files, Deliverables, team, status, the open document, live events); every name in it says it is a sample.
+// The mock keeps what the screen writes (the open document, chat requests), so a test can check them and a reload
+// opens the saved document, as it would from the project's own file.
+import type { Locator, Page, Request, Route } from "@playwright/test";
 import type { DeliverableInfo, DocumentView, SheetView, View as DeliverableView } from "../src/deliverables/types";
+import type { ActivityEvent, AgentInfo, Anchor, ClientBoqInfo, DocKey, FileInfo, FilePiece, ProjectStatus, Team } from "../src/project/types";
+
+/** What PUT /projects/{p}/workspace takes, and GET gives back (with the client BOQs). */
+export type Workspace = { open: DocKey | null; anchor: Anchor | null };
 
 export type Project = { id: string; name: string; created_at: string };
 
@@ -23,7 +22,11 @@ export type Scene = {
   deliverables: DeliverableInfo[];
   team: Team;
   status: ProjectStatus;
-  layout: { frames: Placed[]; view: View | null };
+  /** The document the project opens on (null: Project files). */
+  workspace: Workspace;
+  clientBoqs: ClientBoqInfo[];
+  /** Rows in each sheet the mock serves (12 by default). */
+  sheetRows?: number;
   /** Sent on the first /activity request; later events go with `core.emit`. */
   activity: ActivityEvent[];
 };
@@ -62,7 +65,7 @@ export const estimator = agent({
   role: { en: "Estimator (sample)", ar: "مهندس التسعير - عينة" },
   desk_id: "pricing",
   line: { en: "Pricing item 3/02 (sample)", ar: "بيسعّر البند 3/02 - عينة" },
-  focus: { frame: "deliverable:pricing", anchor: null },
+  focus: { frame: "deliverable:pricing", anchor: { row: "r2" } },
 });
 
 export const checker = agent({
@@ -70,11 +73,10 @@ export const checker = agent({
   kind: "checker",
   role: { en: "Checking QS (sample)", ar: "مهندس المراجعة - عينة" },
   state: "thinking",
-  focus: { frame: "deliverable:pricing", anchor: null },
+  focus: { frame: "deliverable:pricing", anchor: { row: "r5" } },
 });
 
-/** A small tender: 4 files, 4 Deliverables, the team and one Desk; 8 frames (Project files, one opened PDF, the 4
- * Deliverables, the team and the Desk). */
+/** A small tender: 4 files, 4 Deliverables, the team and one Desk; it opens on the priced BOQ. */
 export function small(): Scene {
   return {
     project: { id: P, name: "برج إداري - عينة", created_at: at },
@@ -101,7 +103,8 @@ export function small(): Scene {
       boq_value: { value: "48200000.00", currency: "EGP", deliverable_id: "pricing", revision: null, status: "checked", sample: true },
       open_comments: 1,
     },
-    layout: { frames: [{ key: "file:spec", x: -600, y: 0, w: 480, h: 640, z: 0, collapsed: false }], view: null },
+    workspace: { open: "deliverable:pricing", anchor: null },
+    clientBoqs: [],
     activity: [],
   };
 }
@@ -109,11 +112,10 @@ export function small(): Scene {
 const kinds = ["sheet", "sheet", "document"] as const;
 const states = ["draft", "checked", "signed_off"] as const;
 
-/** `n` frames in all: Project files, the team, and n - 2 Deliverables. `saved` gives them a saved grid layout (a
- * project opened before); without it the canvas places them all, as on a first open. */
-export function many(n: number, { saved = true } = {}): Scene {
+/** A project with `n` Deliverables, opened on the middle one. */
+export function many(n: number): Scene {
   const scene = small();
-  scene.deliverables = Array.from({ length: n - 2 }, (_, i) =>
+  scene.deliverables = Array.from({ length: n }, (_, i) =>
     deliverable({
       id: `d${i}`,
       kind: kinds[i % kinds.length]!,
@@ -126,19 +128,12 @@ export function many(n: number, { saved = true } = {}): Scene {
   );
   scene.team = { desks: [], agents: [] };
   scene.status = {};
-  scene.layout = { frames: [], view: null };
-  if (saved) {
-    const keys: FrameKey[] = ["files:all", "team:core", ...scene.deliverables.map((d) => `deliverable:${d.id}` as const)];
-    const columns = Math.ceil(Math.sqrt(n));
-    scene.layout = {
-      frames: keys.map((key, i) => ({ key, x: (i % columns) * 1040, y: Math.floor(i / columns) * 1020, w: 960, h: 900, z: 0, collapsed: false })),
-      view: null,
-    };
-  }
+  const middle = scene.deliverables.find((d, i) => i >= n / 2 && d.kind === "sheet") ?? scene.deliverables[0]!; // a sheet, so rows show
+  scene.workspace = { open: `deliverable:${middle.id}`, anchor: null };
   return scene;
 }
 
-// Deliverable views, for the live viewers inside zoomed frames ----------------------------------------------------
+// Deliverable views, for the viewers of the open document ----------------------------------------------------------
 
 const head = (d: DeliverableInfo) => ({
   id: d.id, variant: d.kind === "sheet" ? "boq" : "letter", title: d.title, language: d.language, status: d.status,
@@ -149,7 +144,7 @@ const head = (d: DeliverableInfo) => ({
 
 const num = (value: string, id: string) => ({ value, number_id: id, source: "s1", dated: "2026-11-01" });
 
-function viewOf(d: DeliverableInfo): DeliverableView {
+function viewOf(d: DeliverableInfo, rows = 12): DeliverableView {
   if (d.kind === "document") {
     const doc: DocumentView = {
       ...head(d), kind: "document", refs: {}, untraced: [],
@@ -168,7 +163,7 @@ function viewOf(d: DeliverableInfo): DeliverableView {
       { key: "quantity", label: { en: "Qty", ar: "الكمية" }, kind: "number", edit: true, frozen: false, wrap: false, width: 90 },
       { key: "rate", label: { en: "Rate", ar: "الفئة" }, kind: "number", edit: true, frozen: false, wrap: false, width: 110 },
     ],
-    rows: Array.from({ length: 12 }, (_, i) => ({
+    rows: Array.from({ length: rows }, (_, i) => ({
       id: `r${i}`, kind: "item" as const, item_id: `i${i}`, item_version: 1, version: 1, code: `03/${String(i + 1).padStart(2, "0")}`,
       cells: { description: { text: `خرسانة مسلحة - بند عينة ${i + 1}` }, quantity: num(String(10 + i), `q${i}`), rate: num("2589.00", `r${i}`) },
     })),
@@ -213,9 +208,8 @@ const aiSettings = {
 
 export type Core = {
   scene: Scene;
-  /** Every PUT /canvas/frames body, in order. */
-  frameSaves: { frames: Placed[]; removed: FrameKey[] }[];
-  viewSaves: View[];
+  /** Every PUT /workspace body, in order. */
+  workspaceSaves: Workspace[];
   /** Every POST /api/chat body. */
   chats: Record<string, unknown>[];
   /** Calls no route here answers (they get 404), so a test can see what the screen asked that the mock lacks. */
@@ -223,8 +217,8 @@ export type Core = {
   /** Sends live events now: they answer the /activity request the screen holds open (the screen then reconnects, as
    * after any stream that ends, and its next request is held open again). */
   emit(events: ActivityEvent[]): void;
-  /** Resolves with the next PUT /canvas/frames that `match` accepts. */
-  nextFrameSave(match?: (body: { frames: Placed[]; removed: FrameKey[] }) => boolean): Promise<{ frames: Placed[]; removed: FrameKey[] }>;
+  /** Resolves with the next PUT /workspace that `match` accepts. */
+  nextWorkspaceSave(match?: (body: Workspace) => boolean): Promise<Workspace>;
 };
 
 const json = (route: Route, body: unknown, status = 200) =>
@@ -237,14 +231,13 @@ export async function mockCore(
   scene: Scene,
   { language = "ar", remembered = true }: { language?: "ar" | "en"; remembered?: boolean } = {},
 ): Promise<Core> {
-  const waiters: { match: (b: { frames: Placed[]; removed: FrameKey[] }) => boolean; resolve: (b: { frames: Placed[]; removed: FrameKey[] }) => void }[] = [];
+  const waiters: { match: (b: Workspace) => boolean; resolve: (b: Workspace) => void }[] = [];
   const core: Core = {
     scene,
-    frameSaves: [],
-    viewSaves: [],
+    workspaceSaves: [],
     chats: [],
     unknown: [],
-    nextFrameSave: (match = () => true) => new Promise((resolve) => waiters.push({ match, resolve })),
+    nextWorkspaceSave: (match = () => true) => new Promise((resolve) => waiters.push({ match, resolve })),
     emit(events) {
       queued.push(...events);
       const held = open;
@@ -252,7 +245,6 @@ export async function mockCore(
       held?.();
     },
   };
-  const saved = new Map(scene.layout.frames.map((f) => [f.key, f]));
   const queued: ActivityEvent[] = [...scene.activity];
   let open: (() => void) | undefined; // answers the held /activity request with what is queued
   const projects = [scene.project, ...scene.others];
@@ -315,23 +307,19 @@ export async function mockCore(
       if (r === "GET /deliverables") return json(route, { deliverables: [...deliverables.values()] });
       if (r === "GET /team") return json(route, scene.team);
       if (r === "GET /status") return json(route, scene.status);
-      if (r === "GET /canvas") return json(route, { frames: [...saved.values()], view: scene.layout.view });
-      if (r === "PUT /canvas/frames") {
-        const body = request.postDataJSON() as { frames: Placed[]; removed: FrameKey[] };
-        for (const k of body.removed) saved.delete(k);
-        for (const f of body.frames) saved.set(f.key, f);
-        core.frameSaves.push(body);
+      if (r === "GET /workspace") return json(route, { ...scene.workspace, client_boqs: scene.clientBoqs });
+      if (r === "PUT /workspace") {
+        // as the core's workspace.py takes it: {open, anchor}; anything else is refused
+        const body = request.postDataJSON() as Partial<Workspace> | null;
+        if (typeof body?.open !== "string")
+          return json(route, { error: { en: "Bad workspace (e2e mock)", ar: "مساحة عمل غلط (e2e)" }, field: "open" }, 422);
+        scene.workspace = { open: body.open, anchor: body.anchor ?? null };
+        core.workspaceSaves.push(scene.workspace);
         for (const w of [...waiters]) {
-          if (!w.match(body)) continue;
+          if (!w.match(scene.workspace)) continue;
           waiters.splice(waiters.indexOf(w), 1);
-          w.resolve(body);
+          w.resolve(scene.workspace);
         }
-        return json(route, { ok: true });
-      }
-      if (r === "PUT /canvas/view") {
-        const view = request.postDataJSON() as View;
-        scene.layout.view = view;
-        core.viewSaves.push(view);
         return json(route, { ok: true });
       }
       if (r === "GET /activity") {
@@ -353,7 +341,7 @@ export async function mockCore(
       if (text) return json(route, { pieces: scene.text[text[1]!] ?? [] });
       if (r.startsWith("GET /search")) return json(route, { hits: [] });
       const view = /^GET \/deliverables\/([^/]+)$/.exec(r);
-      if (view && deliverables.has(view[1]!)) return json(route, viewOf(deliverables.get(view[1]!)!));
+      if (view && deliverables.has(view[1]!)) return json(route, viewOf(deliverables.get(view[1]!)!, scene.sheetRows));
       if (/^GET \/deliverables\/[^/]+\/changes$/.test(r)) return json(route, { changes: [] });
       if (/^GET \/deliverables\/[^/]+\/comments$/.test(r)) return json(route, { comments: [] });
     }
@@ -365,29 +353,35 @@ export async function mockCore(
   return core;
 }
 
-/** The frames on the canvas, by key, once the canvas has drawn them. */
-export const frame = (page: Page, key: FrameKey) => page.locator(`.react-flow__node[data-id="${key}"]`);
+/** The open document's region. */
+export const documentRegion = (page: Page): Locator => page.locator('[data-region="document"]');
 
-/** A frame's position in world coordinates, read from React Flow's transform. */
-export async function positionOf(page: Page, key: FrameKey): Promise<{ x: number; y: number }> {
-  const transform = await frame(page, key).evaluate((el) => (el as HTMLElement).style.transform);
-  const [, x, y] = /translate\(\s*(-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(transform) ?? [];
-  return { x: Number(x), y: Number(y) };
-}
-
-/** Waits for the screen to settle on the canvas: frames drawn and the fonts loaded. */
-export async function canvasReady(page: Page, key: FrameKey = "files:all") {
-  await frame(page, key).waitFor();
+/** Waits for the screen to settle on the open document: shown, something drawn in it, and the fonts loaded. */
+export async function workspaceReady(page: Page, content?: Locator) {
+  await documentRegion(page).waitFor();
+  await (content ?? documentRegion(page).locator("[data-document-sheet] *").first()).waitFor();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
-/** "Show everything" from the palette: every frame in view. A first open shows only what can be read at once (the
- * Project files first), so a test that needs all of them on screen asks for them, as the engineer would. */
-export async function showAll(page: Page, language: "ar" | "en" = "ar") {
-  const mod = await page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "Meta" : "Control"));
-  await page.keyboard.press(`${mod}+KeyK`);
-  await page.keyboard.type(language === "ar" ? "اعرض كل حاجة" : "Show everything");
-  await page.keyboard.press("Enter");
-  await page.waitForTimeout(500); // the view's glide
-}
+/** The document switcher: the open document's title, with its ▾, in the top bar. */
+export const switcher = (page: Page): Locator => page.locator('[data-region="topbar"] h1 button[aria-haspopup="menu"]');
 
+/** Whether the element's text is all seen: nothing past its own edges, and inside every ancestor that clips. */
+export const shownWhole = (l: Locator) =>
+  l.evaluate((el) => {
+    if (el.scrollWidth > el.clientWidth + 1) return false;
+    const r = el.getBoundingClientRect();
+    for (let a = el.parentElement; a; a = a.parentElement) {
+      const style = getComputedStyle(a);
+      if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+      const b = a.getBoundingClientRect();
+      if (r.left < b.left - 1 || r.right > b.right + 1 || r.top < b.top - 1 || r.bottom > b.bottom + 1) return false;
+    }
+    return r.left >= -1 && r.right <= innerWidth + 1;
+  });
+
+/** Picks a document from the switcher, by (part of) its name. */
+export async function openDocument(page: Page, name: string | RegExp) {
+  await switcher(page).click();
+  await page.getByRole("menu").getByRole("menuitem", { name }).first().click();
+}

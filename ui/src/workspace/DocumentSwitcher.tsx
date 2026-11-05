@@ -57,7 +57,7 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
     t("projectFiles")
   );
   const state = current ? [statusWord(current), current.revision !== null ? fill(t("docRevision"), { n: current.revision }) : null] : [];
-  const facts = [state.filter(Boolean).join(" · "), current?.sample ? t("sampleNumbers") : ""].filter(Boolean);
+  const stateWords = state.filter(Boolean).join(" · ");
 
   const pick = (key: DocKey) => {
     workspaceApi.open(key);
@@ -78,64 +78,72 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
     "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-start hover:bg-stone focus-visible:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
   const facts_ = "flex flex-wrap items-center gap-x-3 text-sm text-slate";
 
+  // Short of room the top bar gives in this order: the state words, then the title, then (TopBar) the project's name.
+  // The order is each one's shrink, 100000 to 1, and the title keeps 6rem (a few words and its ▾) before the name gives;
+  // «الأرقام عينة» is a top-bar item of its own that never shrinks.
   return (
-    <div className="flex min-w-0 items-baseline gap-x-3">
-      <Popover open={open} onOpenChange={setOpen}>
-        <h1 className="shrink-0 whitespace-nowrap text-base font-semibold text-ink">
-          <PopoverTrigger asChild>
-            <button type="button" aria-haspopup="menu" className="inline-flex items-center gap-2 rounded-lg px-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink">
-              <Dot on={working.has(opened.key)} />
-              {title}
-              <span aria-hidden>▾</span>
+    <>
+      <div className="flex min-w-24 shrink-[100000] items-baseline gap-x-3">
+        <Popover open={open} onOpenChange={setOpen}>
+          <h1 className="min-w-0 whitespace-nowrap text-base font-semibold text-ink">
+            <PopoverTrigger asChild>
+              <button type="button" aria-haspopup="menu" className="inline-flex max-w-full items-center gap-2 rounded-lg px-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink">
+                <Dot on={working.has(opened.key)} />
+                <span className="min-w-0 truncate">{title}</span>
+                <span aria-hidden>▾</span>
+              </button>
+            </PopoverTrigger>
+          </h1>
+          <PopoverContent role="menu" aria-label={t("docSwitch")} className="flex max-h-[70vh] min-w-72 flex-col gap-2 overflow-y-auto p-3" onKeyDown={move}>
+            {sorted.map((d) => {
+              const key: DocKey = `deliverable:${d.id}`;
+              const parts = rowParts(d);
+              return (
+                <button key={key} type="button" role="menuitem" className={`${item} flex-wrap`} onClick={() => pick(key)}>
+                  <Dot on={working.has(key)} />
+                  <span dir="auto" lang={d.language} className="font-semibold">
+                    {d.title}
+                  </span>
+                  <span className={`${facts_} ms-auto`}>
+                    <span>{parts.kind}</span>
+                    <span>{d.revision !== null ? fill(t("docRevision"), { n: d.revision }) : "—"}</span>
+                    {parts.status}
+                    {(d.pending ?? 0) > 0 && <span>{count("sheetPending", d.pending ?? 0)}</span>}
+                    {d.open_comments > 0 && <span className="text-copper">{count("openComments", d.open_comments)}</span>}
+                  </span>
+                </button>
+              );
+            })}
+            {clientBoqs.map((b) => {
+              const key: DocKey = `clientboq:${b.file_id}`;
+              return (
+                <button key={key} type="button" role="menuitem" className={item} onClick={() => pick(key)}>
+                  <Dot on={working.has(key)} />
+                  <span>{t("docClientBoq")} ·</span>
+                  <FileName name={b.name} fit />
+                </button>
+              );
+            })}
+            <button type="button" role="menuitem" className={item} onClick={() => pick("files:all")}>
+              <Dot on={working.has("files:all")} />
+              {t("projectFiles")}
             </button>
-          </PopoverTrigger>
-        </h1>
-        <PopoverContent role="menu" aria-label={t("docSwitch")} className="flex max-h-[70vh] min-w-72 flex-col gap-2 overflow-y-auto p-3" onKeyDown={move}>
-          {sorted.map((d) => {
-            const key: DocKey = `deliverable:${d.id}`;
-            const parts = rowParts(d);
-            return (
-              <button key={key} type="button" role="menuitem" className={`${item} flex-wrap`} onClick={() => pick(key)}>
-                <Dot on={working.has(key)} />
-                <span dir="auto" lang={d.language} className="font-semibold">
-                  {d.title}
-                </span>
-                <span className={`${facts_} ms-auto`}>
-                  <span>{parts.kind}</span>
-                  <span>{d.revision !== null ? fill(t("docRevision"), { n: d.revision }) : "—"}</span>
-                  {parts.status}
-                  {(d.pending ?? 0) > 0 && <span>{count("sheetPending", d.pending ?? 0)}</span>}
-                  {d.open_comments > 0 && <span className="text-copper">{count("openComments", d.open_comments)}</span>}
-                </span>
-              </button>
-            );
-          })}
-          {clientBoqs.map((b) => {
-            const key: DocKey = `clientboq:${b.file_id}`;
-            return (
-              <button key={key} type="button" role="menuitem" className={item} onClick={() => pick(key)}>
-                <Dot on={working.has(key)} />
-                <span>{t("docClientBoq")} ·</span>
-                <FileName name={b.name} fit />
-              </button>
-            );
-          })}
-          <button type="button" role="menuitem" className={item} onClick={() => pick("files:all")}>
-            <Dot on={working.has("files:all")} />
-            {t("projectFiles")}
-          </button>
-        </PopoverContent>
-      </Popover>
-      {facts.length > 0 && (
-        <p className="min-w-0 truncate text-sm text-slate max-[999px]:hidden">
-          {facts.map((f, i) => (
-            <span key={f}>
-              {i > 0 && <span> · </span>}
-              <span>{f}</span>
-            </span>
-          ))}
-        </p>
+          </PopoverContent>
+        </Popover>
+        {/* the «·» before the sample label ends the state words, so it goes with them when they are cut */}
+        {stateWords && (
+          <span className="min-w-0 shrink-[100000] truncate whitespace-nowrap text-sm text-slate max-[999px]:hidden">
+            {stateWords}
+            {current?.sample && " ·"}
+          </span>
+        )}
+      </div>
+      {/* sample numbers are said whole at every width */}
+      {current?.sample && (
+        <span data-sample-label className={`shrink-0 whitespace-nowrap text-sm text-slate ${stateWords ? "min-[1000px]:-ms-2" : ""}`}>
+          {t("sampleNumbers")}
+        </span>
       )}
-    </div>
+    </>
   );
 }

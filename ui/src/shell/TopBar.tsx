@@ -24,7 +24,7 @@ import { centreOf, withTransition } from "../ui/viewTransition";
 import { ActivityMark, activityWord } from "./ActivityMark";
 import { WaitingDot } from "./ChatPanel";
 import { elsewhere, GENERAL, useActivity, useOpenChat } from "./chatActivity";
-import { useCompact, useSmall } from "./regions";
+import { useCompact } from "./regions";
 import { StatusStrip } from "./StatusStrip";
 
 export type PanelKind = "ai" | "projects" | "records" | "deliverables" | "backup" | "close" | "confidential";
@@ -64,7 +64,6 @@ export function TopBar(props: TopBarProps) {
   const more = useRef<HTMLButtonElement>(null);
   const keys = isMac() ? "⌘K" : "Ctrl K";
   const compact = useCompact(); // the tools fold into More before the project name or the status would be cut
-  const small = useSmall(); // below 640 px what is waiting is its dot: the words would run into the title
   const chatId = project?.id ?? GENERAL;
   useOpenChat(chatId);
   const other = elsewhere(useActivity(), chatId);
@@ -84,16 +83,19 @@ export function TopBar(props: TopBarProps) {
       type="button"
       data-search-field=""
       aria-label={fill(t("searchKeys"), { keys })}
-      className="flex w-48 items-center justify-between gap-4 rounded-lg border border-ink/10 bg-stone/60 px-3 py-1 text-start whitespace-nowrap hover:border-ink/20 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+      className={`flex ${compact ? "" : "w-48"} items-center justify-between gap-4 rounded-lg border border-ink/10 bg-stone/60 px-3 py-1 text-start whitespace-nowrap hover:border-ink/20 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink`}
       onClick={(event) => {
         event.currentTarget.focus(); // WebKit does not focus a clicked button; the palette gives focus back to this
         props.onPalette(event.currentTarget.getBoundingClientRect());
       }}
     >
       <span>{t("searchField")}</span>
-      <kbd dir="ltr" className="font-sans text-xs text-slate">
-        {keys}
-      </kbd>
+      {/* below 1280 px the field is its word: the room goes to the document's facts («الأرقام عينة» said whole) */}
+      {!compact && (
+        <kbd dir="ltr" className="font-sans text-xs text-slate">
+          {keys}
+        </kbd>
+      )}
     </button>
   );
   const ai = (opener?: HTMLElement | null) => (
@@ -136,11 +138,11 @@ export function TopBar(props: TopBarProps) {
         data-region-start
         aria-expanded={panel === "projects"}
         title={t("projects")}
-        className={`${button} -ms-1 flex shrink-0 items-center gap-2 font-semibold text-ink`}
+        className={`${button} -ms-1 flex min-w-0 items-center gap-2 font-semibold text-ink`}
         onClick={(event) => onPanel("projects", event.currentTarget)}
       >
-        {/* the project's name is never cut: the status folds before it does */}
-        <span dir="auto">
+        {/* the project's name is cut last: the status folds, then the document's state and title give (DocumentSwitcher) */}
+        <span dir="auto" className="min-w-0 truncate">
           {project?.name ?? t("generalChat")}
         </span>
         {other && <ActivityMark state={other} label={fill(t("activityElsewhere"), { state: activityWord(other) })} />}
@@ -175,7 +177,8 @@ export function TopBar(props: TopBarProps) {
           (props.waiting > 0 ? (
             <button type="button" className={`${button} flex items-center gap-2 text-copper hover:text-copper`} onClick={props.onWaiting}>
               <WaitingDot />
-              <span className={small ? "sr-only" : undefined}>{count("decisionsWaiting", props.waiting)}</span>
+              {/* below 1000 px what is waiting is its dot (the chat button has it too): the words would run into the title */}
+              <span className={narrow ? "sr-only" : undefined}>{count("decisionsWaiting", props.waiting)}</span>
             </button>
           ) : (
             !narrow && <span className="whitespace-nowrap px-3 text-slate">{t("nothingWaiting")}</span>

@@ -52,7 +52,7 @@ describe("the project's sources over /api", () => {
     const s = httpSources("p 1");
     await s.saveWorkspace({ key: "files:all", anchor: null }, true);
     expect(calls[0]).toMatchObject({ url: "/api/projects/p%201/workspace", init: { method: "PUT", keepalive: true } });
-    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ key: "files:all", anchor: null });
+    expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ open: "files:all", anchor: null });
   });
 
   it("asks for page images by width and keeps at most 64 object URLs", async () => {

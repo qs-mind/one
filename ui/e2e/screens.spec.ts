@@ -5,7 +5,7 @@
 // passes, so CI stays green before the first baselines are in.
 import { existsSync } from "node:fs";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { canvasReady, frame, mockCore, small, showAll } from "./fixtures";
+import { mockCore, small, workspaceReady } from "./fixtures";
 
 test.skip(({ browserName }) => browserName !== "chromium", "screenshots are taken on Chromium only (their reference)");
 
@@ -31,15 +31,13 @@ const sizes = [
 
 for (const language of ["ar", "en"] as const) {
   for (const size of sizes) {
-    test(`canvas-${language}-${size.width}`, async ({ page }, info) => {
+    test(`workspace-${language}-${size.width}`, async ({ page }, info) => {
       await page.setViewportSize(size);
       await mockCore(page, small(), { language });
       await page.goto("/");
-      await canvasReady(page);
-      await showAll(page, language); // every frame on screen, not only the readable first view
-      await expect(page.locator(".react-flow__node")).toHaveCount(8);
-      await expect(frame(page, "file:spec").locator("header")).toContainText("18"); // its page count came
-      await shot(page, `canvas-${language}-${size.width}`, info);
+      await workspaceReady(page, page.getByRole("grid"));
+      await expect(page.getByRole("grid")).toContainText("03/01"); // the priced BOQ's rows came
+      await shot(page, `workspace-${language}-${size.width}`, info);
     });
   }
 
@@ -59,7 +57,7 @@ for (const language of ["ar", "en"] as const) {
     await page.setViewportSize(sizes[0]!);
     await mockCore(page, small(), { language });
     await page.goto("/");
-    await canvasReady(page);
+    await workspaceReady(page);
     await page.getByRole("button", { name: language === "ar" ? "بحث Ctrl K" : "Search Ctrl K" }).click();
     await expect(page.getByRole("dialog", { name: language === "ar" ? "بحث وأوامر" : "Search and commands" })).toBeVisible();
     await shot(page, `palette-${language}`, info);

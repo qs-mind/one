@@ -245,7 +245,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         event.preventDefault();
         setPaletteOrigin(undefined);
         setPaletteOpen((open) => !open);
-      } else if (isMod(event) && event.shiftKey && !event.altKey && event.code === "KeyF") {
+      } else if (isMod(event) && event.shiftKey && !event.altKey && event.code === "KeyF" && !isTyping(event.target)) {
         if (!document.querySelector("[data-region='document']")) return;
         event.preventDefault();
         toggleFullScreen.current();

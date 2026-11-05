@@ -1,117 +1,77 @@
-// The live layer end to end (Plan 7 Task 5): agent cursors on the canvas, from the project's live events only.
-// A cursor is // `data-testid="cursor-<agent id>"`, labelled with the role name in the page language, inside an aria-hidden wrapper.
-import { expect, test, type Page } from "@playwright/test";
-import { canvasReady, checker, estimator, frame, mockCore, small, showAll } from "./fixtures";
+// The live layer end to end (spec "Agents at work"), from the project's live events only: no cursors; an agent
+// working on the open document puts a thin Slate line at the start edge of its row (`[data-working-line]`), with the
+// role's name on hover (its title) and hidden from screen readers; one on another document puts a dot by that
+// document in the switcher.
+import { expect, test } from "@playwright/test";
+import { checker, estimator, mockCore, small, switcher, workspaceReady } from "./fixtures";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-/** The team as the core lists it, with no one on a frame: what is on screen before any event. */
+/** The team as the core lists it, with no one on a document: what is on screen before any event. */
 function quiet() {
   const scene = small();
   scene.team = { ...scene.team, agents: scene.team.agents.map((a) => ({ ...a, focus: null })) };
   return scene;
 }
 
-test("no event, no cursor", async ({ page }) => {
+const line = '[data-working-line]';
+
+test("no event, no line and no cursor", async ({ page }) => {
   await mockCore(page, quiet());
   await page.goto("/");
-  await canvasReady(page);
-  await showAll(page); // every frame on screen, not only the readable first view
-  await expect(frame(page, "deliverable:pricing")).toBeVisible();
+  await workspaceReady(page, page.getByRole("grid"));
+  await expect(page.locator(line)).toHaveCount(0);
   await expect(page.locator('[data-testid^="cursor-"]')).toHaveCount(0);
 });
 
-test("an agent's cursor sits over its frame with its role name, hidden from screen readers", async ({ page }) => {
+test("an agent's row gets a thin line at its start edge, its role on hover, hidden from screen readers", async ({ page }) => {
   const core = await mockCore(page, quiet());
   await page.goto("/");
-  await canvasReady(page);
-  await showAll(page); // every frame on screen, not only the readable first view
-  core.emit([{ type: "agent", agent: estimator }]);
+  const grid = page.getByRole("grid");
+  await workspaceReady(page, grid);
+  core.emit([{ type: "agent", agent: estimator }]); // on row r2: item 03/03
 
-  const cursor = page.getByTestId("cursor-est");
-  await expect(cursor).toBeVisible();
-  await expect(cursor).toContainText("مهندس التسعير - عينة");
-  expect(await cursor.evaluate((el) => el.closest('[aria-hidden="true"]') !== null)).toBe(true);
-  const c = (await cursor.boundingBox())!;
-  const f = (await frame(page, "deliverable:pricing").boundingBox())!;
-  // the arrow's point (the cursor's top-left corner) is on the frame: its body or its name strip
-  expect(c.x).toBeGreaterThanOrEqual(f.x - 1);
-  expect(c.x).toBeLessThanOrEqual(f.x + f.width + 1);
-  expect(c.y).toBeGreaterThanOrEqual(f.y - 1);
-  expect(c.y).toBeLessThanOrEqual(f.y + f.height + 1);
+  const mark = page.locator(line);
+  await expect(mark).toHaveCount(1);
+  await expect(mark).toHaveAttribute("title", "مهندس التسعير - عينة");
+  expect(await mark.evaluate((el) => el.closest('[aria-hidden="true"]') !== null)).toBe(true);
+  const m = (await mark.boundingBox())!;
+  const row = (await grid.getByRole("row").filter({ hasText: "03/03" }).boundingBox())!;
+  expect(Math.abs(m.y - row.y)).toBeLessThanOrEqual(2);
+  // at the row's start edge: the right in Arabic
+  const sheet = (await page.locator("[data-document-sheet]").boundingBox())!;
+  expect(sheet.x + sheet.width - (m.x + m.width)).toBeLessThan(16);
 });
 
-test("two cursors on one frame do not sit on top of each other", async ({ page }) => {
+test("two agents on two rows: two lines", async ({ page }) => {
   const core = await mockCore(page, quiet());
   await page.goto("/");
-  await canvasReady(page);
+  await workspaceReady(page, page.getByRole("grid"));
   core.emit([
     { type: "agent", agent: estimator },
     { type: "agent", agent: checker },
   ]);
-  await expect(page.getByTestId("cursor-est")).toBeVisible();
-  await expect(page.getByTestId("cursor-chk")).toBeVisible();
-  const a = (await page.getByTestId("cursor-est").boundingBox())!;
-  const b = (await page.getByTestId("cursor-chk").boundingBox())!;
-  expect(Math.abs(a.y - b.y) + Math.abs(a.x - b.x)).toBeGreaterThan(4); // 24 world px apart, at the fit-all zoom
+  await expect(page.locator(line)).toHaveCount(2);
 });
 
-test("a finished agent's cursor goes", async ({ page }) => {
+test("a finished agent's line goes", async ({ page }) => {
   const core = await mockCore(page, quiet());
   await page.goto("/");
-  await canvasReady(page);
+  await workspaceReady(page, page.getByRole("grid"));
   core.emit([{ type: "agent", agent: estimator }]);
-  await expect(page.getByTestId("cursor-est")).toBeVisible();
+  await expect(page.locator(line)).toHaveCount(1);
   core.emit([{ type: "agent", agent: { ...estimator, state: "done" } }]);
-  await expect(page.getByTestId("cursor-est")).toHaveCount(0);
+  await expect(page.locator(line)).toHaveCount(0);
 });
 
-test("a cursor follows its agent to another frame", async ({ page }) => {
+test("an agent on another document: no line here, a dot by that document in the switcher", async ({ page }) => {
   const core = await mockCore(page, quiet());
   await page.goto("/");
-  await canvasReady(page);
-  core.emit([{ type: "agent", agent: estimator }]);
-  const cursor = page.getByTestId("cursor-est");
-  await expect(cursor).toBeVisible();
+  await workspaceReady(page, page.getByRole("grid"));
   core.emit([{ type: "agent", agent: { ...estimator, focus: { frame: "deliverable:letter", anchor: null } } }]);
-  const f = (await frame(page, "deliverable:letter").boundingBox())!;
-  await expect
-    .poll(async () => {
-      const c = (await cursor.boundingBox())!;
-      return c.x >= f.x - 1 && c.x <= f.x + f.width + 1 && c.y >= f.y - 1 && c.y <= f.y + f.height + 1;
-    })
-    .toBe(true);
-});
-
-/** Whether the frame's centre sits in the middle half of the canvas, where following puts it. */
-async function centred(page: Page, key: "deliverable:pricing" | "deliverable:letter") {
-  const f = (await frame(page, key).boundingBox())!;
-  const c = (await page.locator('[data-region="canvas"]').boundingBox())!;
-  const [fx, fy, cx, cy] = [f.x + f.width / 2, f.y + f.height / 2, c.x + c.width / 2, c.y + c.height / 2];
-  return Math.abs(fx - cx) < c.width / 4 && Math.abs(fy - cy) < c.height / 4;
-}
-
-test("Follow keeps the agent's frame in view; a zoom by hand stops it", async ({ page }) => {
-  const core = await mockCore(page, quiet());
-  await page.goto("/");
-  await canvasReady(page);
-  // the team frame up close, its buttons shown
-  const mod = await page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "Meta" : "Control"));
-  await page.keyboard.press(`${mod}+KeyK`);
-  await page.keyboard.type("فريق المشروع");
-  await expect(page.getByRole("option", { name: "فريق المشروع" })).toHaveAttribute("aria-selected", "true"); // Enter takes it
-  await page.keyboard.press("Enter");
-  core.emit([{ type: "agent", agent: checker }]);
-  await frame(page, "team:core").locator('li[data-agent="chk"]').getByRole("button", { name: /تابع/ }).click();
-  const following = page.getByRole("banner").getByText("متابع مهندس المراجعة - عينة");
-  await expect(following).toBeVisible();
-  await expect.poll(() => centred(page, "deliverable:pricing")).toBe(true);
-
-  core.emit([{ type: "agent", agent: { ...checker, focus: { frame: "deliverable:letter", anchor: null } } }]);
-  await expect.poll(() => centred(page, "deliverable:letter")).toBe(true);
-
-  await page.waitForTimeout(400); // a pan within 100 ms of a follow move is the camera's own, not the engineer's
-  // a zoom by hand (the frame under the pointer may scroll its own page on a wheel, at a readable zoom)
-  await page.getByRole("toolbar", { name: "أدوات التكبير" }).getByRole("button", { name: "صغّر" }).click();
-  await expect(following).toBeHidden();
+  await switcher(page).click();
+  const letter = page.getByRole("menu").getByRole("menuitem", { name: /خطاب العطاء - مسودة عينة/ });
+  await expect(letter.locator("[data-working-dot]")).toHaveCount(1);
+  await expect(page.getByRole("menu").getByRole("menuitem", { name: /تسعير المقايسة - عينة/ }).locator("[data-working-dot]")).toHaveCount(0);
+  await expect(page.locator(line)).toHaveCount(0);
 });

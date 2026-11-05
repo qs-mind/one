@@ -1,7 +1,7 @@
 // The audit's layout fixes on the real app and core, with the bench's fake AI, in Arabic: the source card stays on
-// screen above everything, Arrange by stage shows every frame clear of the chat, the work log names each agent once,
-// full screen has one exit, More's labels say what they open, AI settings never scroll sideways, and at 1000 px the
-// chat takes at most a third. Each step takes a screenshot, fix-<item>-<phase>.png in $QSONE_FIX_SHOTS
+// screen above everything, the document sits clear of the chat, the work log names each agent once, full screen
+// (More, the chat folds) has one exit and keeps the review in the document, More's labels say what they open, AI
+// settings never scroll sideways, and at 1000 px the chat takes at most a third. Each step takes a screenshot, fix-<item>-<phase>.png in $QSONE_FIX_SHOTS
 // ($QSONE_FIX_PHASE, "after" by default), so the same walk shows a screen before and after a fix.
 import type { Locator } from "@playwright/test";
 import { mkdirSync } from "node:fs";
@@ -44,26 +44,21 @@ test("audit fixes, in Arabic", async ({ walk, page }) => {
     await shot("R5", walk.chat);
   });
 
-  await step("C12", async () => {
-    await page.getByRole("button", { name: texts.arrangeByStage.ar, exact: true }).click({ timeout: 5000 });
-    await page.waitForTimeout(1500);
-    await shot("C12");
-    if (!after) return;
-    // every frame in sight, none under the open chat
-    const chat = (await walk.chat.boundingBox())!;
-    for (const frame of await page.locator(".react-flow__node").all()) {
-      const box = await frame.boundingBox();
-      if (!box) continue;
-      expect.soft(box.x + box.width <= chat.x || box.x >= chat.x + chat.width, "a frame is clear of the chat").toBe(true);
-    }
-    await expect.soft(page.getByRole("toolbar", { name: texts.zoomControls.ar }).getByRole("button", { name: texts.fitAll.ar })).toBeVisible();
-  });
-
-  const sheet = page.locator('[data-frame^="deliverable:"]').filter({ has: page.getByRole("grid") }).first();
+  const sheet = walk.document;
   await step("R9", async () => {
     await walk.chat.getByRole("button", { name: /^افتح: / }).first().click({ timeout: 5000 });
-    await page.waitForTimeout(1500);
+    await expect(sheet.getByRole("grid")).toBeVisible();
+    await page.waitForTimeout(800);
     await shot("R9");
+  });
+
+  await step("C12", async () => {
+    await shot("C12");
+    if (!after) return;
+    // the document beside the open chat, never under it
+    const chat = (await walk.chat.boundingBox())!;
+    const box = (await page.locator("[data-document-sheet]").boundingBox())!;
+    expect.soft(box.x + box.width <= chat.x || box.x >= chat.x + chat.width, "the document is clear of the chat").toBe(true);
   });
 
   await step("B3", async () => {
@@ -87,21 +82,25 @@ test("audit fixes, in Arabic", async ({ walk, page }) => {
   });
 
   await step("R8", async () => {
-    await sheet.getByRole("button", { name: texts.openFull.ar, exact: true }).click({ timeout: 5000 });
+    await more();
+    await page.getByRole("button", { name: texts.fullScreen.ar, exact: true }).click({ timeout: 5000 });
     await page.waitForTimeout(800);
     await shot("R8");
     if (after) {
-      await expect.soft(page.getByRole("button", { name: texts.sheetLeaveFullScreen.ar })).toHaveCount(0);
-      await expect.soft(page.getByRole("tab", { name: texts.reviewCloseOut.ar })).toBeVisible();
+      await expect.soft(page.locator('aside[data-region="chat"]'), "full screen folds the chat").toHaveCount(0);
+      await expect.soft(page.getByRole("button", { name: texts.sheetLeaveFullScreen.ar }), "one exit: More's").toHaveCount(0);
+      await expect.soft(sheet.getByRole("tab", { name: texts.reviewCloseOut.ar }), "the review stays in the document").toBeVisible();
     }
+    await more();
+    await page.getByRole("button", { name: texts.leaveFullScreen.ar, exact: true }).click({ timeout: 5000 });
+    await expect(page.locator('aside[data-region="chat"]')).toBeVisible();
   });
 
   await step("C14", async () => {
-    await page.getByRole("button", { name: texts.exportExcel.ar, exact: true }).click({ timeout: 5000 });
+    // the file is saved in place, the line under the buttons says where: nothing to close
+    await sheet.getByRole("button", { name: texts.exportExcel.ar, exact: true }).click({ timeout: 5000 });
     await page.waitForTimeout(1500);
     await shot("C14");
-    await page.getByRole("button", { name: texts.close.ar, exact: true }).first().click();
-    await page.waitForTimeout(600);
   });
 
   await step("R10", async () => {
@@ -116,10 +115,10 @@ test("audit fixes, in Arabic", async ({ walk, page }) => {
     await expect(page.getByRole("heading", { name: texts.aiTitle.ar }).first()).toBeVisible();
     await shot("R13");
     if (after) {
-      // wherever AI settings open, nothing on the page that scrolls does so sideways (the canvas pans, it never scrolls)
+      // wherever AI settings open, nothing on the page that scrolls does so sideways (a wide sheet scrolls in its box)
       const sideways = await page.evaluate(() =>
         [...document.querySelectorAll<HTMLElement>("body *")]
-          .filter((x) => !x.closest(".react-flow"))
+          .filter((x) => !x.closest('[data-region="document"]'))
           .filter((x) => ["auto", "scroll"].includes(getComputedStyle(x).overflowX) && x.scrollWidth > x.clientWidth + 1)
           .map((x) => x.className.slice(0, 60)),
       );
@@ -129,11 +128,12 @@ test("audit fixes, in Arabic", async ({ walk, page }) => {
   });
 
   await step("C10", async () => {
-    await page.keyboard.press("Control+k");
-    await page.getByRole("combobox").fill(texts.projectTeam.ar);
-    await page.getByRole("option", { name: new RegExp(texts.projectTeam.ar) }).first().click({ timeout: 5000 });
-    await page.waitForTimeout(1200);
+    // the team is in the chat's head: pressing who is working shows the team list
+    await walk.chat.getByRole("button", { name: new RegExp(`${texts.projectTeam.ar}|شغال`) }).first().click({ timeout: 5000 });
+    await expect(page.getByRole("list", { name: texts.projectTeam.ar })).toBeVisible();
+    await page.waitForTimeout(400);
     await shot("C10");
+    await page.keyboard.press("Escape");
   });
 
   await step("C21", async () => {

@@ -1,7 +1,8 @@
 // Helpers for the bench walks: the real app with the fake AI of core/tests/bench (see playwright.bench.config.ts).
 // A walk records every console error, page error and failed /api request, and fails with them at the end; problems
-// found on the way (a card that only shows after a reload, a frame that does not come) are soft failures with a
-// screenshot, so one run lists them all.
+// found on the way (a card that only shows after a reload, a document that does not come) are soft failures with a
+// screenshot, so one run lists them all. The screen is the workspace: one document (switched from its title in the top
+// bar) and the chat beside it.
 import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -19,35 +20,33 @@ const words = {
     general: "الشات العام",
     projectName: "اسم المشروع",
     newProject: "مشروع جديد",
-    records: "سجلات المشروع",
     message: "رسالة إلى كبير مهندسي الكميات",
     send: "إرسال",
     stop: "إيقاف",
     keepTicked: "احفظ الصفوف المعلّمة",
     yes: "أيوه",
     open: "افتح",
-    zoomOut: "صغّر",
     clientBoqReadOnly: "مستند العميل: للقراءة بس",
     notInClient: "البند ده مش موجود في مقايسة العميل",
     comments: "الملاحظات",
-    openFull: "افتح ملء الشاشة",
+    projectFiles: "ملفات المشروع",
+    clientBoq: "مقايسة العميل",
   },
   en: {
     general: "General chat",
     projectName: "Project name",
     newProject: "New project",
-    records: "Project Records",
     message: "Message to the Lead QS",
     send: "Send",
     stop: "Stop",
     keepTicked: "Keep the ticked rows",
     yes: "Yes",
     open: "Open",
-    zoomOut: "Zoom out",
     clientBoqReadOnly: "The client's document: read only",
     notInClient: "Not in the client's BOQ",
     comments: "Comments",
-    openFull: "Open full screen",
+    projectFiles: "Project files",
+    clientBoq: "Client BOQ",
   },
 } as const;
 
@@ -83,6 +82,29 @@ export class Walk {
 
   get chat(): Locator {
     return this.page.locator('[data-region="chat"]');
+  }
+
+  /** The open document's region (its name is the document's title). */
+  get document(): Locator {
+    return this.page.locator('[data-region="document"]');
+  }
+
+  /** The document switcher: the open document's title, with its ▾, in the top bar. */
+  get switcher(): Locator {
+    return this.page.locator('[data-region="topbar"] h1 button[aria-haspopup="menu"]');
+  }
+
+  /** Picks a document from the switcher, by (part of) its name; false when the switcher does not list it. */
+  async openDocument(name: string | RegExp): Promise<boolean> {
+    await this.switcher.click();
+    const item = this.page.getByRole("menu").getByRole("menuitem", { name }).first();
+    if (!(await item.count())) {
+      await this.page.keyboard.press("Escape");
+      return false;
+    }
+    await item.click();
+    await expect(this.page.getByRole("menu")).toHaveCount(0);
+    return true;
   }
 
   /** A full-page screenshot in test-results/bench/shots, copied to $QSONE_BENCH_SHOTS when it is set. */
@@ -126,25 +148,23 @@ export class Walk {
     await this.page.getByLabel(this.w.projectName).fill(name);
     await this.page.getByLabel(this.w.projectName).press("Enter");
     await expect(top.getByRole("button", { name })).toBeVisible();
-    await expect(this.page.locator('[data-region="canvas"]')).toBeVisible();
+    // a new project opens on Project files, with its drop area
+    await expect(this.document).toHaveAttribute("aria-label", this.w.projectFiles);
     const list = (await (await this.page.request.get("/api/projects")).json()) as { projects: { id: string; name: string }[] };
     this.projectId = list.projects.find((p) => p.name === name)?.id;
     expect(this.projectId, "the new project is listed").toBeTruthy();
   }
 
-  /** The sample files, through Project Records' Add files, as the engineer adds them. */
-  async addFiles() {
-    const names = readdirSync(samplesDir);
-    await this.page.getByRole("button", { name: this.w.records, exact: true }).click();
-    await this.page.locator('input[type="file"]:not([data-folder-chooser])').setInputFiles(names.map((f) => path.join(samplesDir, f)));
-    for (const name of names) await expect(this.page.getByText(name.replace(/\.[^.]+$/, "").slice(0, 12)).first()).toBeVisible();
-    await this.page.waitForTimeout(1500); // the canvas has had time to hear of them
-    const files = this.page.locator('[data-frame="files:all"]');
-    for (const name of names) {
-      if (!(await files.getByText(name.slice(0, 12)).count()))
-        await this.problem(`files added in Project Records are not on the canvas's Project files frame without a reload: ${name}`, "files-frame-not-live");
+  /** The sample files (and `extra` ones; only those when `samples` is false), through Project files' Add files, as the
+   * engineer adds them; they show in Project files at once, without a reload. */
+  async addFiles(extra: string[] = [], samples = true) {
+    const files = [...(samples ? readdirSync(samplesDir).map((f) => path.join(samplesDir, f)) : []), ...extra];
+    if ((await this.document.getAttribute("aria-label")) !== this.w.projectFiles) await this.openDocument(this.w.projectFiles);
+    await this.document.locator('input[type="file"]').setInputFiles(files);
+    for (const file of files) {
+      const name = path.basename(file).replace(/\.[^.]+$/, "").slice(0, 12);
+      await expect(this.document.getByText(name).first(), `${name} shows in Project files`).toBeVisible();
     }
-    await this.page.getByRole("button", { name: this.lang === "ar" ? "إغلاق" : "Close", exact: true }).click();
   }
 
   private async waiting(): Promise<number> {
@@ -153,7 +173,7 @@ export class Walk {
     return r.ok() ? (((await r.json()) as { waiting?: number }).waiting ?? 0) : 0;
   }
 
-  private pendingCard(): Locator {
+  pendingCard(): Locator {
     // a card still waiting: an answered one folds to a line and says so (data-answered)
     return this.chat.locator("section[data-approval-card]:not([data-answered])").filter({ has: this.page.locator("button") });
   }
@@ -204,7 +224,7 @@ export class Walk {
     return answered;
   }
 
-  private async answer(card: Locator): Promise<string> {
+  async answer(card: Locator): Promise<string> {
     await card.scrollIntoViewIfNeeded();
     // `card` matches only unanswered cards, so once answered it is gone: count the answers in the chat instead.
     const answers = this.chat.locator("section[data-approval-card][data-answered]");
@@ -219,6 +239,11 @@ export class Walk {
       await this.shot("rows-card");
       for (const box of await card.getByRole("checkbox").all()) await box.check();
       await card.getByRole("button", { name: w.keepTicked }).click();
+    } else if (await card.getByRole("combobox").count()) {
+      kind = "rows"; // a BOQ's columns, each with what it holds: approved as mapped
+      await this.shot("rows-card");
+      const yes = card.getByRole("button", { name: w.yes, exact: true });
+      await ((await yes.count()) ? yes : card.getByRole("button").first()).click();
     } else if (await card.locator("fieldset").count()) {
       kind = "question";
       await this.shot("question-card");
@@ -247,75 +272,69 @@ export class Walk {
     return kind;
   }
 
-  /** After a BOQ import: the client's BOQ is on the canvas at once, its own read-only frame, and its rows show. */
+  /** After a BOQ import: the client's BOQ is in the document switcher at once, a read-only document, and its rows
+   * show when it is picked. */
   async clientBoq(rowText: string) {
-    const frame = this.page.locator('[data-frame^="clientboq:"]');
-    if (!(await frame.count())) {
+    const name = new RegExp(`^${this.w.clientBoq}`);
+    if (!(await this.openDocument(name))) {
       await this.page.waitForTimeout(3000);
-      if (!(await frame.count())) {
-        await this.problem("the Client BOQ frame is not on the canvas without a reload", "client-boq-not-live");
+      if (!(await this.openDocument(name))) {
+        await this.problem("the Client BOQ is not in the document switcher without a reload", "client-boq-not-live");
         await this.page.reload();
+        expect(await this.openDocument(name), "the Client BOQ is in the document switcher").toBe(true);
       }
     }
-    await expect(frame, "the Client BOQ frame is on the canvas").toHaveCount(1);
-    // Brought forward from the palette, so it is near enough to show its rows.
-    await this.page.keyboard.press("Control+k");
-    await this.page.keyboard.type("clientboq");
-    await this.page.getByRole("option", { name: /^Client BOQ|^مقايسة العميل/ }).click();
-    await this.page.waitForTimeout(800);
-    await expect.soft(frame.getByRole("grid"), "the Client BOQ frame shows the sheet").toBeVisible();
-    await expect.soft(frame.getByText(rowText).first(), "the client's rows show in the frame").toBeVisible();
-    await expect.soft(frame.getByText(this.w.clientBoqReadOnly).first(), "it says it is read only").toBeVisible();
-    return this.shot("client-boq-frame");
+    await expect.soft(this.document.getByRole("grid"), "the Client BOQ shows as a sheet").toBeVisible();
+    await expect.soft(this.document.getByText(rowText).first(), "the client's rows show").toBeVisible();
+    await expect.soft(this.document.getByText(this.w.clientBoqReadOnly).first(), "it says it is read only").toBeVisible();
+    return this.shot("client-boq-document");
   }
 
-  /** The Priced BOQ, opened full screen, shows the Checking QS's open comment on the extra row. */
+  /** The Priced BOQ, opened from its card as the document, shows the Checking QS's open comment on the extra row in
+   * its own review area. */
   async notInClientFlag() {
     await this.chat.getByRole("button", { name: new RegExp(`^${this.w.open}: `) }).first().click();
-    await this.page.waitForTimeout(1200);
-    const sheet = this.page.locator('[data-frame^="deliverable:"]').filter({ has: this.page.getByRole("grid") }).first();
-    await sheet.getByRole("button", { name: this.w.openFull, exact: true }).click();
-    await this.page.waitForTimeout(1200);
-    await this.page.getByRole("tab", { name: new RegExp(`^${this.w.comments}`) }).click();
-    const flag = this.page.getByRole("tabpanel").getByText(this.w.notInClient).first();
+    await expect(this.document.getByRole("grid")).toBeVisible();
+    await this.page.waitForTimeout(800);
+    await this.document.getByRole("tab", { name: new RegExp(`^${this.w.comments}`) }).click();
+    const flag = this.document.getByRole("tabpanel").getByText(this.w.notInClient).first();
     await expect.soft(flag, "the extra row's comment shows").toBeVisible();
     const size = this.page.viewportSize();
     await this.page.setViewportSize({ width: 1440, height: 1400 }); // the comments panel is short: a taller shot
     await flag.evaluate((e) => e.scrollIntoView({ block: "center" })).catch(() => undefined);
     const file = await this.shot("not-in-client-boq-comment");
     if (size) await this.page.setViewportSize(size);
-    await this.page.keyboard.press("Escape");
     return file;
   }
 
-  /** The Deliverables made by the Brief: on the canvas live, then each opened from its chat card. */
+  /** The Deliverables made by the Brief: in the document switcher live, then each opened from its chat card as the
+   * document. */
   async deliverables(expected: number) {
-    const frames = this.page.locator('[data-frame^="deliverable:"]');
     await this.page.waitForTimeout(1500);
-    // The canvas draws only the frames in view: zoom out until all of them are.
-    const zoomOut = this.page.getByRole("button", { name: this.w.zoomOut, exact: true });
-    for (let i = 0; i < 8 && (i < 4 || (await frames.count()) < expected); i++) {
-      await zoomOut.click();
-      await this.page.waitForTimeout(150);
-    }
-    await this.page.waitForTimeout(600);
-    const live = await frames.count();
+    const listed = async () => {
+      await this.switcher.click();
+      const menu = this.page.getByRole("menu");
+      await expect(menu).toBeVisible();
+      const n = (await menu.getByRole("menuitem").count()) - 1 - (await menu.getByRole("menuitem", { name: new RegExp(`^${this.w.clientBoq}`) }).count());
+      await this.shot("deliverables-in-switcher");
+      await this.page.keyboard.press("Escape");
+      return n; // less Project files and the client BOQs
+    };
+    const live = await listed();
     if (live < expected) {
-      await this.problem(`only ${live} of ${expected} Deliverables are on the canvas without a reload`, "deliverables-not-live");
+      await this.problem(`only ${live} of ${expected} Deliverables are in the document switcher without a reload`, "deliverables-not-live");
       await this.page.reload();
-      for (let i = 0; i < 4; i++) await zoomOut.click();
-      await expect(frames, "after a reload every Deliverable is on the canvas").toHaveCount(expected);
+      expect(await listed(), "after a reload every Deliverable is in the switcher").toBe(expected);
     }
-    await this.shot("deliverables-on-canvas");
     const opens = this.chat.getByRole("button", { name: new RegExp(`^${this.w.open}: `) });
     const count = await opens.count();
     expect.soft(count, "each Deliverable has its card in the chat").toBe(expected);
     for (let i = 0; i < count; i++) {
+      const title = (await opens.nth(i).getAttribute("aria-label"))!.replace(new RegExp(`^${this.w.open}: `), "");
       await opens.nth(i).click();
-      await this.page.waitForTimeout(1200);
+      await expect.soft(this.document, "the card opens its Deliverable as the document").toHaveAttribute("aria-label", title);
+      await this.page.waitForTimeout(800);
       await this.shot(`deliverable-${i + 1}-open`);
-      await this.page.keyboard.press("Escape");
-      await this.page.waitForTimeout(400);
     }
   }
 

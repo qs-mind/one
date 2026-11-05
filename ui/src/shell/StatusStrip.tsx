@@ -136,6 +136,8 @@ export function StatusStrip({
   // always known; then how many fit
   const box = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState<ReadonlySet<string> | null>(null); // null: all
+  // with something folded the strip keeps room for More status at least: a long name never squeezes it out of sight
+  const [floor, setFloor] = useState(0);
   const signature = items.map((item) => item.key).join() + lang + JSON.stringify(status);
   useLayoutEffect(() => {
     if (stacked) return;
@@ -150,6 +152,7 @@ export function StatusStrip({
       const more = width("more");
       const n = widths.length > SHOWN_MOST ? fitting(widths.slice(0, SHOWN_MOST), room - more - GAP, 0) : fitting(widths, room, more);
       setShown(n >= items.length ? null : new Set(order.slice(0, n).map((item) => item.key)));
+      setFloor(n >= items.length ? 0 : more);
     };
     update();
     const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(update);
@@ -167,7 +170,7 @@ export function StatusStrip({
   const folded = shown ? items.filter((item) => !shown.has(item.key)) : [];
   const away = "invisible absolute start-0 top-0";
   return (
-    <div ref={box} className="relative flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-slate">
+    <div ref={box} style={floor ? { minWidth: floor } : undefined} className="relative flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-slate">
       {items.map((item) => {
         const hidden = shown !== null && !shown.has(item.key);
         return (
