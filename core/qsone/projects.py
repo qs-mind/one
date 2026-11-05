@@ -275,8 +275,10 @@ class RerankIn(BaseModel):
 
 
 def _file(info: files.FileInfo) -> dict:
-    """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair."""
-    return asdict(info) | {"note": getattr(copy, info.note) if info.note else None}
+    """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair; `note_key`
+    keeps the name (the import report names a locked or an empty file by it)."""
+    note = getattr(copy, info.note) if info.note else None
+    return asdict(info) | {"note": note, "note_key": info.note}
 
 
 def _zip_note(text: dict) -> str:

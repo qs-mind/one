@@ -127,6 +127,18 @@ FILE_UNREADABLE = {
     "ar": "اتحفظ، بس ONE مقدرش يقراه (يا إما بايظ، يا إما مقفول بباسورد).",
 }
 
+FILE_LOCKED = {
+    "en": "Kept, but it is locked with a password, so ONE cannot read it. Save an open copy "
+    "(without the password) and add that one.",
+    "ar": "اتحفظ، بس مقفول بباسورد فـ ONE مش قادر يقراه. احفظ نسخة مفتوحة (من غير الباسورد) "
+    "وضيفها.",
+}
+
+FILE_SHEETS_EMPTY = {
+    "en": "Read: its sheets are empty, so there is nothing in it.",
+    "ar": "اتقرا: الشيتات بتاعته فاضية، مفيهوش حاجة.",
+}
+
 FILE_NOT_FOUND = {
     "en": "This file is not in Project Records.",
     "ar": "الملف ده مش موجود في سجلات المشروع.",

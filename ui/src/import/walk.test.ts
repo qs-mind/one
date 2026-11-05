@@ -141,6 +141,8 @@ describe("uploading", () => {
       notRead: 1,
       tooBig: ["big.dwg", "huge.tif", "model.ifc"],
       unreadable: ["scan.pdf", "empty.txt", "blank.txt"],
+      locked: [],
+      empty: [],
       zips: 1,
       failed: ["away.pdf"],
     });

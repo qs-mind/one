@@ -847,6 +847,11 @@ export const texts = {
   importNotRead: { en: "Kept, not read yet: {n}", ar: "اتحفظ ولسه ماتقراش: {n}" },
   importTooBig: { en: "Too big to add:", ar: "أكبر من إنه يتضاف:" },
   importUnreadable: { en: "Could not be read:", ar: "مقدرناش نقراه:" },
+  importLocked: {
+    en: "Locked with a password: save an open copy (without the password) and add that one:",
+    ar: "مقفول بباسورد: احفظ نسخة مفتوحة (من غير الباسورد) وضيفها:",
+  },
+  importEmpty: { en: "Read, but its sheets are empty:", ar: "اتقرا، بس الشيتات بتاعته فاضية:" },
   importZips: { en: "Zips opened: {n}", ar: "ملفات مضغوطة اتفتحت: {n}" },
   importFailed: { en: "Some files were not added. Try again.", ar: "في ملفات ماتضافتش. جرّب تاني." },
   importUnderstanding: { en: "The Lead QS is reading the folder…", ar: "كبير مهندسي الكميات بيقرا الفولدر…" },

@@ -278,6 +278,24 @@ describe("importing a folder", () => {
     expect(names).toEqual(["برج", "برج (2)"]);
   });
 
+  it("names a locked workbook and asks for an open copy; names an empty one", async () => {
+    let n = 0;
+    mockCore({
+      "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "x" }, { status: 201 }),
+      "POST /projects/p1/files": () =>
+        Response.json(
+          ++n === 1 ? { status: "unreadable", note_key: "FILE_LOCKED" } : { status: "read", note_key: "FILE_SHEETS_EMPTY" },
+          { status: 201 },
+        ),
+      "POST /projects/p1/understand": () => Response.json({ brief_id: "b1" }, { status: 202 }),
+    });
+    render(<ImportReports />);
+    await act(() => importFolders([file("مقفول.xlsx", "مناقصة/مقفول.xlsx"), file("فاضي.xlsx", "مناقصة/فاضي.xlsx")], { old: false }));
+    expect(await screen.findByText(texts.importLocked.en)).toBeInTheDocument();
+    expect(screen.getByText(texts.importEmpty.en)).toBeInTheDocument();
+    expect(screen.queryByText(texts.importUnreadable.en)).toBeNull();
+  });
+
   it("says why the Lead QS could not start", async () => {
     mockCore({
       "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "x" }, { status: 201 }),

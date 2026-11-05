@@ -90,6 +90,7 @@ def test_upload_then_search_with_page_and_row(client, project):
     assert r.status_code == 201
     info = r.json()
     assert info["status"] == "read" and info["name"] == BOQ and info["note"] is None
+    assert info["note_key"] is None
     assert info["duplicate"] is False and info["replaces"] is None and info["chunks"] == 1
     assert client.get(f"/projects/{project}/files", headers=AUTH).json() == {"files": [info]}
 
