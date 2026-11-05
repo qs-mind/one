@@ -7,7 +7,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test as base, type Locator, type Page, type TestInfo } from "@playwright/test";
 
-export const samplesDir = path.join(tmpdir(), "qs-mind-one-bench", "samples");
+// the folder scripts/bench.mjs makes for this port (QSONE_BENCH_PORT), so two worktrees' benches never share samples
+const benchPort = Number(process.env.QSONE_BENCH_PORT || 1442);
+export const samplesDir = path.join(tmpdir(), benchPort === 1442 ? "qs-mind-one-bench" : `qs-mind-one-bench-${benchPort}`, "samples");
 const shotsDir = path.join("test-results", "bench", "shots");
 const MARK = /bench reply|رد تجريبي/;
 
