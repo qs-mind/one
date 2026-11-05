@@ -63,6 +63,13 @@ describe("the agent card", () => {
     expect((await model("qs")).querySelector("svg")).toHaveAttribute("data-logo", "unknown");
   });
 
+  it("its model by the name the sheet gives it, never the raw id (tender day: «models/gemini-3.1-flash-lite»)", async () => {
+    showCanvas({ team: { desks: [], agents: [agent("est", { model: "models/gemini-3.1-flash-lite", model_name: "Gemini 3.1 Flash Lite" })] } });
+    const el = await card("est");
+    expect(el).toHaveTextContent("Gemini 3.1 Flash Lite");
+    expect(el).not.toHaveTextContent("models/");
+  });
+
   it("its line is in its Brief's language, not the page's", async () => {
     setLanguage("en");
     const est = agent("est", { line: { en: "Look at the BOQ columns", ar: "يبص على أعمدة المقايسة" }, lang: "ar" });

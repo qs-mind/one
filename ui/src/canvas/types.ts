@@ -42,6 +42,8 @@ export type AgentInfo = {
   role: Text;
   desk_id: string | null;
   model: string;
+  /** The model's name as the sheet gives it («Gemini 3.1 Flash Lite»); null when it is not on the sheet. */
+  model_name?: string | null;
   /** The model's provider, for its company's logo; null when the core does not know it. */
   provider?: string | null;
   state: "idle" | "thinking" | "working" | "waiting" | "done" | "failed";
