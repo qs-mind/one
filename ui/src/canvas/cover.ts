@@ -98,3 +98,21 @@ export function readable<T extends Framed>(frames: readonly T[], rank: (key: str
   for (const f of order.slice(1)) if (fits([...taken, f])) taken.push(f);
   return taken;
 }
+
+/** What the view shows when frames arrive out of sight: the new ones, with the frames that were in view before,
+ * nearest first, while all of them still fit `area` at a readable zoom; so none is left half off the screen. */
+export function revealed<T extends Framed>(added: readonly T[], before: readonly T[], area: { w: number; h: number }, margin = MARGIN): T[] {
+  const fits = (set: readonly T[]) => {
+    const w = Math.max(...set.map((f) => f.x + f.w)) - Math.min(...set.map((f) => f.x));
+    const h = Math.max(...set.map((f) => f.y + f.h)) - Math.min(...set.map((f) => f.y));
+    return Math.min((area.w - 2 * margin) / w, (area.h - 2 * margin) / h) >= READABLE;
+  };
+  const cx = (f: T) => f.x + f.w / 2;
+  const cy = (f: T) => f.y + f.h / 2;
+  const ax = added.reduce((s, f) => s + cx(f), 0) / (added.length || 1);
+  const ay = added.reduce((s, f) => s + cy(f), 0) / (added.length || 1);
+  const nearest = [...before].sort((a, b) => Math.hypot(cx(a) - ax, cy(a) - ay) - Math.hypot(cx(b) - ax, cy(b) - ay));
+  const taken = [...added];
+  for (const f of nearest) if (fits([...taken, f])) taken.push(f);
+  return taken;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freeRect, readable, worldOf } from "./cover";
+import { freeRect, readable, revealed, READABLE, worldOf } from "./cover";
 import { inView, placeInView } from "./place";
 import type { Placed } from "./types";
 
@@ -72,5 +72,29 @@ describe("a first view stays readable", () => {
     expect(shown).toEqual(["deliverable:new"]);
     const near = readable(frames, (k) => ["files:all", "deliverable:old", "deliverable:new", "team:core"].indexOf(k), { w: 1626, h: 1278 });
     expect(near.map((f) => f.key)).toEqual(["files:all", "deliverable:old", "team:core"]);
+  });
+});
+
+describe("a frame that arrives out of view (tender day: the BOQ frame came, the view went to 79% and the Team frame sat half off)", () => {
+  const box = (key: string, x: number, y: number, w: number, h: number) => ({ key, x, y, w, h });
+  const area = { w: 1060, h: 780 };
+
+  it("is shown with the frames that were in view, whole, while they fit at a readable zoom", () => {
+    const team = box("team:core", 0, 0, 420, 300);
+    const files = box("files:all", 460, 0, 380, 300);
+    const boq = box("deliverable:boq", 0, 340, 900, 420);
+    const shown = revealed([boq], [files, team], area);
+    expect(shown[0]!.key).toBe("deliverable:boq");
+    expect(shown.map((f) => f.key).sort()).toEqual(["deliverable:boq", "files:all", "team:core"]);
+  });
+
+  it("leaves out, nearest first, the ones that would take the view below a readable zoom; the new frame always", () => {
+    const boq = box("deliverable:boq", 0, 0, 1200, 700);
+    const near = box("team:core", 0, -340, 400, 300);
+    const far = box("files:all", 3000, 0, 400, 300);
+    const shown = revealed([boq], [far, near], area);
+    expect(shown.map((f) => f.key)).toEqual(["deliverable:boq", "team:core"]);
+    const w = Math.max(...shown.map((f) => f.x + f.w)) - Math.min(...shown.map((f) => f.x));
+    expect((area.w - 64) / w).toBeGreaterThanOrEqual(READABLE);
   });
 });

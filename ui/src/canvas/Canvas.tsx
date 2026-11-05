@@ -40,7 +40,7 @@ import { deskCounts, startActivity, useDeskCounts, workedOn } from "./live/activ
 import { isMac, isMod, isTyping, matches } from "./keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
-import { freeArea, MARGIN, PREFERRED, READABLE, readable, TOGETHER, worldOf } from "./cover";
+import { freeArea, MARGIN, PREFERRED, READABLE, readable, revealed, TOGETHER, worldOf } from "./cover";
 import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
 import { importInto } from "../import/importer";
 import { holdsFolder } from "../import/walk";
@@ -390,8 +390,22 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     for (const key of removed) committed.current.delete(key);
     if (added.length || removed.length || kept.some((n, i) => n !== nodesRef.current[i])) setNodes(kept);
     if (added.length || removed.length) saver.frames(added, removed);
-    if (added.length && !added.every((p) => inView({ ...p, h: p.collapsed ? STRIP_H : p.h }, view))) fitTo(added, { keepZoom: true, margin: MARGIN, minZoom: READABLE });
-  }, [saver, setNodes, seen, fitTo]);
+    const shownBox = (p: Placed) => ({ ...p, h: p.collapsed ? STRIP_H : p.h });
+    if (added.length && !added.every((p) => inView(shownBox(p), view))) {
+      // the view goes to the new frames with the ones the engineer was looking at, whole, as long as all stay readable
+      const newKeys = new Set(added.map((p) => p.key));
+      const before = kept
+        .map(placedOf)
+        .filter((p) => !newKeys.has(p.key))
+        .filter((p) => {
+          const b = shownBox(p);
+          return b.x < view.x + view.w && b.x + b.w > view.x && b.y < view.y + view.h && b.y + b.h > view.y;
+        });
+      const area = free();
+      const keys = new Set(revealed(added.map(shownBox), before.map(shownBox), area).map((p) => p.key));
+      fitTo([...added, ...before].filter((p) => keys.has(p.key)), { keepZoom: true, margin: MARGIN, minZoom: READABLE });
+    }
+  }, [saver, setNodes, seen, fitTo, free]);
 
   /** Moves frames to a layout (arrange, undo, redo, fold); saves what changed. */
   const applyLayout = useCallback(
