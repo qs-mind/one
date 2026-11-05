@@ -42,6 +42,13 @@ describe("the agent card", () => {
     await waitFor(() => expect(currentSelection()).toEqual([{ kind: "deliverable", id: "boq", title: "تسعير boq - عينة" }]));
   });
 
+  it("its model has its company's logo; one not on the sheet has the neutral mark", async () => {
+    showCanvas({ team: { desks: [], agents: [agent("est", { provider: "anthropic" }), agent("qs", { provider: null })] } });
+    const model = (id: string) => card(id).then((el) => within(el).getByText("claude-sonnet-5").closest("span")!);
+    expect((await model("est")).querySelector("svg")).toHaveAttribute("data-logo", "claude");
+    expect((await model("qs")).querySelector("svg")).toHaveAttribute("data-logo", "unknown");
+  });
+
   it("its line is in its Brief's language, not the page's", async () => {
     setLanguage("en");
     const est = agent("est", { line: { en: "Look at the BOQ columns", ar: "يبص على أعمدة المقايسة" }, lang: "ar" });

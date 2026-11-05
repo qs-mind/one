@@ -5,6 +5,7 @@
 // Removing a Standard Link takes it out at once, with Undo in its place for the core's window (UndoNotice).
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api } from "../api";
+import { ProviderLogo } from "../brand/providers/ProviderLogo";
 import { coreLine, send } from "../core";
 import { Feedback, secondary } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
@@ -170,7 +171,10 @@ function ClaudeKey({ settings, onSaved }: { settings: Settings; onSaved: () => v
   const saved = settings.connectors.some((c) => c.id === "anthropic" && c.key_set);
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="font-semibold">{t("aiKey")}</h3>
+      <h3 className="flex items-center gap-2 font-semibold">
+        <ProviderLogo provider="anthropic" />
+        {t("aiKey")}
+      </h3>
       {saved && <p className="text-slate">{t("claudeKeySaved")}</p>}
       {settings.key_store === "file" && <p className="text-slate">{t("keyStoreFile")}</p>}
       <Alert line={settings.connectors.find((c) => c.id === "anthropic" && c.key_set)?.error ?? undefined} />
@@ -246,7 +250,10 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
             ) : (
               <li key={link.id} className="flex items-center justify-between gap-4 rounded-md bg-stone px-3 py-2">
                 <span className="flex flex-wrap gap-x-2">
-                  <span dir="auto">{link.name}</span>
+                  <span className="flex items-center gap-2">
+                    <ProviderLogo provider={link.provider} />
+                    <span dir="auto">{link.name}</span>
+                  </span>
                   {link.on_device && <span className="text-slate">{t("onDevice")}</span>}
                   {link.error && <span className="text-copper">{pick(link.error)}</span>}
                 </span>
@@ -368,7 +375,10 @@ function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; on
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="font-semibold">{t("claudeCode")}</h3>
+      <h3 className="flex items-center gap-2 font-semibold">
+        <ProviderLogo provider="anthropic" />
+        {t("claudeCode")}
+      </h3>
       <p className="text-slate">{t("claudeCodeHelp")}</p>
       <label className="flex flex-col gap-1">
         <span>{t("claudeCodePath")}</span>

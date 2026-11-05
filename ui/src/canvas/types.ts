@@ -42,6 +42,8 @@ export type AgentInfo = {
   role: Text;
   desk_id: string | null;
   model: string;
+  /** The model's provider, for its company's logo; null when the core does not know it. */
+  provider?: string | null;
   state: "idle" | "thinking" | "working" | "waiting" | "done" | "failed";
   line: Text | null;
   /** The language of its Brief: the line is in it. */

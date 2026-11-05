@@ -157,6 +157,18 @@ describe("AiSettings", () => {
     expect(lead).toHaveValue(JSON.stringify(opus));
   });
 
+  it("each AI link shows its company's logo: Claude for the key and Claude Code, a Standard Link's from its provider", async () => {
+    const local = { id: "standard:s2", kind: "model", name: "Local - sample", provider: "localhost:11434", on_device: true, key_set: false, error: null };
+    core({ "GET /api/settings/ai": () => Response.json(settings({ connectors: [local] })) });
+    render(<Harness />);
+    const logo = (text: string) => screen.getByText(text).closest("h3, li")!.querySelector("svg[data-logo]")?.getAttribute("data-logo");
+    await screen.findByText("Local - sample");
+    expect(logo(texts.aiKey.ar)).toBe("claude");
+    expect(logo(texts.claudeCode.ar)).toBe("claude");
+    expect(logo("Local - sample")).toBe("ollama");
+    expect(logo("Sample provider")).toBe("unknown");
+  });
+
   it("adding a Standard Link sends the key once and never shows it", async () => {
     let added = false;
     const fresh = { id: "standard:s2", kind: "model", name: "Local - sample", provider: "local", on_device: true, key_set: true, error: null };

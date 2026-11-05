@@ -6,6 +6,7 @@
 // checks itself as it is pasted or typed. Next waits, in its place, until the check works, so no button moves.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { api, inInstalledApp } from "../api";
+import { ProviderLogo } from "../brand/providers/ProviderLogo";
 import { coreLine, send } from "../core";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
@@ -152,11 +153,17 @@ export function ConnectAi({ nav }: { nav: Nav }) {
         {!agreed && <p className="text-slate">{t("aiLinkAfterConsent")}</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           <button type="button" aria-pressed={via === "claude_code"} onClick={() => choose("claude_code")} className={`${option(via === "claude_code")} text-start`}>
-            <span className="block font-semibold">{t("aiLinkClaudeCode")}</span>
+            <span className="flex items-center gap-2 font-semibold">
+              <ProviderLogo provider="anthropic" size={20} />
+              {t("aiLinkClaudeCode")}
+            </span>
             <span className={`block text-sm ${via === "claude_code" ? "text-paper/80" : "text-slate"}`}>{t("aiLinkClaudeCodeHelp")}</span>
           </button>
           <button type="button" aria-pressed={via === "api_key"} onClick={() => choose("api_key")} className={`${option(via === "api_key")} text-start`}>
-            <span className="block font-semibold">{t("aiLinkApiKey")}</span>
+            <span className="flex items-center gap-2 font-semibold">
+              <ProviderLogo provider="anthropic" size={20} />
+              {t("aiLinkApiKey")}
+            </span>
             <span className={`block text-sm ${via === "api_key" ? "text-paper/80" : "text-slate"}`}>{t("aiLinkApiKeyHelp")}</span>
           </button>
         </div>
