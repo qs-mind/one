@@ -52,7 +52,7 @@ function board(pending: Change[] = [sourced, typed], more: Record<string, (url: 
 }
 
 const panel = () => screen.getByRole("tabpanel");
-const changeItems = () => within(panel()).getAllByRole("option");
+const changeItems = () => [...panel().querySelectorAll<HTMLElement>("[data-change]")];
 const rowOf = (code: string) => screen.getAllByRole("row").find((r) => within(r).queryByText(code))!;
 
 beforeEach(() => {
@@ -73,8 +73,8 @@ describe("BOQ change review", () => {
     expect(rate.compareDocumentPosition(old) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // the panel shows it the same way
     const first = changeItems()[0]!;
-    expect(within(first).getByText("40,000.00").closest("ins")).toHaveClass("text-copper");
-    expect(within(first).getByText("39,850.50").closest("del")).toHaveClass("text-slate");
+    expect(within(first).getByText(/40,000\.00/).closest("ins")).toHaveClass("text-copper");
+    expect(within(first).getByText(/39,850\.50/).closest("del")).toHaveClass("text-slate");
   });
 
   it("each change shows its reason and its source; the source opens its card", async () => {
@@ -101,7 +101,7 @@ describe("BOQ change review", () => {
     expect(rowOf("03/04")).not.toHaveClass("review-dim");
   });
 
-  it("nothing dims with no pending change, or in a frame", async () => {
+  it("nothing dims with no pending change", async () => {
     board([]);
     await screen.findByText("03/02");
     expect(rowOf("03/04")).not.toHaveClass("review-dim");
@@ -149,10 +149,10 @@ describe("BOQ change review", () => {
     await screen.findByText("03/02");
     const [first, second] = changeItems();
     act(() => first!.focus());
-    expect(first).toHaveAttribute("aria-selected", "true");
+    expect(first).toHaveAttribute("aria-current", "true");
     // J on an Arabic keyboard types «ت»: the key's place decides
     await user.keyboard("[KeyJ]");
-    expect(second).toHaveAttribute("aria-selected", "true");
+    expect(second).toHaveAttribute("aria-current", "true");
     expect(second).toHaveFocus();
     await user.keyboard("{ArrowUp}");
     expect(first).toHaveFocus();

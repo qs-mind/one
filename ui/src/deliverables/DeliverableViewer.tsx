@@ -14,8 +14,9 @@ import { SignOff } from "../review/SignOff";
 import { VersionsPanel } from "../review/VersionsPanel";
 import { DocumentViewer, type DocumentHandle } from "../viewers/document/DocumentViewer";
 import type { TextAnchor } from "../viewers/document/plate";
+import { UndoNotice } from "../ui/UndoNotice";
 import { SheetViewer, type SheetHandle, type SheetRange } from "../viewers/sheet/SheetViewer";
-import { deliverablesApi } from "./api";
+import { deliverablesApi, type Accepted } from "./api";
 import type { CommentAnchor, FillPlanInfo, View } from "./types";
 import { useDeliverable, type Subscribe } from "./useDeliverable";
 
@@ -67,6 +68,9 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
   const [fillOpen, setFillOpen] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [plan, setPlan] = useState<FillPlanInfo | null>(null);
+  // The last accept's Undo, «اتقبل · تراجع», while its window lasts; and the change the review is on
+  const [undo, setUndo] = useState<{ token: string; windowMs: number; takeFocus: boolean } | null>(null);
+  const [current, setCurrent] = useState<string | null>(null);
 
   // The board finds the Sheet's newest Fill Plan, and looks again each time the Deliverable is loaded (a plan the
   // Lead QS saves is announced on the live stream).
@@ -115,6 +119,10 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
     queueMicrotask(() => setStatus(line));
   }, []);
   const changed = useCallback(() => void reload(), [reload]);
+  const accepted = useCallback((answer: Accepted, how: { keys: boolean } = { keys: false }) => {
+    if (answer.undo && answer.window_ms) setUndo({ token: answer.undo, windowMs: answer.window_ms, takeFocus: !how.keys });
+  }, []);
+  const onCurrent = useCallback((change: { id: string } | null) => setCurrent(change?.id ?? null), []);
 
   if (!view) {
     return (
@@ -142,6 +150,8 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         onChanged={changed}
         onSelection={onSheetSelection}
         onToggleFullScreen={props.onToggleFullScreen}
+        review={mode === "full" ? { active: tab === "changes" && !fillOpen && view.pending > 0, current } : undefined}
+        onAccepted={accepted}
       />
     ) : (
       <DocumentViewer
@@ -199,6 +209,21 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
                 </button>
               ))}
             </div>
+            {undo && (
+              <UndoNotice
+                key={undo.token}
+                label={t("reviewAcceptedShort")}
+                token={undo.token}
+                windowMs={undo.windowMs}
+                takeFocus={undo.takeFocus}
+                onUndone={() => {
+                  setUndo(null);
+                  announce(t("undoDone"));
+                  changed();
+                }}
+                onEnd={() => setUndo(null)}
+              />
+            )}
             <div className="ms-auto">
               <ExportMenu
                 projectId={projectId}
@@ -228,6 +253,8 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
                 onChanged={changed}
                 onLocate={onLocate}
                 announce={announce}
+                onAccepted={accepted}
+                onCurrent={onCurrent}
               />
             ) : tab === "comments" ? (
               <CommentsPanel

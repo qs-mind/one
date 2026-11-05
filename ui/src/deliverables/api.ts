@@ -17,6 +17,9 @@ import type {
   View,
 } from "./types";
 
+/** What an accept answers: the version it saved, and, when Undo can take it back, its Undo token and window. */
+export type Accepted = { version: number | null; accepted: string[]; stale: string[]; undo?: string; window_ms?: number };
+
 export type Answer<T> = { ok: true; data: T } | { ok: false; error: Text; field: string | null; status: number };
 export type FileBytes = { bytes: Uint8Array; name: string; type: string };
 
@@ -82,7 +85,7 @@ export const deliverablesApi = {
   propose: (p: string, d: string, ops: Op[], reason: string | null = null) =>
     call<{ changes: Change[] }>(`${base(p)}/deliverables/${id(d)}/changes`, "POST", { ops, reason }),
   accept: (p: string, d: string, which: { ids: string[] } | { mine: true }) =>
-    call<{ version: number | null; accepted: string[]; stale: string[] }>(
+    call<Accepted>(
       `${base(p)}/deliverables/${id(d)}/changes/accept`,
       "POST",
       which,

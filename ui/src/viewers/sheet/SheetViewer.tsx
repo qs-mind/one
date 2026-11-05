@@ -2,7 +2,7 @@
 // Deliverable's language, not the screen's. Every edit, typed or pasted, is sent as a Suggested change and
 // shows old → new with ✓ ✗ until the engineer decides; nothing on this screen adds, multiplies or totals.
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
-import { deliverablesApi } from "../../deliverables/api";
+import { deliverablesApi, type Accepted } from "../../deliverables/api";
 import type { Change, NumberCell, Op, SheetView, Thread, ViewRow } from "../../deliverables/types";
 import { isNumber } from "../../deliverables/types";
 import { count, dir, fill, language, pick, t, texts, useLanguage, type Text } from "../../i18n";
@@ -40,6 +40,11 @@ export type SheetViewerProps = {
   virtualize?: boolean;
   /** A document that is not ours (the client's BOQ): nothing can be typed, pasted or changed. */
   readOnly?: boolean;
+  /** The review board's change review: while `active`, the rows with no change dim; `current` is the change the
+   * engineer is on. Left out (a frame), nothing dims. */
+  review?: { active: boolean; current: string | null };
+  /** After an accept from a cell: its answer, with its Undo when it has one. */
+  onAccepted?: (answer: Accepted) => void;
   ref?: Ref<SheetHandle>;
 };
 
@@ -126,6 +131,20 @@ export function SheetViewer(props: SheetViewerProps) {
     return [...changes, ...posted.filter((c) => !ids.has(c.id))].filter((c) => !decided.has(c.id));
   }, [changes, posted, decided]);
   const pending = useMemo(() => pendingCells(allChanges, columns, titleColumn), [allChanges, columns, titleColumn]);
+  // The rows a pending change paints or is about (a row it removes or moves): they stay clear while reviewing
+  const changedRows = useMemo(() => {
+    const ids = new Set([...pending.keys()].map((k) => k.split("\u0000")[0]!));
+    for (const change of allChanges) {
+      const row = (change.op as { row?: string }).row;
+      if (change.status === "pending" && row) ids.add(row);
+    }
+    return ids;
+  }, [pending, allChanges]);
+  const reviewing = !!props.review?.active && changedRows.size > 0;
+  const rowClass = useCallback(
+    (row: ViewRow) => (reviewing && !changedRows.has(row.id) ? "review-dim" : undefined),
+    [reviewing, changedRows],
+  );
   const marks = useMemo(() => commentMarks(comments, columns), [comments, columns]);
 
   // Row heights in the real font once it has loaded; a row with a Suggested change holds two lines.
@@ -237,6 +256,7 @@ export function SheetViewer(props: SheetViewerProps) {
       : await deliverablesApi.reject(projectId, view.id, [changeId]);
     if (!answer.ok) return say(answer.error);
     setDecided((ids) => new Set([...ids, changeId]));
+    if (accept) props.onAccepted?.(answer.data as Accepted);
     onChanged?.();
   }
 
@@ -270,6 +290,7 @@ export function SheetViewer(props: SheetViewerProps) {
     setPopover(null);
   }
 
+  const current = props.review?.current ?? null;
   const renderCell = useCallback(
     (row: ViewRow, column: SheetColumn) => {
       const vc = byKey.get(column.key)!;
@@ -280,6 +301,7 @@ export function SheetViewer(props: SheetViewerProps) {
           titleColumn={titleColumn}
           direction={direction}
           pending={pending.get(cellKey(row.id, column.key))}
+          current={!!current && pending.get(cellKey(row.id, column.key))?.change.id === current}
           marks={marks.get(cellKey(row.id, column.key))}
           collapsed={collapsed.has(row.id)}
           onToggle={toggle}
@@ -290,7 +312,7 @@ export function SheetViewer(props: SheetViewerProps) {
       );
     },
     // toggle and decide read the latest state when called
-    [byKey, titleColumn, direction, pending, marks, collapsed, keysOf],
+    [byKey, titleColumn, direction, pending, marks, collapsed, keysOf, current],
   );
   const readOnly = !!props.readOnly;
   const canEdit = useCallback(
@@ -388,7 +410,7 @@ export function SheetViewer(props: SheetViewerProps) {
         lang={view.language}
         // in full mode the grid is as tall as its rows (and no taller than its room), so a short bill leaves no empty
         // band above its total: the review panels under it take the room
-        className={full ? "min-h-0 flex-[0_1_auto]" : "min-h-0 flex-1"}
+        className={`${full ? "min-h-0 flex-[0_1_auto]" : "min-h-0 flex-1"}${props.review ? " sheet-review" : ""}`}
         style={full ? { height: contentHeight } : undefined}
       >
         <Grid<ViewRow>
@@ -398,6 +420,7 @@ export function SheetViewer(props: SheetViewerProps) {
           rows={rows}
           direction={direction}
           rowHeight={(row) => heights.get(row.id) ?? linesHeight(1)}
+          rowClass={props.review ? rowClass : undefined}
           renderCell={renderCell}
           canEdit={canEdit}
           editText={editText}

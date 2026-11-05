@@ -207,6 +207,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The BOQ change review (ui/src/review/ChangesPanel.tsx): while the engineer reviews suggested changes, the rows with
+   no change dim to Slate at half opacity, over 220 ms with ONE's ease (opacity only); with reduced motion at once. */
+.sheet-review .rdg-cell {
+  transition: opacity 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sheet-review .review-dim > .rdg-cell {
+  opacity: 0.5;
+  color: var(--color-slate);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-review .rdg-cell {
+    transition: none;
+  }
+}
+
 /* Motion, group A: the start screen (ui/src/app/StartScreen.tsx). «ONE» is set in Instrument Sans Bold, the logo's
    family (OFL; Latin only, 17 KB). The mark's lines draw in (stroke-dashoffset from each line's length), the face
    fills copper, then ONE and the slogan's words rise 4 px and fade in. Every animation's resting style is the end

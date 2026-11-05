@@ -162,6 +162,9 @@ export type Change = {
   note?: Text | null; // e.g. NUMBER_WAS_CALCULATED
   /** A Document block change: the core's word segments, old → new (Task 3). */
   segments?: Segment[];
+  /** The source of each number the change shows that is in Project Records, by id (a typed number's comes only
+   * when it is accepted). */
+  sources?: Record<string, Source>;
 };
 
 export type Shown = ViewCell | Block | ViewRow | { columns: ViewColumn[] };

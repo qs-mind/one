@@ -1,10 +1,14 @@
-// What one sheet cell shows: its value, a Suggested change (old struck in Slate, new in Ink, ✓ ✗), a value the
-// QS Calc Engine would recalculate, comment marks, and a section's fold button. Values are never computed here.
+// What one sheet cell shows: its value, a Suggested change (the new value in Copper over the old one struck in Slate,
+// ✓ ✗), a value the QS Calc Engine would recalculate, comment marks, and a section's fold button. Values are never
+// computed here. The change the engineer moves to in the review reveals its new value (220 ms; at once with reduced
+// motion).
+import { useLayoutEffect, useRef } from "react";
 import type { Change, Thread, ViewCell, ViewColumn, ViewRow } from "../../deliverables/types";
 import { asCell, isNumber } from "../../deliverables/types";
 import { t } from "../../i18n";
 import { sourceLineHandlers } from "../../sources/line";
 import { TARGET } from "../../sources/targets";
+import { DUR, play } from "../../ui/motion";
 import { fieldKey, numberName } from "./clipboard";
 import { formatDecimal } from "./format";
 
@@ -12,6 +16,12 @@ export const cellKey = (row: string, column: string) => `${row}\u0000${column}`;
 
 export type Pending = { change: Change; before: ViewCell | null; after: ViewCell | null; recalculated: boolean };
 export type Mark = "review" | "note";
+
+/** A change's new value coming in where it shows: up a little and fading in (whole values, never by letter). */
+export const REVEAL: Keyframe[] = [
+  { opacity: 0, transform: "translateY(3px)" },
+  { opacity: 1, transform: "none" },
+];
 
 /** The cells each pending change paints. An edit wins over a recalculation shown on the same cell. */
 export function pendingCells(changes: Change[], columns: ViewColumn[], titleColumn: string | undefined) {
@@ -85,27 +95,28 @@ function Marks({ marks }: { marks: Set<Mark> | undefined }) {
 function Suggested({
   pending,
   end,
+  current,
   onAccept,
   onReject,
 }: {
   pending: Pending;
   end: boolean;
+  current: boolean;
   onAccept: (id: string) => void;
   onReject: (id: string) => void;
 }) {
+  const value = useRef<HTMLModElement>(null);
+  useLayoutEffect(() => {
+    if (current && value.current) void play(value.current, REVEAL, DUR.base);
+  }, [current]);
   const stop = (fn: () => void) => (event: { stopPropagation(): void }) => {
     event.stopPropagation(); // not a click on the cell: no source popover
     fn();
   };
   return (
     <span className={`flex w-full flex-col leading-snug ${end ? "items-end text-end" : "items-start"}`}>
-      {pending.before && (
-        <del className="text-slate">
-          <Value cell={pending.before} />
-        </del>
-      )}
       <span className="flex items-center gap-1">
-        <ins className="font-semibold text-ink no-underline">
+        <ins ref={value} className="inline-block font-semibold text-copper no-underline">
           <Value cell={pending.after} />
         </ins>
         {pending.recalculated ? (
@@ -135,6 +146,11 @@ function Suggested({
           </>
         )}
       </span>
+      {pending.before && (
+        <del className="text-slate">
+          <Value cell={pending.before} />
+        </del>
+      )}
     </span>
   );
 }
@@ -145,6 +161,8 @@ export type CellProps = {
   titleColumn: string | undefined;
   direction: "rtl" | "ltr";
   pending: Pending | undefined;
+  /** The change the engineer is on in the review. */
+  current?: boolean;
   marks: Set<Mark> | undefined;
   collapsed: boolean;
   onToggle: (sectionId: string) => void;
@@ -161,7 +179,7 @@ export function SheetCell(p: CellProps) {
   const wrap = column.wrap ? "whitespace-normal break-words" : "truncate";
   let content;
   if (p.pending) {
-    content = <Suggested pending={p.pending} end={number} onAccept={p.onAccept} onReject={p.onReject} />;
+    content = <Suggested pending={p.pending} end={number} current={!!p.current} onAccept={p.onAccept} onReject={p.onReject} />;
   } else if (row.kind === "section" && column.key === p.titleColumn) {
     content = (
       <span dir="auto" className={`font-bold ${wrap}`}>
