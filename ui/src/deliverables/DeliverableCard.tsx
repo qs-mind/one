@@ -1,6 +1,6 @@
 // A Deliverable in the chat, where the Lead QS made it (a `data-deliverable` part): its title, kind, status, Revision,
 // pending changes and open comments, kept up to date by the project's live stream, and "Open".
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { subscribeActivity } from "../activity";
 import { count, fill, pick, t, texts, useLanguage, type Text } from "../i18n";
 import { StatusChips } from "../viewers/sheet/SheetViewer";
@@ -27,7 +27,8 @@ export function Facts({ d }: { d: DeliverableInfo }) {
 export type DeliverableCardProps = {
   projectId: string;
   id: string;
-  onOpen: (id: string) => void;
+  /** Open, with the card itself: the board grows from it and closes back to it. */
+  onOpen: (id: string, card?: HTMLElement) => void;
   subscribe?: Subscribe;
 };
 
@@ -35,6 +36,7 @@ export function DeliverableCard({ projectId, id, onOpen, subscribe = subscribeAc
   useLanguage();
   const [entry, setEntry] = useState<DeliverableInfo | null>(null);
   const [failed, setFailed] = useState<Text | null>(null);
+  const card = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let live = true;
@@ -67,6 +69,8 @@ export function DeliverableCard({ projectId, id, onOpen, subscribe = subscribeAc
     ) : null;
   return (
     <article
+      ref={card}
+      data-deliverable-card
       aria-label={entry.title}
       className="flex flex-col gap-3 rounded-[14px] bg-stone/70 px-5 py-4"
     >
@@ -83,7 +87,7 @@ export function DeliverableCard({ projectId, id, onOpen, subscribe = subscribeAc
           type="button"
           className="ms-auto rounded-lg bg-ink px-4 py-1.5 text-paper"
           aria-label={`${t("deliverableOpen")}: ${entry.title}`}
-          onClick={() => onOpen(entry.id)}
+          onClick={() => onOpen(entry.id, card.current ?? undefined)}
         >
           {t("deliverableOpen")}
         </button>

@@ -107,8 +107,8 @@ export type ChatLogProps = {
   /** The log's accessible name: the project chat or the General chat. */
   label: string;
   projectId?: string;
-  /** A Deliverable card's Open. */
-  onOpenDeliverable?: (id: string) => void;
+  /** A Deliverable card's Open, with the card it opens from. */
+  onOpenDeliverable?: (id: string, card?: HTMLElement) => void;
 };
 
 /** How near the end (px) still counts as reading the newest message. */
