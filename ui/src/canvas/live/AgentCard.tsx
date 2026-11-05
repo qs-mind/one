@@ -131,7 +131,10 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
         <button
           type="button"
           className="nodrag self-start truncate text-start underline decoration-ink/30 underline-offset-2 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-ink"
-          onClick={() => canvasApi.focusFrame(frame, agent.focus?.anchor ? { anchor: agent.focus.anchor } : undefined)}
+          onClick={(event) => {
+            event.stopPropagation(); // the click must not also select the team frame around the card
+            canvasApi.focusFrame(frame, agent.focus?.anchor ? { anchor: agent.focus.anchor } : undefined);
+          }}
         >
           {place ? fill(t("agentOnAt"), { title, place }) : fill(t("agentOn"), { title })}
         </button>

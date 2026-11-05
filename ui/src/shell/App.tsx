@@ -9,6 +9,9 @@ import { Canvas } from "../canvas/Canvas";
 import { CHAT_STARTS_OPEN, DELIVERABLE_CARD_OPENS } from "../canvas/choices";
 import { sampleSources } from "../canvas/fake";
 import { isMod, isTyping, matches } from "../canvas/keys";
+import { leadFromChat, useWaiting } from "../canvas/live/activity";
+import { Announcer } from "../canvas/live/Announcer";
+import { Cursors } from "../canvas/live/Cursors";
 import { select } from "../canvas/selection";
 import { httpSources } from "../canvas/sources";
 import type { FrameKey, ProjectSources, ProjectStatus } from "../canvas/types";
@@ -71,7 +74,12 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const deliverable = useDeliverablePanel(project?.id);
   const [status, setStatus] = useState<ProjectStatus>({});
-  const [waiting, setWaiting] = useState(0);
+  const liveWaiting = useWaiting(); // the live stream's count, once it has said one; until then the status's
+  const waiting = liveWaiting ?? status.waiting ?? 0;
+
+  useEffect(() => {
+    leadFromChat(chat.running); // before Plan 4 sends a Lead QS, the team shows the chat's own
+  }, [chat.running]);
 
   useEffect(() => {
     // a remembered project that no longer opens is forgotten, and the projects show
@@ -83,9 +91,8 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   }, [project?.id]);
 
   useEffect(() => {
-    // the project's status; the live stream says when waiting cards change and when a Deliverable (the BOQ) moved
+    // the project's status, read again when a Deliverable (the BOQ) moved
     setStatus({});
-    setWaiting(0);
     if (!sources) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -95,7 +102,6 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         .then((next) => {
           if (controller.signal.aborted) return;
           setStatus(next);
-          setWaiting(next.waiting ?? 0);
         })
         .catch(() => undefined); // the strip shows what it has
     const later = () => {
@@ -105,8 +111,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     load();
     sources.activity(
       (event) => {
-        if (event.type === "waiting") setWaiting(event.count);
-        else if (event.type === "deliverable") later();
+        if (event.type === "deliverable") later();
       },
       controller.signal,
       load,
@@ -210,7 +215,9 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
           {project && sources ? (
             <main className="relative min-h-0 flex-1 overflow-hidden">
               <div data-region="canvas" tabIndex={-1} className="absolute inset-0 outline-none" inert={fullScreen}>
-                <Canvas projectId={project.id} sources={sources} onOpenFull={(id) => deliverable.show(id, true)} />
+                <Canvas projectId={project.id} sources={sources} onOpenFull={(id) => deliverable.show(id, true)}>
+                  <Cursors />
+                </Canvas>
               </div>
               <ChatPanel
                 {...body}
@@ -256,6 +263,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
             setPanel("projects");
           }}
         />
+        <Announcer />
       </div>
     </DirectionProvider>
   );

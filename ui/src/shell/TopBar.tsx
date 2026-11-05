@@ -1,9 +1,10 @@
-// The top bar, 48 px: the mark, the project (or the General chat) with its switcher, the project's status, "Waiting
-// for you", search, then AI settings, the other language, the Deliverables and Project Records. Below 900 px the
+// The top bar, 48 px: the mark, the project (or the General chat) with its switcher, the project's status, the agent
+// the view follows, who is working now, "Waiting for you", search, then AI settings, the other language, the Deliverables and Project Records. Below 900 px the
 // status folds into one Status button and the rest into More. The chrome mirrors in Arabic.
 import { useRef } from "react";
 import type { ProjectSources, ProjectStatus } from "../canvas/types";
 import { isMac } from "../canvas/keys";
+import { Following, TeamNow } from "../canvas/live/TeamNow";
 import { fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -140,6 +141,8 @@ export function TopBar(props: TopBarProps) {
       )}
 
       <div className="ms-auto flex shrink-0 items-center gap-1">
+        {project && <Following />}
+        {project && !narrow && <TeamNow />}
         {project && props.waiting > 0 && (
           <button type="button" className={`${button} text-copper`} onClick={props.onWaiting}>
             {fill(t("waitingForYou"), { n: props.waiting })}
