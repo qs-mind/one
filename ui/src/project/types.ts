@@ -15,6 +15,11 @@ export type View = { x: number; y: number; zoom: number };
 
 /** A place inside a frame: a sheet row and column, a document block (`row`) and text range, a PDF page. */
 export type Anchor = { row?: string; column?: string; page?: number; text?: [number, number]; point?: [number, number] };
+export type DocKind = "files" | "file" | "deliverable" | "clientboq";
+/** "files:all", "file:<id>", "deliverable:<id>", "clientboq:<id>". */
+export type DocKey = `${DocKind}:${string}`;
+/** The document open in the workspace, and where in it. */
+export type Opened = { key: DocKey; anchor: Anchor | null };
 export type Focus = { frame: FrameKey; anchor: Anchor | null };
 
 /** Plan 2: GET /projects/{id}/files -> {files}. */
@@ -102,6 +107,8 @@ export interface ProjectSources {
   layout(): Promise<{ frames: Placed[]; view: View | null; client_boqs?: ClientBoqInfo[] }>;
   saveFrames(frames: Placed[], removed: FrameKey[], keepalive?: boolean): Promise<void>;
   saveView(view: View, keepalive?: boolean): Promise<void>;
+  workspace(): Promise<{ open: DocKey | null; anchor: Anchor | null; client_boqs: ClientBoqInfo[] }>;
+  saveWorkspace(opened: Opened, keepalive?: boolean): Promise<void>;
   /** Live events until `signal` aborts; reconnects by itself and then calls `onReconnect`. */
   activity(onEvent: (event: ActivityEvent) => void, signal: AbortSignal, onReconnect?: () => void): void;
   /** An object URL of the page as a PNG. */
