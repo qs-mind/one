@@ -2,7 +2,15 @@
 import { useSyncExternalStore } from "react";
 import { api } from "../api";
 
-export type Project = { id: string; name: string; created_at: string };
+export type Project = {
+  id: string;
+  name: string;
+  created_at: string;
+  /** Archived: read-only until unarchived (Plan 8). */
+  archived_at?: string | null;
+  /** A Confidential Project: nothing in it is used outside it. */
+  confidential?: boolean;
+};
 
 const storageKey = "qsone.project";
 const listeners = new Set<() => void>();

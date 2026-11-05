@@ -1,0 +1,165 @@
+// The folder imports under way and their reports, one value for the page like records/project.ts, so an import
+// started on the first launch's Ready screen carries on in the app. Three ways in:
+// - a tender folder, with no project open: a new project named after the folder, its files, then the
+//   "I understood this" Brief (POST /understand), whose card comes in the project chat;
+// - old work: each folder its own project, archived without the AI step; "Understand it" later unarchives it first;
+// - a folder dropped on an open project's canvas: its files go into that project, with their folders.
+import { useSyncExternalStore } from "react";
+import { api } from "../api";
+import { askForBackupFolder } from "../backup/ask";
+import { coreLine, send } from "../core";
+import { type Text, texts } from "../i18n";
+import { type Project, switchProject } from "../records/project";
+import { byTopFolder, entriesOf, fromDrop, fromInput, type Picked, type Report, upload } from "./walk";
+
+export type Job = {
+  key: number;
+  name: string;
+  projectId?: string;
+  old: boolean;
+  /** A folder dropped on an open project: its files went into that project. */
+  into?: boolean;
+  /** Adding files: how many are done of how many. */
+  done: number;
+  total: number;
+  report?: Report;
+  /** The "I understood this" Brief: started, or not started with the core's reason. */
+  understanding?: "started" | Text;
+  /** Old work: archived. */
+  archived?: boolean;
+  /** The project was not made, or the files not sent: nothing more happens. */
+  failed?: Text;
+};
+
+let jobs: Job[] = [];
+let next = 1;
+const listeners = new Set<() => void>();
+const briefListeners = new Set<(projectId: string) => void>();
+
+function changed(list: Job[]) {
+  jobs = list;
+  for (const listener of listeners) listener();
+}
+
+function update(key: number, change: Partial<Job>) {
+  changed(jobs.map((job) => (job.key === key ? { ...job, ...change } : job)));
+}
+
+/** The imports, newest last. */
+export function useImports(): Job[] {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => jobs,
+  );
+}
+
+/** The report is read: it goes. */
+export function dismiss(key: number) {
+  changed(jobs.filter((job) => job.key !== key));
+}
+
+/** Tells the shell a Brief started in a project from here, so its chat shows it (the chat joins it). */
+export function onBriefStarted(listener: (projectId: string) => void): () => void {
+  briefListeners.add(listener);
+  return () => void briefListeners.delete(listener);
+}
+
+export function briefStarted(projectId: string) {
+  for (const listener of briefListeners) listener(projectId);
+}
+
+/** The picked files of a drop or a folder chooser. A drop's entries are taken now, while its event lasts. */
+function picking(source: DataTransfer | FileList | File[] | Picked[]): Promise<Picked[]> {
+  if (Array.isArray(source) && (source.length === 0 || "folder" in source[0]!)) return Promise.resolve(source as Picked[]);
+  if (source instanceof FileList || Array.isArray(source)) return Promise.resolve(fromInput(source as FileList | File[]));
+  const entries = entriesOf(source.items);
+  return entries.length ? fromDrop(entries) : Promise.resolve(fromInput(source.files));
+}
+
+async function create(name: string): Promise<{ project?: Project; line?: Text }> {
+  const response = await send("/projects", "POST", { name: name.slice(0, 200) });
+  if (response?.ok) return { project: (await response.json()) as Project };
+  return { line: await coreLine(response, texts.projectNotCreated) };
+}
+
+async function understand(projectId: string): Promise<"started" | Text> {
+  const response = await send(`/projects/${encodeURIComponent(projectId)}/understand`, "POST");
+  if (response?.status === 202 || response?.status === 409) {
+    const body = (await response.json().catch(() => ({}))) as { brief_id?: string; error?: Text };
+    if (body.brief_id) {
+      briefStarted(projectId);
+      return "started";
+    }
+    if (body.error) return body.error;
+  }
+  return await coreLine(response, texts.importFailed);
+}
+
+async function run(job: Job, picked: Picked[], { understandAfter }: { understandAfter: boolean }) {
+  const id = job.projectId!;
+  const report = await upload(id, picked, (done, total) => update(job.key, { done, total }));
+  update(job.key, { report });
+  if (job.old) {
+    const archived = await send(`/projects/${encodeURIComponent(id)}/archive`, "POST");
+    update(job.key, { archived: archived?.ok === true });
+    void send(`/projects/${encodeURIComponent(id)}/close`, "POST"); // old work is not left open
+  } else if (understandAfter) {
+    update(job.key, { understanding: await understand(id) });
+  }
+}
+
+/** A dropped or chosen tender folder (old: false), or old work (old: true), each folder its own project. */
+export async function importFolders(source: DataTransfer | FileList | File[] | Picked[], { old }: { old: boolean }) {
+  const picked = await picking(source);
+  if (!picked.length) return;
+  // a tender is one project, named after the (first) folder; old work is one project per folder
+  const groups = old ? byTopFolder(picked) : [{ name: byTopFolder(picked)[0]!.name, picked }];
+  for (const group of groups) {
+    const job: Job = { key: next++, name: group.name, old, done: 0, total: group.picked.length };
+    changed([...jobs, job]);
+    const made = await create(group.name);
+    if (!made.project) {
+      update(job.key, { failed: made.line });
+      continue;
+    }
+    job.projectId = made.project.id;
+    update(job.key, { projectId: made.project.id });
+    if (!old) switchProject(made.project); // the engineer works in the tender now
+    void askForBackupFolder();
+    await run(job, group.picked, { understandAfter: !old });
+  }
+}
+
+/** A folder dropped on the open project's canvas: its files, with their folders, into that project. */
+export async function importInto(project: Project, source: DataTransfer | Picked[]) {
+  const picked = await picking(source);
+  if (!picked.length) return;
+  const name = byTopFolder(picked)[0]!.name;
+  const job: Job = { key: next++, name, projectId: project.id, old: false, into: true, done: 0, total: picked.length };
+  changed([...jobs, job]);
+  await run(job, picked, { understandAfter: false });
+}
+
+/** Old work, understood after all: it is opened and unarchived first (an archived project takes no change), then the
+ * Brief starts, with its Brief Budget as any Brief. */
+export async function understandIt(key: number) {
+  const job = jobs.find((one) => one.key === key);
+  if (!job?.projectId) return;
+  const id = encodeURIComponent(job.projectId);
+  const opened = await api(`/projects/${id}/open`, { method: "POST" }).catch(() => undefined);
+  if (!opened?.ok) return update(key, { understanding: await coreLine(opened, texts.projectNotOpened) });
+  const project = (await opened.json()) as Project;
+  const back = await send(`/projects/${id}/unarchive`, "POST");
+  if (!back?.ok) return update(key, { understanding: await coreLine(back, texts.importFailed) });
+  switchProject({ ...project, archived_at: null });
+  update(key, { archived: false, old: false, understanding: await understand(job.projectId) });
+}
+
+/** For the tests: no import, no listener. */
+export function resetImports() {
+  changed([]);
+  briefListeners.clear();
+}
