@@ -1,5 +1,6 @@
-"""The first launch's routes: its steps, the AI consent, Claude Code, the AI check, the
-introduction card, and the outside links the core opens for the page (decision 6)."""
+"""The journey's routes (Plan 8): the first launch's steps, the AI consent, Claude Code, the AI
+check, the introduction card and the outside links the core opens for the page (decision 6);
+and a tender folder's "I understood this" card."""
 
 import asyncio
 import webbrowser
@@ -12,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from qsone import chat, usage
 from qsone.engine import connectors as engine_connectors
 from qsone.engine.connectors import claude_code as claude_link
-from qsone.journey import claude_code, engineer, setup_state
+from qsone.journey import claude_code, engineer, setup_state, understand
 from qsone.journey.setup_state import Language, State
 
 LINKS = {
@@ -49,6 +50,22 @@ class OpenIn(BaseModel):
 
     link: Literal["terms", "privacy", "releases", "sign_in"]
     lang: Language | None = None  # the page's language; else the one chosen at the first launch
+
+
+FactName = Literal["client", "submission_date", "contract_type", "items_count"]
+
+
+class FactIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    value: str = Field(min_length=1, max_length=300)
+
+
+class FactsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    facts: dict[FactName, FactIn] = Field(default_factory=dict)
+    approve: bool = False
 
 
 def _not_saved() -> JSONResponse:
@@ -134,6 +151,31 @@ def router(engine: Any) -> APIRouter:
     @r.put("/engineer/card")
     def put_card(body: engineer.Card) -> dict:
         return engineer.save_card(engine.engineer_records(), body)
+
+    @r.post("/projects/{project_id}/understand", status_code=202)
+    async def understand_project(project_id: str) -> JSONResponse:
+        """One Brief to the Lead QS that reads the folder and fills the card (202)."""
+        from qsone.engine.runner import BriefBusy, NoAI
+
+        rec = engine.projects.get(project_id)
+        try:
+            brief_id = await understand.start(rec, engine)
+        except BriefBusy as busy:
+            return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
+        except NoAI as none:
+            return JSONResponse({"error": none.text}, status_code=409)
+        return JSONResponse({"brief_id": brief_id}, status_code=202)
+
+    @r.get("/projects/{project_id}/facts")
+    async def get_facts(project_id: str) -> dict:
+        return await asyncio.to_thread(understand.facts, engine.projects.get(project_id))
+
+    @r.put("/projects/{project_id}/facts")
+    async def put_facts(project_id: str, body: FactsIn) -> dict:
+        """The engineer's corrections, then the approval as given."""
+        rec = engine.projects.get(project_id)
+        values = {name: fact.value for name, fact in body.facts.items()}
+        return await asyncio.to_thread(understand.correct, rec, values, approve=body.approve)
 
     @r.post("/app/open")
     async def open_link(body: OpenIn) -> dict:

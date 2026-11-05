@@ -110,7 +110,7 @@ from qsone.engine.types import (
     brief_language,
     choice_of,
 )
-from qsone.journey import engineer
+from qsone.journey import engineer, understand
 from qsone.projects import Projects
 from qsone.records.project import Records, RecordsError
 
@@ -952,9 +952,11 @@ class _Brief:
 
     async def _lead_job(self, run_id: str, spec: AgentSpec, choice: ModelChoice) -> str:
         self._agent(run_id, state="working", model=choice.model)
-        selected = selection.line(self.selection)
-        if selected is not None:  # Claude Code reads only its instructions file
-            spec = replace(spec, instructions=f"{spec.instructions}\n\n{selected}")
+        # Claude Code reads only its instructions file: a Brief from code's own instruction
+        # (Plan 8) and the canvas selection go there.
+        for extra in (self.instruction, selection.line(self.selection)):
+            if extra:
+                spec = replace(spec, instructions=f"{spec.instructions}\n\n{extra}")
         return await self._job(run_id, spec, choice, self.text)
 
     # Specialists and the checker ---------------------------------------------------------------
@@ -1536,7 +1538,9 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
     if reply:
         events.append(TextDelta(brief_id, reply))
     if lead is not None and lead["history"]:
-        events += general.stored_cards(brief_id, agents.tool_returns(lead["history"]))
+        returns = agents.tool_returns(lead["history"])
+        events += general.stored_cards(brief_id, returns)
+        events += understand.stored_cards(brief_id, returns)  # Plan 8's card
     for m in store.team(brief_id):
         events.append(TeamMessage(brief_id, m["id"], m["sender"], m["recipient"], m["text"]))
     with store.rec.read() as c:

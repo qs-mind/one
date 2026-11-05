@@ -1,7 +1,11 @@
 """Files in Project Records. The original is kept inside the encrypted file in pieces, found again
 by its SHA-256; its text goes in chunks and into the word index. A file dropped again under the same
 name with new content is a new version; the old one is kept and marked "valid until". A scanned
-page's text, read later by the engineer's AI from its image, is added with `add_ocr_pages`."""
+page's text, read later by the engineer's AI from its image, is added with `add_ocr_pages`.
+
+A file from a tender folder keeps its `folder`: the path inside the dropped folder (Plan 8),
+display text only, never a path on this computer. Two files of the same name in two folders are
+two files; a version replaces only the file of the same name in the same folder."""
 
 import hashlib
 import json
@@ -36,13 +40,15 @@ class FileInfo:
     replaces: str | None
     valid_until: str | None
     flags: int = 0  # hidden-text flags (file_flags rows)
+    folder: str | None = None  # the path inside a dropped folder, "a/b" (Plan 8)
     duplicate: bool = False
 
 
 _INFO = (
     "SELECT f.id, f.name, f.kind, f.size, f.sha256, f.status, f.note, f.pages,"
     " (SELECT count(*) FROM chunks c WHERE c.file_id = f.id), f.added_at, f.replaces,"
-    " f.valid_until, (SELECT count(*) FROM file_flags g WHERE g.file_id = f.id) FROM files f"
+    " f.valid_until, (SELECT count(*) FROM file_flags g WHERE g.file_id = f.id), f.folder"
+    " FROM files f"
 )
 
 
@@ -54,6 +60,18 @@ def _same_bytes(conn, sha256: str) -> FileInfo | None:
     return None if row is None else FileInfo(*row, duplicate=True)
 
 
+MAX_FOLDER = 1000  # characters of a folder path
+
+
+def clean_folder(folder: str | None) -> str | None:
+    """A folder path as kept: "/" between its parts, no empty, "." or ".." part, None when
+    nothing is left. Display text only."""
+    if folder is None:
+        return None
+    parts = (p.strip() for p in re.split(r"[/\\]", folder))
+    return "/".join(p for p in parts if p and p not in (".", ".."))[:MAX_FOLDER] or None
+
+
 def add_file(
     rec: Records,
     name: str,
@@ -62,13 +80,17 @@ def add_file(
     actor: str,
     embedder: search.Embedder | None = None,
     flags: Sequence[Flag] = (),
+    folder: str | None = None,
+    note: str | None = None,
 ) -> FileInfo:
     """Raises `RecordsError`: FILE_EMPTY (422) or FILE_TOO_BIG (413), and then nothing is stored.
 
-    `name` is display text only and never touches the disk. `flags` are hidden-text flags the
-    caller found and the stored bytes no longer show (a web page's hidden elements), kept with
-    the file's own; they are not added again when the same bytes are already stored."""
+    `name` and `folder` are display text only and never touch the disk. `flags` are hidden-text
+    flags the caller found and the stored bytes no longer show (a web page's hidden elements),
+    kept with the file's own; they are not added again when the same bytes are already stored.
+    `note` (a copy.py name) replaces what reading the file noted: a zip kept and not opened."""
     name = re.split(r"[/\\]", name)[-1][:255]
+    folder = clean_folder(folder)
     if not data:
         raise RecordsError(copy.FILE_EMPTY, status=422)
     if len(data) > MAX_FILE_BYTES:
@@ -96,7 +118,8 @@ def add_file(
             ),
         )
         old = conn.execute(
-            "SELECT id FROM files WHERE name = ? AND valid_until IS NULL", (name,)
+            "SELECT id FROM files WHERE name = ? AND folder IS ? AND valid_until IS NULL",
+            (name, folder),
         ).fetchone()
         replaces = None if old is None else old[0]
         if replaces is not None:
@@ -118,16 +141,17 @@ def add_file(
             "size": len(data),
             "sha256": sha256,
             "status": extracted.status,
-            "note": extracted.note,
+            "note": note or extracted.note,
             "pages": extracted.pages,
             "added_at": at,
             "added_by": actor,
             "replaces": replaces,
+            "folder": folder,
         }
         conn.execute(
             "INSERT INTO files(id, name, kind, size, sha256, status, note, pages, added_at,"
-            " added_by, replaces) VALUES (:id, :name, :kind, :size, :sha256, :status, :note,"
-            " :pages, :added_at, :added_by, :replaces)",
+            " added_by, replaces, folder) VALUES (:id, :name, :kind, :size, :sha256, :status,"
+            " :note, :pages, :added_at, :added_by, :replaces, :folder)",
             row,
         )
         audit.record(
@@ -170,13 +194,14 @@ def add_file(
         len(data),
         sha256,
         extracted.status,
-        extracted.note,
+        row["note"],
         extracted.pages,
         len(chunks),
         at,
         replaces,
         None,
         len(all_flags),
+        folder,
     )
 
 
