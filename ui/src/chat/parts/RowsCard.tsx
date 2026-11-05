@@ -6,7 +6,7 @@
 // table (which scrolls sideways inside the card if it must). Each cell finds its own direction, and a long value shows
 // two lines with the whole of it as the cell's title. Table roles are set by hand: a stacked table keeps them.
 import { useState } from "react";
-import { BidiText } from "../bidi";
+import { baseDirection, BidiText } from "../bidi";
 import { fill, pick, t } from "../../i18n";
 import type { CardKindProps } from "./cardKinds";
 
@@ -16,7 +16,8 @@ function Cell({ value, label, main }: { value: string; label: string; main: bool
   return (
     <td
       role="cell"
-      dir="auto"
+      // a value with no letter (a price, a date) takes the card's direction, so its "label: " stays before it
+      dir={baseDirection(value) ? "auto" : undefined}
       title={value || undefined}
       data-label={main ? undefined : `${label}: `}
       className={`min-w-0 align-top @lg:table-cell @lg:min-w-[5rem] @lg:max-w-[14rem] @lg:px-3 @lg:py-2.5 @lg:before:content-none ${

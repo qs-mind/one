@@ -805,7 +805,8 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
           <MiniMap
             className="max-[900px]:hidden"
             position={rtl ? "bottom-right" : "bottom-left"}
-            style={{ marginBottom: 80, width: 168, height: 112 }}
+            // in one bottom band with the zoom bar beside it, so the two take a strip off the free area, not a column
+            style={{ margin: 16, width: 168, height: 112 }}
             ariaLabel={t("minimap")}
             bgColor="#F9F8F4"
             nodeColor="#F2EEE7"
@@ -847,7 +848,8 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   );
 }
 
-/** Zoom out, the zoom level, zoom in, and Arrange by stage, at the bottom inline start (it mirrors in Arabic). */
+/** Zoom out, the zoom level, zoom in, and Arrange by stage, at the bottom inline start (it mirrors in Arabic), beside
+ * the minimap where it shows (wider than 900 px). */
 function ZoomBar({ onArrange }: { onArrange(): void }) {
   useLanguage();
   const flow = useReactFlow();
@@ -861,7 +863,7 @@ function ZoomBar({ onArrange }: { onArrange(): void }) {
       data-canvas-cover
       dir={dir()}
       style={{ [dir() === "rtl" ? "right" : "left"]: 16 }}
-      className="absolute bottom-4 z-10 flex items-center gap-1 rounded-[16px] border border-ink/[0.08] bg-paper p-1.5 shadow-[0_2px_12px_rgb(14_15_18/0.06)]"
+      className={`absolute bottom-4 z-10 flex ${dir() === "rtl" ? "min-[901px]:right-[196px]!" : "min-[901px]:left-[196px]!"} items-center gap-1 rounded-[16px] border border-ink/[0.08] bg-paper p-1.5 shadow-[0_2px_12px_rgb(14_15_18/0.06)]`}
     >
       <button type="button" aria-label={t("zoomOut")} title={t("zoomOut")} className={button} onClick={() => void flow.zoomOut({ duration: duration() })}>
         −

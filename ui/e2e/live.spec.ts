@@ -99,6 +99,7 @@ test("Follow keeps the agent's frame in view; a zoom by hand stops it", async ({
   const mod = await page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "Meta" : "Control"));
   await page.keyboard.press(`${mod}+KeyK`);
   await page.keyboard.type("فريق المشروع");
+  await expect(page.getByRole("option", { name: "فريق المشروع" })).toHaveAttribute("aria-selected", "true"); // Enter takes it
   await page.keyboard.press("Enter");
   core.emit([{ type: "agent", agent: checker }]);
   await frame(page, "team:core").locator('li[data-agent="chk"]').getByRole("button", { name: /تابع/ }).click();
