@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SelectionItem } from "../canvas/types";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
 import { fill, type Language, language, languageOf, pick, t, type Text, useLanguage } from "../i18n";
+import { UnderstoodCard } from "../import/UnderstoodCard";
 import { HandOffCards } from "../shell/HandOffCard";
 import type { ChatState } from "../shell/useChats";
 import { textOf } from "../shell/useChats";
@@ -78,6 +79,9 @@ function BriefReply({
         >
           <ApprovalCard id={card.id} card={card.data} lang={said} />
         </div>
+      ))}
+      {partsOf(parts, "understood").map((part) => (
+        <UnderstoodCard key={part.id} projectId={part.data.project_id} />
       ))}
       {partsOf(parts, "cost").map((cost) => (
         <CostNotice key={cost.id} cost={cost.data} />

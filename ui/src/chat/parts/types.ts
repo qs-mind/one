@@ -74,6 +74,9 @@ export type UnsourcedData = { values: string[] };
 export type StatusData = { state: BriefState; step: Text | null };
 /** data-deliverable, id = the Deliverable (Plan 6): the Lead QS made it; the chat shows its card. */
 export type DeliverableData = { id: string };
+/** data-understood, id = understood-<Brief id> (Plan 8): the Lead QS read a tender folder; the chat shows the
+ * "I understood this" card, which reads the facts itself. */
+export type UnderstoodData = { project_id: string };
 
 export type OneData = {
   progress: ProgressData;
@@ -84,6 +87,7 @@ export type OneData = {
   unsourced: UnsourcedData;
   status: StatusData;
   deliverable: DeliverableData;
+  understood: UnderstoodData;
 };
 
 /** A message the engineer sent while a Brief ran is marked as steering it; one sent with a canvas selection keeps

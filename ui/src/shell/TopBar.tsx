@@ -7,14 +7,16 @@ import { useRef } from "react";
 import type { ProjectSources, ProjectStatus } from "../canvas/types";
 import { isMac } from "../canvas/keys";
 import { Following, TeamNow } from "../canvas/live/TeamNow";
+import { send } from "../core";
 import { openSetup } from "../firstlaunch/parts";
+import { chooseFolder } from "../import/FolderDrop";
 import { fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { useCompact } from "./regions";
 import { StatusStrip } from "./StatusStrip";
 
-export type PanelKind = "ai" | "projects" | "records" | "deliverables";
+export type PanelKind = "ai" | "projects" | "records" | "deliverables" | "backup" | "close" | "confidential";
 
 const MARK = 
   "M18 109.32L31.22 171.34M18 109.32L31.63 138.83M18 109.32L41.86 84.2M18 109.32L43.74 51.39M31.22 171.34L31.63 138.83M31.22 171.34L63.25 184.55M31.22 171.34L78.35 213.75M31.63 138.83L41.86 84.2M31.63 138.83L63.25 184.55M31.63 138.83L69.83 130.69M41.86 84.2L43.74 51.39M41.86 84.2L69.83 130.69M41.86 84.2L75.43 40.26M41.86 84.2L95.57 72.76M43.74 51.39L75.43 40.26M43.74 51.39L98.61 19.66M63.25 184.55L69.83 130.69M63.25 184.55L78.35 213.75M63.25 184.55L111.82 210.98M63.25 184.55L116.96 173.1M69.83 130.69L95.57 72.76M69.83 130.69L116.96 173.1M69.83 130.69L123.01 119.36M75.43 40.26L95.57 72.76M75.43 40.26L98.61 19.66M75.43 40.26L130.64 32.86M78.35 213.75L111.82 210.98M78.35 213.75L141.39 220.34M95.57 72.76L123.01 119.36M95.57 72.76L130.64 32.86M95.57 72.76L158.61 79.35M98.61 19.66L130.64 32.86M98.61 19.66L161.65 26.25M111.82 210.98L116.96 173.1M111.82 210.98L141.39 220.34M111.82 210.98L165.25 195.22M116.96 173.1L123.01 119.36M116.96 173.1L165.25 195.22M116.96 173.1L171.83 141.37M123.01 119.36L158.61 79.35M123.01 119.36L171.83 141.37M130.64 32.86L158.61 79.35M130.64 32.86L161.65 26.25M130.64 32.86L182.68 51.49M141.39 220.34L165.25 195.22M141.39 220.34L196.26 188.61M158.61 79.35L171.83 141.37M158.61 79.35L182.68 51.49M158.61 79.35L206.9 101.48M161.65 26.25L182.68 51.49M161.65 26.25L208.78 68.66M165.25 195.22L171.83 141.37M165.25 195.22L196.26 188.61M165.25 195.22L205.17 157M171.83 141.37L205.17 157M171.83 141.37L206.9 101.48M182.68 51.49L206.9 101.48M182.68 51.49L208.78 68.66M196.26 188.61L205.17 157M196.26 188.61L222 130.68M205.17 157L206.9 101.48M205.17 157L222 130.68M206.9 101.48L208.78 68.66M206.9 101.48L222 130.68M208.78 68.66L222 130.68";
@@ -83,7 +85,12 @@ export function TopBar(props: TopBarProps) {
       type="button"
       lang={lang === "ar" ? "en" : "ar"}
       className={button}
-      onClick={() => setLanguage(language() === "ar" ? "en" : "ar")}
+      onClick={() => {
+        const next = language() === "ar" ? "en" : "ar";
+        setLanguage(next);
+        // the core starts some Briefs itself (a tender folder's, a project's lessons): in the language on the screen
+        void send("/setup/language", "PUT", { state: "done", lang: next });
+      }}
     >
       {t("otherLanguage")}
     </button>
@@ -132,6 +139,16 @@ export function TopBar(props: TopBarProps) {
         </span>
         <span aria-hidden="true" className="text-xs text-slate">▾</span>
       </button>
+      {project?.archived_at && (
+        <button
+          type="button"
+          aria-expanded={panel === "close"}
+          className="shrink-0 whitespace-nowrap rounded-lg bg-stone px-3 py-1 text-ink hover:bg-ink/[0.08] focus-visible:outline-2 focus-visible:outline-ink"
+          onClick={(event) => onPanel("close", event.currentTarget)}
+        >
+          {t("archivedReadOnly")}
+        </button>
+      )}
 
       {project && !narrow && <StatusStrip status={props.status} sources={props.sources} />}
       {project && narrow && Object.keys(props.status).length > 0 && (
@@ -176,6 +193,32 @@ export function TopBar(props: TopBarProps) {
                 {projectPanels(more.current)}
               </>
             )}
+            {project && (
+              <>
+                {!project.archived_at && (
+                  <button type="button" className={button} onClick={() => onPanel("close", more.current!)}>
+                    {t("closeProject")}
+                  </button>
+                )}
+                <button type="button" className={button} onClick={() => onPanel("confidential", more.current!)}>
+                  {t("confidential")}
+                </button>
+              </>
+            )}
+            <button type="button" className={button} onClick={() => onPanel("backup", more.current!)}>
+              {t("backupTitle")}
+            </button>
+            <PopoverClose asChild>
+              <button type="button" className={button} onClick={() => chooseFolder(false)}>
+                {t("importMenu")}
+              </button>
+            </PopoverClose>
+            <PopoverClose asChild>
+              <button type="button" title={t("readyImportOldHelp")} className={button} onClick={() => chooseFolder(true)}>
+                {t("readyImportOld")}
+              </button>
+            </PopoverClose>
+            <hr className="mx-3 my-1 border-ink/[0.06]" />
             {ai(more.current)}
             {otherLanguage}
             <PopoverClose asChild>

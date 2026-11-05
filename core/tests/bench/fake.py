@@ -3,9 +3,10 @@
 The brain is stateless: each request it reads what it was given (the tools offered, the output
 tool, the Brief, the tool results so far) and picks the next step of the Brief's scenario. A
 scenario is chosen by a keyword in the Brief: "bench:chat", "bench:question", "bench:boq",
-"bench:deliverable", "bench:team"; anything else is the full tender walk-through. Each step is
-tried once: a tool that refuses is noted in core.log and the brain moves on, so it never loops.
-Every text it writes says it is a bench reply, and it writes no number of its own.
+"bench:deliverable", "bench:team"; the Briefs One starts itself (a tender folder's "I understood
+this", a project's lessons) have their own; anything else is the full tender walk-through.
+Each step is tried once: a tool that refuses is noted in core.log and the brain moves on, so it
+never loops. Every text it writes says it is a bench reply, and it writes no number of its own.
 """
 
 import json
@@ -36,11 +37,12 @@ log = logging.getLogger("qsone.bench")
 
 USAGE = (600, 120)  # tokens in and out of every bench response: 0.0012 USD at the sample prices
 PRICE_SOURCE = "bench sample price, not real"
-SCENARIOS = ("chat", "question", "boq", "deliverable", "team", "full")
+SCENARIOS = ("chat", "question", "boq", "deliverable", "team", "full", "understand", "lessons")
 _KEYWORD = re.compile(r"bench:(\w+)")
 _ARABIC = re.compile(r"[؀-ۿ]")
 _LATIN = re.compile(r"[A-Za-z]")
-_FILE = re.compile(r"file:([0-9a-f]{32}) \| ([^|]+?) \| (\w+)")
+# a files_list line: file:<id> | <name> | [in folder <folder> |] <kind> | …
+_FILE = re.compile(r"file:([0-9a-f]{32}) \| ([^|]+?) \| (?:in folder [^|]+ \| )?(\w+)")
 _NEXT_IMPORT = re.compile(r"Next: boq_import (\{.*\})")
 _MODEL = re.compile(r"You run on the model ([\w.:-]+)")
 
@@ -98,6 +100,10 @@ def read(messages: list, info: AgentInfo) -> Seen:
                 log.warning("bench: %s refused %s: %s", part.tool_name, step, _text(part.content))
     found = _KEYWORD.search(brief)
     scenario = found.group(1) if found and found.group(1) in SCENARIOS else "full"
+    if brief in copy.UNDERSTAND_BRIEF.values():  # the Brief a tender folder's import starts
+        scenario = "understand"
+    elif brief in copy.LESSONS_BRIEF.values():  # the one closing a project starts
+        scenario = "lessons"
     tools = {t.name for t in info.function_tools}
     model = _MODEL.search(info.instructions or "")
     effort = info.model_request_parameters.thinking  # PydanticAI moves `thinking` here
@@ -310,6 +316,47 @@ def _letter(seen: Seen) -> Step:
     return _call("letter", "deliverable_create", args)
 
 
+def _understood(seen: Seen) -> Step | None:
+    """The "I understood this" card: every fact a bench sample, each with a place in the BOQ, the
+    count from the BOQ import, and every file sorted."""
+    boq = _file(seen, ("xlsx", "xls", "excel"))
+    if boq is None:
+        return None
+
+    def at(row: int, value: str) -> dict:
+        return {"value": value, "file_id": boq, "locator": {"sheet": "BOQ", "row": row}}
+
+    def label(kind: str) -> str:
+        if kind.lower() in ("xlsx", "xls", "excel"):
+            return _words(seen, "BOQ (bench)", "مقايسة (تجريبي)")
+        if kind.lower() in ("docx", "pdf"):
+            return _words(seen, "Specification (bench)", "مواصفات (تجريبي)")
+        return _words(seen, "Other (bench)", "ملفات تانية (تجريبي)")
+
+    why = _words(seen, "Bench sample sort", "تقسيم عينة من منصة الاختبار")
+    args: dict = {
+        "client": at(1, _words(seen, "Sample client (bench, not real)", "عميل تجريبي (عينة)")),
+        "submission_date": at(1, "2026-12-01"),
+        "contract_type": at(2, _words(seen, "Re-measured (bench sample)", "إعادة قياس (عينة)")),
+        "missing": [_words(seen, "Soil report (bench sample)", "تقرير التربة (عينة تجريبية)")],
+        "files": [{"file_id": f, "label": label(kind), "why": why} for f, _, kind in _files(seen)],
+    }
+    result, ok = seen.done.get("import", ("", False))
+    trace = _data(result).get("import_id") if ok else None
+    if trace:
+        args["items_count"] = {"value": "0", "trace_id": trace}  # the value saved is the import's
+    return _call("understood", "understood", args)
+
+
+def _lesson(seen: Seen) -> Step:
+    text = _words(
+        seen,
+        "(bench sample lesson) Check the BOQ units before pricing.",
+        "(درس عينة من منصة الاختبار) راجع وحدات المقايسة قبل التسعير.",
+    )
+    return _call("lesson", "note_lesson", {"text": text, "kind": "method"})
+
+
 BOQ = (_files_step, _preview, _import, _items)
 LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "chat": (),
@@ -317,6 +364,8 @@ LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "boq": BOQ,
     "deliverable": (*BOQ, _extra, _sheet, _letter),  # with one priced row of our own
     "team": (_plan, _build, _delegate),
+    "understand": (_files_step, _preview, _import, _understood),
+    "lessons": (_lesson,),
     "full": (
         _files_step,
         _read_spec,
@@ -344,6 +393,8 @@ _STEP_OF = {
     _delegate: "delegate",
     _sheet: "sheet",
     _letter: "letter",
+    _understood: "understood",
+    _lesson: "lesson",
 }
 
 

@@ -876,6 +876,10 @@ export const texts = {
   restoreProject: { en: "Restore", ar: "رجّعه" },
   restoreDone: { en: "«{name}» is back.", ar: "«{name}» رجع." },
   restoreFailed: { en: "It was not restored. Try again.", ar: "مارجعش. جرّب تاني." },
+  // Task 11, found missing while building the screens.
+  importMenu: { en: "Import a tender folder", ar: "استورد فولدر مناقصة" },
+  importIntoProject: { en: "Adding «{name}» to this project", ar: "بنضيف «{name}» للمشروع ده" },
+  lessonsNotStarted: { en: "The Lead QS did not start on the lessons. Try again.", ar: "كبير مهندسي الكميات مابدأش في الدروس. جرّب تاني." },
   // Task 12: the update card.
   updateReady: { en: "One {version} is ready", ar: "One {version} جاهز" },
   updateNotes: { en: "What changed", ar: "إيه اللي اتغيّر" },

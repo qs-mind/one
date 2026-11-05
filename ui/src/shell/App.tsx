@@ -15,7 +15,14 @@ import { Cursors } from "../canvas/live/Cursors";
 import { select } from "../canvas/selection";
 import { httpSources } from "../canvas/sources";
 import type { FrameKey, ProjectSources, ProjectStatus } from "../canvas/types";
+import { useBackupAsk } from "../backup/ask";
+import { BackupAsk, BackupPanel } from "../backup/BackupPanel";
+import { Confidential } from "../backup/Confidential";
 import { ProjectIndex } from "../deliverables/ProjectIndex";
+import { FolderChooser, FolderDrop } from "../import/FolderDrop";
+import { onBriefStarted } from "../import/importer";
+import { ImportReports } from "../import/ImportReport";
+import { CloseProject } from "../journey/CloseProject";
 import { dir, useLanguage } from "../i18n";
 import { restoreProject, useProject } from "../records/project";
 import { leaveProject, ProjectPicker } from "../records/ProjectPicker";
@@ -50,6 +57,7 @@ const CHAT_BUTTON_SPACE = 16;
 const STATUS_RELOAD_MS = 1000;
 const WAITING_SYNC_MS = 1500;
 const WAITING_FRAMES = 30;
+const BRIEF_REREAD_MS = 2000; // after a screen starts a Brief, the chat checks it did not miss the Brief's end
 
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
@@ -82,6 +90,30 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const [status, setStatus] = useState<ProjectStatus>({});
   const liveWaiting = useWaiting(); // the live stream's count, once it has said one; until then the status's
   const waiting = liveWaiting ?? status.waiting ?? 0;
+
+  const askBackup = useBackupAsk();
+
+  // A Brief started from a screen (the "I understood this" Brief, the lessons): the chat reads it from the core.
+  // A short Brief may end between the chat's two reads (its messages, then its stream): when the chat is not
+  // streaming a moment later, it reads the core once more, so it never shows as running a Brief that has ended.
+  const chatStatus = useRef(chat.status);
+  chatStatus.current = chat.status;
+  useEffect(() => {
+    let again: ReturnType<typeof setTimeout> | undefined;
+    const off = onBriefStarted((projectId) => {
+      if (projectId !== chat.chatId) return;
+      setChatShown(true);
+      void chat.resync();
+      clearTimeout(again);
+      again = setTimeout(() => {
+        if (chatStatus.current !== "streaming" && chatStatus.current !== "submitted") void chat.resync();
+      }, BRIEF_REREAD_MS);
+    });
+    return () => {
+      off();
+      clearTimeout(again);
+    };
+  }, [chat.chatId, chat.resync, narrow]);
 
   useEffect(() => {
     leadFromChat(chat.running); // before Plan 4 sends a Lead QS, the team shows the chat's own
@@ -226,6 +258,11 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
       {panel === "deliverables" && project && (
         <ProjectIndex projectId={project.id} onOpen={(id) => deliverable.show(id)} onClose={closePanel} />
       )}
+      {panel === "backup" && <BackupPanel onClose={closePanel} />}
+      {panel === "close" && project && (
+        <CloseProject project={project} briefRunning={chat.running} onOpenDeliverable={openDeliverable} onClose={closePanel} />
+      )}
+      {panel === "confidential" && project && <Confidential project={project} onClose={closePanel} />}
     </FloatingPanel>
   );
 
@@ -286,10 +323,18 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
             </main>
           ) : (
             <>
-              <GeneralChat {...body} onConnectAi={connectAi} />
+              <FolderDrop className="flex min-h-0 flex-1 flex-col">
+                <GeneralChat {...body} onConnectAi={connectAi} />
+              </FolderDrop>
               {floatingPanel}
             </>
           )}
+          {/* the import reports and the backup question: top centre, clear of the panels (start) and the chat (end) */}
+          <div className="pointer-events-none absolute inset-x-4 top-2 z-30 flex flex-col items-center gap-3 [&>*]:pointer-events-auto">
+            <ImportReports />
+            {askBackup && <BackupAsk />}
+          </div>
+          <FolderChooser />
         </div>
         <Palette
           open={paletteOpen}

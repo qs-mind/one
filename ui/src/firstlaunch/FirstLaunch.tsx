@@ -29,7 +29,14 @@ const blank: Setup = { done: false, steps: { language: null, account: null, ai: 
 
 /** Shows the first launch until every step is passed, then the app; the app keeps a way back into the flow. When the
  * core cannot say (an older core, a failed read), the app shows: nothing in the flow is needed for it to work. */
-export function SetupGate({ children }: { children: ReactNode }) {
+export function SetupGate({
+  children,
+  onImport,
+}: {
+  children: ReactNode;
+  /** The Ready screen's tender folder or old work (Task 11's importer). */
+  onImport?: (from: DataTransfer | FileList, old: boolean) => void;
+}) {
   const [state, setState] = useState<{ phase: "reading" | "flow" | "app"; setup: Setup }>({ phase: "reading", setup: blank });
   const asked = useSetupRequest();
 
@@ -50,7 +57,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
 
   if (state.phase === "reading") return null;
   if (state.phase === "flow")
-    return <FirstLaunch initial={state.setup} onDone={(setup) => setState({ phase: "app", setup })} />;
+    return <FirstLaunch initial={state.setup} onDone={(setup) => setState({ phase: "app", setup })} onImport={onImport} />;
   return (
     <>
       <div className="contents" inert={asked !== null}>
@@ -63,6 +70,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
             initial={state.setup}
             from={asked.from}
             only={asked.only}
+            onImport={onImport}
             onDone={(setup) => {
               setState({ phase: "app", setup });
               closeSetup();
@@ -144,7 +152,13 @@ export function FirstLaunch({
           {screen === "card" && <IntroCard nav={nav("card")} />}
           {screen === "usage" && <UsageStats nav={nav("usage")} />}
           {screen === "ready" && (
-            <Ready aiSkipped={setup.steps.ai === "skipped"} back={() => setAt(at - 1)} onStart={() => onDone(setup)} onImport={onImport} />
+            <Ready
+              aiSkipped={setup.steps.ai === "skipped"}
+              back={() => setAt(at - 1)}
+              onStart={() => onDone(setup)}
+              // the import goes on in the app: the folder is taken first, then the flow ends
+              onImport={onImport && ((from, old) => (onImport(from, old), onDone(setup)))}
+            />
           )}
           {notSaved && <Alert>{t("setupNotSaved")}</Alert>}
         </div>
