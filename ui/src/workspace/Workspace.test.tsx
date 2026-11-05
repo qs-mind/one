@@ -422,3 +422,19 @@ describe("a file's page", () => {
     expect(workspaceApi.current()).toEqual({ key: "file:f1", anchor: { page: 5 } });
   });
 });
+
+describe("a file replaced by its new version", () => {
+  it("open, the new version opens in its place, at the same page; in the history, Back goes to the new one", async () => {
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({ deliverables: [A], files: [file], pages: { f1: 18, f2: 18 }, workspace: { key: "file:f1", anchor: { page: 4 } } });
+    render(<App sourcesFor={() => sources} />);
+    await waitFor(() => expect(workspaceApi.current()).toEqual({ key: "file:f1", anchor: { page: 4 } }));
+    act(() => sources.emit({ type: "file", file: { ...file, id: "f2", replaces: "f1" } }));
+    await waitFor(() => expect(workspaceApi.current()).toEqual({ key: "file:f2", anchor: { page: 4 } }));
+    act(() => workspaceApi.open("deliverable:dA"));
+    act(() => sources.emit({ type: "file", file: { ...file, id: "f3", replaces: "f2" } }));
+    act(() => void workspaceApi.back());
+    expect(workspaceApi.current()).toEqual({ key: "file:f3", anchor: { page: 4 } });
+  });
+});

@@ -45,6 +45,12 @@ export const workspaceApi = {
     history.clear();
     set(opened && check(opened.key) ? opened : { key: home, anchor: null });
   },
+  /** A document was replaced by a new version (a file uploaded again): the new one takes its place, open or in the
+   * history, at the same place. Not a step of its own. */
+  replace(from: DocKey, to: DocKey) {
+    history.rename(from, to);
+    if (current?.key === from) set({ key: to, anchor: current.anchor });
+  },
   /** A document was removed: out of the history; if it is open, Project files opens. */
   forget(key: DocKey) {
     history.drop(key);

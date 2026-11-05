@@ -114,8 +114,12 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
         (event) => {
           const now = lists!;
           if (event.type === "deliverable") show({ ...now, deliverables: upsert(now.deliverables, event.deliverable, (d) => d.id === event.deliverable.id) });
-          else if (event.type === "file")
-            show({ ...now, files: upsert(now.files, event.file, (f) => f.id === event.file.id || f.id === event.file.replaces) });
+          else if (event.type === "file") {
+            const { id, replaces } = event.file;
+            // a new version of a file: it opens in the old one's place, rather than the old one gone to Project files
+            if (replaces && replaces !== id) workspaceApi.replace(`file:${replaces}`, `file:${id}`);
+            show({ ...now, files: upsert(now.files, event.file, (f) => f.id === id || f.id === replaces) });
+          }
           else if (event.type === "client_boq")
             show({ ...now, clientBoqs: upsert(now.clientBoqs, event.client_boq, (b) => b.file_id === event.client_boq.file_id) });
           else if (event.type === "desk") show({ ...now, desks: upsert(now.desks, event.desk, (d) => d.id === event.desk.id) });

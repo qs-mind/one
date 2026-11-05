@@ -22,5 +22,9 @@ export function createHistory(limit = 50) {
     drop(k: DocKey) {
       stack = stack.filter((o) => o.key !== k);
     },
+    /** A document now goes by another key (a file replaced by its new version): its places are kept. */
+    rename(from: DocKey, to: DocKey) {
+      stack = stack.map((o) => (o.key === from ? { ...o, key: to } : o));
+    },
   };
 }
