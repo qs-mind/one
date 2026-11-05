@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { ProgressBar } from "../ui/ProgressBar";
+import { WorkDots } from "../ui/WorkDots";
 
 type Model = {
   state: "off" | "downloading" | "checking" | "stopped" | "failed" | "ready" | "unavailable";
@@ -25,7 +27,7 @@ function moving({ model, indexing }: Status, projectId: string): boolean {
   return model.state === "ready" && !indexing.paused && (job?.state === "indexing" || job?.state === "waiting");
 }
 
-type Shown = { line: string; tone: "ink" | "slate" | "copper"; button?: { label: Text; post: string }; share?: number };
+type Shown = { line: string; tone: "ink" | "slate" | "copper"; button?: { label: Text; post: string }; count?: { done: number; total: number }; running?: boolean };
 
 function shown({ model, indexing }: Status, projectId: string): Shown {
   const bytes = { done: formatBytes(model.done_bytes), total: formatBytes(model.total_bytes) };
@@ -41,7 +43,7 @@ function shown({ model, indexing }: Status, projectId: string): Shown {
         line: fill(t("meaningDownloading"), bytes),
         tone: "ink",
         button: { label: texts.meaningStop, post: "stop" },
-        share: model.done_bytes / model.total_bytes,
+        count: { done: model.done_bytes, total: model.total_bytes },
       };
     case "stopped":
       return {
@@ -50,7 +52,7 @@ function shown({ model, indexing }: Status, projectId: string): Shown {
         button: { label: texts.meaningResume, post: "download" },
       };
     case "checking":
-      return { line: t("meaningChecking"), tone: "ink" };
+      return { line: t("meaningChecking"), tone: "ink", running: true };
     case "failed":
       return {
         line: model.reason ? pick(model.reason) : "",
@@ -78,7 +80,7 @@ function shown({ model, indexing }: Status, projectId: string): Shown {
       line: fill(t("meaningIndexing"), { done: job.done, total: job.total }),
       tone: "ink",
       button: { label: texts.meaningPause, post: "pause" },
-      share: job.total ? job.done / job.total : 0,
+      count: { done: job.done, total: job.total },
     };
   }
   return { line: t("meaningReady"), tone: "slate" };
@@ -112,7 +114,7 @@ export function MeaningStatus({ projectId }: { projectId: string }) {
   }, [projectId, asked]);
 
   if (!status) return null;
-  const { line, tone, button, share } = shown(status, projectId);
+  const { line, tone, button, count, running } = shown(status, projectId);
 
   async function press(post: string) {
     setPressing(true);
@@ -124,8 +126,9 @@ export function MeaningStatus({ projectId }: { projectId: string }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-4">
-        <p role="status" className={toneClass[tone]}>
+        <p role="status" className={`flex items-baseline gap-2 ${toneClass[tone]}`}>
           {line}
+          {running && <WorkDots />}
         </p>
         {button && (
           <button
@@ -138,11 +141,7 @@ export function MeaningStatus({ projectId }: { projectId: string }) {
           </button>
         )}
       </div>
-      {share !== undefined && (
-        <div aria-hidden="true" className="h-0.5 w-full bg-stone">
-          <div className="h-full bg-ink" style={{ width: `${Math.min(100, Math.max(0, share * 100))}%` }} />
-        </div>
-      )}
+      {count && <ProgressBar done={count.done} total={count.total} className="h-0.5 w-full" />}
     </div>
   );
 }

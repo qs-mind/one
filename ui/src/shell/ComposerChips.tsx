@@ -5,6 +5,7 @@ import { type KeyboardEvent, type RefObject, useRef, useState } from "react";
 import { ProviderLogo } from "../brand/providers/ProviderLogo";
 import { fill, t } from "../i18n";
 import { type Choice, type Effort, keyOf, type ModelCard } from "../settings/AiSettings";
+import { Glide } from "../ui/Glide";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 /** Slate, borderless, no fill until hovered; a visible ring for the keyboard. */
@@ -77,7 +78,7 @@ export function ModelChip({
           (event.currentTarget as HTMLElement).querySelector<HTMLElement>("[aria-checked='true'], [role='menuitemradio']")?.focus();
         }}
       >
-        <div role="menu" aria-label={t("models")} onKeyDown={move} className="flex max-h-72 flex-col overflow-y-auto">
+        <div role="menu" aria-label={t("models")} onKeyDown={move} className="relative isolate flex max-h-72 flex-col overflow-y-auto">
           {sheet.map((card) => {
             const checked = current !== undefined && keyOf(card) === keyOf(current);
             return (
@@ -90,7 +91,7 @@ export function ModelChip({
                   onPick({ connector: card.connector, model: card.model });
                   change(false);
                 }}
-                className={`flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-start text-sm transition-colors duration-150 ease-out hover:bg-stone focus-visible:bg-stone focus-visible:outline-none ${checked ? "text-ink" : "text-slate hover:text-ink"}`}
+                className={`flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-start text-sm transition-colors duration-150 ease-out focus-visible:outline-none ${checked ? "text-ink" : "text-slate hover:text-ink"}`}
               >
                 <ProviderLogo provider={card.provider} />
                 <span dir="auto" className="truncate">
@@ -100,6 +101,7 @@ export function ModelChip({
               </button>
             );
           })}
+          <Glide />
         </div>
       </PopoverContent>
     </Popover>

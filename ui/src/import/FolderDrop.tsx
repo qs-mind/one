@@ -1,37 +1,23 @@
 // Where a tender folder comes in: dropped on the General chat (a new project named after it) or on an open project's
 // canvas (into that project), or picked with "Choose folder" (the browser's folder chooser, `<input webkitdirectory>`;
 // One's window has it too). Only folders: loose files dropped here are left to the drop targets that take files.
-import { type DragEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { t, useLanguage } from "../i18n";
+import { useDragDepth } from "../ui/useDragDepth";
 import { importFolders } from "./importer";
 import { holdsFolder } from "./walk";
 
 /** The General chat's drop target: a dropped folder becomes a new project. */
 export function FolderDrop({ children, className = "" }: { children: ReactNode; className?: string }) {
   useLanguage();
-  const [over, setOver] = useState(false);
-  const depth = useRef(0); // dragenter and dragleave come for every child: count them
-
-  const carriesFiles = (event: DragEvent) => event.dataTransfer.types.includes("Files");
+  const { over, handlers } = useDragDepth(); // counted, so the highlight never blinks over a child
   return (
     <div
       className={`relative ${className}`}
-      onDragEnter={(event) => {
-        if (!carriesFiles(event)) return;
-        depth.current += 1;
-        setOver(true);
-      }}
-      onDragOver={(event) => {
-        if (carriesFiles(event)) event.preventDefault();
-      }}
-      onDragLeave={() => {
-        depth.current = Math.max(0, depth.current - 1);
-        if (depth.current === 0) setOver(false);
-      }}
+      {...handlers}
       onDrop={(event) => {
-        depth.current = 0;
-        setOver(false);
-        if (!carriesFiles(event)) return;
+        handlers.onDrop();
+        if (!event.dataTransfer.types.includes("Files")) return;
         event.preventDefault(); // the window must not open what was dropped
         if (holdsFolder(event.dataTransfer.items)) void importFolders(event.dataTransfer, { old: false });
       }}

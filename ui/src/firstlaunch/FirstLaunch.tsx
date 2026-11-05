@@ -10,6 +10,7 @@ import { api } from "../api";
 import { send } from "../core";
 import { dir, fill, language, setLanguage, t, useLanguage } from "../i18n";
 import { useAiSettings } from "../settings/AiSettings";
+import { useDragDepth } from "../ui/useDragDepth";
 import { Mark } from "../shell/TopBar";
 import { Account } from "./Account";
 import { ConnectAi } from "./ConnectAi";
@@ -210,7 +211,7 @@ function Ready({
   onStart: () => void;
   onImport?: (from: DataTransfer | FileList, old: boolean) => void;
 }) {
-  const [over, setOver] = useState(false);
+  const { over, handlers } = useDragDepth(); // counted, so the highlight never blinks over the line or the button
   const ai = useAiSettings(); // "no AI is connected" only when that is so: a link may be set up from AI settings
   const nav: Nav = { back, pass: async () => true };
   const start = (
@@ -223,14 +224,10 @@ function Ready({
       {onImport && (
         <div className="flex flex-col gap-4">
           <div
-            onDragOver={(event) => {
-              event.preventDefault();
-              setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
+            {...handlers}
             onDrop={(event) => {
               event.preventDefault();
-              setOver(false);
+              handlers.onDrop();
               onImport(event.dataTransfer, false);
             }}
             className={`flex flex-col items-center gap-4 rounded-lg border-2 border-dashed px-6 py-12 text-center ${

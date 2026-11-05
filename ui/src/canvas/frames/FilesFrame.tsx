@@ -5,6 +5,7 @@ import { dir, pick, t, texts, useLanguage, type Text } from "../../i18n";
 import type { FileInfo } from "../types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, type FilesData } from "./Frame";
 import { FileName } from "../../ui/FileName";
+import { Glide } from "../../ui/Glide";
 
 const statusText: Record<FileInfo["status"], Text> = {
   read: texts.fileRead,
@@ -42,13 +43,13 @@ function FilesFrameView(props: NodeProps<Node<FilesData, "files">>) {
         {files.length === 0 ? (
           <p className="px-5 py-3 text-slate">{t("noFiles")}</p>
         ) : (
-          <ul className="flex flex-col gap-1 px-2">
+          <ul className="relative isolate flex flex-col gap-1 px-2">
             {files.map((file) => (
               <li key={file.id}>
                 <button
                   type="button"
                   onClick={() => actions.openFile(file.id)}
-                  className="flex w-full flex-col items-start rounded-[10px] px-3 py-2.5 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+                  className="flex w-full flex-col items-start rounded-[10px] px-3 py-2.5 text-start focus-visible:outline-2 focus-visible:outline-ink"
                 >
                   <span className="flex w-full items-center justify-between gap-4">
                     <FileName name={file.name} fit />
@@ -60,6 +61,7 @@ function FilesFrameView(props: NodeProps<Node<FilesData, "files">>) {
                 </button>
               </li>
             ))}
+            <Glide as="li" />
           </ul>
         )}
         <p className="mt-auto px-5 py-4 text-xs text-slate">{t("dropToAdd")}</p>

@@ -5,6 +5,8 @@
 import { type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react";
 import { t, useLanguage } from "../i18n";
 import { AutoHeight } from "../ui/AutoHeight";
+import { InkCheck } from "../ui/InkCheck";
+import { WorkDots } from "../ui/WorkDots";
 
 export type Step = "language" | "account" | "ai" | "card" | "usage";
 export const STEPS: readonly Step[] = ["language", "account", "ai", "card", "usage"];
@@ -65,8 +67,8 @@ export const option = (chosen: boolean) =>
 
 export type Progress = "busy" | "done" | "failed";
 
-/** How a check, a sign-in or a save is going, in the same look on every step, without a colour of its own: a quiet
- * Slate ring turning while it runs (shown after 300 ms, so a quick one never flashes); a filled Ink circle whose check
+/** How a check, a sign-in or a save is going, in the same look on every step, without a colour of its own: three
+ * Slate dots fading in turn while it runs (shown after 300 ms, so a quick one never flashes); a filled Ink circle whose check
  * draws itself once it worked, the line in Ink; Copper with a ring and "!" when it did not, the line saying what to do
  * next. Each line rises into place, and scrolls into view when it lands below the window's edge. With `fade`, a done
  * line fades out after a moment, keeping its place (a quiet "Saved"). */
@@ -88,13 +90,8 @@ export function Feedback({ state, children, fade = false }: { state: Progress; c
       className={`${state === "busy" ? "fl-rise-late" : fade ? "fl-fade" : "fl-rise"} flex items-start gap-2.5 ${look}`}
     >
       <span aria-hidden="true" className="flex h-[1lh] shrink-0 items-center">
-        {state === "busy" && <span className="fl-spin block size-4 rounded-full border-2 border-slate/25 border-t-slate" />}
-        {state === "done" && (
-          <svg viewBox="0 0 20 20" className="size-5">
-            <circle cx="10" cy="10" r="10" className="fill-ink" />
-            <path d="M5.8 10.4l2.8 2.8 5.6-5.8" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="fl-check stroke-paper" />
-          </svg>
-        )}
+        {state === "busy" && <WorkDots />}
+        {state === "done" && <InkCheck />}
         {state === "failed" && (
           <svg viewBox="0 0 20 20" className="size-5">
             <circle cx="10" cy="10" r="9" fill="none" strokeWidth="1.5" className="stroke-copper" />

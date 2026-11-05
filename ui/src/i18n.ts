@@ -962,6 +962,10 @@ export const texts = {
   queueEditField: { en: "Queued message", ar: "رسالة في الطابور" },
   queueResume: { en: "Carry on with the queue", ar: "كمّل الطابور" },
   queueHint: { en: "{keys} interrupts ONE", ar: "{keys} يقاطع ONE" },
+  // Calm interaction details: a file frame's page shown as its picture or as its text.
+  pageView: { en: "Show the page as", ar: "اعرض الصفحة" },
+  pageViewImage: { en: "Picture", ar: "صورة" },
+  pageViewText: { en: "Text", ar: "نص" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";

@@ -6,6 +6,7 @@ import { api } from "../api";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 import { askForBackupFolder } from "../backup/ask";
 import { coreLine } from "../core";
+import { Glide } from "../ui/Glide";
 import { useScrollEdges } from "../ui/useScrollEdges";
 import { currentProject, type Project, setCurrentProject, switchProject, useProject } from "./project";
 
@@ -107,7 +108,7 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
           aria-current={item.id === current?.id || undefined}
           disabled={busy}
           onClick={() => void open(item.id)}
-          className={`flex w-full items-center justify-between gap-4 rounded-md px-3 py-2 text-start hover:bg-stone disabled:opacity-40 ${item.id === current?.id ? "bg-stone font-semibold" : ""}`}
+          className={`flex w-full items-center justify-between gap-4 rounded-md px-3 py-2 text-start disabled:opacity-40 ${item.id === current?.id ? "bg-stone font-semibold" : ""}`}
         >
           <span dir="auto">{item.name}</span>
           {item.id === current?.id ? (
@@ -156,11 +157,11 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
           </div>
         )}
         {list.state === "ready" && list.projects.length === 0 && <p className="text-slate">{t("noProjects")}</p>}
-        {working.length > 0 && <ul ref={workingList} className="scroll-fade flex max-h-[40dvh] flex-col gap-1 overflow-y-auto">{working.map(row)}</ul>}
+        {working.length > 0 && <ul ref={workingList} className="scroll-fade relative isolate flex max-h-[40dvh] flex-col gap-1 overflow-y-auto">{working.map(row)}<Glide as="li" /></ul>}
         {archived.length > 0 && (
           <div className="flex flex-col gap-1">
             <h3 className="px-3 text-sm text-slate">{t("archivedGroup")}</h3>
-            <ul ref={archivedList} className="scroll-fade flex max-h-[30dvh] flex-col gap-1 overflow-y-auto">{archived.map(row)}</ul>
+            <ul ref={archivedList} className="scroll-fade relative isolate flex max-h-[30dvh] flex-col gap-1 overflow-y-auto">{archived.map(row)}<Glide as="li" /></ul>
           </div>
         )}
         <form onSubmit={create} className="flex flex-col gap-2 border-t border-stone pt-3">

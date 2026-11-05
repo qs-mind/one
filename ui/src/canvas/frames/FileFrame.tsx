@@ -7,6 +7,7 @@ import { dir, fill, t, useLanguage } from "../../i18n";
 import type { FilePiece } from "../types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type FileData } from "./Frame";
 import { FileName } from "../../ui/FileName";
+import { Segmented } from "../../ui/Segmented";
 import { fileKey, TARGET } from "../../sources/targets";
 
 /** Page images come in two widths: enough for the frame on screen, never more (decision 13). */
@@ -111,13 +112,16 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
               <button type="button" className={button} disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>
                 {t("sheetNextPage")}
               </button>
-              <button
-                type="button"
-                className={`${button} ms-auto`}
-                onClick={() => setMode((m) => (m === "image" ? "text" : "image"))}
-              >
-                {mode === "image" ? t("showPageText") : t("showPageImage")}
-              </button>
+              <Segmented<"image" | "text">
+                label={t("pageView")}
+                options={[
+                  { value: "image", label: t("pageViewImage") },
+                  { value: "text", label: t("pageViewText") },
+                ]}
+                value={mode}
+                onChange={setMode}
+                className="nodrag ms-auto"
+              />
             </div>
           )}
           {showImage &&

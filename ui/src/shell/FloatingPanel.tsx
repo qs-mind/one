@@ -1,13 +1,18 @@
 // One floating panel under the top bar at the inline start, for the panels that already exist (AI settings,
 // Projects, Project Records, the Project Index), kept as they are. Focus goes into it when it opens; Esc closes it
-// (the shell then gives focus back to the button that opened it).
+// (the shell then gives focus back to the button that opened it). A click outside closes it too, but only one that
+// both starts and ends outside: selecting text or dragging from inside out past its edge keeps it open. That close
+// says "outside", so focus stays where the engineer clicked.
 import { type ReactNode, useEffect, useRef } from "react";
 import { useScrollEdges } from "../ui/useScrollEdges";
 
 /** `wide`: a panel with a table (the Project Index), so its columns and titles have room. */
-export function FloatingPanel({ onClose, wide = false, children }: { onClose: () => void; wide?: boolean; children: ReactNode }) {
+export function FloatingPanel({ onClose, wide = false, children }: { onClose: (how?: "outside") => void; wide?: boolean; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const startedInside = useRef(false);
+  const close = useRef(onClose);
+  close.current = onClose;
   useScrollEdges(scroller);
 
   useEffect(() => {
@@ -15,10 +20,29 @@ export function FloatingPanel({ onClose, wide = false, children }: { onClose: ()
     if (!box.current?.contains(document.activeElement)) box.current?.focus();
   }, []);
 
+  useEffect(() => {
+    // The page's capture listeners run first: a press starts outside unless the panel's own handler (which also hears
+    // presses in menus it opened, drawn elsewhere on the page) says it started inside. The click is judged before the
+    // button under it acts, so a top bar button that opens another panel still opens it.
+    const down = () => void (startedInside.current = false);
+    const click = (event: MouseEvent) => {
+      if (event.detail === 0) return; // Enter or Space on a button: not a click of the pointer
+      if (startedInside.current || box.current?.contains(event.target as Node)) return;
+      close.current("outside");
+    };
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("click", click, true);
+    return () => {
+      document.removeEventListener("pointerdown", down, true);
+      document.removeEventListener("click", click, true);
+    };
+  }, []);
+
   return (
     <div
       ref={box}
       tabIndex={-1}
+      onPointerDownCapture={() => void (startedInside.current = true)}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.defaultPrevented) return;
         event.preventDefault();

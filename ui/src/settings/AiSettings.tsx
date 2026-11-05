@@ -10,6 +10,7 @@ import { coreLine, send } from "../core";
 import { Feedback, secondary } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AutoHeight } from "../ui/AutoHeight";
+import { SavedCheck } from "../ui/InkCheck";
 import { looksLikeAmount, SaveNote, useSaving } from "../ui/live";
 import { UndoNotice } from "../ui/UndoNotice";
 import type { Removed } from "./Connectors";
@@ -392,7 +393,7 @@ function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; on
           className={field}
         />
       </label>
-      <label className="flex items-center gap-2 self-start">
+      <label className="tap flex items-center gap-2 self-start">
         <input type="checkbox" checked={on} onChange={() => void toggle()} className="accent-ink" />
         <span>{t("useClaudeCode")}</span>
       </label>
@@ -431,14 +432,17 @@ function priceText(card: ModelCard): string {
   return card.price_source ? `${price} · ${fill(t("priceSource"), { source: card.price_source })}` : price;
 }
 
-/** One select per role, from the Model Data Sheet; the Recommended Setting is marked. */
+/** One select per role, from the Model Data Sheet; the Recommended Setting is marked. The select just picked shows
+ * the ink check for a moment once its save is made. */
 function RoleModels({ settings, onSaved }: { settings: Settings; onSaved: (roles: Roles) => void }) {
   const { saving, n, now } = useSaving();
+  const [picked, setPicked] = useState<Role>();
   const { sheet, roles, defaults } = settings;
 
   function choose(role: Role, value: string) {
     const card = sheet.find((item) => keyOf(item) === value);
     if (!card) return;
+    setPicked(role);
     const next = { ...roles, [role]: { connector: card.connector, model: card.model } };
     void now(async () => {
       const response = await send("/settings/ai/roles", "PUT", next);
@@ -462,23 +466,29 @@ function RoleModels({ settings, onSaved }: { settings: Settings; onSaved: (roles
           return (
             <label key={role} className="flex flex-col gap-1">
               <span>{t(roleTexts[role])}</span>
-              <select
-                dir="ltr"
-                value={value}
-                disabled={saving.state === "busy"}
-                onChange={(event) => choose(role, event.target.value)}
-                className={field}
-              >
-                {!chosen && <option value={value}>{current?.model ?? ""}</option>}
-                {sheet.map((card) => {
-                  const key = keyOf(card);
-                  return (
-                    <option key={key} value={key}>
-                      {`${card.name} · ${priceText(card)}${key === recommended ? ` · ${t("recommended")}` : ""}`}
-                    </option>
-                  );
-                })}
-              </select>
+              <span className="relative flex items-center">
+                <select
+                  dir="ltr"
+                  value={value}
+                  disabled={saving.state === "busy"}
+                  onChange={(event) => choose(role, event.target.value)}
+                  className={`${field} pe-16`}
+                >
+                  {!chosen && <option value={value}>{current?.model ?? ""}</option>}
+                  {sheet.map((card) => {
+                    const key = keyOf(card);
+                    return (
+                      <option key={key} value={key}>
+                        {`${card.name} · ${priceText(card)}${key === recommended ? ` · ${t("recommended")}` : ""}`}
+                      </option>
+                    );
+                  })}
+                </select>
+                {picked === role && (
+                  // the select is left to right in both languages: its arrow, and so the check, sit on the right
+                  <SavedCheck n={n} done={saving.state === "done"} className="pointer-events-none absolute right-9" />
+                )}
+              </span>
               {chosen?.subscription && <span className="text-slate">{t("equivalentCost")}</span>}
             </label>
           );

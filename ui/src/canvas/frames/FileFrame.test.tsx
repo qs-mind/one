@@ -71,7 +71,7 @@ describe("a file frame", () => {
     show({ files: [spec], pages: { spec: 2 }, text: { spec: [{ locator: { page: 2 }, text: "القسم ٣ - نص عينة" }] } }, [
       frame("file:spec"),
     ]);
-    fireEvent.click(await screen.findByRole("button", { name: texts.showPageText.ar }));
+    fireEvent.click(await screen.findByRole("radio", { name: texts.pageViewText.ar }));
     expect(await screen.findByText(texts.pageScanned.ar)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: texts.sheetNextPage.ar }));
     expect(await screen.findByText("القسم ٣ - نص عينة")).toHaveAttribute("dir", "auto");

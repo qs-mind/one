@@ -48,6 +48,7 @@ import { select } from "./selection";
 import { SourceError } from "./sources";
 import { markFrame } from "./mark";
 import { ease } from "../ui/motion";
+import { Tip } from "../ui/Tip";
 import type {
   ActivityEvent,
   Anchor,
@@ -876,18 +877,22 @@ function ZoomBar({ onArrange }: { onArrange(): void }) {
       style={{ [dir() === "rtl" ? "right" : "left"]: 16 }}
       className={`absolute bottom-4 z-10 flex ${dir() === "rtl" ? "min-[901px]:right-[196px]!" : "min-[901px]:left-[196px]!"} items-center gap-1 rounded-[16px] border border-ink/[0.08] bg-paper p-1.5 shadow-[0_2px_12px_rgb(14_15_18/0.06)]`}
     >
-      <button type="button" aria-label={t("zoomOut")} title={t("zoomOut")} className={button} onClick={() => void flow.zoomOut({ duration: duration() })}>
-        −
-      </button>
+      <Tip label={t("zoomOut")} side="top">
+        <button type="button" aria-label={t("zoomOut")} className={`${button} tap`} onClick={() => void flow.zoomOut({ duration: duration() })}>
+          −
+        </button>
+      </Tip>
       <span className="min-w-14 text-center tabular-nums">
         <span className="sr-only">{fill(t("zoomLevel"), { percent })}</span>
         <bdi dir="ltr" aria-hidden="true">
           {percent}%
         </bdi>
       </span>
-      <button type="button" aria-label={t("zoomIn")} title={t("zoomIn")} className={button} onClick={() => void flow.zoomIn({ duration: duration() })}>
-        +
-      </button>
+      <Tip label={t("zoomIn")} side="top">
+        <button type="button" aria-label={t("zoomIn")} className={`${button} tap`} onClick={() => void flow.zoomIn({ duration: duration() })}>
+          +
+        </button>
+      </Tip>
       <button type="button" className={button} onClick={onArrange}>
         {t("arrangeByStage")}
       </button>

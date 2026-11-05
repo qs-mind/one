@@ -225,6 +225,8 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
       <div
         ref={ref}
         role="log"
+        aria-live="polite"
+        aria-atomic="false"
         aria-label={label}
         tabIndex={0}
         data-region-start
