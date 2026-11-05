@@ -21,7 +21,7 @@ async function covers(page: Page): Promise<Box[]> {
 }
 
 for (const language of ["ar", "en"] as const) {
-  test(`fit all shows the frames beside the open chat, ${language}`, async ({ page }) => {
+  test(`a first open shows readable frames beside the open chat, ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const scene = small();
     scene.layout.frames = []; // a first open: every frame placed and fitted
@@ -29,7 +29,16 @@ for (const language of ["ar", "en"] as const) {
     await page.goto("/");
     await canvasReady(page);
     const chat = await box(page.locator('aside[data-region="chat"]'));
-    for (const node of await page.locator(".react-flow__node").all()) expect(overlaps(await box(node), chat)).toBe(false);
+    // readable: never below 60%; what it shows is beside the chat, and the rest is a pan away
+    const zoom = Number(await page.evaluate(() => /scale\(([\d.]+)\)/.exec(document.querySelector<HTMLElement>(".react-flow__viewport")!.style.transform)?.[1]));
+    expect(zoom).toBeGreaterThanOrEqual(0.6);
+    expect(overlaps(await box(frame(page, "files:all")), chat)).toBe(false);
+    const pane = await box(page.locator(".react-flow"));
+    for (const node of await page.locator(".react-flow__node").all()) {
+      const b = await box(node);
+      const whollyShown = b.x >= pane.x && b.x + b.width <= pane.x + pane.width && b.y >= pane.y && b.y + b.height <= pane.y + pane.height;
+      if (whollyShown) expect(overlaps(b, chat)).toBe(false);
+    }
   });
 
   test(`one message box, at the open chat's foot, ${language}`, async ({ page }) => {
@@ -96,4 +105,69 @@ for (const language of ["ar", "en"] as const) {
     expect(b.x + b.width).toBeLessThanOrEqual(pane.x + pane.width);
     for (const cover of await covers(page)) expect(overlaps(b, cover)).toBe(false);
   });
+
+  test(`a five-column table card shows every column whole in the chat panel, ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const scene = small();
+    await mockCore(page, scene, { language });
+    await page.route(`**/api/chat/${scene.project.id}/messages`, (route) =>
+      route.fulfill({ contentType: "application/json", body: JSON.stringify({ messages: priceProposal() }) }),
+    );
+    await page.goto("/");
+    await canvasReady(page);
+    const chat = await box(page.locator('aside[data-region="chat"]'));
+    const card = page.locator('[data-card="c1"]');
+    await expect(card).toBeVisible();
+    const b = await box(card);
+    expect(b.x).toBeGreaterThanOrEqual(chat.x);
+    expect(b.x + b.width).toBeLessThanOrEqual(chat.x + chat.width);
+    // at the chat's width every column shows whole inside the card: the rows stack, nothing scrolls or is cut
+    expect(await card.locator("[data-rows-scroll]").evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    for (const cell of await card.locator("td[dir=auto]").all()) {
+      const c = await box(cell);
+      expect(c.x).toBeGreaterThanOrEqual(b.x);
+      expect(c.x + c.width).toBeLessThanOrEqual(b.x + b.width);
+      expect(await cell.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    }
+  });
+}
+
+/** The chat as prices_propose leaves it: one table card waiting, five columns (sample data). */
+function priceProposal() {
+  const rows = [
+    { description: "بالمتر المكعب خرسانة مسلحة للأعمدة والكمرات طبقاً للمواصفات - عينة", unit: "م3", rate: "4150.00", currency: "EGP", vat: "14%" },
+    { description: "بالطن حديد تسليح عالي المقاومة - عينة", unit: "طن", rate: "38500.00", currency: "EGP", vat: "14%" },
+    { description: "بالمتر المربع بلاط بورسلين 60×60 - عينة", unit: "م2", rate: "620.00", currency: "EGP", vat: "14%" },
+  ];
+  return [
+    { id: "u1", role: "user", parts: [{ type: "text", text: "سعّر بنود الخرسانة والحديد - عينة" }] },
+    {
+      id: "a1",
+      role: "assistant",
+      parts: [
+        {
+          type: "data-card",
+          id: "c1",
+          data: {
+            kind: "rows",
+            title: { en: "Keep these prices?", ar: "احفظ الأسعار دي؟" },
+            detail: { en: "Tick the rows to keep (sample data).", ar: "علّم على الصفوف اللي تتحفظ - عينة." },
+            options: ["keep", "no"],
+            status: "pending",
+            payload: {
+              columns: [
+                { key: "description", label: { en: "Item", ar: "البند" } },
+                { key: "unit", label: { en: "Unit", ar: "الوحدة" } },
+                { key: "rate", label: { en: "Rate", ar: "السعر" } },
+                { key: "currency", label: { en: "Currency", ar: "العملة" } },
+                { key: "vat", label: { en: "VAT", ar: "الضريبة" } },
+              ],
+              rows,
+              tick: true,
+            },
+          },
+        },
+      ],
+    },
+  ];
 }

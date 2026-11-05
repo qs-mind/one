@@ -35,11 +35,11 @@ import {
   type FrameNode,
 } from "./frames/Frame";
 import { TeamFrame } from "./frames/TeamFrame";
-import { deskCounts, startActivity, useDeskCounts } from "./live/activity";
+import { deskCounts, startActivity, useDeskCounts, workedOn } from "./live/activity";
 import { isMac, isMod, isTyping, matches } from "./keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
-import { freeArea, worldOf } from "./cover";
+import { freeArea, readable, worldOf } from "./cover";
 import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
 import { select } from "./selection";
 import { SourceError } from "./sources";
@@ -272,6 +272,27 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     [flow, store, free],
   );
 
+  /** A first view: every frame if they can be read together, else the ones that matter most now (the Project files,
+   * what agents work on, the Deliverables changed last), as many as can be read; the rest are a pan away. */
+  const fitReadable = useCallback(
+    (frames: readonly Placed[], opts: { animate?: boolean } = {}) => {
+      const boxes = frames.map((f) => ({ ...f, h: f.collapsed ? STRIP_H : f.h }));
+      const worked = workedOn();
+      const changed = [...things.current.deliverables.values()]
+        .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+        .map((d) => `deliverable:${d.id}`);
+      const rank = (key: string) => {
+        if (key === "files:all") return 0; // where a project's work starts: always in the first view
+        if (worked.includes(key)) return 1;
+        const at = changed.indexOf(key);
+        return at === -1 ? 1000 : 2 + at;
+      };
+      const shown = new Set(readable(boxes, rank, free()).map((f) => f.key));
+      fitTo(frames.filter((f) => shown.has(f.key)), opts);
+    },
+    [fitTo, free],
+  );
+
   /** The free area in world coordinates: where a new frame can go and be seen. */
   const seen = useCallback(() => worldOf(free(), store.getState().transform), [free, store]);
 
@@ -381,9 +402,9 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       const target = arrange(nodesRef.current.map(placedOf), status, mode, { dir: dir() });
       remember();
       applyLayout(target);
-      fitTo(target);
+      fitReadable(target);
     },
-    [applyLayout, fitTo],
+    [applyLayout, fitReadable],
   );
 
   const focusFrame = useCallback(
@@ -477,7 +498,7 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
         }
         setState("ready");
         if (layout.view) void flow.setViewport(layout.view);
-        else fitTo(all, { animate: false });
+        else fitReadable(all, { animate: false });
       } catch {
         if (live) setState("failed");
       }

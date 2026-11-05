@@ -1,7 +1,8 @@
 // What the engineer can see of the canvas: the pane less what floats over it (the open chat, the command bar, the
 // minimap and the zoom controls). Fit all, a project's first view, Focus, Follow and new frames use this free area, so
 // nothing they show sits under the chat, on whichever side the language puts it. An overlay marks itself with
-// `data-canvas-cover`; the minimap is React Flow's own.
+// `data-canvas-cover`; the minimap is React Flow's own. A first view is also kept readable: when every frame would be
+// too small to read, it shows the ones that matter most now, and the rest stay a pan or a minimap click away.
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -10,26 +11,37 @@ const COVERS = "[data-canvas-cover], .react-flow__minimap";
 const LEAST = 0.3;
 
 /** The pane less the covers, in the pane's own coordinates. A cover that spans most of the pane's height (the chat)
- * takes its side off; any other takes a band off the bottom (or top) up to its far edge. */
+ * takes its side off; any other (the minimap, the zoom controls, a floating command bar) takes off a band at its
+ * nearest edge, across or along, whichever leaves more room. */
 export function freeRect(pane: Rect, covers: readonly Rect[]): Rect {
   let left = 0;
   let right = pane.w;
   let top = 0;
   let bottom = pane.h;
-  for (const c of covers) {
-    const x0 = Math.max(0, c.x - pane.x);
-    const x1 = Math.min(pane.w, c.x + c.w - pane.x);
-    const y0 = Math.max(0, c.y - pane.y);
-    const y1 = Math.min(pane.h, c.y + c.h - pane.y);
-    if (x1 <= x0 || y1 <= y0) continue; // not over the pane
-    if (y1 - y0 >= pane.h * 0.6) {
-      if ((x0 + x1) / 2 >= pane.w / 2) right = Math.min(right, x0);
-      else left = Math.max(left, x1);
-    } else if ((y0 + y1) / 2 >= pane.h / 2) {
-      bottom = Math.min(bottom, y0);
-    } else {
-      top = Math.max(top, y1);
+  const inPane = covers
+    .map((c) => ({
+      x0: Math.max(0, c.x - pane.x),
+      x1: Math.min(pane.w, c.x + c.w - pane.x),
+      y0: Math.max(0, c.y - pane.y),
+      y1: Math.min(pane.h, c.y + c.h - pane.y),
+    }))
+    .filter((c) => c.x1 > c.x0 && c.y1 > c.y0) // over the pane
+    .map((c) => ({ ...c, tall: c.y1 - c.y0 >= pane.h * 0.6 }))
+    .sort((a, b) => Number(b.tall) - Number(a.tall)); // the chat first: the others are weighed in what it leaves
+  for (const c of inPane) {
+    if (c.x1 <= left || c.x0 >= right || c.y1 <= top || c.y0 >= bottom) continue; // already left out
+    const atEnd = (c.x0 + c.x1) / 2 >= (left + right) / 2;
+    const side = atEnd ? { left, right: Math.min(right, c.x0) } : { left: Math.max(left, c.x1), right };
+    if (c.tall) {
+      ({ left, right } = side);
+      continue;
     }
+    const below = (c.y0 + c.y1) / 2 >= (top + bottom) / 2;
+    const band = below ? { top, bottom: Math.min(bottom, c.y0) } : { top: Math.max(top, c.y1), bottom };
+    const across = (right - left) * (band.bottom - band.top);
+    const along = (side.right - side.left) * (bottom - top);
+    if (across >= along) ({ top, bottom } = band);
+    else ({ left, right } = side);
   }
   const w = right - left;
   const h = bottom - top;
@@ -59,4 +71,24 @@ export function freeArea(pane: Element | null | undefined, size: { width: number
 /** The free area in world coordinates, under the viewport `[tx, ty, zoom]`. */
 export function worldOf(free: Rect, [tx, ty, zoom]: readonly [number, number, number]): Rect {
   return { x: (free.x - tx) / zoom, y: (free.y - ty) / zoom, w: free.w / zoom, h: free.h / zoom };
+}
+
+/** Below this zoom a frame shows only its poster (lod.ts): a first view keeps to it or above. */
+export const READABLE = 0.6;
+
+type Framed = { key: string; x: number; y: number; w: number; h: number };
+
+/** The frames a view shows when all of them would not fit `area` at `zoom`: by `rank` (lower first), each that still
+ * fits with those taken, so the view stays readable. The first by rank always, even alone too big. */
+export function readable<T extends Framed>(frames: readonly T[], rank: (key: string) => number, area: { w: number; h: number }, zoom = READABLE, padding = 0.1): T[] {
+  const fits = (set: readonly T[]) => {
+    const w = Math.max(...set.map((f) => f.x + f.w)) - Math.min(...set.map((f) => f.x));
+    const h = Math.max(...set.map((f) => f.y + f.h)) - Math.min(...set.map((f) => f.y));
+    return w * zoom <= area.w * (1 - 2 * padding) && h * zoom <= area.h * (1 - 2 * padding);
+  };
+  if (!frames.length || fits(frames)) return [...frames];
+  const order = [...frames].sort((a, b) => rank(a.key) - rank(b.key));
+  const taken: T[] = [order[0]!];
+  for (const f of order.slice(1)) if (fits([...taken, f])) taken.push(f);
+  return taken;
 }

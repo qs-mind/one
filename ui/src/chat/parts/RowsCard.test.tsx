@@ -111,7 +111,7 @@ describe("RowsCard", () => {
     expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
   });
 
-  it("each cell finds its own direction; a long value shows two lines, all of it in the title; the table scrolls", () => {
+  it("each cell finds its own direction; a long value shows two lines, all of it in the title; narrow, the rows stack", () => {
     const long = "بالمتر المكعب حفر لزوم الأساسات وخلافة طبقاً للأبعاد والبيانات بالرسومات والمناسيب في boq-priced.xls";
     const boq = { ...rows, payload: { ...rows.payload, rows: [{ description: long, rate: "1-1, 1-3, 1-4" }] } };
     const { container } = render(<ApprovalCard id="c2" card={boq} />);
@@ -122,9 +122,13 @@ describe("RowsCard", () => {
     expect(cell.querySelector("bdi")).toHaveTextContent("boq-priced.xls"); // the English run stays whole
     expect(cell).toHaveTextContent(long);
     expect(screen.getByTitle("1-1, 1-3, 1-4")).toHaveAttribute("dir", "auto");
+    // narrower than 32rem the rows stack, every column whole as "label: value"; wider, a table
     const scroller = container.querySelector("[data-rows-scroll]")!;
-    expect(scroller).toHaveClass("overflow-x-auto"); // columns keep their width; the card scrolls sideways
-    expect(scroller.querySelector("table")).toHaveClass("w-max");
+    expect(scroller).toHaveClass("@container");
+    expect(scroller.querySelector("table")).toHaveClass("block", "@lg:table");
+    expect(screen.getByTitle("1-1, 1-3, 1-4")).toHaveAttribute("data-label", "السعر: ");
+    expect(cell).not.toHaveAttribute("data-label"); // the first column heads its row
+    expect(screen.getByRole("columnheader", { name: "السعر" })).toBeInTheDocument(); // still a table to a reader
   });
 
   it("speaks the Brief's language: an Arabic Brief's card in the English page", () => {

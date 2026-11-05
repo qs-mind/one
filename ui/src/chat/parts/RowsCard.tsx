@@ -1,8 +1,10 @@
 // A table card (kind "rows"): prices to keep (prices_propose), the columns of a BOQ import (boq_import). With `tick`, the
 // engineer ticks the rows to take, and Keep sends them as rows_ok; Refuse sends none. Once sent, or settled in the
 // stream, the rows left out are struck through (never by colour alone); the card's folded line says how many were kept.
-// The card is narrow (the chat): the table keeps its columns readable and scrolls sideways inside the card; each cell
-// finds its own direction, and a long value shows two lines with the whole of it as the cell's title.
+// The card is as wide as the chat (280 to 560 px). Below 32rem of card each row stacks: its first column on a line of
+// its own, the others under it as "label: value", so every column shows whole at any chat width; from 32rem it is a
+// table (which scrolls sideways inside the card if it must). Each cell finds its own direction, and a long value shows
+// two lines with the whole of it as the cell's title. Table roles are set by hand: a stacked table keeps them.
 import { useState } from "react";
 import { BidiText } from "../bidi";
 import { fill, pick, t } from "../../i18n";
@@ -10,9 +12,17 @@ import type { CardKindProps } from "./cardKinds";
 
 const REFUSE = "no"; // takes nothing: no rows (core/qsone/engine/types.py)
 
-function Cell({ value }: { value: string }) {
+function Cell({ value, label, main }: { value: string; label: string; main: boolean }) {
   return (
-    <td dir="auto" title={value || undefined} className="min-w-[5rem] max-w-[14rem] px-2 py-1 align-top">
+    <td
+      role="cell"
+      dir="auto"
+      title={value || undefined}
+      data-label={main ? undefined : `${label}: `}
+      className={`min-w-0 align-top @lg:table-cell @lg:min-w-[5rem] @lg:max-w-[14rem] @lg:px-2 @lg:py-1 @lg:before:content-none ${
+        main ? "basis-full font-semibold @lg:font-normal" : "me-3 flex text-slate before:shrink-0 before:whitespace-pre before:content-[attr(data-label)] @lg:me-0 @lg:text-ink"
+      }`}
+    >
       <span className="line-clamp-2 break-words">
         <BidiText text={value} />
       </span>
@@ -39,14 +49,15 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
   return (
     <>
       {rows.length > 0 && (
-        <div data-rows-scroll className="-mx-1 max-w-full overflow-x-auto px-1">
-          <table className="w-max min-w-full border-collapse text-start">
-            <thead>
-              <tr>
+        <div data-rows-scroll className="@container -mx-1 max-w-full overflow-x-auto px-1">
+          <table role="table" className="block w-full border-collapse text-start @lg:table @lg:w-max @lg:min-w-full">
+            <thead role="rowgroup" className="sr-only @lg:not-sr-only @lg:table-header-group">
+              <tr role="row">
                 {open && tickable && <th />}
                 {columns.map((c) => (
                   <th
                     key={c.key}
+                    role="columnheader"
                     scope="col"
                     dir="auto"
                     className="min-w-[5rem] max-w-[14rem] px-2 py-1 text-start align-bottom font-semibold"
@@ -56,14 +67,15 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup" className="block @lg:table-row-group">
               {rows.map((row, i) => (
                 <tr
                   key={i}
-                  className={`border-t border-stone ${!open && payload.tick && !shownTicked.includes(i) ? "text-slate line-through" : ""}`}
+                  role="row"
+                  className={`flex flex-wrap border-t border-stone py-1.5 @lg:table-row @lg:py-0 ${open && tickable ? "ps-7 @lg:ps-0" : ""} ${!open && payload.tick && !shownTicked.includes(i) ? "text-slate line-through" : ""}`}
                 >
                   {open && tickable && (
-                    <td className="px-1 py-1 align-top">
+                    <td role="cell" className="-ms-7 w-7 shrink-0 align-top @lg:ms-0 @lg:table-cell @lg:w-auto @lg:px-1 @lg:py-1">
                       <input
                         type="checkbox"
                         aria-label={fill(t("tickRow", lang), { n: i + 1 })}
@@ -73,8 +85,8 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
                       />
                     </td>
                   )}
-                  {columns.map((c) => (
-                    <Cell key={c.key} value={row[c.key] ?? ""} />
+                  {columns.map((c, n) => (
+                    <Cell key={c.key} value={row[c.key] ?? ""} label={pick(c.label, lang)} main={n === 0} />
                   ))}
                 </tr>
               ))}

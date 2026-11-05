@@ -1,7 +1,7 @@
 // The project's status in the top bar: its stage, the submission date and the days left, the BOQ so far (with the
 // Deliverable and Revision it comes from), the open comments. Each shows only when the core sends it; nothing is
 // guessed. When the bar has no room for all of them, the lowest in priority fold into a "More status" button rather
-// than being cut: the submission first, then the BOQ so far, the open comments, the stage.
+// than being cut: the stage first, then the open comments, the BOQ so far; the submission date stays longest.
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../canvas/types";
 import { fill, language, pick, t, useLanguage } from "../i18n";
@@ -34,7 +34,7 @@ function statusLine(d: DeliverableInfo): string {
 
 const chip = "whitespace-nowrap rounded-md px-2 py-0.5";
 const GAP = 8; // gap-2
-/** Which item stays longest when the bar is short: lower folds first. */
+/** Which item stays longest when the bar is short: lower stays longer. */
 const PRIORITY: Record<string, number> = { submission: 0, boq: 1, comments: 2, stage: 3 };
 
 /** How many of `widths` (in priority order) fit in `room` px, with a `more` px button when some do not. */

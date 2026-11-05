@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freeRect, worldOf } from "./cover";
+import { freeRect, readable, worldOf } from "./cover";
 import { inView, placeInView } from "./place";
 import type { Placed } from "./types";
 
@@ -16,9 +16,11 @@ describe("the free area of the canvas", () => {
     expect(freeRect(pane, [chatArabic])).toEqual({ x: 356, y: 0, w: 1084, h: 852 });
   });
 
-  it("leaves out a band over the minimap and the command bar at the bottom", () => {
-    const free = freeRect(pane, [chatEnglish, minimap, commandBar]);
-    expect(free).toEqual({ x: 0, y: 0, w: 1084, h: 552 }); // up to the minimap's top edge
+  it("leaves out a band at the minimap and the command bar, whichever way leaves more room", () => {
+    // the command bar: a band off the bottom; the minimap then: its side, not another band across
+    expect(freeRect(pane, [chatEnglish, minimap, commandBar])).toEqual({ x: 216, y: 0, w: 868, h: 772 });
+    // a wide band at the bottom alone is taken off across
+    expect(freeRect(pane, [{ x: 0, y: 800, w: 1440, h: 48 }])).toEqual({ x: 0, y: 0, w: 1440, h: 752 });
   });
 
   it("with the chat a sheet over everything, the whole pane is used", () => {
@@ -46,5 +48,29 @@ describe("a new frame in the visible free area", () => {
 
   it("is null when it cannot fit there: the canvas places it and brings it into view", () => {
     expect(placeInView([files], { key: "file:f1", w: 480, h: 640 }, { x: 0, y: 0, w: 500, h: 500 }, opts)).toBeNull();
+  });
+});
+
+describe("a first view stays readable", () => {
+  const frames = [
+    { key: "files:all", x: 0, y: 0, w: 360, h: 520 },
+    { key: "deliverable:old", x: 440, y: 0, w: 960, h: 640 },
+    { key: "deliverable:new", x: 1480, y: 0, w: 960, h: 640 },
+    { key: "team:core", x: 0, y: 760, w: 480, h: 400 },
+  ];
+  const rank = (key: string) => ["deliverable:new", "files:all", "deliverable:old", "team:core"].indexOf(key);
+
+  it("shows them all when they fit at a readable zoom", () => {
+    expect(readable(frames, rank, { w: 3000, h: 2000 })).toHaveLength(4);
+  });
+
+  it("else the ones that matter most, as many as fit at 60%", () => {
+    // 1084 × 852 beside the chat: 60% leaves room for about 1440 world px across
+    const shown = readable(frames, rank, { w: 1084, h: 852 }).map((f) => f.key);
+    expect(shown[0]).toBe("deliverable:new");
+    expect(shown).not.toContain("files:all"); // too far from the newest to be read with it
+    expect(shown).toEqual(["deliverable:new"]);
+    const near = readable(frames, (k) => ["files:all", "deliverable:old", "deliverable:new", "team:core"].indexOf(k), { w: 1626, h: 1278 });
+    expect(near.map((f) => f.key)).toEqual(["files:all", "deliverable:old", "team:core"]);
   });
 });
