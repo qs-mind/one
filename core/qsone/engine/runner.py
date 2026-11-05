@@ -420,6 +420,7 @@ class _Brief:
             desk = a.spec.desk or self.brief_id
         return {
             "id": a.run_id,
+            "kind": a.spec.role,  # lead, checker, specialist or quick: where the canvas puts it
             "role": a.spec.name,
             "desk_id": desk,
             "model": a.model,

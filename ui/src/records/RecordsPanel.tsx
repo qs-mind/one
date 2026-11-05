@@ -2,18 +2,11 @@
 // Files go to the core one at a time as their raw bytes; the page never sends a file path.
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
+import type { FileInfo } from "../canvas/types";
 import { coreLine } from "../core";
 import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
 
-type FileInfo = {
-  id: string;
-  name: string;
-  status: "read" | "partly_read" | "stored" | "unreadable";
-  note: Text | null;
-  replaces: string | null;
-  duplicate?: boolean;
-};
 type Hit = {
   chunk_id?: number;
   file_id: string;
