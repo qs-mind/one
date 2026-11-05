@@ -10,18 +10,21 @@ DatabaseError = sqlcipher.DatabaseError
 IntegrityError = sqlcipher.IntegrityError
 
 
-def connect(path: Path, key: bytes) -> Connection:
+def connect(path: Path, key: bytes, *, readonly: bool = False) -> Connection:
     """Raises `DatabaseError` when the file is damaged or the key does not match.
 
     The connection is in autocommit mode (`isolation_level=None`): `Records.write` begins and
-    ends each transaction itself, and its lock serialises use across threads."""
-    conn = sqlcipher.connect(str(path), isolation_level=None, check_same_thread=False)
+    ends each transaction itself, and its lock serialises use across threads. `readonly` opens
+    an existing file without changing it (a backup copy), so its journal mode stays as it is."""
+    target = f"{Path(path).resolve().as_uri()}?mode=ro" if readonly else str(path)
+    conn = sqlcipher.connect(target, isolation_level=None, check_same_thread=False, uri=readonly)
     try:
         conn.execute("PRAGMA cipher_log_level = NONE")
         conn.execute(f"PRAGMA key = \"x'{key.hex()}'\"")
         conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
         conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
+        if not readonly:
+            conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA cache_size = -65536")
         conn.execute("PRAGMA temp_store = MEMORY")
         conn.enable_load_extension(True)

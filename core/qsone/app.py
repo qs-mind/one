@@ -15,6 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
 from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings
+from qsone.backup import routes as backup_routes
+from qsone.backup.runner import Backups
 from qsone.calc import routes as calc_routes
 from qsone.connectors import routes as connector_routes
 from qsone.connectors.hub import ConnectorHub
@@ -96,6 +98,9 @@ def create_app(
         mcp=mcp,
         meaning=service,
     )
+    # Task 5 gives the escrow (the account vault); until then the Backup key stays local.
+    backups = Backups(Path(folder), registry, engineer=engine.engineer_records)
+    registry.backups = backups
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -111,6 +116,7 @@ def create_app(
         if own_services:
             engine.services = tool_services.services_for(app.state)
         await engine.start()  # never continues a Brief by itself
+        backups.start()  # every 30 minutes; closing a project also backs it up
         try:
             async with mcp.running():
                 yield
@@ -121,6 +127,7 @@ def create_app(
                 engine.services = None
             await connector_hub.close()  # stdio servers stop with the core
             stop_listening()
+            backups.stop()  # waits for a running copy
         service.stop()
         registry.close_all()
 
@@ -136,6 +143,7 @@ def create_app(
     app.state.mcp = mcp
     app.state.engine = engine
     app.state.connectors = connector_hub
+    app.state.backups = backups
     app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
@@ -146,6 +154,7 @@ def create_app(
     app.include_router(canvas.router(registry, engine.waiting))
     app.add_middleware(canvas.no_store)
     app.include_router(connector_routes.router(connector_hub))
+    app.include_router(backup_routes.router(backups))
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):
