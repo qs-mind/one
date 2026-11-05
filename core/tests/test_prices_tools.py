@@ -583,6 +583,17 @@ async def test_a_replayed_proposal_asks_once(ctx, eng):
     assert len(ctx.host.cards) == 1 and len(kept(eng)) == 1
 
 
+async def test_without_a_key_one_is_not_subscribed(transport):
+    from qsone import keys
+
+    http = httpx.AsyncClient(transport=transport)
+    assert client.from_key_store(http) is None  # no account session yet (Plan 8)
+    keys.set_key(client.DEV_KEY_USER, TOKEN)
+    found = client.from_key_store(http)
+    assert found.base_url == "https://prices.qsmind.app"
+    assert found.auth() == {"Authorization": f"Bearer {TOKEN}"}
+
+
 def test_exact_values_stay_text():
     assert Decimal(client.exact("39850.50")) == Decimal("39850.5")
     assert client.exact(True) is None and client.exact(float("nan")) is None
