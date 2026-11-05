@@ -38,13 +38,15 @@ def on_device(base_url: str) -> bool:
 
 
 def provider_of(base_url: str) -> str:
-    """genai-prices' id for the provider at `base_url` ("deepseek"), else the URL's host.
+    """genai-prices' id for the provider at `base_url` ("deepseek"), else the URL's host and
+    port ("localhost:11434": the port tells local servers apart).
 
-    It decides a Same-provider check, and which prices apply: an unknown host has none."""
+    It decides a Same-provider check, which prices apply (an unknown host has none) and the
+    provider's logo in the UI."""
     try:
         return data_snapshot.get_snapshot().find_provider(None, None, base_url).id
     except LookupError:
-        return urlsplit(base_url).hostname or base_url
+        return urlsplit(base_url).netloc.rpartition("@")[2].lower() or base_url
 
 
 class StandardLink:
@@ -123,7 +125,9 @@ def _entries() -> list[dict]:
 
 def links(*, http_client: httpx2.AsyncClient | None = None) -> list[StandardLink]:
     return [
-        StandardLink(e["id"], e["name"], e["base_url"], e["provider"], http_client=http_client)
+        StandardLink(
+            e["id"], e["name"], e["base_url"], provider_of(e["base_url"]), http_client=http_client
+        )
         for e in _entries()
     ]
 
