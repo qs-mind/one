@@ -74,18 +74,22 @@ class Store:
 
     # Briefs -----------------------------------------------------------------------------------
 
-    def new_brief(self, chat_id: str, text: str) -> str:
+    def new_brief(self, chat_id: str, text: str, selection: list[dict] | None = None) -> str:
+        """`selection` is what the engineer selected on the canvas (Plan 7), kept with it."""
         brief_id = _new_id()
         at = self.rec.clock()
         with self.rec.write(ENGINE) as c:
             c.execute(
-                "INSERT INTO briefs(id, chat_id, text, status, created_at, updated_at)"
-                " VALUES (?, ?, ?, 'queued', ?, ?)",
-                (brief_id, chat_id, text, at, at),
+                "INSERT INTO briefs(id, chat_id, text, status, created_at, updated_at, selection)"
+                " VALUES (?, ?, ?, 'queued', ?, ?, ?)",
+                (brief_id, chat_id, text, at, at, None if not selection else _dump(selection)),
             )
         return brief_id
 
-    _BRIEF = "id, chat_id, text, status, step, read_untrusted, allowed, created_at, updated_at"
+    _BRIEF = (
+        "id, chat_id, text, status, step, read_untrusted, allowed, created_at, updated_at,"
+        " selection"
+    )
 
     @staticmethod
     def _brief_row(row) -> dict:
@@ -93,6 +97,7 @@ class Store:
         d = dict(zip(keys, row, strict=True))
         d["step"] = None if d["step"] is None else json.loads(d["step"])
         d["allowed"] = json.loads(d["allowed"])
+        d["selection"] = None if d["selection"] is None else json.loads(d["selection"])
         return d
 
     def brief(self, brief_id: str) -> dict:

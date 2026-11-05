@@ -223,6 +223,7 @@ class Progress:
     run_id: str
     agent: Text
     text: Text
+    focus: dict | None = None  # the canvas frame the agent now works on (Plan 7), when known
 
 
 @dataclass(frozen=True)

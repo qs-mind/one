@@ -48,7 +48,12 @@ class Projects:
 
     def _remember(self, rec: Records) -> dict:
         meta = rec.meta()
-        self._known[rec.id] = {"id": rec.id, "name": meta["name"], "created_at": meta["created_at"]}
+        self._known[rec.id] = {
+            "id": rec.id,
+            "name": meta["name"],
+            "created_at": meta["created_at"],
+            "confidential": meta.get("confidential") == "1",  # a Confidential Project
+        }
         return self._known[rec.id]
 
     def create(self, name: str, actor: str) -> dict:
@@ -87,7 +92,10 @@ class Projects:
                         failed.append({"id": project_id, "error": e.text})
                         continue
                 rec = self._open.get(project_id)
-                listed.append({**self._known[project_id], "open": rec is not None and rec.is_open})
+                is_open = rec is not None and rec.is_open
+                if is_open:  # its meta may have changed since (e.g. marked Confidential)
+                    self._remember(rec)
+                listed.append({**self._known[project_id], "open": is_open})
         listed.sort(key=lambda p: p["created_at"], reverse=True)
         return listed + failed
 
@@ -121,6 +129,8 @@ class Projects:
         self._folder(project_id)
         with self._lock:
             rec = self._open.pop(project_id, None)
+            if rec is not None and rec.is_open:
+                self._remember(rec)  # the list keeps its latest meta while it is closed
         if rec is not None:
             rec.close()
 
