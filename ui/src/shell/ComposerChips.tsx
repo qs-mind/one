@@ -2,6 +2,7 @@
 // engineer's AI links give, above the box) and the effort (each click moves to the next level: no list). Both are real:
 // what they show is what the message sends. A model that takes no effort shows no effort chip.
 import { type KeyboardEvent, type RefObject, useRef, useState } from "react";
+import { ProviderLogo } from "../brand/providers/ProviderLogo";
 import { fill, t } from "../i18n";
 import { type Choice, type Effort, keyOf, type ModelCard } from "../settings/AiSettings";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -9,16 +10,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 /** Slate, borderless, no fill until hovered; a visible ring for the keyboard. */
 export const chip =
   "flex h-8 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-xs text-slate transition-colors duration-150 ease-out hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ink";
-
-/** One plain glyph for every model (no company's mark): a block, as in a building's. */
-function ModelGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
-      <path d="M8 1.75 13.5 4.9v6.2L8 14.25 2.5 11.1V4.9z" />
-      <path d="M2.5 4.9 8 8.05l5.5-3.15M8 8.05v6.2" />
-    </svg>
-  );
-}
 
 function Check() {
   return (
@@ -68,7 +59,7 @@ export function ModelChip({
     <Popover open={open} onOpenChange={change}>
       <PopoverTrigger asChild>
         <button ref={trigger} type="button" aria-label={fill(t("modelChip"), { name })} title={name} className={chip}>
-          <ModelGlyph />
+          <ProviderLogo provider={current?.provider ?? ""} />
           <span dir="auto" className="truncate">
             {name}
           </span>
@@ -101,7 +92,7 @@ export function ModelChip({
                 }}
                 className={`flex min-h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-start text-sm transition-colors duration-150 ease-out hover:bg-stone focus-visible:bg-stone focus-visible:outline-none ${checked ? "text-ink" : "text-slate hover:text-ink"}`}
               >
-                <ModelGlyph />
+                <ProviderLogo provider={card.provider} />
                 <span dir="auto" className="truncate">
                   {card.name}
                 </span>

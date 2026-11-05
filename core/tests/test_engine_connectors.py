@@ -336,6 +336,27 @@ def test_a_key_over_plain_http_to_another_computer_is_refused():
     assert standard.add("Office server", "http://192.168.1.10:8080/v1", None).provider
 
 
+def test_an_unknown_provider_is_its_host_and_port():
+    # the port tells local servers apart (Ollama 11434, LM Studio 1234): the UI's logo and a
+    # Same-provider check both read it; a name and password before the host never show
+    assert standard.provider_of("http://localhost:11434/v1") == "localhost:11434"
+    assert standard.provider_of("http://127.0.0.1:1234/v1") == "127.0.0.1:1234"
+    assert standard.provider_of("http://[::1]:11434/v1") == "[::1]:11434"
+    assert standard.provider_of("https://me:pw@Example.com/v1") == "example.com"
+    assert standard.provider_of("https://dashscope.aliyuncs.com/compatible-mode/v1") == (
+        "dashscope.aliyuncs.com"
+    )
+    assert standard.provider_of("https://openrouter.ai/api/v1") == "openrouter"
+
+
+def test_a_saved_link_reads_its_provider_from_its_address(data_dir):
+    # a link saved before the port counted (provider "localhost") shows as the server it is
+    entry = {"id": "old", "name": "Ollama", "base_url": "http://localhost:11434/v1"}
+    settings.save_ai("standard", [entry | {"provider": "localhost"}])
+    [link] = standard.links()
+    assert link.provider == "localhost:11434"
+
+
 # The settings routes -------------------------------------------------------------------------
 
 

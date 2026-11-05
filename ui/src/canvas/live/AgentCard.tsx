@@ -2,6 +2,7 @@
 // Progress Line, what it is on (a button that shows that frame), Follow, and Stop for the Brief it works on.
 import { useStore, type ReactFlowState } from "@xyflow/react";
 import { useState } from "react";
+import { ProviderLogo } from "../../brand/providers/ProviderLogo";
 import { coreLine, send } from "../../core";
 import { fill, pick, t, texts, useLanguage, type Text } from "../../i18n";
 import { canvasApi } from "../api";
@@ -117,9 +118,10 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
         </span>
       </span>
       {agent.model && (
-        <bdi dir="ltr" className="self-start text-slate">
-          {agent.model}
-        </bdi>
+        <span className="flex items-center gap-1.5 self-start text-slate">
+          <ProviderLogo provider={agent.provider ?? ""} />
+          <bdi dir="ltr">{agent.model}</bdi>
+        </span>
       )}
       {agent.noNews && <span className="text-slate">{t("noNews")}</span>}
       {agent.line && (

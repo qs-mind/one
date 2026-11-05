@@ -439,6 +439,16 @@ describe("FirstLaunch", () => {
     }
   });
 
+  it("the AI step's two choices show the Claude logo, 20 px", async () => {
+    mockCore({ "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }) });
+    flowAt("ai");
+    for (const via of [texts.aiLinkClaudeCode, texts.aiLinkApiKey]) {
+      const logo = (await screen.findByRole("button", { name: choice(via.en) })).querySelector("svg[data-logo]");
+      expect(logo).toHaveAttribute("data-logo", "claude");
+      expect(logo).toHaveAttribute("width", "20");
+    }
+  });
+
   it("introduction card: the country starts at the system's, with no blank choice", async () => {
     mockCore();
     systemLanguageIs("ar-AE");
