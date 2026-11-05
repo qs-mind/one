@@ -12,7 +12,7 @@ import { HandOffCards } from "../shell/HandOffCard";
 import type { ChatState } from "../shell/useChats";
 import { textOf } from "../shell/useChats";
 import { DUR, play, useReducedMotion } from "../ui/motion";
-import { ApprovalCard, CARD_ANSWERED } from "./parts/ApprovalCard";
+import { ApprovalQueue, CARD_ANSWERED } from "./parts/ApprovalCard";
 import { ContinueBriefs } from "./parts/ContinueBriefs";
 import { CoordinationRoom } from "./parts/CoordinationRoom";
 import { CostNotice } from "./parts/CostNotice";
@@ -89,19 +89,11 @@ function BriefReply({
   const said = progress.find((item) => item.data.lang)?.data.lang ?? lang;
   return (
     <div className="flex flex-col gap-4">
-      <ProgressLine items={progress} lang={said} live={live} />
+      <ProgressLine items={progress} worklog={partsOf(parts, "worklog").at(-1)?.data} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
       {text && <Reply text={text} unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)} />}
-      {partsOf(parts, "card").map((card) => (
-        // the top bar's "Waiting for you" goes to the first card still waiting
-        <div
-          key={card.id}
-          data-card={card.id}
-          data-waiting={card.data.status === "pending" || card.data.status === undefined || undefined}
-        >
-          <ApprovalCard id={card.id} card={card.data} lang={said} />
-        </div>
-      ))}
+      {/* one card open at a time; the top bar's "Waiting for you" goes to it (data-waiting) */}
+      <ApprovalQueue cards={partsOf(parts, "card")} lang={said} />
       {partsOf(parts, "understood").map((part) => (
         <UnderstoodCard key={part.id} projectId={part.data.project_id} />
       ))}
@@ -251,7 +243,8 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
               </li>
             ),
           )}
-          {busy && (
+          {/* once the running Brief sends its work log, Thinking shimmers at its head (ProgressLine) instead */}
+          {busy && !(lastReply >= 0 && lastReply === messages.length - 1 && partsOf(messages[lastReply]!.parts, "worklog").length) && (
             <li>
               <span className={reduced ? "text-slate" : "shimmer"}>{t("thinking")}</span>
             </li>

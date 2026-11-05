@@ -85,7 +85,7 @@ describe("RowsCard", () => {
     expect(container.querySelector("section")).toHaveClass("border-copper");
     for (const n of [1, 2, 3]) await user.click(screen.getByRole("checkbox", { name: `احفظ الصف ${n}` }));
     await user.click(screen.getByRole("button", { name: texts.keepTicked.ar }));
-    const line = await screen.findByRole("button", { name: /أحفظ الأسعار دي؟.*اتحفظ 3 من 3 صفوف\./ });
+    const line = await screen.findByRole("button", { name: /اتحفظ 3 من 3 صفوف\..*أحفظ الأسعار دي؟/ });
     expect(container.querySelector("section")).not.toHaveClass("border-copper");
     expect(screen.queryByRole("table")).toBeNull(); // folded: the next card is in sight
     await user.click(line);

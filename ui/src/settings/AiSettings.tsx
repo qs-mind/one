@@ -2,6 +2,7 @@
 // each job, prices One does not know, and the Spending Caps. The engineer picks every model; nothing here is fixed.
 // No Save or Check button: a key checks itself, a choice saves when it is made, an amount after a pause in typing
 // or on leaving its field, a file path on leaving its field (never a half-typed path), each with its quiet line.
+// Removing a Standard Link takes it out at once, with Undo in its place for the core's window (UndoNotice).
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api } from "../api";
 import { coreLine, send } from "../core";
@@ -9,6 +10,8 @@ import { Feedback, secondary } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AutoHeight } from "../ui/AutoHeight";
 import { looksLikeAmount, SaveNote, useSaving } from "../ui/live";
+import { UndoNotice } from "../ui/UndoNotice";
+import type { Removed } from "./Connectors";
 import { AiKey } from "./AiKey";
 
 export type Role = "lead" | "checker" | "specialist" | "quick";
@@ -177,7 +180,13 @@ function ClaudeKey({ settings, onSaved }: { settings: Settings; onSaved: () => v
 }
 
 function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[]; onChanged: () => void }) {
-  const links = connectors.filter((c) => c.id.startsWith("standard:"));
+  // each one removed in this window stays in its place with its Undo (the core has it out of use already)
+  const [removed, setRemoved] = useState<Record<string, Removed & { link: ConnectorInfo }>>({});
+  const listed = connectors.filter((c) => c.id.startsWith("standard:"));
+  const links = Object.values(removed).reduce(
+    (all, { link }) => (all.some((l) => l.id === link.id) ? all : [...all, link]),
+    listed,
+  );
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [key, setKey] = useState("");
@@ -202,11 +211,19 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
     }
   }
 
-  async function remove(id: string) {
+  async function remove(link: ConnectorInfo) {
     setFailed(undefined);
-    const response = await send(`/settings/ai/standard/${encodeURIComponent(id)}`, "DELETE");
-    if (response?.ok) onChanged();
-    else setFailed(await coreLine(response, texts.removeFailed));
+    const response = await send(`/settings/ai/standard/${encodeURIComponent(link.id)}`, "DELETE");
+    if (!response?.ok) return setFailed(await coreLine(response, texts.removeFailed));
+    const undo = (await response.json().catch(() => undefined)) as Removed | undefined;
+    if (undo?.undo) setRemoved((was) => ({ ...was, [link.id]: { ...undo, link } }));
+    onChanged();
+  }
+
+  /** Its Undo was pressed, or its window ended: the links as the core has them now. */
+  function settled(id: string) {
+    setRemoved(({ [id]: _, ...rest }) => rest);
+    onChanged();
   }
 
   return (
@@ -215,18 +232,30 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
       <p className="text-slate">{t("standardLinkHelp")}</p>
       {links.length > 0 && (
         <ul className="flex flex-col gap-1">
-          {links.map((link) => (
-            <li key={link.id} className="flex items-center justify-between gap-4 rounded-md bg-stone px-3 py-2">
-              <span className="flex flex-wrap gap-x-2">
-                <span dir="auto">{link.name}</span>
-                {link.on_device && <span className="text-slate">{t("onDevice")}</span>}
-                {link.error && <span className="text-copper">{pick(link.error)}</span>}
-              </span>
-              <button type="button" onClick={() => void remove(link.id)} className="text-slate hover:text-ink">
-                {t("remove")}
-              </button>
-            </li>
-          ))}
+          {links.map((link) =>
+            removed[link.id] ? (
+              <li key={link.id} className="rounded-md px-3 py-2">
+                <UndoNotice
+                  label={fill(t("removedName"), { name: link.name })}
+                  token={removed[link.id]!.undo}
+                  windowMs={removed[link.id]!.window_ms}
+                  onUndone={() => settled(link.id)}
+                  onEnd={() => settled(link.id)}
+                />
+              </li>
+            ) : (
+              <li key={link.id} className="flex items-center justify-between gap-4 rounded-md bg-stone px-3 py-2">
+                <span className="flex flex-wrap gap-x-2">
+                  <span dir="auto">{link.name}</span>
+                  {link.on_device && <span className="text-slate">{t("onDevice")}</span>}
+                  {link.error && <span className="text-copper">{pick(link.error)}</span>}
+                </span>
+                <button type="button" onClick={() => void remove(link)} className="text-slate hover:text-ink">
+                  {t("remove")}
+                </button>
+              </li>
+            ),
+          )}
         </ul>
       )}
       <form onSubmit={add} className="flex flex-col gap-2">

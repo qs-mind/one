@@ -12,19 +12,38 @@ from qsone.undo import Trash
 from tests.conftest import AUTH, SECRET
 
 
+class Timer:
+    def __init__(self, timers: list, delay: float, callback) -> None:
+        self.timers, self.delay, self.callback = timers, delay, callback
+
+    def cancel(self) -> None:
+        if self in self.timers:
+            self.timers.remove(self)
+
+
 class Later:
     """Stands in for the loop's `call_later`: keeps each timer for the test to fire."""
 
     def __init__(self) -> None:
-        self.timers: list[tuple[float, object]] = []
+        self.timers: list[Timer] = []
 
-    def __call__(self, delay, callback):
-        self.timers.append((delay, callback))
+    def __call__(self, delay, callback) -> Timer:
+        timer = Timer(self.timers, delay, callback)
+        self.timers.append(timer)
+        return timer
 
     def fire(self) -> None:
-        for _, callback in self.timers:
-            callback()
+        for timer in list(self.timers):
+            timer.callback()
         self.timers.clear()
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now = 100.0
+
+    def __call__(self) -> float:
+        return self.now
 
 
 @pytest.fixture
@@ -33,8 +52,13 @@ def later():
 
 
 @pytest.fixture
-def trash(data_dir, later):
-    found = Trash(later=later)
+def clock():
+    return Clock()
+
+
+@pytest.fixture
+def trash(data_dir, later, clock):
+    found = Trash(later=later, clock=clock)
     shelf = {"items": ["عينة"]}
     found.kind(
         "sample",
@@ -49,13 +73,26 @@ def test_undo_inside_the_window_restores(trash, later):
     trash.shelf["items"].remove("عينة")
     given = trash.put("sample", {"name": "عينة"})
     assert given["window_ms"] == 6000 and given["undo"]
-    [(delay, _)] = later.timers
-    assert delay == pytest.approx(6 + 2)  # the window, and time for an Undo pressed at its end
+    [timer] = later.timers
+    assert timer.delay == pytest.approx(6 + 2)  # the window, and time for an Undo at its end
     assert trash.undo(given["undo"])
     assert trash.shelf["items"] == ["عينة"] and "purged" not in trash.shelf
-    later.fire()  # the window ends: nothing is left to purge
-    assert "purged" not in trash.shelf
+    assert later.timers == []  # its purge is called off
     assert not trash.undo(given["undo"])  # once only
+
+
+def test_the_window_pauses_while_the_engineer_points_at_undo(trash, later, clock):
+    given = trash.put("sample", {"name": "عينة"})
+    clock.now += 4  # 2 s of the window left
+    assert trash.pause(given["undo"])
+    assert later.timers == []  # nothing is purged while paused
+    clock.now += 60
+    assert trash.resume(given["undo"])
+    [timer] = later.timers
+    assert timer.delay == pytest.approx(2 + 2)  # the 2 s it had left, and the grace
+    later.fire()
+    assert trash.shelf["purged"] == ["عينة"]
+    assert not trash.pause(given["undo"]) and not trash.resume(given["undo"])
 
 
 def test_after_the_window_it_is_purged_and_undo_is_too_late(trash, later):
@@ -115,6 +152,17 @@ def test_a_removed_standard_link_comes_back_whole_with_undo(client):
     assert f"{added['id']}/sample-chat" in back["prices"]
     gone = client.post(f"/undo/{removed.json()['undo']}")
     assert gone.status_code == 404 and gone.json()["error"] == copy.UNDO_GONE
+    assert client.post(f"/undo/{removed.json()['undo']}/pause").status_code == 404
+
+
+def test_pause_and_resume_answer_while_the_window_runs(client):
+    added = client.post(
+        "/settings/ai/standard", json={"name": "عينة", "base_url": "https://api.example.com/v1"}
+    ).json()
+    token = client.delete(f"/settings/ai/standard/{added['id']}").json()["undo"]
+    assert client.post(f"/undo/{token}/pause").status_code == 204
+    assert client.post(f"/undo/{token}/resume").status_code == 204
+    assert client.post(f"/undo/{token}").status_code == 204
 
 
 def test_a_removed_standard_link_loses_its_key_when_the_window_ends(client):

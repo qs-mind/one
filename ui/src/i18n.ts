@@ -925,6 +925,22 @@ export const texts = {
   startSlogan: { en: "Every number has a source", ar: "كل رقم له مصدر" },
   startEngine: { en: "Starting ONE's engine…", ar: "بيشغّل محرّك ONE…" },
   searchField: { en: "Search", ar: "بحث" },
+  // The honest work log, approvals that can't be pressed by mistake, Undo instead of "are you sure?".
+  workedFor: { en: "Worked for {time} · {steps}", ar: "اشتغل {time} · {steps}" },
+  workSteps: { en: "Steps", ar: "الخطوات" },
+  durationAnd: { en: "{a} {b}", ar: "{a} و{b}" },
+  tickSeconds: { en: "{s} s", ar: "{s} ث" },
+  tickMinutes: { en: "{m}m {s}s", ar: "{m} د {s} ث" },
+  holdHintPaid: { en: "Press and hold to go ahead: this costs money.", ar: "اضغط مطوّل عشان تكمّل: ده بيكلّف فلوس." },
+  holdHintIrreversible: {
+    en: "Press and hold to go ahead: this can't be taken back.",
+    ar: "اضغط مطوّل عشان تكمّل: ده مش هينفع يترجع.",
+  },
+  approvalTrace: { en: "{answer} · {title} · {time}", ar: "{answer} · {title} · {time}" },
+  undo: { en: "Undo", ar: "تراجع" },
+  undoDone: { en: "Back as it was.", ar: "رجع زي ما كان." },
+  removedName: { en: "Removed «{name}»", ar: "اتشال «{name}»" },
+  undoFailed: { en: "It was not put back. Add it again if you need it.", ar: "مارجعش. ضيفه تاني لو محتاجه." },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";
@@ -1061,6 +1077,27 @@ export const counted = {
   deskSummary: {
     en: { other: "{desk}: {n} working" },
     ar: { zero: "{desk}: مفيش حد شغال", one: "{desk}: واحد شغال", two: "{desk}: اتنين شغالين", other: "{desk}: {n} شغالين" },
+  },
+  // The work log: its steps, and a Brief's whole time in words.
+  steps: {
+    en: { one: "{n} step", other: "{n} steps" },
+    ar: { zero: "مفيش خطوات", one: "خطوة واحدة", two: "خطوتين", few: "{n} خطوات", other: "{n} خطوة" },
+  },
+  seconds: {
+    en: { other: "{n}s" },
+    ar: { zero: "أقل من ثانية", one: "ثانية", two: "ثانيتين", few: "{n} ثواني", other: "{n} ثانية" },
+  },
+  minutes: {
+    en: { other: "{n}m" },
+    ar: { one: "دقيقة", two: "دقيقتين", few: "{n} دقايق", other: "{n} دقيقة" },
+  },
+  hours: {
+    en: { other: "{n}h" },
+    ar: { one: "ساعة", two: "ساعتين", few: "{n} ساعات", other: "{n} ساعة" },
+  },
+  moreWaiting: {
+    en: { one: "{n} more waiting", other: "{n} more waiting" },
+    ar: { one: "واحدة كمان مستنية", two: "اتنين كمان مستنيين", few: "{n} كمان مستنيين", other: "{n} كمان مستنيين" },
   },
 } satisfies Record<string, { en: Forms; ar: Forms }>;
 
