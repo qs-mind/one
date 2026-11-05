@@ -19,6 +19,7 @@ class WorkLog:
     started: str
     ended: str | None = None
     steps: list[dict] = field(default_factory=list)  # {run, agent, text, at, until, tool}
+    truth: dict | None = None  # the facts the core put beside the reply (engine.truth), kept
 
     def _open(self, run_id: str) -> list[dict]:
         return [s for s in self.steps if s["run"] == run_id and s["until"] is None]
@@ -61,10 +62,10 @@ class WorkLog:
         return {"started": self.started, "ended": self.ended, "steps": steps}
 
     def saved(self) -> str:
-        return json.dumps(
-            {"started": self.started, "ended": self.ended, "steps": self.steps},
-            ensure_ascii=False,
-        )
+        found = {"started": self.started, "ended": self.ended, "steps": self.steps}
+        if self.truth is not None:
+            found["truth"] = self.truth
+        return json.dumps(found, ensure_ascii=False)
 
     @classmethod
     def load(cls, text: str, *, stopped_at: str) -> "WorkLog":
@@ -72,6 +73,7 @@ class WorkLog:
         ends at `stopped_at`, the last time the core wrote the Brief."""
         data = json.loads(text)
         log = cls(started=data["started"], ended=data.get("ended"), steps=list(data["steps"]))
+        log.truth = data.get("truth")
         for s in log.steps:
             if s["until"] is None:
                 s["until"] = stopped_at

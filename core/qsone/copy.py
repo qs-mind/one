@@ -2289,6 +2289,47 @@ UPDATE_OFFLINE = {
 }
 
 
+# The truth checks (engine/truth.py): the facts the core puts beside a Brief's reply, from its own
+# records, and the line for each claim the records do not show.
+TRUTH_COVERAGE = {
+    "en": "From ONE's records: {priced} of {items} priced · {made}",
+    "ar": "من سجلات ONE: اتسعّر {priced} من {items} · {made}",
+}
+TRUTH_NO_DELIVERABLE_YET = {"en": "no Deliverable yet", "ar": "مفيش مخرج لسه"}
+TRUTH_DELIVERABLES = {"en": "{n} made", "ar": "فيه {n}"}
+TRUTH_OVERCLAIM_PRICED = {
+    "en": "The reply says {said} items are priced; the records show {priced} of {items}.",
+    "ar": "الرد بيقول إن {said} بند اتسعّروا، والسجلات فيها {priced} بس من {items}.",
+}
+TRUTH_NO_DELIVERABLE = {
+    "en": "The reply says a Deliverable is ready; there is none yet.",
+    "ar": "الرد بيقول إن فيه مخرج جاهز، ومفيش مخرج لسه.",
+}
+TRUTH_NOTHING_CHANGED = {
+    "en": "The reply says something changed; nothing was recorded or changed in this Brief.",
+    "ar": "الرد بيقول إن حاجة اتغيرت، بس مفيش حاجة اتسجلت ولا اتغيرت في التكليف ده.",
+}
+TRUTH_SUPPLY_ONLY = {
+    "en": "The reply says the rate includes labour; the quote it cites ({quote}) is supply only.",
+    "ar": "الرد بيقول إن الفئة شاملة المصنعية، بس العرض اللي اتذكر ({quote}) توريد بس.",
+}
+TRUTH_PLACEHOLDER = {
+    "en": "The reply left blanks for values: {blanks}. Those values are missing.",
+    "ar": "الرد ساب فراغات مكان قيم: {blanks}. القيم دي ناقصة.",
+}
+TRUTH_PROMISE = {
+    "en": "The reply says work is under way, but nothing is running now. Ask again to go on.",
+    "ar": "الرد بيقول إن فيه شغل ماشي، بس مفيش حاجة شغالة دلوقتي. ابعت تاني عشان نكمّل.",
+}
+TRUTH_NO_CARD = {
+    "en": "The «I understood this» card was not saved, so there is none to review yet.",
+    "ar": "كارت «فهمت كده» ماتحفظش، فمفيش كارت تراجعه لسه.",
+}
+TRUTH_CARD_NOT_SAVED = {
+    "en": "The «I understood this» card was not saved: {why}",
+    "ar": "كارت «فهمت كده» ماتحفظش: {why}",
+}
+
 # ---------------------------------------------------------------------------------------------
 # What the screen can add to a text: the action that fixes it, for the place it shows in.
 # "ai": AI settings ("Open AI settings" in the chat; nothing more in AI settings or the first

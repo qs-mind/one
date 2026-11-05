@@ -1,0 +1,163 @@
+"""The truth checks (engine/truth.py), on the exact words a weak model wrote in the tender-day
+walk (gemini-3.1-flash-lite, 5 Nov 2026). Synthetic «عينة» files only."""
+
+from datetime import UTC, date, datetime
+
+from qsone.engine import truth
+from qsone.engine.truth import Brief, Coverage
+from qsone.records import ledger
+from qsone.records.files import add_file
+from tests.samples import sample_pdf
+
+QUOTE = sample_pdf(
+    [
+        [
+            "Quotation No. NB-2026-1147 - SAMPLE DATA",
+            "Date: 2 November 2026 Valid for: 15 days",
+            "1 Ready-mix concrete C30 incl. pumping m3 3,450",
+            "3 Plain concrete C15 m3 2,600",
+            "7 Solid cement block 25 cm nr 21",
+        ]
+    ]
+)
+EMAIL = (
+    "Subject: توضيحات مناقصة - عينة\n"
+    "1- الأسعار بالجنيه المصري ولا تشمل ضريبة القيمة المضافة ١٤٪، وتضاف في الملخص فقط.\n"
+    "2- مدة سريان العرض ٩٠ يوم من تاريخ التقديم.\n"
+    "5- آخر موعد لتقديم العطاءات: ١٨ نوفمبر ٢٠٢٦ الساعة ١٢ ظهراً.\n"
+).encode()
+
+
+def test_today_is_cairos_day():
+    late = datetime(2026, 11, 5, 22, 30, tzinfo=UTC)  # 00:30 on 6 Nov in Cairo
+    assert truth.today(late) == date(2026, 11, 6)
+    assert "2026-11-05" in truth.today_line(datetime(2026, 11, 5, 8, tzinfo=UTC))
+
+
+def test_bracketed_blanks_are_found_and_links_are_not():
+    table = "| البند | الكمية | القيمة |\n| خرسانة | [الكمية] | [القيمة] |"
+    assert truth.placeholders(table) == ["[الكمية]", "[القيمة]"]
+    assert truth.placeholders("الإجمالي: [مبلغ إجمالي المقايسة]") == ["[مبلغ إجمالي المقايسة]"]
+    assert truth.placeholders("Dear [Client name], total {{total}}") == ["[Client name]", "{{total}}"]
+    assert truth.placeholders("see [the quote](https://x.example) and note [1], [x]") == []
+    blocks = [{"type": "p", "children": [{"text": "بقيمة [مبلغ إجمالي المقايسة] جنيه"}]}]
+    assert truth.placeholders_in(blocks) == ["[مبلغ إجمالي المقايسة]"]
+
+
+def test_a_reply_that_ends_on_a_promise():
+    assert truth.promise("بدأت التسعير. جاري التنفيذ…")
+    assert truth.promise("ثواني وهتكون القيم كاملة قدامك")
+    assert truth.promise("هبدأ بتنظيف الأرقام القديمة")
+    assert truth.promise("I'll finish the rest shortly.")
+    assert truth.promise("اتسعّر 8 بنود. لو عايز أكمّل الباقي قولي.") is None
+    assert truth.promise("Priced 8 items. Shall I go on with the rest?") is None
+    assert truth.promise("اتسعّر 8 بنود من 325، والباقي لسه.") is None
+
+
+def test_the_claim_that_all_325_items_are_priced():
+    cov = Coverage(items=325, priced=8, deliverables=0)
+    said = "تم الانتهاء من تسعير كافة بنود المقايسة (325) والمخرج جاهز للمراجعة."
+    found = {p.kind: p for p in truth.overclaim(said, cov, Brief())}
+    assert set(found) == {"priced", "deliverable"}
+    assert "8 of 325" in found["priced"].fix
+    assert "8" in found["priced"].flag["ar"] and "325" in found["priced"].flag["ar"]
+    # a section's items, or the true count, are no overclaim
+    assert truth.overclaim("سعّرت كل بنود الحفر.", cov, Brief()) == []
+    assert truth.overclaim("اتسعّر 8 بنود من المقايسة.", cov, Brief()) == []
+    done = Coverage(items=325, priced=325, deliverables=1)
+    assert truth.overclaim(said, done, Brief(deliverables=1)) == []
+
+
+def test_a_change_that_was_never_made():
+    said = "تم تثبيت الأسعار عند سعر المورد فقط."
+    [found] = truth.overclaim(said, None, Brief(writes=0))
+    assert found.kind == "changed" and found.flag["ar"]
+    assert truth.overclaim(said, None, Brief(writes=2)) == []
+
+
+def test_labour_claimed_on_a_supply_only_quote():
+    said = "الفئة 21.00 شاملاً المواد والمصنعية كما ورد في العرض."
+    [found] = truth.overclaim(said, None, Brief(writes=1, supply_only=("04 عرض أسعار المورد",)))
+    assert found.kind == "labour"
+
+
+def test_reply_problems_for_the_retry():
+    did = Brief(specialists=("Estimator", "مهندس التسعير"), tool_names=frozenset({"web_search"}))
+    kinds = lambda text, **kw: {  # noqa: E731
+        p.kind for p in truth.reply_problems(text, cov=None, did=did, engineer_text="سعّر", **kw)
+    }
+    assert kinds("استمر يا بشمهندس، كمل تسعير… أنا متابع معاك.") >= {"audience"}
+    assert kinds("مقدرتش أستخدم web_search دلوقتي.") == {"tool"}
+    assert kinds("قمت بإنشاء مستند (Deliverable) للمراجعة.") == {"english"}
+    table = "| البند | القيمة |\n|---|---|\n| خرسانة | 1,250,000 |\n| حديد | 980,000 |"
+    assert kinds(table) == {"table"}
+    assert kinds("فهمت الملفات، البطاقة قدامك راجعها.", understand_brief=True) == {"card"}
+    assert kinds("اتسعّر 8 بنود من 325؛ الباقي لسه.") == set()
+
+
+def test_facts_say_what_the_records_hold():
+    line = truth.facts(Coverage(325, 8, 0), [])
+    assert line["text"]["ar"] == "من سجلات ONE: اتسعّر 8 من 325 بند · مفيش مخرج لسه"
+    assert line["text"]["en"] == "From ONE's records: 8 of 325 items priced · no Deliverable yet"
+    assert truth.facts(Coverage(0, 0, 0), []) is None
+
+
+def test_coverage_counts_items_rates_and_deliverables(rec):
+    source = ledger.add_source(rec, kind="sample", title="عينة", actor="t", dated="2026-11-05")
+    with rec.write("t") as c:
+        at = rec.clock()
+        a = ledger.write_item(c, at=at, actor="t", kind="boq_item", code="01-01", fields={})
+        ledger.write_item(c, at=at, actor="t", kind="boq_item", code="01-02", fields={})
+        ledger.write_number(
+            c, at=at, actor="t", item_id=a, name="rate", value="100", source_id=source,
+            dated="2026-11-05", unit="m3", currency="EGP",
+        )  # fmt: skip
+    assert truth.coverage(rec) == Coverage(items=2, priced=1, deliverables=0)
+
+
+def _source(rec, file_id: str, locator: dict) -> str:
+    with rec.write("t") as c:
+        return ledger.write_source(
+            c, at=rec.clock(), actor="t", kind="quote", title="عرض - عينة", file_id=file_id,
+            locator=locator, dated="2026-11-02",
+        )  # fmt: skip
+
+
+def test_a_number_must_be_where_its_source_points(rec):
+    quote = add_file(rec, "04 عرض أسعار المورد - عينة.pdf", QUOTE, actor="engineer").id
+    source = _source(rec, quote, {"page": 1})
+    with rec.read() as c:
+        ok, where, seen = truth.value_at(c, source, "2600")
+        assert ok and "page 1" in where and "2600" in seen
+        assert truth.value_at(c, source, "2600.00")[0]
+        assert not truth.value_at(c, source, "2500")[0]  # blinding cited to a page without it
+        assert not truth.value_at(c, source, "3795")[0]  # 3,450 × 1.1, a calculation
+        assert not truth.value_at(c, source, "2625")[0]  # a "market average" never in the quote
+
+
+def test_quotes_and_items_say_what_they_cover():
+    assert not truth.covers_labour("Solid cement block 25 cm nr 21")
+    assert truth.covers_labour("توريد وتركيب بلاط بورسلين")
+    assert truth.supply_only_item("توريد أسمنت مقاوم للكبريتات")
+    assert not truth.supply_only_item("مباني طوب أسمنتي مصمت 25 سم")
+
+
+def test_a_letter_against_the_files_and_today(rec):
+    add_file(rec, "05 إيميل العميل - عينة.txt", EMAIL, actor="engineer")
+    add_file(rec, "04 عرض أسعار المورد - عينة.pdf", QUOTE, actor="engineer")
+    day = date(2026, 11, 5)
+    bad = (
+        "القاهرة في 6 نوفمبر 2026\n"
+        "نتقدم بعرضنا بإجمالي 1,426,948.50 جنيه، ومدة صلاحية العرض 60 يوماً."
+    )
+    good = (
+        "القاهرة في 5 نوفمبر 2026\n"
+        "نتقدم بعرضنا بإجمالي 1,426,948.50 جنيه غير شامل ضريبة القيمة المضافة 14%، "
+        "ومدة سريان العرض 90 يوم، وآخر موعد للتقديم 18 نوفمبر 2026."
+    )
+    with rec.read() as c:
+        wrong = truth.letter_problems(c, bad, day=day, has_total=True)
+        assert any("6 نوفمبر 2026" in w for w in wrong)
+        assert any("validity 60" in w and "90" in w for w in wrong)
+        assert any("VAT" in w and "14" in w for w in wrong)
+        assert truth.letter_problems(c, good, day=day, has_total=True) == []
