@@ -48,6 +48,10 @@ export const texts = {
     en: "A Claude key is saved. Add a new one only to replace it.",
     ar: "في مفتاح Claude محفوظ. ضيف مفتاح جديد بس لو عايز تغيّره.",
   },
+  keyStoreFile: {
+    en: "This computer has no key store, so One keeps your keys in a protected file in its own folder instead.",
+    ar: "لا يوجد على هذا الجهاز مخزن مفاتيح، لذلك يحفظ ون مفاتيحك في ملف محمي داخل مجلده بدلًا منه.",
+  },
   standardLink: { en: "Standard Link: other AI Providers", ar: "ربط عام: مزوّدين تانيين" },
   standardLinkHelp: {
     en: "Any provider with an OpenAI-compatible API, such as DeepSeek or Mistral, or a model on this computer, such as Ollama.",
