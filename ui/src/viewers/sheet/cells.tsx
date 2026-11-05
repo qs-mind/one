@@ -174,6 +174,8 @@ export type CellProps = {
   onReject: (changeId: string) => void;
   /** Where the number's source shows (../../sources/targets.ts): hovering it draws the source line. */
   sourceKeys?: string[];
+  /** Its source card is open: the cell is outlined 2 px in Ink. */
+  open?: boolean;
   /** The grid's for the cell's buttons: reachable by Tab only on the active cell (the arrows move between cells). */
   tabIndex?: number;
 };
@@ -210,7 +212,7 @@ export function SheetCell(p: CellProps) {
     content = (
       // the ledger number shows here: a number quoted elsewhere draws its source line to this cell
       <span
-        className="w-full text-end"
+        className={`w-full text-end ${p.open ? "rounded-[4px] outline-2 outline-ink" : ""}`}
         {...(cell.number_id ? { [TARGET]: `number:${cell.number_id}` } : {})}
         {...sourceLineHandlers(p.sourceKeys ?? [])}
       >

@@ -322,6 +322,7 @@ export function SheetViewer(props: SheetViewerProps) {
           current={!!current && pending.get(cellKey(row.id, column.key))?.change.id === current}
           marks={marks.get(cellKey(row.id, column.key))}
           collapsed={collapsed.has(row.id)}
+          open={!!popover && popover.cell === row.cells[column.key]}
           onToggle={toggle}
           onAccept={(id) => void decide(id, true)}
           onReject={(id) => void decide(id, false)}
@@ -330,7 +331,7 @@ export function SheetViewer(props: SheetViewerProps) {
       );
     },
     // toggle and decide read the latest state when called
-    [byKey, titleColumn, direction, pending, marks, collapsed, keysOf, current],
+    [byKey, titleColumn, direction, pending, marks, collapsed, keysOf, current, popover],
   );
   const readOnly = !!props.readOnly;
   const canEdit = useCallback(

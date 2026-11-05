@@ -35,6 +35,8 @@ export type Source = {
   dated?: string | null;
   /** Who quoted it, when a card's row says (a price to keep). */
   supplier?: string | null;
+  /** The line of the quote this number was read from (Plan 5 Task 3). */
+  quote?: string | null;
 };
 
 /** A cell that shows a ledger number. */
