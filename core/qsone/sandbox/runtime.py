@@ -27,7 +27,7 @@ from pathlib import Path
 
 import httpx
 
-from qsone import settings
+from qsone import copy, settings
 from qsone.meaning import download as fetch
 from qsone.meaning.manifest import ModelFile
 
@@ -80,6 +80,13 @@ FILES = (
 )
 
 
+# The search models' download words, said for the Sandbox's Python instead.
+_OURS = (
+    (copy.MEANING_DOWNLOAD_FAILED, copy.SANDBOX_DOWNLOAD_FAILED),
+    (copy.MEANING_NO_SPACE, copy.SANDBOX_NO_SPACE),
+)
+
+
 @dataclass(frozen=True)
 class _Spec:
     """What `meaning.download` needs to know about a set of files."""
@@ -113,9 +120,14 @@ def _folder(base: Path) -> Path:
     return base / "cpython-wasi" / VERSION
 
 
+def folder(base: Path | None = None) -> Path:
+    """Where the unpacked runtime is, or will be once installed."""
+    return _folder(base or root()) / "runtime"
+
+
 def find(base: Path | None = None) -> Path | None:
     """The unpacked runtime (`python.wasm` and `lib/`), or None when it is not installed."""
-    runtime = _folder(base or root()) / "runtime"
+    runtime = folder(base)
     try:
         stamp = json.loads((runtime / STAMP).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -140,12 +152,17 @@ def install(
 ) -> Path:
     """Downloads what is missing, checks it, unpacks it; returns the runtime folder.
 
-    Raises `meaning.download.DownloadError` (a copy.py pair in `.text`) or `DownloadStopped`."""
+    Raises `meaning.download.DownloadError` (a copy.py pair in `.text`, the Sandbox's own
+    words) or `DownloadStopped`."""
     base = base or root()
     if found := find(base):
         return found
     spec = _spec(files)
-    fetch.download([spec], base, client=client, stop=stop, on_progress=on_progress)
+    try:
+        fetch.download([spec], base, client=client, stop=stop, on_progress=on_progress)
+    except fetch.DownloadError as e:
+        text = next((ours for theirs, ours in _OURS if e.text == theirs), e.text)
+        raise fetch.DownloadError(text) from e
     folder = _folder(base)
     part = folder / "runtime.part"
     shutil.rmtree(part, ignore_errors=True)
@@ -162,6 +179,13 @@ def install(
         (folder / f.name).unlink(missing_ok=True)
     (folder / fetch.VERIFIED).unlink(missing_ok=True)
     return runtime
+
+
+def ensure(base: Path | None = None) -> Path:
+    """`install` with the download client, for the first run that needs the runtime: about
+    16 MB, once; a stopped download resumes where it ended. Blocks: run it in a thread."""
+    with fetch.default_client() as client:
+        return install(base, client=client, stop=threading.Event())
 
 
 def main(argv: Sequence[str] | None = None) -> int:

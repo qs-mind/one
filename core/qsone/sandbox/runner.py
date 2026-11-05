@@ -4,15 +4,21 @@ The job goes to the child's stdin and the result comes back on its stdout, both 
 file is written. The child is killed when the run is cancelled, when it outlives its time limit
 by `GRACE` seconds, or when its stdout passes `output_max`. Its stdin stays open for the whole
 run: when the core dies, the pipe closes and the child exits by itself.
+
+The app holds one runner (`tools.services`), so every Brief shares its one-run-at-a-time lock.
+Given `install`, `ready()` downloads the runtime the first time a run needs it, and a runtime
+that turns out damaged is forgotten, so the next `ready()` downloads it again.
 """
 
 import asyncio
 import base64
 import json
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from qsone.sandbox import runtime
 
 MiB = 1 << 20
 TIMEOUT = 60
@@ -67,12 +73,22 @@ class SandboxRunner:
         *,
         output_max: int = OUTPUT_MAX,
         command: Sequence[str] = (sys.executable, "-I", "-m", "qsone.sandbox.host"),
+        install: Callable[[], Path] | None = None,
     ) -> None:
         self.runtime_dir = Path(runtime_dir)
         self.output_max = output_max
         self.command = tuple(command)
+        self.install = install  # puts the runtime in `runtime_dir` (`runtime.ensure`), or None
         self.child: asyncio.subprocess.Process | None = None  # the run in progress
         self._one = asyncio.Semaphore(1)  # one run at a time (a 14 GB machine)
+        self._installing = asyncio.Lock()
+
+    async def ready(self) -> None:
+        """Returns once the runtime is in place, downloading it first when it is missing.
+        Raises `meaning.download.DownloadError` (the Sandbox's own words in `.text`)."""
+        if self.install is not None:
+            async with self._installing:
+                await asyncio.to_thread(self.install)
 
     async def run(
         self,
@@ -136,7 +152,10 @@ class SandboxRunner:
                     await child.wait()
                 child.stdin.close()
                 self.child = None
-        return _result(out, _report(err))
+        result = _result(out, _report(err))
+        if self.install is not None and (result.error or "").startswith("runtime:"):
+            (self.runtime_dir / runtime.STAMP).unlink(missing_ok=True)  # download it again
+        return result
 
 
 def _result(out: bytes, host: dict) -> RunResult:

@@ -397,6 +397,18 @@ def _inside(conn, file_id: str, pages: int | None, place: dict) -> None:
         raise _no_evidence("locator")
 
 
+def _made_by_a_script(conn, file_id: str) -> bool:
+    """A file a Sandbox script wrote (and nobody had before): what it holds was computed."""
+    return (
+        conn.execute(
+            "SELECT 1 FROM sandbox_runs r, json_each(r.outputs, '$.files') o"
+            " WHERE json_extract(o.value, '$.file_id') = ? AND json_extract(o.value, '$.new')",
+            (file_id,),
+        ).fetchone()
+        is not None
+    )
+
+
 def _file_source(conn, args: SourceArgs) -> dict:
     if args.file_id is None:
         raise _no_evidence("file_id")
@@ -405,6 +417,8 @@ def _file_source(conn, args: SourceArgs) -> dict:
     ).fetchone()
     if row is None:
         raise RecordsError(copy.FILE_NOT_IN_PROJECT, status=422, field="file_id")
+    if _made_by_a_script(conn, args.file_id):  # Guardrail 2: a script's numbers are evidence
+        raise RecordsError(copy.NUMBER_NEEDS_CALC, status=422, field="file_id")
     name, pages, added_at = row
     place = _place(args.locator)
     if not place:

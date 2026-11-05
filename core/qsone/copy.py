@@ -1482,8 +1482,45 @@ PRICES_COUNTRY = {
 
 # The Sandbox.
 SANDBOX_NOT_READY = {
-    "en": "The Sandbox's Python is missing or damaged, so no code can run. Reinstall One.",
-    "ar": "بايثون الصندوق المعزول ناقص أو بايظ، فمفيش كود هيشتغل. نزّل One تاني.",
+    "en": (
+        "The Sandbox's Python is missing or damaged, so no code ran. "
+        "One downloads it again (about 16 MB) the next time a script runs."
+    ),
+    "ar": (
+        "بايثون الصندوق المعزول ناقص أو بايظ، فمفيش كود اشتغل. "
+        "One هينزّله تاني (حوالي 16 ميجا) أول ما سكريبت يشتغل."
+    ),
+}
+SANDBOX_DOWNLOAD_FAILED = {
+    "en": (
+        "The Sandbox's Python did not download (no internet, or the server did not answer). "
+        "What came so far is kept. Try again."
+    ),
+    "ar": (
+        "بايثون الصندوق المعزول مانزلش (مفيش نت، أو السيرفر مارَدّش). "
+        "اللي نزل لحد دلوقتي محفوظ. جرّب تاني."
+    ),
+}
+SANDBOX_NO_SPACE = {
+    "en": (
+        "There is not enough free space: the Sandbox's Python needs about 300 MB while it "
+        "downloads. Free some space, then try again."
+    ),
+    "ar": (
+        "مفيش مساحة فاضية كفاية: بايثون الصندوق المعزول محتاج حوالي 300 ميجا وهو بينزل. "
+        "فضّي شوية مساحة وجرّب تاني."
+    ),
+}
+SANDBOX_SCRIPT_TOO_BIG = {
+    "en": (
+        "The script is larger than 200 KB. "
+        "Send a shorter one that reads its data from the input files."
+    ),
+    "ar": "السكريبت أكبر من 200 كيلو. ابعت واحد أقصر بيقرا بياناته من ملفات الإدخال.",
+}
+SANDBOX_RUN_UNKNOWN = {
+    "en": "There is no Sandbox run with this id here. A sandbox_run result gives its run id.",
+    "ar": "مفيش تشغيلة في الصندوق المعزول بالرقم ده هنا. نتيجة sandbox_run فيها رقم التشغيلة.",
 }
 SANDBOX_SYNTAX = {
     "en": "The script has a mistake on line {line}: {message}",
