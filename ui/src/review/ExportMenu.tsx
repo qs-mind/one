@@ -21,6 +21,8 @@ export type ExportMenuProps = {
 export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, announce }: ExportMenuProps) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  // how the last export went, shown quietly under the buttons (the announcer says it too)
+  const [done, setDone] = useState<string | null>(null);
   const draft = view.status !== "signed_off";
   const formats: ["xlsx" | "docx" | "pdf", string][] =
     view.kind === "sheet"
@@ -37,10 +39,13 @@ export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, 
   async function make(format: "xlsx" | "docx" | "pdf") {
     setBusy(true);
     setFailed(null);
+    setDone(null);
     const out = await saveAnswer(await deliverablesApi.exportFile(projectId, view.id, format));
     setBusy(false);
-    if (out.ok) announce?.(out.line);
-    else setFailed(out.line);
+    if (out.ok) {
+      setDone(out.line);
+      announce?.(out.line);
+    } else setFailed(out.line);
   }
 
   return (
@@ -77,6 +82,11 @@ export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, 
           {/* the mark is printed in the Deliverable's own language, as the files carry it */}
           <bdi dir="auto">{pick(texts.exportDraftMark, view.language)}</bdi>
         </span>
+      )}
+      {done && (
+        <p data-export-done className="basis-full text-slate">
+          <bdi dir="auto">{done}</bdi>
+        </p>
       )}
       {failed && (
         <p role="alert" className="basis-full text-copper">

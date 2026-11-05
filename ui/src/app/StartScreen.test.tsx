@@ -82,7 +82,7 @@ describe("the start screen", () => {
     const user = userEvent.setup();
     render(<HealthGate logPath={logPath}>chat</HealthGate>);
     expect(await screen.findByText(texts.coreDown.en)).toBeInTheDocument();
-    expect(screen.getByText(texts.coreDown.ar)).toBeInTheDocument();
+    expect(screen.queryByText(texts.coreDown.ar)).toBeNull();
     expect(screen.getByText(logPath)).toBeInTheDocument();
     expect(startScreen()).toContainElement(screen.getByText(logPath));
     expect(startScreen()).toContainElement(screen.getByText(texts.startSlogan.en.split(" ")[0]!));

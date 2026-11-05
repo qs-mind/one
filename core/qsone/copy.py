@@ -1387,7 +1387,7 @@ EXPORT_LABELS = {
     "review": {"en": "Review comment", "ar": "ملاحظة مراجعة"},
     "open": {"en": "Open", "ar": "مفتوحة"},
     "closed": {"en": "Closed", "ar": "مقفولة"},
-    "none": {"en": "None", "ar": "لا يوجد"},
+    "none": {"en": "None", "ar": "مفيش"},
 }
 
 # The client's own file.

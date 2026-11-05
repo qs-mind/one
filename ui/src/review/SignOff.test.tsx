@@ -155,6 +155,8 @@ describe("ExportMenu", () => {
     await waitFor(() => expect(invoke).toHaveBeenCalledWith("save_export", { name: "خطاب العطاء.docx", bytes: [9, 8] }));
     expect(String(fetch.mock.calls[0]![0])).toContain("format=docx");
     expect(announce).toHaveBeenCalledWith(fill(texts.exportSaved.ar, { name: "خطاب العطاء.docx" }));
+    // and it shows, quietly, under the buttons: the engineer sees the export worked without a screen reader
+    expect(screen.getByText(fill(texts.exportSaved.ar, { name: "خطاب العطاء.docx" })).closest("p")).toHaveClass("text-slate");
     expect(screen.getByRole("button", { name: texts.exportPdf.ar })).toBeInTheDocument();
   });
 
