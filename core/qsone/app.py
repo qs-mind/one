@@ -14,7 +14,7 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings, usage
+from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings, undo, usage
 from qsone.account import routes as account_routes
 from qsone.account import vault as account_vault
 from qsone.account.session import Account
@@ -119,6 +119,7 @@ def create_app(
     service = meaning(registry) if meaning else Meaning(registry, Path(folder) / "models")
     mcp = mcp_server.McpGate()
     connector_hub = ConnectorHub()  # the engineer's MCP Connectors (Plan 5)
+    trash = undo.Trash()  # Undo instead of "are you sure?": removals wait out their window here
     engine = Engine(
         projects=registry,
         data_dir=Path(folder),
@@ -149,6 +150,7 @@ def create_app(
             lambda project_id, event: loop.call_soon_threadsafe(activity.publish, project_id, event)
         )
         service.start()
+        trash.purge_all()  # what a core that stopped inside an Undo window left
         connector_hub.start()  # a Connector's server starts only when first used
         # The tools' one way out (Plan 5), unless a test gave the engine its own fakes.
         own_services = engine.services is None
@@ -167,6 +169,7 @@ def create_app(
                 await engine.services.close()  # after the engine: no Brief uses it now
                 engine.services = None
             await connector_hub.close()  # stdio servers stop with the core
+            trash.purge_all()  # an Undo window ends with the core
             stop_listening()
             backups.stop()  # waits for a running copy
             sender.stop()
@@ -186,6 +189,7 @@ def create_app(
     app.state.mcp = mcp
     app.state.engine = engine
     app.state.connectors = connector_hub
+    app.state.trash = trash
     app.state.backups = backups
     app.state.account = account
     app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
@@ -193,11 +197,12 @@ def create_app(
     app.include_router(meaning_routes.router(service))
     app.include_router(calc_routes.router(registry))
     app.include_router(deliverables_api.router(registry))
-    app.include_router(engine_routes.settings_router(ai_http))
+    app.include_router(engine_routes.settings_router(ai_http, trash=trash))
     app.include_router(engine_routes.briefs_router(engine))
     app.include_router(canvas.router(registry, engine.waiting))
     app.add_middleware(canvas.no_store)
-    app.include_router(connector_routes.router(connector_hub))
+    app.include_router(connector_routes.router(connector_hub, trash))
+    app.include_router(undo.router(trash))
     app.include_router(backup_routes.router(backups))
     app.include_router(account_routes.router(account))
     app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)

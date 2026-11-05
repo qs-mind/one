@@ -419,9 +419,17 @@ def test_tokens_live_only_in_the_key_store(client, memory_keyring, data_dir, tmp
         }
     ]
     assert "tok-sample-123" not in json.dumps(listed)
-    assert client.delete(f"/connectors/{NAME}").status_code == 204
-    assert client.get("/connectors").json() == {"connectors": []}
+    removed = client.delete(f"/connectors/{NAME}")
+    assert removed.status_code == 200 and removed.json()["window_ms"] == 6000
+    assert client.get("/connectors").json() == {"connectors": []}  # out of use at once
+    # Undo inside the window: back as it was, its token never left the key store
+    assert client.post(f"/undo/{removed.json()['undo']}").status_code == 204
+    assert client.get("/connectors").json()["connectors"] == listed
+    removed = client.delete(f"/connectors/{NAME}").json()
+    assert memory_keyring.store[(keys.SERVICE, f"connector:{NAME}")] == "tok-sample-123"
+    client.app.state.trash.purge_all()  # as when the window ends
     assert (keys.SERVICE, f"connector:{NAME}") not in memory_keyring.store
+    assert client.post(f"/undo/{removed['undo']}").status_code == 404
 
 
 def test_refusing_the_card_saves_nothing(client, tmp_path):
