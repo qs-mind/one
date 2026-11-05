@@ -5,6 +5,9 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, generateId } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { coreLine, send } from "../core";
+import { DeliverableCard } from "../deliverables/DeliverableCard";
+import { DeliverableViewer } from "../deliverables/DeliverableViewer";
+import { ProjectIndex } from "../deliverables/ProjectIndex";
 import { language, pick, setLanguage, t, type Text, texts, useLanguage } from "../i18n";
 import { restoreProject, useProject } from "../records/project";
 import { ProjectPicker } from "../records/ProjectPicker";
@@ -50,7 +53,7 @@ function textOf(parts: OnePart[]): string {
   return parts.map((part) => (part.type === "text" ? part.text : "")).join("");
 }
 
-function BriefReply({ parts }: { parts: OnePart[] }) {
+function BriefReply({ parts, deliverables }: { parts: OnePart[]; deliverables?: Deliverables }) {
   const text = textOf(parts);
   return (
     <div className="flex flex-col gap-3">
@@ -66,8 +69,42 @@ function BriefReply({ parts }: { parts: OnePart[] }) {
       {partsOf(parts, "review").map((review) => (
         <ReviewBadge key={review.id} review={review.data} />
       ))}
+      {deliverables &&
+        partsOf(parts, "deliverable").map((part) => (
+          <DeliverableCard key={part.id} projectId={deliverables.projectId} id={part.data.id} onOpen={deliverables.open} />
+        ))}
     </div>
   );
+}
+
+// Plan 6: the Deliverables beside the chat (the Project Index, and one Deliverable open in the side panel). Kept in
+// one place so Plan 7's shell can move it.
+type Deliverables = { projectId: string; open: (id: string) => void };
+
+/** Which Deliverable is open beside the chat, and the element that opened it, so Esc can give focus back. */
+function useDeliverablePanel(projectId: string | undefined) {
+  const [indexOpen, setIndexOpen] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    setIndexOpen(false);
+    setOpen(null);
+  }, [projectId]);
+  return {
+    indexOpen,
+    open,
+    toggleIndex: () => setIndexOpen((now) => !now),
+    closeIndex: () => setIndexOpen(false),
+    show(id: string) {
+      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setOpen(id);
+    },
+    close() {
+      setOpen(null);
+      const back = opener.current;
+      queueMicrotask(() => back?.focus());
+    },
+  };
 }
 
 export function Chat() {
@@ -93,13 +130,15 @@ export function Chat() {
   }
   const [pickerOpen, setPickerOpen] = useState(false);
   const [recordsOpen, setRecordsOpen] = useState(false);
+  const panel = useDeliverablePanel(project?.id);
   const list = useRef<HTMLDivElement>(null);
   const streaming = status === "submitted" || status === "streaming";
   const found = activeBrief(messages);
   const brief = found && !stopped.has(found) ? found : undefined;
   const running = streaming || brief !== undefined;
   const aiMain = ai.connected === false || aiOpen === "main";
-  const sideOpen = (aiOpen === "side" && !aiMain) || pickerOpen || recordsOpen;
+  const sideOpen = (aiOpen === "side" && !aiMain) || pickerOpen || recordsOpen || panel.indexOpen || panel.open !== null;
+  const deliverables: Deliverables | undefined = project ? { projectId: project.id, open: panel.show } : undefined;
   const elsewhere = busyWith(error);
 
   useEffect(() => {
@@ -145,11 +184,13 @@ export function Chat() {
     return response?.ok === true;
   }
 
-  async function submit() {
-    const text = draft.trim();
+  /** Sends the typed message, or `given` (a Review comment's "Fix it"), which leaves the box as it is. */
+  async function submit(given?: string) {
+    const typed = given === undefined;
+    const text = (given ?? draft).trim();
     if (!text) return;
     if (brief) {
-      setDraft("");
+      if (typed) setDraft("");
       if (await steerWith(brief, text)) {
         const steering: OneMessage = {
           id: generateId(),
@@ -158,13 +199,13 @@ export function Chat() {
           metadata: { steering: true },
         };
         setMessages((now) => [...now, steering]);
-      } else {
+      } else if (typed) {
         setDraft(text);
       }
       return;
     }
     if (streaming) return; // the Brief is starting; its id comes with its first status
-    setDraft("");
+    if (typed) setDraft("");
     setFailed(undefined);
     void sendMessage({ text });
   }
@@ -208,6 +249,11 @@ export function Chat() {
           >
             {t("records")}
           </button>
+          {project && (
+            <button type="button" aria-expanded={panel.indexOpen} onClick={panel.toggleIndex} className="text-slate hover:text-ink">
+              {t("deliverablesButton")}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-4 text-slate">
           <button
@@ -234,11 +280,45 @@ export function Chat() {
           chat, as before. */}
       <div className="flex min-h-0 flex-1">
         {sideOpen && (
-          <div className="w-full overflow-y-auto min-[900px]:order-last min-[900px]:w-md min-[900px]:shrink-0 min-[900px]:border-s min-[900px]:border-stone">
+          <div
+            className={`w-full overflow-y-auto min-[900px]:order-last min-[900px]:shrink-0 min-[900px]:border-s min-[900px]:border-stone ${
+              panel.open ? "flex flex-col min-[900px]:w-[min(60vw,1100px)]" : "min-[900px]:w-md"
+            }`}
+            onKeyDown={(event) => {
+              // Esc closes the open Deliverable, unless it closes something inside it first (an editor, a popover)
+              const target = event.target as HTMLElement;
+              if (event.key !== "Escape" || !panel.open || event.defaultPrevented) return;
+              if (target.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
+              panel.close();
+            }}
+          >
             {aiOpen === "side" && !aiMain && <AiSettings ai={ai} onClose={() => setAiOpen(false)} />}
             {pickerOpen && <ProjectPicker onClose={() => setPickerOpen(false)} />}
             {recordsOpen && (
               <RecordsPanel onClose={() => setRecordsOpen(false)} onPickProject={() => setPickerOpen(true)} />
+            )}
+            {project && panel.indexOpen && (
+              <div hidden={panel.open !== null}>
+                <ProjectIndex projectId={project.id} onOpen={panel.show} onClose={panel.closeIndex} />
+              </div>
+            )}
+            {project && panel.open && (
+              <div className="flex min-h-[70dvh] flex-1 flex-col">
+                <div className="flex justify-end border-b border-stone px-2 py-1">
+                  <button type="button" className="rounded px-2 hover:bg-stone" onClick={panel.close}>
+                    {t("close")}
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <DeliverableViewer
+                    key={panel.open}
+                    projectId={project.id}
+                    deliverableId={panel.open}
+                    mode="full"
+                    onSend={(text) => void submit(text)}
+                  />
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -266,7 +346,7 @@ export function Chat() {
                       </li>
                     ) : (
                       <li key={message.id}>
-                        <BriefReply parts={message.parts} />
+                        <BriefReply parts={message.parts} deliverables={deliverables} />
                       </li>
                     ),
                   )}

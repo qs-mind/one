@@ -177,6 +177,8 @@ export function SheetCell(p: CellProps) {
         <Value cell={cell} />
       </span>
     );
+  } else if (!cell && row.kind === "section" && column.kind === "calc") {
+    content = <span className="w-full text-end text-slate">—</span>; // nothing priced under it yet: never 0
   } else if (cell) {
     content = column.wrap ? (
       <span dir="auto" className={wrap}>

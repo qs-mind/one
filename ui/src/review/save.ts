@@ -2,6 +2,8 @@
 // through the `save_export` command, which opens the native Save dialog; in a browser (the dev preview, tests) it is
 // a download. This is the only way project content reaches the disk in plain form, and only when the engineer asks.
 import { invoke } from "@tauri-apps/api/core";
+import type { Answer, FileBytes } from "../deliverables/api";
+import { fill, pick, t } from "../i18n";
 
 export type Saved = "saved" | "cancelled" | "downloaded";
 
@@ -26,4 +28,17 @@ export async function saveBytes(name: string, bytes: Uint8Array, type = "applica
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
   return "downloaded";
+}
+
+/** Saves a file the core answered with, under the core's own name; the line to tell the engineer how it went. */
+export async function saveAnswer(answer: Answer<FileBytes>): Promise<{ ok: boolean; line: string }> {
+  if (!answer.ok) return { ok: false, line: pick(answer.error) };
+  const { name, bytes, type } = answer.data;
+  try {
+    const saved = await saveBytes(name, bytes, type);
+    if (saved === "cancelled") return { ok: true, line: t("exportCancelled") };
+    return { ok: true, line: fill(t(saved === "saved" ? "exportSaved" : "exportDownloaded"), { name }) };
+  } catch {
+    return { ok: false, line: t("exportFailed") };
+  }
 }
