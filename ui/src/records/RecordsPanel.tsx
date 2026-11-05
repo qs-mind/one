@@ -38,6 +38,19 @@ function where({ page, sheet, row, line }: Hit["locator"]): string | undefined {
   return undefined;
 }
 
+/** Sends one file to Project Records as its raw bytes; answers what the core made of it, or its refusal. */
+export async function uploadFile(
+  projectId: string,
+  file: File,
+): Promise<{ ok: true; info: FileInfo } | { ok: false; line: Text }> {
+  const response = await fetch(`/api/projects/${projectId}/files?name=${encodeURIComponent(file.name)}`, {
+    method: "POST",
+    body: file,
+  }).catch(() => undefined);
+  if (response?.ok) return { ok: true, info: (await response.json()) as FileInfo };
+  return { ok: false, line: await coreLine(response, texts.fileNotAdded) };
+}
+
 export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; onPickProject: () => void }) {
   useLanguage();
   const title = useId();
@@ -77,16 +90,13 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
     setAdding(true);
     setProblems([]);
     for (const file of chosen) {
-      const response = await fetch(`/api/projects/${id}/files?name=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        body: file,
-      }).catch(() => undefined);
-      if (response?.ok) {
-        const info = (await response.json()) as FileInfo;
+      const added = await uploadFile(id, file);
+      if (added.ok) {
+        const { info } = added;
         // the newest first; a new version takes the place of the one it replaces
         setFiles((list = []) => [info, ...list.filter((f) => f.id !== info.id && f.id !== info.replaces)]);
       } else {
-        const line = await coreLine(response, texts.fileNotAdded);
+        const { line } = added;
         setProblems((list) => [...list, { name: file.name, line }]);
       }
     }
