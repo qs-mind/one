@@ -5,8 +5,11 @@ browser.
 core, and the core its own MCP server, through 127.0.0.1."""
 
 import asyncio.selector_events
+import json
+import os
 import socket
 import webbrowser
+from pathlib import Path
 
 import keyring
 from keyring.backend import KeyringBackend
@@ -20,18 +23,32 @@ class MemoryKeyring(KeyringBackend):
 
     priority = 1
 
-    def __init__(self) -> None:
+    def __init__(self, file: Path | None = None) -> None:
+        """With `file` (an audit's QSONE_BENCH_KEYRING_FILE, inside the bench's throwaway folder)
+        the keys also live in that file, so a core killed mid-walk and started again still opens
+        its projects. Off by default: the walks keep every key in memory only."""
         super().__init__()
+        self.file = file
         self.store: dict[tuple[str, str], str] = {}
+        if file is not None and file.exists():
+            self.store = {(s, u): p for s, u, p in json.loads(file.read_text("utf8"))}
+
+    def _save(self) -> None:
+        if self.file is not None:  # opened owner-only, so the keys are never readable by others
+            fd = os.open(self.file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf8") as out:
+                json.dump([[s, u, p] for (s, u), p in self.store.items()], out)
 
     def get_password(self, service: str, username: str) -> str | None:
         return self.store.get((service, username))
 
     def set_password(self, service: str, username: str, password: str) -> None:
         self.store[(service, username)] = password
+        self._save()
 
     def delete_password(self, service: str, username: str) -> None:
         self.store.pop((service, username), None)
+        self._save()
 
 
 def _local(host) -> bool:
@@ -55,7 +72,8 @@ def _refuse(family, address) -> None:
 def install(allow: tuple[str, ...] = ()) -> None:
     """`allow` names hosts the bench may reach after all (none by default)."""
     _allowed_hosts.update(h.lower() for h in allow)
-    keyring.set_keyring(MemoryKeyring())
+    file = os.environ.get("QSONE_BENCH_KEYRING_FILE")
+    keyring.set_keyring(MemoryKeyring(Path(file) if file else None))
 
     connect, connect_ex, getaddrinfo = (
         socket.socket.connect,
