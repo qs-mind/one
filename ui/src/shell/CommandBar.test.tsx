@@ -32,7 +32,7 @@ describe("CommandBar", () => {
     expect(within(bar).getByText(chip)).toBeInTheDocument();
     expect(await box()).toHaveAttribute("placeholder", texts.commandBox.ar);
 
-    await user.type(await box(), "راجع ده{enter}");
+    await user.type(await box(), "سعّرها{enter}");
     await waitFor(() => expect(calls(fetch, "POST", "/api/chat")).toHaveLength(1));
     const body = bodyOf(calls(fetch, "POST", "/api/chat")[0]![1]) as {
       id: string;
@@ -42,7 +42,7 @@ describe("CommandBar", () => {
     expect(body.id).toBe("p1");
     expect(body.selection).toEqual([pricing]);
     expect(body.messages[0]!.metadata?.selection).toEqual([pricing]);
-    const bubble = (await screen.findByText("راجع ده")).closest("li")!;
+    const bubble = (await screen.findByText("سعّرها")).closest("li")!;
     expect(within(bubble).getByText(chip)).toBeInTheDocument();
   });
 

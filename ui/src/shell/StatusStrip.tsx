@@ -71,6 +71,7 @@ export function StatusStrip({
         >
           <PopoverTrigger className={`${chip} hover:bg-stone hover:text-ink`}>
             {t("boqSoFar")} <bdi dir="ltr" className="text-ink">{money(boq.value, boq.currency, true)}</bdi>
+            {boq.sample && <span className="ms-1 text-copper">({t("sampleData")})</span>}
           </PopoverTrigger>
           <PopoverContent className="flex flex-col gap-1">
             <bdi dir="ltr" className="font-semibold">

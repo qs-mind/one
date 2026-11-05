@@ -104,7 +104,8 @@ export const bodyOf = (init: RequestInit | undefined) => JSON.parse(String(init!
 /** What the canvas stand-in was given, so a test can open a Deliverable full screen as the canvas would. */
 export const shown: { props?: CanvasProps } = {};
 
-/** Replaces ../canvas/Canvas in a test file: `vi.mock("../canvas/Canvas", () => canvasStandIn())`. */
+/** Replaces ../canvas/Canvas in a test file:
+ * `vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }))`. */
 export function CanvasStandIn(props: CanvasProps) {
   shown.props = props;
   return (

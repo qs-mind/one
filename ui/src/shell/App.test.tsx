@@ -54,11 +54,13 @@ describe("the top bar", () => {
     core();
     const sources = fakeSources({
       deliverables: [{ ...entry(), id: "boq1", title: "تسعير المقايسة - عينة" }],
-      status: { boq_value: { value: "48200000.00", currency: "EGP", deliverable_id: "boq1", revision: 2, status: "checked" } },
+      status: { boq_value: { value: "48200000.00", currency: "EGP", deliverable_id: "boq1", revision: 2, status: "checked", sample: true } },
     });
     const user = userEvent.setup();
     render(<App sourcesFor={() => sources} />);
-    await user.click(await within(topBar()).findByRole("button", { name: new RegExp(texts.boqSoFar.ar) }));
+    const boq = await within(topBar()).findByRole("button", { name: new RegExp(texts.boqSoFar.ar) });
+    expect(boq).toHaveTextContent(texts.sampleData.ar); // a sample number is labelled
+    await user.click(boq);
     const popover = await screen.findByRole("dialog");
     expect(await within(popover).findByText(fill(texts.boqFrom.ar, { title: "تسعير المقايسة - عينة" }))).toBeInTheDocument();
     expect(within(popover).getByText(fill(texts.reviewRev.ar, { n: 2 }))).toBeInTheDocument();
@@ -310,7 +312,7 @@ describe("keyboard and layout", () => {
     expect(shown.props?.sources.saveFrames).toBeDefined();
     expect((await shown.props!.sources.files())[0]!.name).toMatch(/عينة/);
     act(() => setLanguage("en"));
-    expect(within(topBar()).getByText(texts.sampleData.en)).toBeInTheDocument();
+    expect(within(screen.getByRole("banner", { name: texts.topBar.en })).getByText(texts.sampleData.en)).toBeInTheDocument();
   });
 
   it("Open full screen on a frame shows the Deliverable over the canvas; Close comes back", async () => {
