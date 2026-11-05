@@ -104,3 +104,30 @@ describe("Continue an unfinished Brief", () => {
     await waitFor(() => expect(document.querySelector("[data-continue-brief]")).toBeNull());
   });
 });
+
+// C8: each card keeps its place in time among the reply's words, as the core sends the parts.
+describe("a reply's parts", () => {
+  it("a card asked before the Lead QS spoke shows before its words, one asked after shows after them", async () => {
+    const settled = { ...card, title: { en: "First - sample", ar: "الأول - عينة" }, status: "settled", choice: "yes" };
+    const stored = [
+      { id: "q-b1", role: "user", parts: [{ type: "text", text: "ابعت - عينة" }] },
+      {
+        id: "r-b1",
+        role: "assistant",
+        parts: [
+          { type: "data-card", id: "c0", data: settled },
+          { type: "text", text: "الكلام بعد الكارت الأول - عينة" },
+          asking,
+        ],
+      },
+    ];
+    core({ routes: { "GET /api/chat/general/messages": () => Response.json({ messages: stored }) } });
+    render(<App />);
+    const words = await screen.findByText("الكلام بعد الكارت الأول - عينة");
+    const first = screen.getByText("الأول - عينة");
+    const second = screen.getByText(card.title.ar);
+    expect(first.compareDocumentPosition(words) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(words.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText(`ردّك: ${texts.didAllowOnce.ar}`)).toBeInTheDocument(); // the answer given, in words
+  });
+});
