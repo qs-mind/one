@@ -9,10 +9,11 @@ export async function coreLine(response: Response | undefined, fallback: Text): 
   return typeof line?.en === "string" && typeof line.ar === "string" ? (line as Text) : fallback;
 }
 
-/** Sends JSON to the core; a network failure answers undefined, like a refused request. */
-export function send(path: string, method: string, body?: unknown): Promise<Response | undefined> {
+/** Sends JSON to the core; a network failure (or `signal` stopping it) answers undefined, like a refused request. */
+export function send(path: string, method: string, body?: unknown, signal?: AbortSignal): Promise<Response | undefined> {
   return api(path, {
     method,
     ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+    ...(signal ? { signal } : {}),
   }).catch(() => undefined);
 }

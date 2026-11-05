@@ -1,9 +1,10 @@
 // A card the engineer must answer: an approval, a Spending Cap pause, a Brief Budget and the like. The core stored it
-// before it was shown; the answer goes to POST /cards/{id}. Raising a cap saves the new caps first. A card with a
-// payload (Plan 5) is drawn by its kind's renderer in cardKinds (questions: QuestionCard, tables: RowsCard), which sends
-// the answers or the ticked rows with the choice. Once answered or withdrawn it is no longer waiting: it drops the
-// copper border and folds to one line (its title and the answer), which opens again on a click, so the next card
-// that waits is in sight without scrolling.
+// before it was shown; the answer goes to POST /cards/{id}. Raising a cap saves the new caps as they are typed, then
+// goes on (its own button, once the last one is saved). A card with a payload (Plan 5) is drawn by its kind's
+// renderer in cardKinds (questions: QuestionCard, tables: RowsCard), which sends the answers or the ticked rows with
+// the choice. Once answered or withdrawn it is no longer waiting: it drops the copper border and folds to one line
+// (its title and the answer), which opens again on a click, so the next card that waits is in sight without
+// scrolling.
 import { useRef, useState } from "react";
 import { coreLine, send } from "../../core";
 import { count, dir, fill, type Language, pick, t, type Text, texts, useLanguage } from "../../i18n";
@@ -146,7 +147,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
                 </button>
               ))}
             </div>
-            {raising && <CapsForm onSaved={() => void answer("raise")} />}
+            {raising && <CapsForm go={{ label: pick(texts.capRaiseGo, lang), onGo: () => void answer("raise") }} />}
           </>
         )}
       </div>

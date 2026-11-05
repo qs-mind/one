@@ -63,8 +63,9 @@ export type Progress = "busy" | "done" | "failed";
 /** How a check, a sign-in or a save is going, in the same look on every step, without a colour of its own: a quiet
  * Slate ring turning while it runs (shown after 300 ms, so a quick one never flashes); a filled Ink circle whose check
  * draws itself once it worked, the line in Ink; Copper with a ring and "!" when it did not, the line saying what to do
- * next. Each line rises into place, and scrolls into view when it lands below the window's edge. */
-export function Feedback({ state, children }: { state: Progress; children: ReactNode }) {
+ * next. Each line rises into place, and scrolls into view when it lands below the window's edge. With `fade`, a done
+ * line fades out after a moment, keeping its place (a quiet "Saved"). */
+export function Feedback({ state, children, fade = false }: { state: Progress; children: ReactNode; fade?: boolean }) {
   const line = useRef<HTMLParagraphElement>(null);
   const shown = Boolean(children);
   useEffect(() => {
@@ -79,7 +80,7 @@ export function Feedback({ state, children }: { state: Progress; children: React
       ref={line}
       role={state === "failed" ? "alert" : "status"}
       data-feedback={state}
-      className={`${state === "busy" ? "fl-rise-late" : "fl-rise"} flex items-start gap-2.5 ${look}`}
+      className={`${state === "busy" ? "fl-rise-late" : fade ? "fl-fade" : "fl-rise"} flex items-start gap-2.5 ${look}`}
     >
       <span aria-hidden="true" className="flex h-[1lh] shrink-0 items-center">
         {state === "busy" && <span className="fl-spin block size-4 rounded-full border-2 border-slate/25 border-t-slate" />}

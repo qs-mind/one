@@ -1,13 +1,15 @@
 // The "I understood this" card, in the project chat once the Lead QS has read a tender folder (a data-understood
 // part, which carries only the project; the card reads GET /projects/{id}/facts). Each fact shows its source ("file,
-// page 3"); the engineer changes any of them (saved at once, by the engineer, with today's date as its source) and
-// approves. Approving is the only way on: until then nothing else starts. A count is One's, from code.
-import { type FormEvent, useCallback, useEffect, useId, useState } from "react";
+// page 3"); the engineer changes any of them (saved on Enter or on leaving the field, by the engineer, with today's
+// date as its source; Escape keeps the fact as it was) and approves. Approving is the only way on: until then nothing
+// else starts. A count is One's, from code.
+import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { api } from "../api";
 import { coreLine, send } from "../core";
 import { field, primary, quiet } from "../firstlaunch/parts";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { FileName } from "../ui/FileName";
+import { SaveNote, useSaving } from "../ui/live";
 
 type Source =
   | { kind: "file"; file_id: string; file_name: string | null; locator: Record<string, string | number> | null }
@@ -68,6 +70,7 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Text>();
   const [unfolded, setUnfolded] = useState(false);
+  const { saving, n, now, flush } = useSaving(); // a changed fact
 
   const load = useCallback(async () => {
     const response = await api(`/projects/${id}/facts`).catch(() => undefined);
@@ -78,17 +81,20 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
     void load();
   }, [load]);
 
-  async function put(body: { facts: Partial<Record<FactName, { value: string }>>; approve: boolean }): Promise<boolean> {
+  async function put(body: { facts: Partial<Record<FactName, { value: string }>>; approve: boolean }): Promise<Text | null> {
+    const response = await send(`/projects/${id}/facts`, "PUT", body);
+    if (!response?.ok) return coreLine(response, texts.understoodNotSaved);
+    setFacts((await response.json()) as Facts);
+    return null;
+  }
+
+  async function approve() {
     setBusy(true);
     setFailed(undefined);
-    const response = await send(`/projects/${id}/facts`, "PUT", body);
+    // a fact the engineer just changed is saved first (pressing Approve left its field)
+    const line = (await flush()) ? await put({ facts: {}, approve: true }) : null;
     setBusy(false);
-    if (!response?.ok) {
-      setFailed(await coreLine(response, texts.understoodNotSaved));
-      return false;
-    }
-    setFacts((await response.json()) as Facts);
-    return true;
+    if (line) setFailed(line);
   }
 
   if (!facts) return null;
@@ -134,12 +140,16 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
               locked={approved || busy}
               onEdit={() => setEditing(name)}
               onCancel={() => setEditing(undefined)}
-              onSave={async (value) => {
-                if (await put({ facts: { [name]: { value } }, approve: false })) setEditing(undefined);
-              }}
+              onSave={(value) =>
+                // the field stays, with what was typed, until the core has it
+                void now(() => put({ facts: { [name]: { value } }, approve: false })).then(
+                  (saved) => saved && setEditing((open) => (open === name ? undefined : open)),
+                )
+              }
             />
           ))}
         </dl>
+        {!approved && <SaveNote saving={saving} n={n} />}
 
         {facts.missing.length > 0 && (
           <div className="flex flex-col gap-1">
@@ -188,12 +198,7 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
           </p>
         )}
         {!approved && (
-          <button
-            type="button"
-            disabled={busy || editing !== undefined}
-            onClick={() => void put({ facts: {}, approve: true })}
-            className={`${primary} self-start`}
-          >
+          <button type="button" disabled={busy} onClick={() => void approve()} className={`${primary} self-start`}>
             {t("understoodApprove")}
           </button>
         )}
@@ -219,15 +224,34 @@ function FactRow({
   locked: boolean;
   onEdit: () => void;
   onCancel: () => void;
-  onSave: (value: string) => Promise<void>;
+  onSave: (value: string) => void;
 }) {
   const inputId = useId();
   const [value, setValue] = useState(fact?.value ?? "");
-  useEffect(() => setValue(fact?.value ?? ""), [fact?.value, editing]);
+  const cancelled = useRef(false); // Escape: leaving the field then saves nothing
+  useEffect(() => {
+    setValue(fact?.value ?? "");
+    cancelled.current = false;
+  }, [fact?.value, editing]);
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (value.trim()) void onSave(value.trim());
+  /** Leaving the field saves what it holds; an empty or unchanged one goes back as it was. */
+  function leave() {
+    if (cancelled.current) return void (cancelled.current = false);
+    const next = value.trim();
+    if (next && next !== fact?.value) onSave(next);
+    else onCancel();
+  }
+
+  function key(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur(); // leaving saves
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation(); // the chat's own Escape does not run too
+      cancelled.current = true;
+      onCancel();
+    }
   }
 
   return (
@@ -235,25 +259,20 @@ function FactRow({
       <dt className="text-sm text-slate">{editing ? <label htmlFor={inputId}>{label}</label> : label}</dt>
       <dd className="flex min-w-0 flex-col gap-1">
         {editing ? (
-          <form onSubmit={submit} className="flex flex-wrap gap-2">
-            <input
-              id={inputId}
-              dir="auto"
-              type={name === "submission_date" ? "date" : "text"}
-              inputMode={name === "items_count" ? "numeric" : undefined}
-              maxLength={300}
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              className={`${field} min-w-0 flex-1`}
-              autoFocus
-            />
-            <button type="submit" disabled={locked || !value.trim()} className={primary}>
-              {t("save")}
-            </button>
-            <button type="button" onClick={onCancel} className={quiet}>
-              {t("accountCancel")}
-            </button>
-          </form>
+          <input
+            id={inputId}
+            dir="auto"
+            type={name === "submission_date" ? "date" : "text"}
+            inputMode={name === "items_count" ? "numeric" : undefined}
+            maxLength={300}
+            value={value}
+            disabled={locked}
+            onChange={(event) => setValue(event.target.value)}
+            onBlur={leave}
+            onKeyDown={key}
+            className={`${field} min-w-0`}
+            autoFocus
+          />
         ) : (
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col">
