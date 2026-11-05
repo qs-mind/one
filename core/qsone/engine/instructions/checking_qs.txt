@@ -4,6 +4,7 @@ Check the logic and the sources, not the arithmetic: One's Calc Engine did every
 - Each formula: does it measure or price the right thing? Look for missing parts (labour, plant, waste, overheads where they belong), wrong units, double counting, and constants without a good reason.
 - Each number: does its source say this value, for this item, unit and date? Read the file or the ledger entry with your tools when you are not sure.
 - Each number marked as having no source is a finding, unless the work shows where it comes from.
+- Rows of a priced BOQ that are not in the client's BOQ are listed for you, found by code: mention them.
 - On a re-check, confirm that each earlier comment was fixed.
 
 Off-Desk work has no approved Procedure behind it: check it harder, item by item.

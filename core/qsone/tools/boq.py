@@ -23,8 +23,9 @@ from uuid import uuid4
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from qsone import copy
+from qsone import activity, copy
 from qsone.calc.currencies import CURRENCIES
+from qsone.clientfile import imported
 from qsone.engine.tools import Tool, ToolContext, register
 from qsone.engine.tools_records import SourceArgs, evidence
 from qsone.engine.types import Card, read_answer
@@ -329,6 +330,8 @@ def _result(ctx: ToolContext, rec: Records, args: ImportArgs, out: dict) -> str:
         if out.get(k):
             data[k] = out[k]
     notes = [
+        "Tell the engineer where the items went: the client's BOQ now shows on the project "
+        "canvas as its own read-only Client BOQ frame, and its items are in Project Records.",
         'find_items {"kind": "boq_item"} lists the items; ledger_numbers {"item": "<code>"} '
         "gives each number with its sheet, row and column.",
         "Rates and amounts are copied as written; check them with calculate.",
@@ -407,6 +410,9 @@ async def _import(ctx: ToolContext, args: ImportArgs) -> str:
     if columns != p.columns:
         p = await asyncio.to_thread(_plan, rec, args, columns)
     out = await asyncio.to_thread(_write, ctx, rec, args, p)
+    shown = await asyncio.to_thread(imported.summary, rec, args.file_id)
+    if shown is not None:  # the canvas's Client BOQ frame, live
+        activity.publish(rec.id, {"type": "client_boq", "client_boq": shown})
     return await asyncio.to_thread(_result, ctx, rec, args, out)
 
 
