@@ -196,8 +196,8 @@ def test_checklist_lists_open_comments_and_unsigned(rec, engineer):
 
 def test_checklist_lists_a_broken_deliverable_as_a_blocker(rec, engineer, monkeypatch):
     """Tender day: the card said «مفيش حاجة هنا بتمنعك» while the priced BOQ did not open."""
-    from tests.test_numbers_newest import _legacy_rate, _row
     from tests.samples import sample_source
+    from tests.test_numbers_newest import _legacy_rate, _row
 
     sheet = sample_sheet(rec)
     assert closing.checklist(rec, engineer)["broken"] == []

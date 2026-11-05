@@ -152,7 +152,8 @@ def _client_items(rec: Records) -> int | None:
     with rec.read() as conn:
         newest = conn.execute(
             "SELECT json_extract(fields, '$.import_id') AS i FROM items"
-            " WHERE kind = 'boq_item' AND i IS NOT NULL ORDER BY created_at DESC, rowid DESC LIMIT 1"
+            " WHERE kind = 'boq_item' AND i IS NOT NULL"
+            " ORDER BY created_at DESC, rowid DESC LIMIT 1"
         ).fetchone()
         if newest is None:
             return None
