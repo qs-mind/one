@@ -279,6 +279,9 @@ export async function mockCore(
     const base = `/projects/${scene.project.id}`;
 
     if (key === "GET /health") return json(route, { ok: true });
+    // past the first launch (Plan 8), with the AI consent given
+    if (key === "GET /setup") return json(route, { done: true, steps: { language: "done", account: "skipped", ai: "done", card: "skipped", usage: "skipped" } });
+    if (key === "GET /settings/ai-consent") return json(route, { at: "2026-11-05T08:00:00+00:00", text_version: 1 });
     if (key === "GET /settings/ai") return json(route, aiSettings);
     if (key === "GET /settings/ai/caps") return json(route, { caps: null, recommended: null });
     if (key === "GET /briefs/unfinished") return json(route, { briefs: [] });
