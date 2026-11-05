@@ -8,7 +8,7 @@ import { SearchKey } from "./SearchKey";
 
 vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
 
-const KEY = "BSA-sample-key-0000"; // not a real key
+const KEY = "BSA-sample-key-not-a-real-0000"; // not a real key
 type Status = { provider: "brave" | "native" | "connector" | "none"; own_key: boolean };
 
 // GET /settings/search answers `now` (changed by a saved key); PUT /settings/search-key answers `put`.
@@ -30,17 +30,18 @@ function searchCore(start: Status, put: () => Response = () => Response.json({ s
 beforeEach(() => setLanguage("ar"));
 
 describe("SearchKey", () => {
-  it("search key is a password field and never shown again", async () => {
+  it("a pasted search key is saved at once, in a password field, and never shown again", async () => {
     const fetch = searchCore({ provider: "none", own_key: false });
     const user = userEvent.setup();
     render(<SearchKey />);
     const field = await screen.findByLabelText(texts.searchKey.ar);
     expect(field).toHaveAttribute("type", "password");
     expect(field).toHaveAttribute("autocomplete", "off");
-    await user.type(field, `  ${KEY}  `);
-    await user.click(screen.getByRole("button", { name: texts.save.ar }));
+    await user.click(field);
+    await user.paste(`  ${KEY}  `);
 
-    expect(await screen.findByRole("status")).toHaveTextContent(texts.keyAdded.ar);
+    expect(await screen.findByText(texts.keySaved.ar)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull(); // no Save button
     const [, init] = calls(fetch, "PUT", "/api/settings/search-key")[0]!;
     expect(JSON.parse(String(init!.body))).toEqual({ value: KEY });
     expect(screen.getByLabelText(texts.searchKey.ar)).toHaveValue("");
@@ -74,10 +75,11 @@ describe("SearchKey", () => {
     searchCore({ provider: "none", own_key: false }, () => Response.json({ error: down }, { status: 503 }));
     const user = userEvent.setup();
     render(<SearchKey />);
-    await user.type(await screen.findByLabelText(texts.searchKey.ar), KEY);
-    await user.click(screen.getByRole("button", { name: texts.save.ar }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(down.ar);
+    const field = await screen.findByLabelText(texts.searchKey.ar);
+    await user.type(field, KEY); // typed: saved after the pause
+    expect(await screen.findByRole("alert", {}, { timeout: 2000 })).toHaveTextContent(down.ar);
     expect(screen.queryByText(texts.searchKeyKept.ar)).toBeNull();
+    expect(field).toHaveValue(KEY); // kept, to be fixed
   });
 
   it("says plainly when the search in use cannot be loaded", async () => {

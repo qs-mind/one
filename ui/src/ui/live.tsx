@@ -4,7 +4,7 @@
 // value stops the older check or save, so only the latest answer shows. A failure keeps what the engineer typed.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Feedback } from "../firstlaunch/parts";
-import { pick, t, type Text, useLanguage } from "../i18n";
+import { pick, t, type Text, texts, useLanguage } from "../i18n";
 
 /** How long typing must stop before a field is saved or checked. */
 export const PAUSE = 700;
@@ -24,8 +24,8 @@ export const looksLikeAmount = (value: string) => /^\d+(\.\d+)?$/.test(value.tri
 export type Live = { state: "idle" | "short" | "busy" | "done" } | { state: "failed"; line: Text };
 
 /** A key field that checks itself. `run` saves and checks one whole key (at least `min` characters) and answers null
- * when it works, or the line to show; it gets a signal that a newer value aborts. The field keeps its value whatever
- * the answer. */
+ * when it works, or the line to show; it gets a signal that a newer value aborts. A key that failed stays in the
+ * field, to be fixed; one that works leaves it (the page never holds a saved key). */
 export function useLiveKey(min: number, run: (key: string, signal: AbortSignal) => Promise<Text | null>) {
   const [value, setValue] = useState("");
   const [live, setLive] = useState<Live>({ state: "idle" });
@@ -48,10 +48,11 @@ export function useLiveKey(min: number, run: (key: string, signal: AbortSignal) 
       const controller = new AbortController();
       flight.current = controller;
       setLive({ state: "busy" });
-      const line = await latest.current(key.trim(), controller.signal).catch(() => null);
+      const line = await latest.current(key.trim(), controller.signal).catch(() => texts.keyFailed);
       if (controller.signal.aborted) return; // a newer value took over: its answer is the one to show
       flight.current = undefined;
       setLive(line ? { state: "failed", line } : { state: "done" });
+      if (!line) setValue("");
     },
     [stop],
   );

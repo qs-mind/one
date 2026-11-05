@@ -57,13 +57,15 @@ describe("the recovery code", () => {
     expect(screen.getByRole("status", { name: texts.recoveryTitle.en })).toHaveTextContent(CODE);
     await user.click(screen.getByRole("button", { name: texts.recoverySaved.en }));
     const box = screen.getByLabelText(texts.recoveryLastGroup.en);
-    await user.type(box, "AAAAA");
-    await user.click(screen.getByRole("button", { name: texts.recoveryConfirm.en }));
+    await user.type(box, "AAAA");
+    expect(sent).toEqual([]); // not a whole group yet: nothing sent
+    await user.type(box, "A"); // the fifth: checked at once, no Confirm button
     expect(await screen.findByRole("alert")).toHaveTextContent("That is not the last group.");
+    expect(box).toHaveValue("AAAAA"); // kept, to be fixed
+    expect(screen.queryByRole("button", { name: /confirm/i })).toBeNull();
     expect(done).not.toHaveBeenCalled();
     await user.clear(box);
     await user.type(box, "zd6jf ");
-    await user.click(screen.getByRole("button", { name: texts.recoveryConfirm.en }));
     await waitFor(() => expect(done).toHaveBeenCalledOnce());
     expect(sent.at(-1)).toEqual({ last_group: "zd6jf" });
   });
@@ -85,7 +87,6 @@ describe("the recovery code", () => {
     expect(await screen.findByText(CODE)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: texts.recoverySaved.en }));
     await user.type(screen.getByLabelText(texts.recoveryLastGroup.en), "ZD6JF");
-    await user.click(screen.getByRole("button", { name: texts.recoveryConfirm.en }));
     await waitFor(() => expect(screen.queryByText(CODE)).toBeNull()); // gone once saved
 
     rerender(<Confidential project={{ ...project, confidential: true }} onClose={() => undefined} />);
@@ -142,6 +143,27 @@ describe("the Backup panel", () => {
     expect(await screen.findByText(CODE)).toBeInTheDocument();
   });
 
+  it("in a plain browser, a typed folder is used on leaving the field, and stays there when refused", async () => {
+    const refused = { en: "That folder cannot be used (sample).", ar: "الفولدر ده مينفعش (عينة)." };
+    const puts: unknown[] = [];
+    mockCore({
+      "GET /backup": () => Response.json(status({ folder: null })),
+      "PUT /backup/folder": (body) => {
+        puts.push(body);
+        return Response.json({ error: refused }, { status: 422 });
+      },
+    });
+    const user = userEvent.setup();
+    render(<BackupPanel onClose={() => undefined} />);
+    const field = await screen.findByLabelText(texts.backupFolderPath.en);
+    await user.type(field, "/home/x/Backups");
+    expect(puts).toEqual([]); // never half typed
+    await user.tab();
+    expect(await screen.findByText(refused.en)).toBeInTheDocument();
+    expect(puts).toEqual([{ path: "/home/x/Backups" }]);
+    expect(field).toHaveValue("/home/x/Backups");
+  });
+
   it("says when the backup folder cannot be reached", async () => {
     const note = { en: "The backup folder could not be reached on 5 Nov.", ar: "فولدر النسخ ماكانش متاح يوم ٥ نوفمبر." };
     mockCore({ "GET /backup": () => Response.json(status({ folder: "/mnt/usb", reachable: false, note })) });
@@ -174,7 +196,8 @@ describe("restore", () => {
     const user = userEvent.setup();
     render(<Restore />);
     await user.type(screen.getByLabelText(texts.backupFolderPath.en), "/media/usb/One");
-    await user.click(screen.getByRole("button", { name: texts.restorePickFolder.en }));
+    expect(screen.queryByRole("button", { name: texts.restorePickFolder.en })).toBeNull(); // the path is used on Enter
+    await user.keyboard("{Enter}");
 
     const row = (name: string) => screen.getByText(name).closest("li")!;
     await screen.findByText("مدرسة - عينة");

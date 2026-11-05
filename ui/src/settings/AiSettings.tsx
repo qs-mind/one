@@ -495,11 +495,14 @@ function Amount({
   value,
   onChange,
   hint,
+  invalid = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   hint?: string;
+  /** The core refused it: its border turns Copper until it saves. */
+  invalid?: boolean;
 }) {
   const hintId = useId();
   return (
@@ -514,7 +517,8 @@ function Amount({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           aria-describedby={hint ? hintId : undefined}
-          className={field}
+          aria-invalid={invalid || undefined}
+          className={`${field} ${invalid ? "border-copper" : ""}`}
         />
       </label>
       {hint && (
@@ -545,6 +549,7 @@ export function CapsForm({ go }: { go?: { label: string; onGo: () => void } }) {
   const [caps, setCaps] = useState<Amounts>();
   const [recommended, setRecommended] = useState<Amounts>();
   const { saving, n, later, flush } = useSaving();
+  const [bad, setBad] = useState<string>();
 
   const shown = useCallback((body: CapsAnswer) => {
     const amounts = (from: Caps): Amounts => ({
@@ -576,7 +581,13 @@ export function CapsForm({ go }: { go?: { label: string; onGo: () => void } }) {
     // stays as typed: the core's answer never rewrites a field under their hands.
     later(async () => {
       const response = await send("/settings/ai/caps", "PUT", next);
-      return response?.ok ? null : coreLine(response, texts.capsNotSaved);
+      if (response?.ok) {
+        setBad(undefined);
+        return null;
+      }
+      const body = (await response?.clone().json().catch(() => undefined)) as { field?: string } | undefined;
+      setBad(body?.field); // the amount the core refused, when it says
+      return coreLine(response, texts.capsNotSaved);
     }, Object.values(next).every(looksLikeAmount));
   }
 
@@ -593,6 +604,7 @@ export function CapsForm({ go }: { go?: { label: string; onGo: () => void } }) {
           value={caps?.[name] ?? ""}
           hint={recommended ? fill(t("recommendedAmount"), { value: recommended[name] }) : undefined}
           onChange={(value) => changed(name, value)}
+          invalid={bad === name}
         />
       ))}
       <SaveNote saving={saving} n={n} />

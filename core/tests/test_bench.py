@@ -167,3 +167,39 @@ def test_the_sample_tender_folder(tmp_path):
             "رسومات - عينة.rar",
         ]
     )
+
+
+def test_the_bench_checks_a_claude_key_itself(data_dir, monkeypatch):
+    """The live key check of the first launch and AI settings, on the bench: never Anthropic."""
+    from fastapi.testclient import TestClient
+
+    from qsone.engine import connectors
+    from qsone.journey import setup_state
+    from tests.bench import __main__ as bench_main
+
+    monkeypatch.setattr(connectors, "check", connectors.check)  # put back after the test
+    monkeypatch.setattr("asyncio.sleep", _no_wait)
+    bench_main.check_keys()
+    setup_state.give_consent(setup_state.CONSENT_VERSION)
+    app = create_app(SECRET, connectors=fake.connectors, data_dir=data_dir)
+    bench_main.forget_claude_key(app)
+    with TestClient(app) as client:
+
+        def check(key: str):
+            client.put(
+                "/settings/ai-key", json={"provider": "anthropic", "value": key}, headers=AUTH
+            )
+            return client.post("/settings/ai/check", json={"via": "api_key"}, headers=AUTH)
+
+        works = check(f"sk-ant{bench_main.BENCH_KEY}sample-not-a-real-key-000000000000")
+        assert works.status_code == 200 and works.json() == {"ok": True}
+        refused = check("sk-ant-sample-not-a-real-key-0000000000000000")
+        assert refused.status_code == 409
+        assert refused.json() == {"error": copy.fill(copy.AI_KEY_REFUSED, provider="Anthropic")}
+
+        client.post("/bench/forget-claude-key", headers=AUTH)
+        assert client.get("/settings/ai-key", headers=AUTH).json() == {"set": False}
+
+
+async def _no_wait(_seconds: float) -> None:
+    return None

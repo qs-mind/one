@@ -8,7 +8,8 @@ computer One was just installed on (no projects, no snapshots, no backup setting
 key and no Backup key in the key store), so a walk can restore from the backup folder.
 
 A Claude key is checked by the bench, never by Anthropic (`check_keys`): one with "-bench-ok-" in
-it works, any other is refused, each after a short wait so the screen's "Checking…" shows."""
+it works, any other is refused, each after a short wait so the screen's "Checking…" shows. A walk
+that saved one takes it out again with `POST /bench/forget-claude-key`."""
 
 import argparse
 import os
@@ -58,6 +59,16 @@ def check_keys() -> None:
         return copy.fill(copy.AI_KEY_REFUSED, provider="Anthropic")
 
     connectors.check = check
+
+
+def forget_claude_key(app) -> None:
+    """Adds `POST /bench/forget-claude-key`: the walks after one that saved a key run as before."""
+    from qsone import keys
+
+    @app.post("/bench/forget-claude-key")
+    def forget() -> dict:
+        keys.delete_key("anthropic")
+        return {"set": False}
 
 
 def new_computer(app, data_dir: Path) -> None:
@@ -115,6 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     def create_app(*a, **k):
         app = real_app(*a, **k)
         new_computer(app, args.data_dir)
+        forget_claude_key(app)
         return app
 
     core.create_app = create_app

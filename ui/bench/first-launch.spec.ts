@@ -98,6 +98,8 @@ for (const lang of ["ar", "en"] as const) {
     await page.getByRole("button", { name: w.agree, exact: true }).click();
     await page.getByRole("button", { name: w.apiKey }).click();
     await shot(walk, "ai-choice");
+    // no Save or Check: Next waits in its place until a key works (live.spec.ts checks keys)
+    await expect(page.getByRole("button", { name: w.next, exact: true })).toBeDisabled();
     await page.getByRole("button", { name: w.skip, exact: true }).click(); // the bench has its own AI link already
 
     await expect(title(w.card)).toBeVisible();

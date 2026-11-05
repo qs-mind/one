@@ -1,6 +1,7 @@
 // Add or replace the engineer's Claude key. No Save button: a pasted key is saved and checked at once, a typed one
 // after a pause, once it is long enough to be whole (ui/live.tsx). The core keeps it in the system key store, and
-// checks it with one tiny call (POST /settings/ai/check); the page never shows it again once the screen closes.
+// checks it with one tiny call (POST /settings/ai/check). A key that works leaves the field: the page never shows it
+// again. One that fails stays, to be fixed.
 // `plain`: the field alone, with no title, help or frame, inside another screen (the first launch's Connect AI, whose
 // choice already says what the key is).
 import { useId } from "react";
@@ -51,8 +52,8 @@ export function AiKey({
           live.state === "failed" ? "border-copper" : "border-slate"
         }`}
       />
-      {/* the line's slot keeps its height, so nothing under the field moves when it changes */}
-      <div className="min-h-7" data-key-line>
+      {/* the line's slot keeps two lines' height, so nothing under the field moves when it changes */}
+      <div className="min-h-16" data-key-line>
         {live.state === "short" && <p className="fl-rise text-slate">{t("keyTooShort")}</p>}
         {live.state === "busy" && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
         {live.state === "done" && <Feedback state="done">{t("aiLinkWorks")}</Feedback>}

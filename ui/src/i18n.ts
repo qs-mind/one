@@ -855,7 +855,6 @@ export const texts = {
   recoveryCopied: { en: "Copied.", ar: "اتنسخ." },
   recoverySaved: { en: "I saved it", ar: "حفظته" },
   recoveryLastGroup: { en: "To confirm, type its last group of five", ar: "عشان تأكد، اكتب آخر مجموعة من الخمسة" },
-  recoveryConfirm: { en: "Confirm", ar: "أكّد" },
   recoveryConfirmed: { en: "Saved.", ar: "اتحفظ." },
   backupTitle: { en: "Backup", ar: "النسخة الاحتياطية" },
   backupFolder: { en: "Backup folder", ar: "فولدر النسخة الاحتياطية" },

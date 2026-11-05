@@ -63,7 +63,7 @@ beforeEach(() => {
 afterEach(() => resetImports());
 
 describe("the I understood this card", () => {
-  it("the card shows each fact with its source and sends the engineer's corrections", async () => {
+  it("the card shows each fact with its source and saves a correction on Enter", async () => {
     const puts: unknown[] = [];
     mockCore({
       "GET /projects/p1/facts": () => Response.json(facts()),
@@ -85,10 +85,70 @@ describe("the I understood this card", () => {
     const box = screen.getByLabelText(texts.understoodClient.en);
     await user.clear(box);
     await user.type(box, "هيئة المجتمعات - عينة");
-    await user.click(screen.getByRole("button", { name: texts.save.en }));
-    expect(puts).toEqual([{ facts: { client: { value: "هيئة المجتمعات - عينة" } }, approve: false }]);
+    expect(screen.queryByRole("button", { name: /save/i })).toBeNull(); // no Save button
+    await user.keyboard("{Enter}");
     expect(await screen.findByText("هيئة المجتمعات - عينة")).toBeInTheDocument();
+    expect(puts).toEqual([{ facts: { client: { value: "هيئة المجتمعات - عينة" } }, approve: false }]);
     expect(screen.getByText("You, 5 Nov 2026")).toBeInTheDocument();
+    expect(await screen.findByText(texts.saved.en)).toBeInTheDocument();
+  });
+
+  it("leaving a changed fact saves it; Escape keeps it as it was; a refused one stays to be fixed", async () => {
+    const refused = { en: "Not saved (sample).", ar: "ماتحفظش (عينة)." };
+    const puts: unknown[] = [];
+    let ok = true;
+    mockCore({
+      "GET /projects/p1/facts": () => Response.json(facts()),
+      "PUT /projects/p1/facts": (body) => {
+        puts.push(body);
+        return ok ? Response.json(facts(false, "عميل - عينة", "engineer")) : Response.json({ error: refused }, { status: 409 });
+      },
+    });
+    const user = userEvent.setup();
+    render(<UnderstoodCard projectId="p1" />);
+    const change = () => screen.getByRole("button", { name: `${texts.understoodChange.en}: ${texts.understoodClient.en}` });
+
+    await screen.findByText("هيئة - عينة");
+    await user.click(change());
+    await user.type(screen.getByLabelText(texts.understoodClient.en), " - تعديل");
+    await user.keyboard("{Escape}");
+    expect(screen.getByText("هيئة - عينة")).toBeInTheDocument();
+    expect(puts).toHaveLength(0);
+
+    ok = false;
+    await user.click(change());
+    const box = screen.getByLabelText(texts.understoodClient.en);
+    await user.clear(box);
+    await user.type(box, "عميل - عينة");
+    await user.tab(); // leaving the field
+    expect(await screen.findByRole("alert")).toHaveTextContent(refused.en);
+    expect(screen.getByLabelText(texts.understoodClient.en)).toHaveValue("عميل - عينة");
+
+    ok = true;
+    await user.click(screen.getByLabelText(texts.understoodClient.en));
+    await user.tab();
+    expect(await screen.findByText("عميل - عينة")).toBeInTheDocument();
+    expect(puts).toHaveLength(2);
+  });
+
+  it("Approve right after a change saves the change first", async () => {
+    const puts: { approve: boolean }[] = [];
+    mockCore({
+      "GET /projects/p1/facts": () => Response.json(facts()),
+      "PUT /projects/p1/facts": (body) => {
+        puts.push(body as { approve: boolean });
+        return Response.json(facts((body as { approve: boolean }).approve, "عميل - عينة", "engineer"));
+      },
+    });
+    const user = userEvent.setup();
+    render(<UnderstoodCard projectId="p1" />);
+    await user.click(await screen.findByRole("button", { name: `${texts.understoodChange.en}: ${texts.understoodClient.en}` }));
+    const box = screen.getByLabelText(texts.understoodClient.en);
+    await user.clear(box);
+    await user.type(box, "عميل - عينة");
+    await user.click(screen.getByRole("button", { name: texts.understoodApprove.en }));
+    expect(await screen.findByText(texts.understoodApproved.en)).toBeInTheDocument();
+    expect(puts.map((put) => put.approve)).toEqual([false, true]);
   });
 
   it("approve is the only way forward", async () => {

@@ -117,7 +117,7 @@ describe("AiSettings", () => {
     expect(await screen.findByText(texts.keyStoreFile.ar)).toBeInTheDocument();
   });
 
-  it("choosing a model for a role saves every role in the core", async () => {
+  it("choosing a model for a role saves every role in the core at once, with a quiet Saved", async () => {
     const fetch = core({ "PUT /api/settings/ai/roles": (init) => Response.json(JSON.parse(String(init.body))) });
     const user = userEvent.setup();
     render(<Harness />);
@@ -125,6 +125,7 @@ describe("AiSettings", () => {
     await user.selectOptions(lead, JSON.stringify(haiku));
     await waitFor(() => expect(bodies(fetch, "PUT", "/api/settings/ai/roles")).toEqual([{ ...roles, lead: haiku }]));
     expect(lead).toHaveValue(JSON.stringify(haiku));
+    expect((await screen.findByText(texts.saved.ar)).closest("[data-feedback]")).toHaveAttribute("data-feedback", "done");
   });
 
   it("a role the core refuses goes back, and says so", async () => {
@@ -133,7 +134,7 @@ describe("AiSettings", () => {
     render(<Harness />);
     const lead = await screen.findByRole("combobox", { name: texts.roleLead.ar });
     await user.selectOptions(lead, JSON.stringify(haiku));
-    expect(await screen.findByText(texts.roleNotSaved.ar)).toHaveAttribute("role", "alert");
+    expect((await screen.findByText(texts.roleNotSaved.ar)).closest("[role=alert]")).not.toBeNull();
     expect(lead).toHaveValue(JSON.stringify(opus));
   });
 
@@ -203,22 +204,32 @@ describe("AiSettings", () => {
     expect(screen.getByLabelText(texts.providerKey.ar)).toHaveValue(""); // never kept on the page
   });
 
-  it("Claude Code is checked only when the button is pressed", async () => {
+  it("Claude Code is checked once when it opens switched on, and again when its file changes: no polling", async () => {
+    const on = { id: "claude-code", kind: "agent", name: "Claude Code", provider: "anthropic", on_device: true, key_set: false, error: null };
     let answer = { installed: true, compatible: true, signed_in: true, version: "2.1.318", code: null, models: ["opus"] };
-    const fetch = core({ "GET /api/settings/ai/claude-code": () => Response.json(answer) });
+    const fetch = core({
+      "GET /api/settings/ai": () => Response.json(settings({ connectors: [on] })),
+      "GET /api/settings/ai/claude-code": () => Response.json(answer),
+      "PUT /api/settings/ai/claude-code": (init) => Response.json(JSON.parse(String(init.body))),
+    });
     const user = userEvent.setup();
     render(<Harness />);
-    const check = await screen.findByRole("button", { name: texts.check.ar });
+    const ready = await screen.findByText("Claude Code 2.1.318 جاهز.");
+    expect(ready.closest("[data-feedback]")).toHaveAttribute("data-feedback", "done");
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(calls(fetch, "GET", "/api/settings/ai/claude-code")).toHaveLength(0); // no check by itself, no polling
-
-    await user.click(check);
-    expect(await screen.findByText("Claude Code 2.1.318 جاهز.")).toBeInTheDocument();
     expect(calls(fetch, "GET", "/api/settings/ai/claude-code")).toHaveLength(1);
 
     answer = { ...answer, compatible: false, code: "CLAUDE_CODE_TOO_OLD" as never };
-    await user.click(check);
-    expect(await screen.findByText(texts.claudeCodeTooOld.ar)).toBeInTheDocument();
+    const path = screen.getByLabelText(texts.claudeCodePath.ar);
+    await user.type(path, "/opt/sample/claude");
+    expect(calls(fetch, "PUT", "/api/settings/ai/claude-code")).toHaveLength(0); // never a half-typed path
+    await user.tab(); // leaving the field saves it, then checks that file
+    expect((await screen.findByText(texts.claudeCodeTooOld.ar)).closest("[role=alert]")).not.toBeNull();
+    expect(bodies(fetch, "PUT", "/api/settings/ai/claude-code")).toEqual([{ path: "/opt/sample/claude", on: true }]);
+    expect(calls(fetch, "GET", "/api/settings/ai/claude-code")).toHaveLength(2);
+    await user.click(path);
+    await user.tab(); // left again unchanged: nothing more
+    expect(calls(fetch, "PUT", "/api/settings/ai/claude-code")).toHaveLength(1);
   });
 
   it("switching Claude Code on saves it and says it keeps its own copy", async () => {
@@ -228,17 +239,19 @@ describe("AiSettings", () => {
     await user.click(await screen.findByRole("checkbox", { name: texts.useClaudeCode.ar }));
     expect(await screen.findByText(texts.claudeCodeCopy.ar)).toBeInTheDocument();
     expect(bodies(fetch, "PUT", "/api/settings/ai/claude-code")).toEqual([{ path: null, on: true }]);
+    await waitFor(() => expect(calls(fetch, "GET", "/api/settings/ai/claude-code")).toHaveLength(1)); // and checks it
   });
 
-  it("enters a price for a model One does not know", async () => {
+  it("a price for a model One does not know saves itself once both amounts are typed", async () => {
     const fetch = core({ "PUT /api/settings/ai/prices": (init) => Response.json(JSON.parse(String(init.body))) });
     const user = userEvent.setup();
     render(<Harness />);
     const form = (await screen.findByRole("heading", { name: texts.enterPrice.ar })).closest("form")!;
     expect(within(form).getAllByRole("option").map((o) => o.textContent)).toEqual(["sample-model"]);
     await user.type(within(form).getByLabelText(texts.priceIn.ar), "0.27");
-    await user.type(within(form).getByLabelText(texts.priceOut.ar), "1.10");
-    await user.click(within(form).getByRole("button", { name: texts.save.ar }));
+    await user.tab(); // to the other amount: nothing to save with one of the two
+    expect(calls(fetch, "PUT", "/api/settings/ai/prices")).toHaveLength(0);
+    await user.type(within(form).getByLabelText(texts.priceOut.ar), "1.10"); // then a pause in typing
     await waitFor(() =>
       expect(bodies(fetch, "PUT", "/api/settings/ai/prices")).toEqual([
         { connector: "standard:s1", model: "sample-model", in: "0.27", out: "1.10" },
@@ -246,7 +259,7 @@ describe("AiSettings", () => {
     );
   });
 
-  it("the caps are exact numbers, saved as typed", async () => {
+  it("the caps are exact numbers, saved as typed after a pause, with a quiet Saved", async () => {
     const saved = (init: RequestInit) => Response.json({ caps: { ...caps, ...JSON.parse(String(init.body)) }, recommended });
     const fetch = core({ "PUT /api/settings/ai/caps": saved });
     const user = userEvent.setup();
@@ -257,10 +270,12 @@ describe("AiSettings", () => {
     await user.clear(day);
     await user.type(day, "20.50");
     const form = day.closest("form")!;
-    await user.click(within(form).getByRole("button", { name: texts.save.ar }));
-    expect(await within(form).findByRole("status")).toHaveTextContent(texts.capsSaved.ar);
-    expect(bodies(fetch, "PUT", "/api/settings/ai/caps")).toEqual([{ ...amounts, day: "20.50" }]);
+    const note = await within(form).findByText(texts.saved.ar, {}, { timeout: 2000 });
+    expect(note.closest("[data-feedback]")).toHaveAttribute("data-feedback", "done");
+    expect(bodies(fetch, "PUT", "/api/settings/ai/caps")).toEqual([{ ...amounts, day: "20.50" }]); // once, the whole amount
     expect(day).toHaveValue("20.50");
+    await user.tab(); // leaving the field: nothing new to save
+    expect(calls(fetch, "PUT", "/api/settings/ai/caps")).toHaveLength(1);
   });
 
   it("each cap shows the recommended amount beside it", async () => {
@@ -274,15 +289,22 @@ describe("AiSettings", () => {
     expect(screen.getByLabelText(texts.budgetAbove.ar)).toHaveAccessibleDescription(hint("0.50"));
   });
 
-  it("caps the core refuses say why", async () => {
+  it("a cap the core refuses says why on leaving the field, and keeps what was typed", async () => {
     const notExact = { en: "Write the amount as an exact number, like 20.50.", ar: "اكتب المبلغ رقم مظبوط، زي 20.50." };
-    core({ "PUT /api/settings/ai/caps": () => Response.json({ error: notExact, field: "day" }, { status: 422 }) });
+    const fetch = core({ "PUT /api/settings/ai/caps": () => Response.json({ error: notExact, field: "day" }, { status: 422 }) });
     const user = userEvent.setup();
     render(<Harness />);
     const day = await screen.findByLabelText(texts.capDay.ar);
     await waitFor(() => expect(day).toHaveValue("15.00"));
-    await user.click(within(day.closest("form")!).getByRole("button", { name: texts.save.ar }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(notExact.ar);
+    await user.clear(day);
+    await user.type(day, "20,5");
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(calls(fetch, "PUT", "/api/settings/ai/caps")).toHaveLength(0); // not a whole amount: no save on a pause
+    await user.tab();
+    const alert = await within(day.closest("form")!).findByRole("alert");
+    expect(alert).toHaveTextContent(notExact.ar);
+    expect(day).toHaveValue("20,5");
+    expect(day).toHaveAttribute("aria-invalid", "true"); // the amount the core named
   });
 
   it("a settings load that fails says so and Retry tries again", async () => {

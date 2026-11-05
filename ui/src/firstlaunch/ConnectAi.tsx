@@ -162,7 +162,7 @@ export function ConnectAi({ nav }: { nav: Nav }) {
         </div>
 
         {/* what the choice shows keeps one height (the key field's), so the buttons under it never move */}
-        <div className="min-h-32">
+        <div className="min-h-40">
           {via === "claude_code" && (
             <div className="flex flex-col gap-2">
               {found?.found && <p className="fl-rise">{fill(t("aiLinkClaudeCodeFound"), { version: found.version ?? "" })}</p>}
