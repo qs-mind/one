@@ -7,6 +7,7 @@ import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../canvas/types";
 import { count, fill, language, pick, t, useLanguage } from "../i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { RollingNumber } from "../ui/RollingNumber";
 
 const locale = () => (language() === "ar" ? "ar-EG-u-nu-latn" : "en-GB");
 
@@ -97,7 +98,11 @@ export function StatusStrip({
           }}
         >
           <PopoverTrigger className={`${chip} hover:bg-stone hover:text-ink`}>
-            {t("boqSoFar")} <bdi dir="ltr" className="text-ink">{money(boq.value, boq.currency, true)}</bdi>
+            {t("boqSoFar")}{" "}
+            <bdi dir="ltr" className="text-ink">
+              {/* rolls when the core's total changes; another BOQ, or the other language, shows still */}
+              <RollingNumber key={`${boq.deliverable_id} ${lang}`} text={money(boq.value, boq.currency, true)} />
+            </bdi>
             {boq.sample && <span className="ms-1 text-copper">({t("sampleData")})</span>}
           </PopoverTrigger>
           <PopoverContent className="flex flex-col gap-1">

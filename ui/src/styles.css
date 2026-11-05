@@ -228,3 +228,17 @@
     transition: none;
   }
 }
+
+/* A total rolling to its new value (ui/src/ui/RollingNumber.tsx): a digit that changed is a one-figure window; the
+   old figure slides out of it as the new one slides in. The window is the new figure's width, so the number takes
+   the same room while it rolls as at rest. */
+.roll-col {
+  position: relative;
+  display: inline-block;
+  clip-path: inset(0);
+}
+.roll-from {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+}

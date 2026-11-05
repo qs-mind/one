@@ -156,6 +156,25 @@ describe("SheetViewer", () => {
     expect(screen.getByText(texts.sheetTotal.ar)).toBeInTheDocument();
   });
 
+  it("the total the core sends rolls to its new value when an edit changes it; still on first render and on another Deliverable", () => {
+    const animate = vi.fn(() => ({ finished: new Promise(() => {}), finish() {}, cancel() {} }));
+    Object.defineProperty(Element.prototype, "animate", { configurable: true, writable: true, value: animate });
+    try {
+      const { rerender } = render(<SheetViewer projectId={P} view={sheet()} />);
+      expect(animate).not.toHaveBeenCalled();
+      rerender(<SheetViewer projectId={P} view={sheet({ version: 2, total: calc("4877770.00", "n-total-2") })} />);
+      expect(animate).toHaveBeenCalled(); // the digits that changed roll
+      const total = screen.getByRole("button", { name: "4,877,770.00" });
+      expect(total.querySelector(".sr-only")).toHaveTextContent("4,877,770.00");
+      animate.mockClear();
+      rerender(<SheetViewer projectId={P} view={sheet({ id: "e".repeat(32), total: calc("120.00", "n-other") })} />);
+      expect(animate).not.toHaveBeenCalled(); // another Deliverable's total is not a change
+      expect(screen.getByRole("button", { name: "120.00" })).toBeInTheDocument();
+    } finally {
+      delete (Element.prototype as { animate?: unknown }).animate;
+    }
+  });
+
   it("the sample banner and the status chip have text labels in both languages", () => {
     const view = sheet({ status: "checked", code: "B", same_provider: true, off_desk: true, version: 7, pending: 3, revision: { no: 2, version: 5, signed_off: false } });
     const { rerender } = render(<SheetViewer projectId={P} view={view} />);
