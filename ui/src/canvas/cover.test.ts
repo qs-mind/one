@@ -83,18 +83,26 @@ describe("a frame that arrives out of view (tender day: the BOQ frame came, the 
     const team = box("team:core", 0, 0, 420, 300);
     const files = box("files:all", 460, 0, 380, 300);
     const boq = box("deliverable:boq", 0, 340, 900, 420);
-    const shown = revealed([boq], [files, team], area);
+    const shown = revealed([boq], [files, team], [], area)!;
     expect(shown[0]!.key).toBe("deliverable:boq");
     expect(shown.map((f) => f.key).sort()).toEqual(["deliverable:boq", "files:all", "team:core"]);
   });
 
-  it("leaves out, nearest first, the ones that would take the view below a readable zoom; the new frame always", () => {
+  it("frames only partly in view come along nearest first, while all stay readable; the new frame always", () => {
     const boq = box("deliverable:boq", 0, 0, 1200, 700);
     const near = box("team:core", 0, -340, 400, 300);
     const far = box("files:all", 3000, 0, 400, 300);
-    const shown = revealed([boq], [far, near], area);
+    const shown = revealed([boq], [], [far, near], area)!;
     expect(shown.map((f) => f.key)).toEqual(["deliverable:boq", "team:core"]);
     const w = Math.max(...shown.map((f) => f.x + f.w)) - Math.min(...shown.map((f) => f.x));
     expect((area.w - 64) / w).toBeGreaterThanOrEqual(READABLE);
+  });
+
+  it("too far to show with the frames wholly in view: the view stays, so none of them leaves (bench: Team and Files left)", () => {
+    const team = box("team:core", 0, 0, 420, 300);
+    const files = box("files:all", 460, 0, 380, 300);
+    const boq = box("deliverable:boq", 2400, 0, 900, 420);
+    expect(revealed([boq], [files, team], [], area)).toBeNull();
+    expect(revealed([boq], [], [], area)!.map((f) => f.key)).toEqual(["deliverable:boq"]); // nothing to keep: it goes there
   });
 });

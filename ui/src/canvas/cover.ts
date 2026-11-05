@@ -99,9 +99,16 @@ export function readable<T extends Framed>(frames: readonly T[], rank: (key: str
   return taken;
 }
 
-/** What the view shows when frames arrive out of sight: the new ones, with the frames that were in view before,
- * nearest first, while all of them still fit `area` at a readable zoom; so none is left half off the screen. */
-export function revealed<T extends Framed>(added: readonly T[], before: readonly T[], area: { w: number; h: number }, margin = MARGIN): T[] {
+/** What the view shows when frames arrive out of sight: the new ones with every frame wholly in view before (`whole`),
+ * and those partly in view (`partial`) nearest first, while all of them fit `area` at a readable zoom. Null when the
+ * frames wholly in view cannot all come along: the view stays where it is (calm; the new frame is a pan away). */
+export function revealed<T extends Framed>(
+  added: readonly T[],
+  whole: readonly T[],
+  partial: readonly T[],
+  area: { w: number; h: number },
+  margin = MARGIN,
+): T[] | null {
   const fits = (set: readonly T[]) => {
     const w = Math.max(...set.map((f) => f.x + f.w)) - Math.min(...set.map((f) => f.x));
     const h = Math.max(...set.map((f) => f.y + f.h)) - Math.min(...set.map((f) => f.y));
@@ -111,8 +118,9 @@ export function revealed<T extends Framed>(added: readonly T[], before: readonly
   const cy = (f: T) => f.y + f.h / 2;
   const ax = added.reduce((s, f) => s + cx(f), 0) / (added.length || 1);
   const ay = added.reduce((s, f) => s + cy(f), 0) / (added.length || 1);
-  const nearest = [...before].sort((a, b) => Math.hypot(cx(a) - ax, cy(a) - ay) - Math.hypot(cx(b) - ax, cy(b) - ay));
-  const taken = [...added];
+  const taken = [...added, ...whole];
+  if (whole.length && !fits(taken)) return null;
+  const nearest = [...partial].sort((a, b) => Math.hypot(cx(a) - ax, cy(a) - ay) - Math.hypot(cx(b) - ax, cy(b) - ay));
   for (const f of nearest) if (fits([...taken, f])) taken.push(f);
   return taken;
 }
