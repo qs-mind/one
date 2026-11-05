@@ -125,7 +125,8 @@ def test_edit_accept_and_see_it(client, project, sheet):
     assert change["before"]["value"] == "14" and change["after"]["value"] == "39850.50"
     assert {f["column"] for f in change["follows"] if f["row"] == row["id"]} == {"amount"}
     out = post(client, f"{path}/changes/accept", {"mine": True}).json()
-    assert out == {"version": 2, "accepted": [change["id"]], "stale": []}
+    undo = {"undo": out.pop("undo"), "window_ms": out.pop("window_ms")}  # Undo, as a removal
+    assert out == {"version": 2, "accepted": [change["id"]], "stale": []} and undo["window_ms"]
     v = get(client, path).json()
     assert cell(v, row["id"], "rate")["value"] == "39850.50" and v["version"] == 2
     assert get(client, f"{path}/changes").json()["changes"][0]["status"] == "accepted"

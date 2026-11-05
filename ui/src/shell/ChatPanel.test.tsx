@@ -89,7 +89,7 @@ describe("the chat in the shell", () => {
     expect(calls(fetch, "POST", "/api/briefs/b1/steer")).toHaveLength(0);
   });
 
-  it("sending while a Brief runs steers it, and shows it as steering", async () => {
+  it("Ctrl+Enter while a Brief runs steers it, and shows it as steering", async () => {
     const fetch = core({
       routes: {
         "POST /api/chat": (init) => streamed([...reply.slice(0, 4), running], init, false),
@@ -103,7 +103,7 @@ describe("the chat in the shell", () => {
 
     const field = screen.getByRole("textbox", { name: texts.message.ar });
     expect(field).toBeEnabled();
-    await user.type(field, "استخدم أسعار الشهر ده{enter}");
+    await user.type(field, "استخدم أسعار الشهر ده{Control>}{enter}{/Control}"); // Enter alone queues it
     await waitFor(() => expect(calls(fetch, "POST", "/api/briefs/b1/steer")).toHaveLength(1));
     const [, init] = calls(fetch, "POST", "/api/briefs/b1/steer")[0]!;
     expect(bodyOf(init)).toEqual({ text: "استخدم أسعار الشهر ده" });

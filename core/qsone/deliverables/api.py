@@ -20,9 +20,10 @@ from starlette.concurrency import run_in_threadpool
 
 from qsone import copy, export
 from qsone.clientfile import fill
-from qsone.deliverables import changes, comments, compare, ops, review, store
+from qsone.deliverables import changes, comments, compare, ops, revert, review, store
 from qsone.projects import ACTOR, Projects
 from qsone.records.project import Records, RecordsError
+from qsone.undo import Trash
 
 _ID = re.compile(r"[0-9a-f]{32}")
 _AT = re.compile(
@@ -85,13 +86,29 @@ def current_view(rec: Records, deliverable_id: str, version=None, revision=None)
     return v
 
 
+def _with_sources(rec: Records, found: list[changes.Change]) -> list[dict]:
+    """Each change as the screen reads it, with `sources`: the source of every number it shows
+    that is in Project Records (a number the engineer types gets its source only when accepted)."""
+    out = [change_json(c) for c in found]
+    wanted: set[str] = set()
+    for change in out:
+        cells = [change["before"], change["after"], *(f["after"] for f in change["follows"])]
+        wanted |= {c["source"] for c in cells if isinstance(c, dict) and c.get("source")}
+    sources = store.sources_of(rec, sorted(wanted))
+    for change in out:
+        cells = [change["before"], change["after"], *(f["after"] for f in change["follows"])]
+        ids = {c["source"] for c in cells if isinstance(c, dict) and c.get("source")}
+        change["sources"] = {s: sources[s] for s in sorted(ids) if s in sources}
+    return out
+
+
 def _changes(rec: Records, d: str, status: str | None) -> dict:
     found = (
         changes.pending(rec, d)
         if status == "pending"
         else changes.list_changes(rec, d, status=status)
     )
-    return {"changes": [change_json(c) for c in found]}
+    return {"changes": _with_sources(rec, found)}
 
 
 def _propose(rec: Records, d: str, body: dict) -> dict:
@@ -99,13 +116,19 @@ def _propose(rec: Records, d: str, body: dict) -> dict:
     made = changes.propose(
         rec, d, body.get("ops"), actor=ACTOR, reason=reason if isinstance(reason, str) else None
     )
-    return {"changes": [change_json(c) for c in made]}
+    return {"changes": _with_sources(rec, made)}
 
 
 def _accept(rec: Records, d: str, body: dict) -> dict:
     if body.get("mine") is True:
-        return changes.accept_mine(rec, d, actor=ACTOR)
-    return changes.accept(rec, d, body.get("ids"), actor=ACTOR)
+        out = changes.accept_mine(rec, d, actor=ACTOR)
+    else:
+        out = changes.accept(rec, d, body.get("ids"), actor=ACTOR)
+    # whether Undo can take it back (not an Update from Project Records); said to the route only
+    return {
+        **out,
+        "_undoable": out["version"] is not None and revert.undoable(rec, d, out["version"]),
+    }
 
 
 def _versions(rec: Records, d: str) -> dict:
@@ -205,8 +228,20 @@ def _fill_file(rec: Records, plan: str) -> Response:
 # The routes.
 
 
-def router(projects: Projects) -> APIRouter:
+def router(projects: Projects, trash: Trash | None = None) -> APIRouter:
+    """An accept waits in `trash` for its Undo window: Undo takes it back to the version before."""
     r = APIRouter()
+    trash = trash if trash is not None else Trash()
+
+    def take_back(entry: dict) -> bool | dict:
+        try:
+            rec = projects.get(entry["project"])
+            revert.undo_accept(rec, entry["deliverable"], entry["version"], actor=ACTOR)
+        except RecordsError as e:
+            return e.text
+        return True
+
+    trash.kind("accepted", restore=take_back, purge=lambda entry: None)  # nothing kept aside
 
     async def answer(project_id: str, fn, *args, status: int = 200, ids=()) -> Response:
         """Runs `fn(rec, *args)` in the thread pool: JSON (or the file) on success, else the
@@ -251,7 +286,17 @@ def router(projects: Projects) -> APIRouter:
 
     @r.post(base + "/{d}/changes/accept")
     async def accept(p: str, d: str, body: Json) -> Response:
-        return await answer(p, _accept, d, body, ids=deliverable(d))
+        try:
+            _known(d, copy.DELIVERABLE_NOT_FOUND, "deliverable")
+            rec = await run_in_threadpool(projects.get, p)
+            out = await run_in_threadpool(_accept, rec, d, body)
+        except RecordsError as e:
+            return _refusal(e)
+        if out.pop("_undoable"):  # its Undo token and window, as a removal answers
+            out |= trash.put(
+                "accepted", {"project": p, "deliverable": d, "version": out["version"]}
+            )
+        return JSONResponse(out)
 
     @r.post(base + "/{d}/changes/reject")
     async def reject(p: str, d: str, body: Json) -> Response:

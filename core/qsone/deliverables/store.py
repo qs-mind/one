@@ -452,6 +452,29 @@ def _read_number(row) -> tuple:
     return item_id, name, cell, source_id, source
 
 
+def sources_of(rec: Records, source_ids: list[str]) -> dict:
+    """{source id: source}, shaped as a view's `sources`, for the ids that exist."""
+    with rec.read() as conn:
+        rows = conn.execute(
+            "SELECT s.id, s.kind, s.title, s.locator, s.url, s.dated, f.name, s.file_id"
+            " FROM sources s LEFT JOIN files f ON f.id = s.file_id"
+            " WHERE s.id IN (SELECT value FROM json_each(?))",
+            (_dump(source_ids),),
+        ).fetchall()
+    return {
+        sid: {
+            "kind": kind,
+            "title": title,
+            "file_name": file_name,
+            "file_id": file_id,
+            "locator": json.loads(locator),
+            "url": url,
+            "dated": dated,
+        }
+        for sid, kind, title, locator, url, dated, file_name, file_id in rows
+    }
+
+
 def _sample(conn, cells: list[dict], sources: dict) -> bool:
     """Any shown number from a `sample` source, or any input, at any depth, of a shown
     calculation."""

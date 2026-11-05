@@ -165,7 +165,10 @@ def _put_back(conn, rec: Records, head: dict, plan: dict, actor: str) -> None:
     for item_id, (before, _) in plan["items"].items():
         fields = before["fields"]
         ledger.update_item(
-            rec, item_id, fields=json.loads(fields) if isinstance(fields, str) else fields, actor=actor
+            rec,
+            item_id,
+            fields=json.loads(fields) if isinstance(fields, str) else fields,
+            actor=actor,
         )
     for replaced, last in plan["numbers"].values():
         if replaced is None:

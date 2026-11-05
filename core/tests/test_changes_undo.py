@@ -163,7 +163,9 @@ def test_too_late_once_anything_moved_since(rec):
 def test_too_late_after_another_version(rec):
     d = sample_sheet(rec)
     v = view(rec, d)
-    [a] = propose(rec, d, [set_number(row_by_code_in(v, "03/02"), "rate", "40000")], actor="engineer")
+    [a] = propose(
+        rec, d, [set_number(row_by_code_in(v, "03/02"), "rate", "40000")], actor="engineer"
+    )
     accept(rec, d, [a.id], actor="engineer")
     [b] = propose(rec, d, [set_number(row_by_code_in(v, "2-1"), "rate", "2700")], actor="engineer")
     accept(rec, d, [b.id], actor="engineer")
@@ -239,7 +241,9 @@ def test_an_undo_that_comes_too_late_says_why(client):
     d = sample_sheet(rec)
     path = f"/projects/{project}/deliverables/{d}"
     v = client.get(path, headers=AUTH).json()
-    [a] = propose(rec, d, [set_number(row_by_code_in(v, "03/02"), "rate", "40000")], actor="engineer")
+    [a] = propose(
+        rec, d, [set_number(row_by_code_in(v, "03/02"), "rate", "40000")], actor="engineer"
+    )
     first = client.post(f"{path}/changes/accept", json={"ids": [a.id]}, headers=AUTH).json()
     [b] = propose(rec, d, [set_number(row_by_code_in(v, "2-1"), "rate", "2700")], actor="engineer")
     client.post(f"{path}/changes/accept", json={"ids": [b.id]}, headers=AUTH)
@@ -260,3 +264,19 @@ def test_an_accepted_update_from_project_records_answers_no_undo(client):
     [update] = pending(rec, d)
     answer = client.post(f"{path}/changes/accept", json={"ids": [update.id]}, headers=AUTH).json()
     assert answer["version"] == 2 and "undo" not in answer
+
+
+def test_a_change_names_the_source_of_its_new_number(client):
+    project = client.post("/projects", json={"name": "مدرسة - عينة"}, headers=AUTH).json()["id"]
+    rec = client.app.state.projects.get(project)
+    d = sample_sheet(rec)
+    path = f"/projects/{project}/deliverables/{d}"
+    v = view(rec, d)
+    source = sample_source(rec)
+    agent = {**set_number(row_by_code_in(v, "03/02"), "rate", "40000"), "source_id": source}
+    propose(rec, d, [agent], actor="lead_qs")
+    propose(rec, d, [set_number(row_by_code_in(v, "2-1"), "rate", "2700")], actor="engineer")
+    listed = client.get(f"{path}/changes", params={"status": "pending"}, headers=AUTH).json()
+    sourced, typed = listed["changes"]
+    assert sourced["after"]["source"] == source and sourced["sources"][source]["kind"] == "sample"
+    assert typed["after"]["source"] is None  # the engineer's own: its source comes with the accept
