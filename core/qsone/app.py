@@ -14,18 +14,20 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import activity, chat, copy, keys, models, projects
+from qsone import activity, chat, copy, keys, models, projects, settings
 from qsone.calc import routes as calc_routes
 from qsone.deliverables import api as deliverables_api
 from qsone.deliverables import events as deliverable_events
 from qsone.engine import connectors as engine_connectors
 from qsone.engine import mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
+from qsone.engine.connectors import claude_code
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
 from qsone.records.project import RecordsError
+from qsone.web import search as web_search
 
 Provider = Literal["anthropic"]
 
@@ -35,6 +37,12 @@ class AiKeyIn(BaseModel):
 
     provider: Provider
     value: str = Field(min_length=1)
+
+
+class SearchKeyIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    value: str = Field(min_length=1, max_length=500)
 
 
 class ModelIn(BaseModel):
@@ -155,6 +163,22 @@ def create_app(
     def save_ai_key(body: AiKeyIn) -> JSONResponse:
         try:
             keys.set_key(body.provider, body.value)
+        except KeyringError:
+            return JSONResponse({"error": copy.KEY_STORE_DOWN}, status_code=503)
+        return JSONResponse({"set": True})
+
+    @app.get("/settings/search")
+    def search_status() -> dict:
+        own_key = keys.get_key(web_search.KEY_USER) is not None
+        native = keys.get_key("anthropic") is not None or bool(claude_code.saved()["on"])
+        setting = settings.load().get("search_provider")
+        provider = web_search.provider_name(setting=setting, own_key=own_key, native=native)
+        return {"provider": provider, "own_key": own_key}
+
+    @app.put("/settings/search-key")
+    def save_search_key(body: SearchKeyIn) -> JSONResponse:
+        try:
+            keys.set_key(web_search.KEY_USER, body.value)
         except KeyringError:
             return JSONResponse({"error": copy.KEY_STORE_DOWN}, status_code=503)
         return JSONResponse({"set": True})
