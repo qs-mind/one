@@ -134,7 +134,8 @@ def test_the_lead_shows_a_view_of_sourced_numbers(bench):
     assert "رفضت" not in reply
     [view] = [e for e in events if e["type"] == "data-view"]
     data = view["data"]
-    assert [b["kind"] for b in data["blocks"]] == ["heading", "figures", "table", "group"]
+    assert [b["kind"] for b in data["blocks"]] == ["heading", "figures", "table", "prose"]
+    assert data["blocks"][3]["section"] and data["blocks"][2]["rows"][0]["numbers"]
     figures = [i["value"] for i in data["blocks"][1]["items"]]
     assert figures and all(f["number_id"] and f["source"] in data["sources"] for f in figures)
     assert data["sample"] is True and data["unsourced"] == []

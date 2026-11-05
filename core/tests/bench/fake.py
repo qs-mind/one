@@ -373,10 +373,8 @@ def _view(seen: Seen) -> Step | None:
     numbers = [n for n in _data(result).get("numbers", []) if isinstance(n, dict)] if ok else []
     if not numbers:
         return None
-    columns = [
-        {"key": "name", "label": _words(seen, "Number", "الرقم"), "type": "text"},
-        {"key": "value", "label": _words(seen, "Value", "القيمة"), "type": "number"},
-    ]
+    columns = [{"label": _words(seen, "Number", "الرقم")}]
+    columns.append({"label": _words(seen, "Value", "القيمة")})
     note = _words(
         seen,
         "(bench reply, not a real AI) Each figure opens its source.",
@@ -391,13 +389,9 @@ def _view(seen: Seen) -> Step | None:
         {
             "kind": "table",
             "columns": columns,
-            "rows": [{"name": n["name"], "value": {"number": n["id"]}} for n in numbers],
+            "rows": [{"label": n["name"], "numbers": [{"number": n["id"]}]} for n in numbers],
         },
-        {
-            "kind": "group",
-            "title": _words(seen, "About this view", "عن العرض ده"),
-            "blocks": [{"kind": "prose", "text": note}],
-        },
+        {"kind": "prose", "text": note, "section": _words(seen, "About this view", "عن العرض ده")},
     ]
     title = _words(seen, "BOQ at a glance (bench sample)", "نظرة على المقايسة (عينة تجريبية)")
     return _call("view", "show", {"title": title, "sample": True, "blocks": blocks})

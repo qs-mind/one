@@ -22,13 +22,13 @@ const prose: ViewBlock = { kind: "prose", text: "The rate is from the supplier's
 const figures: ViewBlock = { kind: "figures", items: [{ label: "Rate", value: rate }, { label: "Quantity", value: quantity }] };
 const table: ViewBlock = {
   kind: "table",
-  columns: [
-    { key: "item", label: "Item", type: "text" },
-    { key: "rate", label: "Rate", type: "number" },
-  ],
-  rows: [{ item: "03/02 (sample)", rate }],
+  columns: [{ label: "Item" }, { label: "Description" }, { label: "Rate" }],
+  rows: [{ label: "03/02 (sample)", texts: ["Reinforced concrete"], numbers: [rate] }],
 };
-const group: ViewBlock = { kind: "group", title: "About the rate", blocks: [{ kind: "prose", text: "Inside the group." }] };
+const inSection: ViewBlock[] = [
+  { kind: "prose", text: "Inside the section.", section: "About the rate" },
+  { kind: "prose", text: "Also inside.", section: "About the rate" },
+];
 
 function explainFetch() {
   const fetch = vi.fn(async (_input: RequestInfo | URL) =>
@@ -46,8 +46,8 @@ beforeEach(() => setLanguage("en"));
 afterEach(() => vi.restoreAllMocks());
 
 describe("ViewPart", () => {
-  it("draws each block: heading, prose, figures, table and group", () => {
-    render(<ViewPart view={viewOf([heading, prose, figures, table, group])} projectId="p1" />);
+  it("draws each block: heading, prose, figures, table, and blocks under their section title", () => {
+    render(<ViewPart view={viewOf([heading, prose, figures, table, ...inSection])} projectId="p1" />);
     const view = screen.getByRole("region", { name: "Rates summary (sample)" });
     expect(within(view).getByRole("heading", { name: "Reinforced concrete (sample)" })).toBeInTheDocument();
     expect(within(view).getByText("The rate is from the supplier's quote.")).toBeInTheDocument();
@@ -58,9 +58,19 @@ describe("ViewPart", () => {
     expect(within(view).getByText("120 m3")).toBeInTheDocument();
     const grid = within(view).getByRole("table");
     expect(within(grid).getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
-    expect(within(grid).getByRole("cell", { name: /03\/02/ })).toBeInTheDocument();
+    // a row is its label, its texts, then its numbers, under the columns in that order
+    const [header, row] = within(grid).getAllByRole("row");
+    expect(within(header!).getAllByRole("columnheader").map((c) => c.textContent)).toEqual(["Item", "Description", "Rate"]);
+    expect(within(row!).getByRole("rowheader", { name: "03/02 (sample)" })).toBeInTheDocument();
+    const [words, number] = within(row!).getAllByRole("cell");
+    expect(words).toHaveTextContent("Reinforced concrete");
+    expect(within(number!).getByText("39,850.50 EGP/m3")).toBeInTheDocument();
+    expect(within(grid).getByRole("columnheader", { name: "Rate" })).toHaveClass("text-end");
+    // the blocks of one section stand together under its title, once
     const inner = within(view).getByRole("region", { name: "About the rate" });
-    expect(within(inner).getByText("Inside the group.")).toBeInTheDocument();
+    expect(within(inner).getByText("Inside the section.")).toBeInTheDocument();
+    expect(within(inner).getByText("Also inside.")).toBeInTheDocument();
+    expect(within(view).getAllByText("About the rate")).toHaveLength(1);
   });
 
   it("every number has a source chip with its source's name", () => {
@@ -121,7 +131,7 @@ describe("ViewPart", () => {
     const arabic = viewOf(
       [
         { kind: "heading", text: "فئة الخرسانة - عينة" },
-        { kind: "table", columns: [{ key: "item", label: "البند", type: "text" }, { key: "rate", label: "الفئة", type: "number" }], rows: [{ item: "خرسانة مسلحة - عينة", rate }] },
+        { kind: "table", columns: [{ label: "البند" }, { label: "الفئة" }], rows: [{ label: "خرسانة مسلحة - عينة", texts: [], numbers: [rate] }] },
       ],
       { title: "ملخص التسعير - عينة" },
     );

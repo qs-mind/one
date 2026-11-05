@@ -1,12 +1,11 @@
 // One small component per view block (decision 16.1). Each draws only what the core checked: words as plain text,
 // numbers as the core resolved them, each with its source chip. Logical CSS only, so a block reads right to left in
 // an Arabic view; brand colours only, no shadows.
-import type { NumberCell } from "../../../deliverables/types";
 import { BlockBoundary } from "./BlockBoundary";
 import { useViewEnv } from "./env";
 import { Num } from "./Num";
 import { viewBlocks } from "./registry";
-import type { FiguresBlock, GroupBlock, HeadingBlock, ProseBlock, TableBlock } from "./types";
+import type { FiguresBlock, HeadingBlock, ProseBlock, TableBlock, ViewBlock } from "./types";
 import { Words } from "./Words";
 
 export function Heading({ block }: { block: HeadingBlock }) {
@@ -51,22 +50,23 @@ export function Figures({ block }: { block: FiguresBlock }) {
   );
 }
 
-const isCell = (value: string | NumberCell | undefined): value is NumberCell =>
-  typeof value === "object" && value !== null && typeof value.value === "string";
-
+/** A row is its label, then its texts, then its numbers: where a value stands says what it is, so the last
+ * columns, as many as the first row's numbers, are the number columns. */
 export function Table({ block }: { block: TableBlock }) {
   const { unsourced } = useViewEnv();
+  const firstNumber = block.columns.length - (block.rows[0]?.numbers.length ?? 0);
+  const cell = "border-b border-stone px-2 py-1";
   return (
     <div className="overflow-x-auto">
       <table className="border-collapse text-start">
         <thead>
           <tr>
-            {block.columns.map((c) => (
+            {block.columns.map((c, i) => (
               <th
-                key={c.key}
+                key={i}
                 scope="col"
                 dir="auto"
-                className={`border-b border-stone px-2 py-1 font-semibold ${c.type === "number" ? "text-end" : "text-start"}`}
+                className={`${cell} font-semibold ${i >= firstNumber && i > 0 ? "text-end" : "text-start"}`}
               >
                 <Words text={c.label} unsourced={unsourced} />
               </th>
@@ -76,20 +76,21 @@ export function Table({ block }: { block: TableBlock }) {
         <tbody>
           {block.rows.map((row, i) => (
             <tr key={i}>
-              {block.columns.map((c) => {
-                const value = row[c.key];
-                return (
-                  <td key={c.key} className={`border-b border-stone px-2 py-1 ${c.type === "number" ? "text-end" : ""}`}>
-                    {isCell(value) ? (
-                      <Num cell={value} />
-                    ) : typeof value === "string" ? (
-                      <span dir="auto">
-                        <Words text={value} unsourced={unsourced} />
-                      </span>
-                    ) : null}
-                  </td>
-                );
-              })}
+              <th scope="row" dir="auto" className={`${cell} text-start font-normal`}>
+                <Words text={row.label} unsourced={unsourced} />
+              </th>
+              {row.texts.map((text, j) => (
+                <td key={`t${j}`} className={cell}>
+                  <span dir="auto">
+                    <Words text={text} unsourced={unsourced} />
+                  </span>
+                </td>
+              ))}
+              {row.numbers.map((number, j) => (
+                <td key={`n${j}`} className={`${cell} text-end`}>
+                  <Num cell={number} />
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
@@ -98,22 +99,17 @@ export function Table({ block }: { block: TableBlock }) {
   );
 }
 
-/** Blocks shown together under a title. It holds leaves only: a group in a group shows nothing. */
-export function Group({ block }: { block: GroupBlock }) {
+/** A run of blocks under one section title, one level deep. */
+export function Section({ title, blocks }: { title: string; blocks: ViewBlock[] }) {
   const { unsourced } = useViewEnv();
   return (
-    <section
-      aria-label={block.title ?? undefined}
-      className="flex flex-col gap-3 border-s-2 border-stone ps-3"
-    >
-      {block.title && (
-        <h5 dir="auto" className="font-semibold text-slate">
-          <Words text={block.title} unsourced={unsourced} />
-        </h5>
-      )}
-      {block.blocks.map((leaf, i) =>
-        leaf.kind === ("group" as string) ? null : <BlockBoundary key={i} block={leaf} registry={viewBlocks} />,
-      )}
+    <section aria-label={title} className="flex flex-col gap-3 border-s-2 border-stone ps-3">
+      <h5 dir="auto" className="font-semibold text-slate">
+        <Words text={title} unsourced={unsourced} />
+      </h5>
+      {blocks.map((block, i) => (
+        <BlockBoundary key={i} block={block} registry={viewBlocks} />
+      ))}
     </section>
   );
 }

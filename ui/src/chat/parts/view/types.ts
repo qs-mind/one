@@ -3,16 +3,15 @@
 // reference, so the screen never computes a number. Text is plain words, never HTML.
 import type { NumberCell, Source } from "../../../deliverables/types";
 
-export type HeadingBlock = { kind: "heading"; text: string };
-export type ProseBlock = { kind: "prose"; text: string };
-export type FiguresBlock = { kind: "figures"; items: { label: string; value: NumberCell }[] };
-export type TableColumn = { key: string; label: string; type: "text" | "number" };
-/** A row by column key: words in a text column, a number's cell in a number column. */
-export type TableBlock = { kind: "table"; columns: TableColumn[]; rows: Record<string, string | NumberCell>[] };
-export type LeafBlock = HeadingBlock | ProseBlock | FiguresBlock | TableBlock;
-/** One level only: a group holds no group. */
-export type GroupBlock = { kind: "group"; title: string | null; blocks: LeafBlock[] };
-export type ViewBlock = LeafBlock | GroupBlock;
+/** Any block may name its section; a run of blocks with one section shows under its title, one level deep. */
+type InSection = { section?: string | null };
+export type HeadingBlock = InSection & { kind: "heading"; text: string };
+export type ProseBlock = InSection & { kind: "prose"; text: string };
+export type FiguresBlock = InSection & { kind: "figures"; items: { label: string; value: NumberCell }[] };
+/** A row's label, then its texts, then its numbers, under the columns in that order. */
+export type TableRow = { label: string; texts: string[]; numbers: NumberCell[] };
+export type TableBlock = InSection & { kind: "table"; columns: { label: string }[]; rows: TableRow[] };
+export type ViewBlock = HeadingBlock | ProseBlock | FiguresBlock | TableBlock;
 
 export type ViewData = {
   title: string;
