@@ -209,7 +209,7 @@ export async function packageCore({ target = hostTarget(), out = path.join(root,
   run("uv", [
     "pip", "install", "--python", python, "--require-hashes", "--no-deps", "--link-mode", "copy",
     "--quiet", "-r", path.join(root, "core", "runtime.lock"),
-  ]); // prettier-ignore
+  ]);
   copyCore(path.join(root, "core", "qsone"), site);
   trim(out, target);
   refuseLicensedFonts(out);

@@ -88,11 +88,11 @@ test("trim removes what must not ship and keeps what must", () => {
     `${lib}/site-packages/pip`, `${lib}/site-packages/pip-26.2.2.dist-info`, `${lib}/site-packages/x/tests`,
     `${lib}/site-packages/x/__pycache__`, `${lib}/site-packages/x/libstatic.a`, "include", "lib/libtcl9.0.so",
     "lib/tk9.0", "bin/pip3", "bin/uvicorn", "bin/python3.12",
-  ]) expect(existsSync(path.join(dir, gone)), gone).toBe(false); // prettier-ignore
+  ]) expect(existsSync(path.join(dir, gone)), gone).toBe(false);
   for (const kept of [
     `${lib}/os.py`, `${lib}/lib-dynload/_ssl.cpython-312-x86_64-linux-gnu.so`, `${lib}/site-packages/x/mod.py`,
     `${lib}/site-packages/qsone/app.py`, `${lib}/site-packages/qsone/fonts/Zain-Regular.ttf`, "lib/libpython3.12.so.1.0",
-  ]) expect(existsSync(path.join(dir, kept)), kept).toBe(true); // prettier-ignore
+  ]) expect(existsSync(path.join(dir, kept)), kept).toBe(true);
   expect(readdirSync(path.join(dir, "bin"))).toEqual(["python3"]); // the interpreter itself, not a link
   expect(layout(dir, "x86_64-unknown-linux-gnu").python).toBe(path.join(dir, "bin", "python3"));
 });
@@ -103,7 +103,7 @@ test("trim on Windows drops Tcl/Tk, test modules, import libraries and Scripts",
     "python.exe", "Lib/os.py", "Lib/tkinter/__init__.py", "DLLs/_tkinter.pyd", "DLLs/tcl86t.dll", "DLLs/tk86t.dll",
     "DLLs/_testcapi.pyd", "DLLs/_ssl.pyd", "DLLs/libcrypto-3-x64.dll", "tcl/tcl86t.lib", "libs/python312.lib",
     "Scripts/pip.exe", "Lib/site-packages/x/mod.py",
-  ]); // prettier-ignore
+  ]);
   trim(dir, "x86_64-pc-windows-msvc");
   for (const gone of ["Lib/tkinter", "DLLs/_tkinter.pyd", "DLLs/tcl86t.dll", "DLLs/tk86t.dll", "DLLs/_testcapi.pyd", "tcl", "libs", "Scripts"]) {
     expect(existsSync(path.join(dir, gone)), gone).toBe(false);
@@ -145,7 +145,7 @@ test("the core's data ships with it, and a licensed font never does", () => {
     "qsone/engine/instructions/lead_qs.txt", "qsone/engine/instructions/checking_qs.txt",
     "qsone/deliverables/templates/sheet.json", "qsone/export/typst/sheet.typ", "qsone/fonts/Zain-Regular.ttf",
     "qsone/fonts/KumbhSans-Variable.ttf", "qsone/fonts/OFL.txt", "qsone/sandbox/guest/one_io.py", "qsone/__main__.py",
-  ]) expect(existsSync(path.join(site, data)), data).toBe(true); // prettier-ignore
+  ]) expect(existsSync(path.join(site, data)), data).toBe(true);
   expect(() => refuseLicensedFonts(site)).not.toThrow();
 
   put(site, ["qsone/fonts/Thmanyah-Sans-Regular.otf"]);
