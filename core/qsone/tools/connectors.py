@@ -165,7 +165,7 @@ for _tool in (
         ToolsArgs,
         "read",
         _tools,
-        lambda a: copy.fill(copy.TOOL_WORKING, tool="connector_tools"),
+        lambda a: copy.tool_step("connector_tools"),
         untrusted=True,
         example=_TOOLS_EXAMPLE,
         roles=_ROLES,

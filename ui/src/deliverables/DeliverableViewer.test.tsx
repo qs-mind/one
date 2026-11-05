@@ -192,10 +192,10 @@ describe("texts", () => {
       "reviewOpMoveRow", "reviewOpColumns", "reviewOpInsertBlock", "reviewOpRemoveBlock", "reviewOpMoveBlock", "placeItem",
       "placeItems", "placeCell", "placeWhole", "placeParagraph", "placeQuote", "placeMoved", "reviewCommentOn",
       "reviewCommentAdd", "reviewCommentText", "reviewReplyText", "reviewNoComments", "reviewFixSent", "reviewFilter",
-      "reviewCodeC", "reviewFrom", "reviewTo", "reviewBy", "reviewChangesCount", "reviewIssued", "reviewAdded", "reviewRemoved",
+      "reviewCodeC", "reviewFrom", "reviewTo", "reviewBy", "reviewIssued", "reviewAdded", "reviewRemoved",
       "reviewMovedRow", "reviewNoDifference", "reviewCanSignOff", "reviewRevisionIssued", "exportSaved", "exportDownloaded",
       "exportCancelled", "exportFailed", "fillSkippedMerged", "fillSkipped", "fillMismatches", "fillOurs", "fillTheirs",
-      "fillMarkedRight", "fillMismatchesFirst", "fillUnmappedRows", "fillUnmappedItems", "fillNoPlan",
+      "fillMarkedRight", "fillMismatchesFirst", "fillUnmappedItems", "fillNoPlan",
     ];
     for (const key of keys) {
       expect(texts[key].en.trim(), key).not.toBe("");

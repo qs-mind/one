@@ -3,7 +3,7 @@
 // frame never move the canvas or the frame (decision 11). Enter goes in, Esc comes back (handled by the canvas).
 import { NodeResizer, useStore, type Node } from "@xyflow/react";
 import { createContext, memo, useContext, type ComponentType, type ReactNode } from "react";
-import { fill, pick, t, useLanguage } from "../../i18n";
+import { count, pick, t, useLanguage } from "../../i18n";
 import { lod, type Detail } from "../lod";
 import { MIN_H, MIN_W, STRIP_H } from "../place";
 import type { Anchor, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
@@ -68,7 +68,7 @@ export function frameTitle(node: Titled): string {
       return node.data.deliverable.title;
     case "desk":
       return node.data.collapsed
-        ? fill(t("deskSummary"), { desk: pick(node.data.desk.name), n: node.data.working })
+        ? count("deskSummary", node.data.working, { desk: pick(node.data.desk.name) })
         : pick(node.data.desk.name);
     default:
       return t("projectTeam");

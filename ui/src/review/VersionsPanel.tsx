@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { deliverablesApi } from "../deliverables/api";
 import type { Versions, View } from "../deliverables/types";
-import { fill, pick, t, type Text } from "../i18n";
+import { count, fill, pick, t, type Text } from "../i18n";
 import { ComparePanel } from "./ComparePanel";
 import { authorName, when } from "./place";
 
@@ -67,7 +67,7 @@ export function VersionsPanel({ projectId, view }: { projectId: string; view: Vi
                 <span>{fill(t("reviewVersion"), { n: v.n })}</span>
                 <span className="text-slate">{when(v.at)}</span>
                 <span className="text-slate">{fill(t("reviewBy"), { who: authorName(v.by) })}</span>
-                <span className="text-slate">{fill(t("reviewChangesCount"), { n: v.changes.length })}</span>
+                <span className="text-slate">{count("reviewChangesCount", v.changes.length)}</span>
               </li>
             ))}
           </ol>

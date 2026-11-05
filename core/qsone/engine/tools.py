@@ -170,7 +170,7 @@ def _from_function(fn: Callable, group: str, roles: set[str], risk: Risk) -> Too
         args=args,
         risk=risk,
         run=run,
-        activity=lambda _: copy.fill(copy.TOOL_WORKING, tool=name),
+        activity=lambda _: copy.tool_step(name),
         lead_only=set(roles) == {"lead"},
         writes=risk in ("write", "outside"),
         roles=frozenset(roles),

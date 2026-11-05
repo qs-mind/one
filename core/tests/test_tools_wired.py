@@ -198,7 +198,10 @@ def test_a_scripted_lead_reads_a_file_then_asks_the_engineer(serve_app):
         with client.stream("POST", f"{url}/chat", json=message("درجة الخرسانة كام؟", pid)) as r:
             before, after = answer_the_question(client, url, r.iter_lines())
     progress = [c["data"]["text"] for c in before if c["type"] == "data-progress"]
-    assert copy.fill(copy.DOING_FILES_READ, name="مواصفات - عينة.pdf", pages="1") in progress
+    assert (
+        copy.fill(copy.DOING_FILES_READ, name=copy.file_name("مواصفات - عينة.pdf"), pages="1")
+        in progress
+    )
     assert copy.DOING_ASK in progress
     assert said(after).endswith("الدرجة C30 والخرسانة جاهزة - عينة")  # the results reached it
     read, asked = holder["seen"]["files_read"], holder["seen"]["ask_engineer"]

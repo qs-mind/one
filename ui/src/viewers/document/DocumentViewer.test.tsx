@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Change, DocumentView, Explained, Thread } from "../../deliverables/types";
-import { setLanguage, texts } from "../../i18n";
+import { count, setLanguage, texts } from "../../i18n";
 import { DocumentViewer, type DocumentHandle } from "./DocumentViewer";
 
 // jsdom has no editing: Slate only takes key and input events from a target whose isContentEditable is true, and
@@ -148,7 +148,7 @@ describe("DocumentViewer", () => {
     expect(value.closest("[contenteditable='false']")).not.toBeNull(); // a void: no caret, no typing inside
     await userEvent.setup().click(value);
     const popover = await screen.findByRole("dialog", { name: texts.sheetSource.ar });
-    expect(await within(popover).findByText("sum(amount)", { selector: "bdi" })).toBeInTheDocument();
+    expect(await within(popover).findByText("sum(amount)", { selector: "bdi.font-mono" })).toBeInTheDocument();
   });
 
   it("pending segments draw struck and inserted words, never split letters, with ✓ and ✗", async () => {
@@ -205,7 +205,7 @@ describe("DocumentViewer", () => {
     const untraced = blockEl("b4").querySelector("[data-untraced]");
     expect(untraced).toHaveTextContent(/^٣٠$/);
     expect(untraced).toHaveAttribute("title", texts.docUntraced.ar);
-    expect(screen.getByText(texts.docUntracedCount.ar.replace("{n}", "1"))).toBeInTheDocument();
+    expect(screen.getByText(count("docUntracedCount", 1, {}, "ar"))).toBeInTheDocument();
   });
 
   it("an edit is sent on Ctrl+Enter as one set_block op with the block's version, then shows as suggested", async () => {

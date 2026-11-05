@@ -119,6 +119,8 @@ function parse(text: string): ActivityEvent | undefined {
       return isObject(value.deliverable) ? (value as ActivityEvent) : undefined;
     case "desk":
       return isObject(value.desk) ? (value as ActivityEvent) : undefined;
+    case "file":
+      return isObject(value.file) && typeof value.file.id === "string" ? (value as ActivityEvent) : undefined;
     case "waiting":
       return typeof value.count === "number" ? (value as ActivityEvent) : undefined;
     default:

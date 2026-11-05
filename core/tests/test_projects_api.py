@@ -64,7 +64,9 @@ def test_an_added_file_is_told_on_the_activity_stream(client, project, monkeypat
 
     told = []
     monkeypatch.setattr(activity, "publish", lambda pid, event: told.append((pid, event)))
-    info = upload(client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "خرسانة", "م3", 120]]})).json()
+    info = upload(
+        client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "خرسانة", "م3", 120]]})
+    ).json()
     assert told == [(project, {"type": "file", "file": info})]
 
 

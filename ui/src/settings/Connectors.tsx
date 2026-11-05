@@ -7,7 +7,7 @@ import { ConnectorCard } from "../chat/parts/ConnectorCard";
 import type { CardAnswer } from "../chat/parts/cardKinds";
 import type { CardData } from "../chat/parts/types";
 import { coreLine, send } from "../core";
-import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { count, pick, t, type Text, texts, useLanguage } from "../i18n";
 
 /** One Connector, as GET /connectors sends it (core/qsone/connectors/routes.py). */
 export type ConnectorRow = {
@@ -107,7 +107,7 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
                     </span>
                     <span className="flex flex-wrap gap-x-2 text-slate">
                       <span>{t(row.transport === "stdio" ? "onThisComputer" : "overInternet")}</span>
-                      <span>{fill(t("connectorTools"), { n: row.tools })}</span>
+                      <span>{count("connectorTools", row.tools)}</span>
                       {row.token && <span>{t("connectorTokenKept")}</span>}
                     </span>
                     <span dir="ltr" className="text-slate">

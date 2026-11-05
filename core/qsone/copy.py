@@ -3,6 +3,8 @@
 "Claude key" / «مفتاح Claude» is the button label on the screen (aiKey in ui/src/i18n.ts).
 """
 
+import re
+
 NO_KEY = {
     "en": (
         "There is no Claude key yet. Press “Claude key” at the top, add your Claude key, "
@@ -405,7 +407,75 @@ ASK_ONLINE = {
 }
 
 # Progress Line words of the tools. {tool} is a tool's name; the other values come from its call.
-TOOL_WORKING = {"en": "Using {tool}", "ar": "بيستخدم {tool}"}
+# What a step is, for the Progress Line, when the tool has no words of its own for its arguments:
+# never the tool's id. Every registered tool has its line here (tests/test_arabic.py checks it).
+TOOL_STEP = {"en": "Working on a step", "ar": "بيشتغل على خطوة"}
+TOOL_WORDS = {
+    "add_item": {"en": "Adding an item to the Source Ledger", "ar": "بيضيف بند لسجل المصادر"},
+    "add_source": {"en": "Adding a source to the Source Ledger", "ar": "بيضيف مصدر لسجل المصادر"},
+    "ask_engineer": {"en": "Asking you a question", "ar": "بيسألك سؤال"},
+    "boq_import": {"en": "Importing the BOQ", "ar": "بيستورد جدول الكميات"},
+    "boq_preview": {"en": "Looking at the BOQ's columns", "ar": "بيشوف أعمدة جدول الكميات"},
+    "build_specialist": {"en": "Setting up a specialist", "ar": "بيجهّز متخصص"},
+    "calculate": {"en": "Calculating a number", "ar": "بيحسب رقم"},
+    "client_file_plan": {
+        "en": "Planning how to fill the client's file",
+        "ar": "بيخطط إزاي يملا ملف العميل",
+    },
+    "client_file_read": {"en": "Reading the client's file", "ar": "بيقرا ملف العميل"},
+    "connector_call": {"en": "Using a connected app", "ar": "بيستخدم تطبيق متوصّل"},
+    "connector_tools": {
+        "en": "Looking at what the connected apps can do",
+        "ar": "بيشوف التطبيقات المتوصّلة تقدر تعمل إيه",
+    },
+    "correct_number": {"en": "Correcting a number", "ar": "بيصحّح رقم"},
+    "define_unit": {"en": "Defining a project unit", "ar": "بيعرّف وحدة للمشروع"},
+    "delegate": {"en": "Handing work to the team", "ar": "بيسلّم شغل للفريق"},
+    "deliverable_comment": {"en": "Commenting on a Deliverable", "ar": "بيعلّق على مُخرج"},
+    "deliverable_create": {"en": "Making a Deliverable", "ar": "بيعمل مُخرج"},
+    "deliverable_propose": {
+        "en": "Suggesting changes to a Deliverable",
+        "ar": "بيقترح تعديلات على مُخرج",
+    },
+    "deliverable_read": {"en": "Reading a Deliverable", "ar": "بيقرا مُخرج"},
+    "explain_number": {"en": "Tracing where a number comes from", "ar": "بيتتبّع مصدر رقم"},
+    "files_list": {"en": "Looking at the project files", "ar": "بيشوف ملفات المشروع"},
+    "files_read": {"en": "Reading a project file", "ar": "بيقرا ملف من ملفات المشروع"},
+    "find_items": {"en": "Looking up items", "ar": "بيدوّر على بنود"},
+    "hand_to_project": {"en": "Passing the work to a project", "ar": "بيحوّل الشغل لمشروع"},
+    "ledger_numbers": {"en": "Reading the project's numbers", "ar": "بيقرا أرقام المشروع"},
+    "make_deliverable": {"en": "Making a Deliverable", "ar": "بيعمل مُخرج"},
+    "note_lesson": {"en": "Noting a lesson learned", "ar": "بيسجّل درس مستفاد"},
+    "offer_new_project": {"en": "Suggesting a new project", "ar": "بيقترح مشروع جديد"},
+    "plan_brief": {"en": "Planning the work", "ar": "بيخطط للشغل"},
+    "prices_lookup": {"en": "Looking up market prices", "ar": "بيدوّر على أسعار السوق"},
+    "prices_propose": {"en": "Proposing prices for you to keep", "ar": "بيقترح أسعار تحفظها"},
+    "projects": {"en": "Looking at your projects", "ar": "بيشوف المشاريع"},
+    "read_chunk": {
+        "en": "Reading a passage of the project files",
+        "ar": "بيقرا جزء من ملفات المشروع",
+    },
+    "recalculate": {"en": "Recalculating numbers", "ar": "بيعيد حساب الأرقام"},
+    "record_number": {"en": "Recording a number", "ar": "بيسجّل رقم"},
+    "sandbox_rerun": {"en": "Running a script again", "ar": "بيشغّل سكريبت تاني"},
+    "sandbox_run": {"en": "Running a script", "ar": "بيشغّل سكريبت"},
+    "save_desk": {"en": "Saving a Desk", "ar": "بيحفظ قسم"},
+    "search_records": {"en": "Searching the project files", "ar": "بيدوّر في ملفات المشروع"},
+    "send_message": {"en": "Sending a message to the team", "ar": "بيبعت رسالة للفريق"},
+    "submit_for_check": {
+        "en": "Sending work to the Checking QS",
+        "ar": "بيبعت الشغل لمهندس المراجعة",
+    },
+    "use_desk": {"en": "Calling on a Desk", "ar": "بيستعين بقسم"},
+    "web_read": {"en": "Reading a web page", "ar": "بيقرا صفحة ويب"},
+    "web_search": {"en": "Searching the web", "ar": "بيدوّر على الويب"},
+}
+
+
+def tool_step(name: str) -> dict[str, str]:
+    """The Progress Line's words for a step of tool `name`: its own line, or a plain one."""
+    return TOOL_WORDS.get(name, TOOL_STEP)
+
 
 TOOL_SEARCH_RECORDS = {
     "en": "Searching the project files for «{query}»",
@@ -665,6 +735,20 @@ CARD_CHOICE = {
 # QS Calc Engine (Plan 3). Keep these texts together, in this block.
 # Texts with values use {name} placeholders filled by `fill`; literal braces are doubled.
 # ---------------------------------------------------------------------------------------------
+
+
+_EXTENSION = re.compile(r"(\.[A-Za-z0-9]{1,8})$")
+
+
+def file_name(name: str) -> str:
+    """A file name for a sentence on screen, in Unicode isolates: the whole name first-strong
+    (FSI … PDI), its extension left to right (LRI … PDI), so «مواصفات (sample spec).docx» reads
+    in order inside Arabic or English words. Only for text shown to the engineer, never to a model.
+    The UI's own file names do the same (ui/src/ui/FileName.tsx)."""
+    found = _EXTENSION.search(name)
+    if found is None or found.start() == 0:
+        return f"\u2068{name}\u2069"
+    return f"\u2068{name[: found.start()]}\u2066{found.group(1)}\u2069\u2069"
 
 
 def fill(text: dict[str, str], /, **values) -> dict[str, str]:

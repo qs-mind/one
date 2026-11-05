@@ -585,7 +585,7 @@ class _Stream:
             return
         self._tools.add(tool_id)
         tool = REGISTRY.get(name.removeprefix(TOOL_PREFIX))
-        words = copy.fill(copy.TOOL_WORKING, tool=name.removeprefix(TOOL_PREFIX))
+        words = copy.tool_step(name.removeprefix(TOOL_PREFIX))
         if tool is not None:
             try:
                 words = tool.activity(tool.args.model_validate(args))

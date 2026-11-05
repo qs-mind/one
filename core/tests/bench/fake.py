@@ -12,14 +12,13 @@ import json
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
 from pydantic_ai.messages import (
     ModelRequest,
-    ModelResponse,
     RetryPromptPart,
     TextPart,
     ToolCallPart,
@@ -28,6 +27,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.function import AgentInfo
 
+from qsone import copy
 from qsone.engine.types import ModelCard, ModelChoice
 from tests.engine_fakes import Scripted, Step, _stream_usage
 
@@ -56,6 +56,7 @@ class Seen:
     lang: str  # "ar" | "en"
     scenario: str
     done: dict[str, tuple[str, bool]]  # step -> (result text, ok)
+    used: dict[str, str] = field(default_factory=dict)  # step -> the tool it called
 
 
 def _text(content) -> str:
@@ -78,10 +79,12 @@ def read(messages: list, info: AgentInfo) -> Seen:
                     start, brief = i, part.content
     steps: dict[str, str] = {}  # tool call id -> step
     done: dict[str, tuple[str, bool]] = {}
+    used: dict[str, str] = {}
     for message in messages[start:]:
         for part in message.parts:
             if isinstance(part, ToolCallPart) and part.tool_call_id.startswith("bench-"):
                 steps[part.tool_call_id] = part.tool_call_id.split("-")[1]
+                used[steps[part.tool_call_id]] = part.tool_name
                 done.setdefault(steps[part.tool_call_id], ("", False))
             elif isinstance(part, ToolReturnPart) and part.tool_call_id in steps:
                 done[steps[part.tool_call_id]] = (_text(part.content), True)
@@ -92,7 +95,7 @@ def read(messages: list, info: AgentInfo) -> Seen:
     found = _KEYWORD.search(brief)
     scenario = found.group(1) if found and found.group(1) in SCENARIOS else "full"
     tools = {t.name for t in info.function_tools}
-    return Seen(tools, brief, language(brief), scenario, done)
+    return Seen(tools, brief, language(brief), scenario, done, used)
 
 
 def _call(step: str, tool: str, args: dict) -> Step:
@@ -182,8 +185,11 @@ def _ask(seen: Seen) -> Step:
                 "text": "Bench question: ready-mix concrete or mixed on site?",
                 "options": ["Ready-mix", "Mixed on site"],
             },
-            {"id": "q2", "text": "Bench question: any note on the excavation items?",
-             "free_text": True},  # fmt: skip
+            {
+                "id": "q2",
+                "text": "Bench question: any note on the excavation items?",
+                "free_text": True,
+            },  # fmt: skip
         ]
     return _call("ask", "ask_engineer", {"questions": questions})
 
@@ -254,7 +260,9 @@ def _letter(seen: Seen) -> Step:
         return {"type": kind, "children": [{"text": text}]}
 
     blocks = [
-        block("h1", _words(seen, "Tender cover letter (bench sample)", "خطاب العطاء (عينة تجريبية)")),
+        block(
+            "h1", _words(seen, "Tender cover letter (bench sample)", "خطاب العطاء (عينة تجريبية)")
+        ),
         block(
             "p",
             _words(
@@ -311,11 +319,17 @@ _STEP_OF = {
 
 
 def _report(seen: Seen) -> str:
-    refused = sorted(step for step, (_, ok) in seen.done.items() if not ok)
-    done = sorted(step for step, (_, ok) in seen.done.items() if ok)
+    def said(ok: bool) -> list[str]:  # each step in the Progress Line's own words, never a tool id
+        return [
+            copy.tool_step(seen.used.get(s, ""))[seen.lang]
+            for s, (_, k) in seen.done.items()
+            if k is ok
+        ]
+
+    refused, done = said(False), said(True)
     if seen.lang == "ar":
         text = "(رد تجريبي من منصة الاختبار، وليس ذكاء اصطناعي حقيقي) "
-        text += "خلصت الخطوات: " + ("، ".join(done) if done else "لا شيء") + "."
+        text += "اللي اتعمل: " + ("، ".join(done) if done else "لا شيء") + "."
         if refused:
             text += " رفضت الأدوات: " + "، ".join(refused) + "."
         return text
@@ -353,12 +367,16 @@ def _today() -> str:
 
 def specialist(seen: Seen) -> Step:
     if "send_message" in seen.tools and "hello" not in seen.done:
-        text = _words(seen, "(bench) Starting on the sample prices.", "(تجريبي) بدأت في أسعار العينة.")
+        text = _words(
+            seen, "(bench) Starting on the sample prices.", "(تجريبي) بدأت في أسعار العينة."
+        )
         return _call("hello", "send_message", {"to": "lead", "text": text})
     if "prices_propose" in seen.tools and "prices" not in seen.done:
         rows = [
             {
-                "description": _words(seen, "Portland cement (sample price)", "أسمنت بورتلاندي (سعر عينة)"),
+                "description": _words(
+                    seen, "Portland cement (sample price)", "أسمنت بورتلاندي (سعر عينة)"
+                ),
                 "unit": _words(seen, "t", "طن"),
                 "rate": "3950",
                 "currency": "EGP",
@@ -366,7 +384,9 @@ def specialist(seen: Seen) -> Step:
                 "vat": "incl",
             },
             {
-                "description": _words(seen, "Rebar 16 mm (sample price)", "حديد تسليح ١٦ مم (سعر عينة)"),
+                "description": _words(
+                    seen, "Rebar 16 mm (sample price)", "حديد تسليح ١٦ مم (سعر عينة)"
+                ),
                 "unit": _words(seen, "t", "طن"),
                 "rate": "38500",
                 "currency": "EGP",

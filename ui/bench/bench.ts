@@ -24,6 +24,7 @@ const words = {
     keepTicked: "احفظ الصفوف المعلّمة",
     yes: "أيوه",
     open: "افتح",
+    zoomOut: "صغّر",
     done: /ردّك:|مبقاش له لازمة/,
   },
   en: {
@@ -37,6 +38,7 @@ const words = {
     keepTicked: "Keep the ticked rows",
     yes: "Yes",
     open: "Open",
+    zoomOut: "Zoom out",
     done: /Your answer:|No longer needed\./,
   },
 } as const;
@@ -184,6 +186,9 @@ export class Walk {
 
   private async answer(card: Locator): Promise<string> {
     await card.scrollIntoViewIfNeeded();
+    // `card` matches only unanswered cards, so once answered it is gone: count the answers in the chat instead.
+    const answers = this.chat.locator("section.border-copper").getByText(this.w.done);
+    const before = await answers.count();
     let kind = "approval";
     if (await card.getByRole("checkbox").count()) {
       kind = "rows";
@@ -204,7 +209,7 @@ export class Walk {
       const yes = card.getByRole("button", { name: this.w.yes, exact: true });
       await (await yes.count() ? yes : card.getByRole("button").first()).click();
     }
-    await expect.soft(card.getByText(this.w.done), `the ${kind} card shows its answer`).toBeVisible();
+    await expect.soft(answers, `the ${kind} card shows its answer`).toHaveCount(before + 1);
     await this.shot(`${kind}-answered`);
     return kind;
   }
@@ -213,10 +218,15 @@ export class Walk {
   async deliverables(expected: number) {
     const frames = this.page.locator('[data-frame^="deliverable:"]');
     await this.page.waitForTimeout(1500);
+    // The canvas draws only the frames in view: zoom out until all of them are.
+    const zoomOut = this.page.getByRole("button", { name: this.w.zoomOut, exact: true });
+    for (let i = 0; i < 4; i++) await zoomOut.click();
+    await this.page.waitForTimeout(600);
     const live = await frames.count();
     if (live < expected) {
       await this.problem(`only ${live} of ${expected} Deliverables are on the canvas without a reload`, "deliverables-not-live");
       await this.page.reload();
+      for (let i = 0; i < 4; i++) await zoomOut.click();
       await expect(frames, "after a reload every Deliverable is on the canvas").toHaveCount(expected);
     }
     await this.shot("deliverables-on-canvas");

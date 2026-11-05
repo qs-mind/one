@@ -193,7 +193,6 @@ export const texts = {
   connectorChecking: { en: "Starting the Connector to see what it can do…", ar: "بنشغّل الموصّل عشان نشوف يقدر يعمل إيه…" },
   connectorNotAdded: { en: "The Connector was not added. Try again.", ar: "الموصّل ماتضافش. جرّب تاني." },
   connectorAdded: { en: "Connector added.", ar: "الموصّل اتضاف." },
-  connectorTools: { en: "{n} tools", ar: "{n} أدوات" },
   connectorTokenKept: { en: "Token kept", ar: "التوكن محفوظ" },
   connectorSwitchedOn: { en: "Switched on", ar: "شغّال" },
   connectorNotSaved: { en: "The change was not saved. Try again.", ar: "التغيير ماتحفظش. جرّب تاني." },
@@ -355,7 +354,6 @@ export const texts = {
   sheetNotNumber: { en: "this is not a number", ar: "ده مش رقم" },
   sheetNotSent: { en: "The change was not sent. Try again.", ar: "التعديل موصلش. جرّب تاني." },
   sheetNoAnswer: { en: "One's core did not answer. Try again.", ar: "محرك One مردّش. جرّب تاني." },
-  sheetPending: { en: "{n} suggested changes", ar: "{n} تعديلات مقترحة" },
   sheetTotal: { en: "Total", ar: "الإجمالي العام" },
   sheetFullScreen: { en: "Full screen", ar: "ملء الشاشة" },
   sheetLeaveFullScreen: { en: "Leave full screen", ar: "اخرج من ملء الشاشة" },
@@ -369,10 +367,6 @@ export const texts = {
   docMoved: {
     en: "Moved: the text it was on has changed.",
     ar: "اتنقلت: النص اللي كانت عليه اتغيّر.",
-  },
-  docUntracedCount: {
-    en: "{n} numbers with no source (dotted underline): they are not linked to Project Records.",
-    ar: "{n} أرقام من غير مصدر (تحتها خط منقّط): مش مربوطة بسجلات المشروع.",
   },
   docRefMissing: { en: "This number was not found in Project Records", ar: "الرقم ده مش لاقيينه في سجلات المشروع" },
   docMoveSuggested: { en: "Suggested: move this paragraph", ar: "مقترح: نقل الفقرة دي" },
@@ -491,7 +485,6 @@ export const texts = {
   reviewFrom: { en: "From", ar: "من" },
   reviewTo: { en: "To", ar: "إلى" },
   reviewBy: { en: "by {who}", ar: "بواسطة {who}" },
-  reviewChangesCount: { en: "{n} changes", ar: "{n} تعديلات" },
   reviewIssued: { en: "Issued", ar: "صادر" },
   reviewAdded: { en: "Added", ar: "اتضاف" },
   reviewRemoved: { en: "Removed", ar: "اتشال" },
@@ -510,7 +503,6 @@ export const texts = {
   fillTheirs: { en: "The client's: {code}", ar: "عند العميل: {code}" },
   fillMarkedRight: { en: "Marked right", ar: "اتعلّم إنه مظبوط" },
   fillMismatchesFirst: { en: "Mark each differing code first.", ar: "علّم على كل كود مختلف الأول." },
-  fillUnmappedRows: { en: "{n} rows of the client's file are not mapped.", ar: "{n} صفوف في ملف العميل مش متربطة." },
   fillUnmappedItems: { en: "Not in the client's file: {codes}", ar: "مش في ملف العميل: {codes}" },
   fillNoPlan: { en: "No Fill Plan yet: ask the Lead QS to map the client's file.", ar: "لسه مفيش خطة تعبئة: اطلب من كبير مهندسي الكميات يربط ملف العميل." },
   // Plan 7 (the Project Canvas). Names proposed in glossary.md; never «لوحة» for the canvas (a drawing sheet in QS).
@@ -558,7 +550,6 @@ export const texts = {
   teamNow: { en: "Working now", ar: "الشغالين دلوقتي" },
   submission: { en: "Submission {date}, {days} days left", ar: "التسليم {date}، فاضل {days} يوم" },
   boqSoFar: { en: "BOQ so far", ar: "المقايسة لحد دلوقتي" },
-  openCommentsCount: { en: "{n} open comments", ar: "{n} ملاحظات مفتوحة" },
   sampleData: { en: "Sample data", ar: "بيانات تجريبية" },
   continueInProject: { en: "Continue in «{name}»", ar: "كمّل في «{name}»" },
   createProjectNamed: { en: "Create the project «{name}»", ar: "اعمل مشروع «{name}»" },
@@ -582,7 +573,6 @@ export const texts = {
   canvasFailed: { en: "The canvas could not be loaded. Try again.", ar: "مقدرناش نفتح الكانفاس. جرّب تاني." },
   projectTeam: { en: "Project team", ar: "فريق المشروع" },
   progressOf: { en: "{done} of {total}", ar: "{done} من {total}" },
-  deskSummary: { en: "{desk}: {n} working", ar: "{desk}: {n} شغالين" },
   showPageText: { en: "Show the page's text", ar: "اعرض نص الصفحة" },
   showPageImage: { en: "Show the page", ar: "اعرض الصفحة" },
   pageScanned: {
@@ -664,6 +654,73 @@ export function t(key: keyof typeof texts): string {
 /** Puts values into a text's blanks: fill("Page {page}", { page: 3 }) is "Page 3". */
 export function fill(template: string, values: Record<string, string | number | undefined>): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key]));
+}
+
+type Forms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
+
+/** Texts with a count in them, in each form the language needs: English one/other; Arabic zero, one, two, few (3–10)
+ * and other (11 and up, where the noun is singular). count() picks the form. */
+export const counted = {
+  openComments: {
+    en: { one: "{n} open comment", other: "{n} open comments" },
+    ar: {
+      zero: "مفيش ملاحظات مفتوحة",
+      one: "ملاحظة واحدة مفتوحة",
+      two: "ملاحظتين مفتوحتين",
+      few: "{n} ملاحظات مفتوحة",
+      other: "{n} ملاحظة مفتوحة",
+    },
+  },
+  connectorTools: {
+    en: { one: "{n} tool", other: "{n} tools" },
+    ar: { one: "أداة واحدة", two: "أداتين", few: "{n} أدوات", other: "{n} أداة" },
+  },
+  sheetPending: {
+    en: { one: "{n} suggested change", other: "{n} suggested changes" },
+    ar: { one: "تعديل واحد مقترح", two: "تعديلين مقترحين", few: "{n} تعديلات مقترحة", other: "{n} تعديل مقترح" },
+  },
+  reviewChangesCount: {
+    en: { one: "{n} change", other: "{n} changes" },
+    ar: { one: "تعديل واحد", two: "تعديلين", few: "{n} تعديلات", other: "{n} تعديل" },
+  },
+  fillUnmappedRows: {
+    en: { one: "{n} row of the client's file is not mapped.", other: "{n} rows of the client's file are not mapped." },
+    ar: {
+      one: "صف واحد في ملف العميل مش متربط.",
+      two: "صفين في ملف العميل مش متربطين.",
+      few: "{n} صفوف في ملف العميل مش متربطة.",
+      other: "{n} صف في ملف العميل مش متربط.",
+    },
+  },
+  docUntracedCount: {
+    en: {
+      one: "{n} number with no source (dotted underline): it is not linked to Project Records.",
+      other: "{n} numbers with no source (dotted underline): they are not linked to Project Records.",
+    },
+    ar: {
+      one: "رقم واحد من غير مصدر (تحته خط منقّط): مش مربوط بسجلات المشروع.",
+      two: "رقمين من غير مصدر (تحتهم خط منقّط): مش مربوطين بسجلات المشروع.",
+      few: "{n} أرقام من غير مصدر (تحتها خط منقّط): مش مربوطة بسجلات المشروع.",
+      other: "{n} رقم من غير مصدر (تحتهم خط منقّط): مش مربوطين بسجلات المشروع.",
+    },
+  },
+  deskSummary: {
+    en: { other: "{desk}: {n} working" },
+    ar: { zero: "{desk}: مفيش حد شغال", one: "{desk}: واحد شغال", two: "{desk}: اتنين شغالين", other: "{desk}: {n} شغالين" },
+  },
+} satisfies Record<string, { en: Forms; ar: Forms }>;
+
+const pluralRules = { en: new Intl.PluralRules("en"), ar: new Intl.PluralRules("ar") };
+
+/** A counted text in the form `n` takes: count("openComments", 1) is «ملاحظة واحدة مفتوحة», with 11 «11 ملاحظة مفتوحة». */
+export function count(
+  key: keyof typeof counted,
+  n: number,
+  values: Record<string, string | number> = {},
+  lang: Language = current,
+): string {
+  const forms: Forms = counted[key][lang];
+  return fill(forms[pluralRules[lang].select(n)] ?? forms.other, { ...values, n });
 }
 
 /** Re-renders the component when the language changes. */

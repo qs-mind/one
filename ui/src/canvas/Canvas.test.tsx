@@ -1,7 +1,7 @@
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { forwardRef, useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fill, setLanguage, texts } from "../i18n";
+import { count, fill, setLanguage, texts } from "../i18n";
 import { canvasApi } from "./api";
 import { Canvas } from "./Canvas";
 import { fakeSources, type FakeOptions } from "./fake";
@@ -116,7 +116,7 @@ describe("the Project Canvas", () => {
 
   it("a new Desk starts folded to one line", async () => {
     show({ team: { desks: [{ id: "pricing", name: { en: "Pricing Desk (sample)", ar: "قسم التسعير - عينة" }, stage: "temporary" }], agents: [estimator] } });
-    const name = fill(texts.deskSummary.ar, { desk: "قسم التسعير - عينة", n: 1 });
+    const name = count("deskSummary", 1, { desk: "قسم التسعير - عينة" }, "ar");
     const desk = await frameEl(name);
     expect(desk.querySelector("[data-frame-body]")).toBeNull();
     expect(placedOf("desk:pricing")).toMatchObject({ collapsed: true });
