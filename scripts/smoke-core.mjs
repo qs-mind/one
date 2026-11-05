@@ -55,7 +55,7 @@ export async function smoke(python) {
   const auth = { Authorization: `Bearer ${secret}` };
   const env = { ...cleanEnv(), QSONE_SECRET: secret, QSONE_RELEASE: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONUTF8: "1" };
   const started = Date.now();
-  const child = spawn(python, ["-I", "-m", "qsone", "--port", String(port), "--exit-with-stdin", "--data-dir", data], {
+  const child = spawn(python, ["-I", "-X", "utf8", "-B", "-m", "qsone", "--port", String(port), "--exit-with-stdin", "--data-dir", data], {
     cwd: data, // never the repository, so nothing can come from core/qsone
     env,
     stdio: ["pipe", "inherit", "inherit"],

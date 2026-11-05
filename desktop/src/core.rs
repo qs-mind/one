@@ -377,8 +377,12 @@ fn start_with(app: &AppHandle, log: &Path) -> Result<Core, String> {
     let data = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&data).map_err(|e| e.to_string())?;
     let target = fresh_target()?;
+    // -I ignores PYTHON* variables, so UTF-8 mode (needed on Windows) and no .pyc writing are given as flags.
     let args: Vec<OsString> = vec![
         "-I".into(),
+        "-X".into(),
+        "utf8".into(),
+        "-B".into(),
         "-m".into(),
         "qsone".into(),
         "--data-dir".into(),
