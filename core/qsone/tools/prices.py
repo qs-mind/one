@@ -106,7 +106,12 @@ class LookupArgs(_Args):
         return [v.strip() for v in value]
 
 
-_LOOKUP_EXAMPLE = {"item": "حديد تسليح 16 مم", "also": ["rebar 16 mm"], "country": "EG", "unit": "طن"}
+_LOOKUP_EXAMPLE = {
+    "item": "حديد تسليح 16 مم",
+    "also": ["rebar 16 mm"],
+    "country": "EG",
+    "unit": "طن",
+}
 
 _LOOKUP_DOC = f"""Look up an item's price: QS Mind Prices (subscribers), the engineer's own \
 prices and this project's rates, each with its source, date, age in days and old flag.
@@ -240,7 +245,6 @@ def _size(text: str, data: dict, notes: list[str], sources: list[SourceRef], def
 
 async def _lookup(ctx: ToolContext, args: LookupArgs) -> str:
     eng = _engineer(ctx)
-    _say(ctx, copy.fill(copy.DOING_PRICES, item=args.item))
     code, defaults = _country(ctx, args.country)
     services, notes = ctx.services, []
     qsmind: list[tuple[dict, SourceRef | None]] = []
@@ -254,15 +258,23 @@ async def _lookup(ctx: ToolContext, args: LookupArgs) -> str:
         note = await cache.refresh(services, code, on_device=services.on_device(ctx.rec))
         if note is not None:
             notes.append(note)
-        if note is not copy.PRICES_NOT_SUBSCRIBED:
+        if note != copy.PRICES_NOT_SUBSCRIBED:  # refused: none of QS Mind's prices
             items = await asyncio.to_thread(cache.lookup, eng, code, args.item, args.also, k=20)
             items = _units_first(items, args.unit, lambda i: i.unit["ar"] or i.unit["en"])
             for i in items[: args.k]:
                 found = _qsmind(i, code, today)
                 link = i.sources[0]["url"] if i.sources else None
                 name = i.name["ar"] or i.name["en"]
-                line = None if "ref" not in found else SourceRef(
-                    found["ref"], f"QS Mind Prices: {name}", read, dated=found["dated"], link=link
+                line = (
+                    None
+                    if "ref" not in found
+                    else SourceRef(
+                        found["ref"],
+                        f"QS Mind Prices: {name}",
+                        read,
+                        dated=found["dated"],
+                        link=link,
+                    )
                 )
                 qsmind.append((found, line))
     texts = [args.item, *args.also]
@@ -276,7 +288,7 @@ async def _lookup(ctx: ToolContext, args: LookupArgs) -> str:
     return _render(args, code, groups, [n["en"] for n in notes], defaults)
 
 
-def _render(args: LookupArgs, code: str | None, groups: dict, notes: list[str], defaults) -> str:
+def _summary(args: LookupArgs, code: str | None, groups: dict) -> str:
     counts = {name: len(found) for name, found in groups.items()}
     where = f" in {code}" if code else ""
     text = (
@@ -284,18 +296,26 @@ def _render(args: LookupArgs, code: str | None, groups: dict, notes: list[str], 
         f"{counts['own']} of the engineer's own, {counts['project']} from this project. "
         "Candidates only: never pick one alone or convert a unit or currency."
     )
-    if not any(counts.values()):
-        text += "\n" + copy.PRICES_NONE_FOUND["en"]
+    return text if any(counts.values()) else text + "\n" + copy.PRICES_NONE_FOUND["en"]
+
+
+def _render(args: LookupArgs, code: str | None, groups: dict, notes: list[str], defaults) -> str:
+    """The result, with the last candidates of the longest group left out until it fits."""
     while True:
+        text = _summary(args, code, groups)
         data = {name: [c for c, _ in found] for name, found in groups.items()}
         sources = [s for found in groups.values() for _, s in found if s is not None]
         if _size(text, data, notes, sources, defaults) <= cite.LIMIT - 256:
-            break
+            return cite.render(
+                text, data=data, notes=notes, sources=sources, defaults_used=defaults
+            )
         longest = max(groups, key=lambda name: len(groups[name]))
         groups[longest] = groups[longest][:-1]
-        if not notes or not notes[-1].startswith("fewer shown"):
-            notes.append("fewer shown to fit: use narrower words, a unit or a smaller k")
-    return cite.render(text, data=data, notes=notes, sources=sources, defaults_used=defaults)
+        if FEWER not in notes:
+            notes.append(FEWER)
+
+
+FEWER = "fewer shown to fit: use narrower words, a unit or a smaller k"
 
 
 # prices_propose ------------------------------------------------------------------------------
@@ -333,8 +353,14 @@ class ProposeArgs(_Args):
 
 _PROPOSE_EXAMPLE = {
     "rows": [
-        {"description": "أسمنت بورتلاندي", "unit": "طن", "rate": "3950", "currency": "EGP",
-         "dated": "2026-11-04", "vat": "incl"}
+        {
+            "description": "أسمنت بورتلاندي",
+            "unit": "طن",
+            "rate": "3950",
+            "currency": "EGP",
+            "dated": "2026-11-04",
+            "vat": "incl",
+        }
     ],
     "from": "chat",
     "where": "engineer",
@@ -438,11 +464,26 @@ def _store(
             source_id = ledger.write_source(c, at=at, actor=actor, **source)
             item_id = ledger.write_item(c, at=at, actor=actor, kind="price", fields=fields)
             number_id = ledger.write_number(
-                c, at=at, actor=actor, item_id=item_id, name="rate", value=r.rate,
-                source_id=source_id, dated=r.dated, unit=r.unit, currency=r.currency,
+                c,
+                at=at,
+                actor=actor,
+                item_id=item_id,
+                name="rate",
+                value=r.rate,
+                source_id=source_id,
+                dated=r.dated,
+                unit=r.unit,
+                currency=r.currency,
             )
-            out.append({"row": index, "description": r.description, "item_id": item_id,
-                        "number_id": number_id, "source_id": source_id})
+            out.append(
+                {
+                    "row": index,
+                    "description": r.description,
+                    "item_id": item_id,
+                    "number_id": number_id,
+                    "source_id": source_id,
+                }
+            )
     return out
 
 
@@ -461,24 +502,31 @@ async def _propose(ctx: ToolContext, args: ProposeArgs) -> str:
         r = args.rows[i]
         fields, gone = await _kept_fields(ctx, r)
         dropped |= gone
-        source = quotes[i] if quotes is not None else {
-            "kind": "engineer",
-            "title": "The engineer's prices",
-            "locator": {"card_id": card.id, "row": i},
-            "dated": r.dated,
-        }
+        source = (
+            quotes[i]
+            if quotes is not None
+            else {
+                "kind": "engineer",
+                "title": "The engineer's prices",
+                "locator": {"card_id": card.id, "row": i},
+                "dated": r.dated,
+            }
+        )
         rows.append((i, r, fields, source))
     kept = await asyncio.to_thread(_store, target, rows, _actor(ctx)) if rows else []
     read = ctx.services.clock().strftime("%Y-%m-%d %H:%M UTC")
     sources = [
         SourceRef(
             _ref_of(k["source_id"], src["kind"], src.get("file_id"), src["locator"]),
-            src["title"], read, dated=src["dated"],
+            src["title"],
+            read,
+            dated=src["dated"],
         )
         for k, (_, _, _, src) in zip(kept, rows, strict=True)
     ]
-    left_out = [{"row": i, "description": r.description}
-                for i, r in enumerate(args.rows) if i not in ticked]
+    left_out = [
+        {"row": i, "description": r.description} for i, r in enumerate(args.rows) if i not in ticked
+    ]
     where = "Engineer Records, for every project" if args.where == "engineer" else "this project"
     text = f"The engineer kept {len(kept)} of {len(args.rows)} prices, in {where}."
     return cite.render(

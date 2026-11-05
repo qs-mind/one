@@ -17,7 +17,7 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Literal, Protocol
 
 import httpx

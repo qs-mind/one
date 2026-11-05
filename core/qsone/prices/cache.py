@@ -25,7 +25,7 @@ POOL = 50  # word-index hits taken from each wording before they are fused
 
 
 def country_name(code_or_name: str) -> Country | None:
-    """"egypt" for "EG" or "egypt" (any case); None for a country Prices does not cover."""
+    """ "egypt" for "EG" or "egypt" (any case); None for a country Prices does not cover."""
     found = COUNTRIES.get(code_or_name.upper(), code_or_name.lower())
     return found if found in CODES else None  # type: ignore[return-value]
 
@@ -56,7 +56,9 @@ def store(
                 "INSERT INTO price_cache(country, item_id, day, payload) VALUES (?, ?, ?, ?)",
                 (name, item.id, item.day, payload),
             ).lastrowid
-            c.execute("INSERT INTO price_cache_fts(rowid, norm) VALUES (?, ?)", (rowid, _norm(item)))
+            c.execute(
+                "INSERT INTO price_cache_fts(rowid, norm) VALUES (?, ?)", (rowid, _norm(item))
+            )
         c.execute(
             "INSERT INTO price_cache_meta(country, fetched_at, last_day) VALUES (?, ?, ?)"
             " ON CONFLICT(country) DO UPDATE SET fetched_at = excluded.fetched_at,"
@@ -101,12 +103,9 @@ def lookup(eng: Records, country: str, text: str, also=(), *, k: int = 5) -> lis
             ).fetchall()
             lists.append([r[0] for r in found])
         best = [rowid for rowid, _ in search.rrf(lists)[:k]]
-        payloads = dict(
-            c.execute(
-                f"SELECT rowid, payload FROM price_cache WHERE rowid IN ({','.join('?' * len(best))})",
-                best,
-            ).fetchall()
-        ) if best else {}
+        marks = ",".join("?" * len(best))
+        query = f"SELECT rowid, payload FROM price_cache WHERE rowid IN ({marks})"
+        payloads = dict(c.execute(query, best).fetchall()) if best else {}
     return [_item(payloads[r]) for r in best if r in payloads]
 
 
@@ -123,7 +122,9 @@ async def refresh(services, country: str, *, on_device: bool = False) -> Text | 
         return None
     saved_day = None if saved is None else local_day(datetime.fromisoformat(saved))
     if on_device:  # an On-device Project sends nothing out, not even the country
-        return copy.PRICES_NONE_SAVED if saved_day is None else _on(copy.PRICES_ON_DEVICE, saved_day)
+        return (
+            copy.PRICES_NONE_SAVED if saved_day is None else _on(copy.PRICES_ON_DEVICE, saved_day)
+        )
     try:
         last_day, items = await services.prices.country_list(name)
     except PricesFailed as e:
