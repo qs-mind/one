@@ -310,7 +310,7 @@ class Client:
 _PAGE = """<!doctype html>
 <html lang="{lang}" dir="{dir}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QS Mind One</title>
+<title>QS Mind ONE</title>
 <style>
 :root {{ color-scheme: light dark; }}
 body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; background: #F9F8F4;

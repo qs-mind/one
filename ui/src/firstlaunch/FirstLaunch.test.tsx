@@ -158,6 +158,40 @@ describe("FirstLaunch", () => {
     expect(document.querySelector("a")).toBeNull();
   });
 
+  it("signs in on another device: the code, and the device page as a link in a new tab", async () => {
+    const device = { user_code: "SAMPLE12", verification_uri: "https://auth.example/device" };
+    const waiting = { state: "waiting", url: "https://auth.example/device?user_code=SAMPLE12", device };
+    let started = false;
+    const fetch = mockCore({
+      "POST /account/sign-in": () => ((started = true), Response.json(waiting)),
+      "GET /account": () => Response.json(started ? waiting : { state: "signed_out" }),
+    });
+    const user = userEvent.setup();
+    flowAt("account");
+    await screen.findByText(texts.accountSignInHow.en);
+    await user.click(screen.getByRole("button", { name: texts.accountUseDevice.en }));
+    expect(calls(fetch, "POST /account/sign-in")[0]).toEqual({ locale: "en", device: true });
+    expect(await screen.findByText("SAMPLE12")).toBeInTheDocument();
+    const page = screen.getByRole("link", { name: "auth.example/device" });
+    expect(page).toHaveAttribute("href", "https://auth.example/device?user_code=SAMPLE12");
+    expect(page).toHaveAttribute("target", "_blank");
+    expect(screen.getByText(texts.accountDeviceWaiting.en).closest("[data-feedback]")).toHaveAttribute("data-feedback", "busy");
+  });
+
+  it("a sign-in that fails says why, in the core's words", async () => {
+    const note = { en: "The sign-in ran out of time (sample).", ar: "وقت الدخول خلص (عينة)." };
+    let polls = 0;
+    mockCore({
+      "POST /account/sign-in": () => Response.json({ state: "waiting", url: "https://auth.example/authorize?x=1" }),
+      "GET /account": () => Response.json((polls += 1) < 2 ? { state: "signed_out" } : { state: "signed_out", note }),
+    });
+    const user = userEvent.setup();
+    flowAt("account");
+    await user.click(await screen.findByRole("button", { name: texts.accountSignIn.en }));
+    expect(await screen.findByRole("alert", {}, { timeout: 4000 })).toHaveTextContent(note.en);
+    expect(screen.getByRole("button", { name: texts.accountSignIn.en })).toBeEnabled(); // and it can start again
+  });
+
   it("a sign-in still waiting is stopped when the step is skipped", async () => {
     const fetch = mockCore({
       "POST /account/sign-in": () => Response.json({ state: "waiting" }),
@@ -182,13 +216,19 @@ describe("FirstLaunch", () => {
     expect(screen.getByRole("button", { name: choice(texts.aiLinkApiKey.en) })).toBeDisabled();
     expect(screen.getByText(texts.aiLinkAfterConsent.en)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: texts.consentTerms.en }));
-    expect(calls(fetch, "POST /app/open")[0]).toEqual({ link: "terms", lang: "en" });
+    // in a plain browser (maybe on another computer than the core) the website's pages open in a new tab
+    const terms = screen.getByRole("link", { name: texts.consentTerms.en });
+    expect(terms).toHaveAttribute("href", "https://qsmind.app/en/terms");
+    expect(terms).toHaveAttribute("target", "_blank");
+    expect(terms).toHaveAttribute("rel", "noopener");
+    expect(screen.getByRole("link", { name: texts.consentPrivacy.en })).toHaveAttribute("href", "https://qsmind.app/en/privacy");
+    expect(calls(fetch, "POST /app/open")).toHaveLength(0);
 
     await user.click(agree);
     expect(calls(fetch, "PUT /settings/ai-consent")[0]).toEqual({ text_version: 1 });
     expect(await screen.findByRole("button", { name: choice(texts.aiLinkApiKey.en) })).toBeEnabled();
     expect(screen.queryByRole("button", { name: texts.consentAgree.en })).toBeNull();
+    expect(screen.getByText(texts.consentGiven.en).closest("[data-feedback]")).toHaveAttribute("data-feedback", "done");
     expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(0); // no AI call was asked for
   });
 
@@ -203,10 +243,29 @@ describe("FirstLaunch", () => {
     await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkApiKey.en) }));
     await user.type(screen.getByLabelText(texts.aiKeyLabel.en), "sk-ant-sample-not-a-key");
     await user.click(screen.getByRole("button", { name: texts.save.en }));
-    expect(await screen.findByText(texts.aiLinkWorks.en)).toBeInTheDocument();
+    const works = await screen.findByText(texts.aiLinkWorks.en);
+    expect(works.closest("[data-feedback]")).toHaveAttribute("data-feedback", "done"); // the same mark on every step
+    expect(works.closest("[role=status]")).not.toBeNull();
     expect(calls(fetch, "POST /settings/ai/check")[0]).toEqual({ via: "api_key" });
     await user.click(screen.getByRole("button", { name: texts.setupNext.en }));
     expect(calls(fetch, "PUT /setup/ai")[0]).toEqual({ state: "done" });
+  });
+
+  it("a key the check refuses says why, and the key field comes back for another", async () => {
+    const refused = { en: "The key was refused (sample).", ar: "المفتاح اترفض (عينة)." };
+    mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "PUT /settings/ai-key": () => Response.json({ set: true }),
+      "POST /settings/ai/check": () => Response.json({ error: refused }, { status: 409 }),
+    });
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkApiKey.en) }));
+    await user.type(screen.getByLabelText(texts.aiKeyLabel.en), "sk-ant-sample-not-a-key");
+    await user.click(screen.getByRole("button", { name: texts.save.en }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(refused.en);
+    expect(screen.getByLabelText(texts.aiKeyLabel.en)).toHaveValue("");
+    expect(screen.queryByRole("button", { name: texts.setupNext.en })).toBeNull();
   });
 
   it("Claude Code: found shows its version and Check; not found says how to get it", async () => {
@@ -223,6 +282,7 @@ describe("FirstLaunch", () => {
     expect(await screen.findByText(texts.aiLinkClaudeCodeMissing.en)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: texts.aiLinkCheck.en }));
     expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(0); // nothing to check yet
+    expect(await screen.findByRole("alert")).toHaveTextContent(texts.aiLinkClaudeCodeMissing.en); // and what to do
 
     found = true; // the engineer installed it
     await user.click(screen.getByRole("button", { name: texts.aiLinkCheck.en }));
@@ -232,7 +292,24 @@ describe("FirstLaunch", () => {
     expect(screen.queryByRole("button", { name: texts.setupNext.en })).toBeNull();
   });
 
-  it("introduction card: Saudi Arabia sets SAR; a city in Arabic stays as typed", async () => {
+  it("introduction card: the country starts at the system's, with no blank choice", async () => {
+    mockCore();
+    systemLanguageIs("ar-AE");
+    flowAt("card");
+    const country = await screen.findByLabelText(texts.cardCountry.en);
+    expect(country).toHaveValue("AE");
+    expect([...(country as HTMLSelectElement).options].map((o) => o.value)).toEqual(["EG", "SA", "AE", "other"]);
+    expect(document.querySelector("input[maxlength='3']")).toBeNull(); // no currency field: the country says it
+  });
+
+  it("introduction card: Egypt when the system names none of the three", async () => {
+    mockCore();
+    systemLanguageIs("en-US");
+    flowAt("card");
+    expect(await screen.findByLabelText(texts.cardCountry.en)).toHaveValue("EG");
+  });
+
+  it("introduction card: Saudi Arabia sends SAR; a city in Arabic stays as typed", async () => {
     const fetch = mockCore({ "PUT /engineer/card": (body) => Response.json(body) });
     const user = userEvent.setup();
     flowAt("card");
@@ -240,10 +317,22 @@ describe("FirstLaunch", () => {
     expect(next).toBeDisabled();
     await user.click(screen.getByRole("radio", { name: texts.cardRoleConsultant.en }));
     await user.selectOptions(screen.getByLabelText(texts.cardCountry.en), texts.cardCountrySA.en);
-    expect(screen.getByLabelText(texts.cardCurrency.en)).toHaveValue("SAR");
     await user.type(screen.getByLabelText(texts.cardCity.en), "الرياض");
     await user.click(next);
     expect(calls(fetch, "PUT /engineer/card")[0]).toEqual({ role: "consultant", country: "SA", city: "الرياض", currency: "SAR" });
+    await waitFor(() => expect(calls(fetch, "PUT /setup/card")[0]).toEqual({ state: "done" }));
+  });
+
+  it("introduction card: Other sends no currency, and asks for none", async () => {
+    const fetch = mockCore({ "PUT /engineer/card": (body) => Response.json(body) });
+    const user = userEvent.setup();
+    flowAt("card");
+    await user.click(await screen.findByRole("radio", { name: texts.cardRoleProcurement.en }));
+    await user.selectOptions(screen.getByLabelText(texts.cardCountry.en), texts.cardCountryOther.en);
+    expect(document.querySelector("input[maxlength='3']")).toBeNull();
+    await user.type(screen.getByLabelText(texts.cardCity.en), "Doha");
+    await user.click(screen.getByRole("button", { name: texts.setupNext.en }));
+    expect(calls(fetch, "PUT /engineer/card")[0]).toEqual({ role: "procurement", country: "other", city: "Doha" });
     await waitFor(() => expect(calls(fetch, "PUT /setup/card")[0]).toEqual({ state: "done" }));
   });
 
@@ -253,10 +342,6 @@ describe("FirstLaunch", () => {
     const user = userEvent.setup();
     flowAt("card");
     await user.click(await screen.findByRole("radio", { name: texts.cardRoleContractor.en }));
-    await user.selectOptions(screen.getByLabelText(texts.cardCountry.en), texts.cardCountryOther.en);
-    expect(screen.getByLabelText(texts.cardCurrency.en)).toHaveValue(""); // "Other" has no currency of its own
-    await user.type(screen.getByLabelText(texts.cardCurrency.en), "kwd1");
-    expect(screen.getByLabelText(texts.cardCurrency.en)).toHaveValue("KWD");
     await user.click(screen.getByRole("button", { name: texts.setupNext.en }));
     expect(await screen.findByRole("alert")).toHaveTextContent(texts.cardNotSaved.en);
     expect(calls(fetch, "PUT /setup/card")).toHaveLength(0);
@@ -309,7 +394,7 @@ describe("FirstLaunch", () => {
       language: ["languageTitle", "languageHelp", "setupNext", "setupSkip"],
       account: ["accountTitle", "accountWhy", "accountSignIn", "accountUseDevice", "setupBack"],
       ai: ["connectAi", "consentTitle", "consentBody", "consentTerms", "consentPrivacy", "consentAgree", "aiLinkTitle", "aiLinkClaudeCode", "aiLinkApiKey"],
-      card: ["cardTitle", "cardHelp", "cardRole", "cardRoleProcurement", "cardCountry", "cardCity", "cardCurrency", "cardCurrencyHelp"],
+      card: ["cardTitle", "cardHelp", "cardRole", "cardRoleProcurement", "cardCountry", "cardCountryOther", "cardCity"],
       usage: ["usageTitle", "usageHelp", "usageSentTitle", "usageSent", "usageNeverTitle", "usageNever", "usageShare", "usageDontShare"],
       ready: ["readyTitle", "readyStart"],
     };

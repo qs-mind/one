@@ -1,14 +1,15 @@
-// The Introduction card: role, country, city and currency, kept in Engineer Records (PUT /engineer/card). The Lead QS
-// reads one line of it. The currency follows the country and can be changed; a city is kept as typed, in any language.
+// The Introduction card: role, country and city, kept in Engineer Records (PUT /engineer/card). The Lead QS reads one
+// line of it. The currency is never asked: it follows the country (EGP, SAR, AED), and "Other" sends none. The country
+// starts at the system's own when it is one of the three, else Egypt. A city is kept as typed, in any language.
 import { type FormEvent, useEffect, useId, useState } from "react";
 import { api } from "../api";
 import { coreLine, send } from "../core";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
-import { field, type Nav, option, primary, StepScreen } from "./parts";
+import { Feedback, field, type Nav, option, primary, StepScreen } from "./parts";
 
 type Role = "contractor" | "consultant" | "owner" | "procurement";
 type Country = "EG" | "SA" | "AE" | "other";
-type Card = { role: Role; country: Country; city: string; currency: string };
+type Card = { role: Role; country: Country; city: string };
 
 const roles: [Role, keyof typeof texts][] = [
   ["contractor", "cardRoleContractor"],
@@ -23,7 +24,20 @@ const countries: [Country, keyof typeof texts][] = [
   ["other", "cardCountryOther"],
 ];
 const CURRENCY: Partial<Record<Country, string>> = { EG: "EGP", SA: "SAR", AE: "AED" };
-const CODE = /^[A-Z]{3}$/;
+
+/** The country the system's language names (ar-EG, en-AE…) when it is one of the three, else Egypt. */
+function systemCountry(): Country {
+  for (const tag of navigator.languages ?? [navigator.language]) {
+    let region: string | undefined;
+    try {
+      region = new Intl.Locale(tag).region;
+    } catch {
+      continue; // not a language tag
+    }
+    if (region === "EG" || region === "SA" || region === "AE") return region;
+  }
+  return "EG";
+}
 
 // The core's own words for a refusal; the currency hint only when the core refused the currency (a 422 on that field).
 async function notSaved(response: Response | undefined): Promise<Text> {
@@ -36,12 +50,11 @@ async function notSaved(response: Response | undefined): Promise<Text> {
 export function IntroCard({ nav }: { nav: Nav }) {
   useLanguage();
   const [role, setRole] = useState<Role>();
-  const [country, setCountry] = useState<Country | "">("");
+  const [country, setCountry] = useState<Country>(systemCountry);
   const [city, setCity] = useState("");
-  const [currency, setCurrency] = useState("");
   const [failed, setFailed] = useState<Text>();
   const [saving, setSaving] = useState(false);
-  const ids = { role: useId(), help: useId() };
+  const ids = { role: useId() };
 
   useEffect(() => {
     let live = true;
@@ -50,9 +63,8 @@ export function IntroCard({ nav }: { nav: Nav }) {
       .then((saved) => {
         if (!live || !saved?.role) return;
         setRole(saved.role);
-        setCountry(saved.country ?? "");
+        if (saved.country) setCountry(saved.country);
         setCity(saved.city ?? "");
-        setCurrency(saved.currency ?? "");
       })
       .catch(() => undefined);
     return () => {
@@ -60,24 +72,18 @@ export function IntroCard({ nav }: { nav: Nav }) {
     };
   }, []);
 
-  function pickCountry(next: Country | "") {
-    setCountry(next);
-    const follows = next ? CURRENCY[next] : undefined;
-    if (follows) setCurrency(follows);
-  }
-
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!role || !country) return;
+    if (!role) return;
     setSaving(true);
     setFailed(undefined);
-    const response = await send("/engineer/card", "PUT", { role, country, city: city.trim(), currency });
+    const response = await send("/engineer/card", "PUT", { role, country, city: city.trim(), currency: CURRENCY[country] });
     setSaving(false);
     if (!response?.ok) return setFailed(await notSaved(response));
     await nav.pass("done");
   }
 
-  const ready = role !== undefined && country !== "" && CODE.test(currency) && !saving;
+  const ready = role !== undefined && !saving;
   return (
     <form onSubmit={save} noValidate>
       <StepScreen
@@ -112,8 +118,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-2">
               <span>{t("cardCountry")}</span>
-              <select value={country} onChange={(event) => pickCountry(event.target.value as Country | "")} className={field}>
-                <option value="" disabled />
+              <select value={country} onChange={(event) => setCountry(event.target.value as Country)} className={field}>
                 {countries.map(([value, label]) => (
                   <option key={value} value={value}>
                     {t(label)}
@@ -126,24 +131,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
               <input dir="auto" maxLength={80} value={city} onChange={(event) => setCity(event.target.value)} className={field} />
             </label>
           </div>
-          <div className="flex flex-col gap-2 sm:w-1/2 sm:pe-2">
-            <label className="flex flex-col gap-2">
-            <span>{t("cardCurrency")}</span>
-            <input
-              dir="ltr"
-              maxLength={3}
-              spellCheck={false}
-              autoComplete="off"
-              aria-describedby={ids.help}
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
-              className={`${field} uppercase tracking-wider`}
-            />
-            </label>
-            <span id={ids.help} className="text-xs text-slate">
-              {t("cardCurrencyHelp")}
-            </span>
-          </div>
+          {saving && <Feedback state="busy">{t("cardSaving")}</Feedback>}
         </div>
       </StepScreen>
     </form>

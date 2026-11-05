@@ -102,6 +102,66 @@
   }
 }
 
+/* The first launch: soft and calm. A new step slides 16 px in from the side the flow is going to (the reading end
+   going forward, the start going back, so the sides swap on an Arabic page) and fades in; a feedback line, a field
+   or a button that appears rises 4 px and fades in; a busy line waits 300 ms first, so a quick save never flashes.
+   Ease-out, 150 to 240 ms, transform and opacity only, no bounce. With reduced motion nothing moves. */
+@keyframes fl-step-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--fl-way, 1) * var(--fl-side, 1) * 16px));
+  }
+}
+@keyframes fl-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes fl-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes fl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.fl-step {
+  animation: fl-step-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.fl-step[data-way="back"] {
+  --fl-way: -1;
+}
+[dir="rtl"] .fl-step {
+  --fl-side: -1;
+}
+.fl-rise {
+  animation: fl-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.fl-rise-late {
+  animation: fl-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) 300ms both;
+}
+.fl-check {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  animation: fl-draw 240ms ease-out 120ms forwards;
+}
+.fl-spin {
+  animation: fl-spin 900ms linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-firstlaunch],
+  [data-firstlaunch] * {
+    transition-duration: 0ms !important;
+    animation: none !important;
+  }
+  [data-firstlaunch] .fl-check {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* The sheet grid (react-data-grid, in its own cascade layer: unlayered rules win): rows divided by a quiet line
    only, no rule between columns, roomier cells, figures in tabular digits. */
 .rdg-cell {

@@ -44,10 +44,9 @@ const words = {
     countryName: "مصر",
     city: "المدينة",
     cityName: "القاهرة",
-    currency: "العملة",
     usage: "إحصائيات الاستخدام",
     dontShare: "ماتشاركش",
-    ready: "One جاهز",
+    ready: "ONE جاهز",
     next: "التالي",
     skip: "تخطّى",
     start: "ابدأ من غير فولدر", // the Ready screen offers a tender folder first
@@ -66,10 +65,9 @@ const words = {
     countryName: "Saudi Arabia",
     city: "City",
     cityName: "Riyadh",
-    currency: "Currency",
     usage: "Usage Stats",
     dontShare: "Don't share",
-    ready: "One is ready",
+    ready: "ONE is ready",
     next: "Next",
     skip: "Skip",
     start: "Start without a folder",
@@ -106,7 +104,8 @@ for (const lang of ["ar", "en"] as const) {
     await page.getByRole("radio", { name: w.role }).click();
     await page.getByLabel(w.country).selectOption({ label: w.countryName });
     await page.getByLabel(w.city).fill(w.cityName);
-    await expect(page.getByLabel(w.currency)).toHaveValue(lang === "ar" ? "EGP" : "SAR");
+    await expect(page.getByLabel(w.country).locator("option")).toHaveCount(4); // no blank choice
+    await expect(page.locator("input[maxlength='3']")).toHaveCount(0); // the country says the currency
     await shot(walk, "card");
     // the flow fits a 380 px wide window: nothing scrolls sideways
     const size = page.viewportSize()!;
@@ -129,7 +128,7 @@ for (const lang of ["ar", "en"] as const) {
     const setup = (await (await page.request.get("/api/setup")).json()) as { done: boolean; steps: Record<string, string> };
     expect(setup).toEqual({ done: true, steps: { language: "done", account: "skipped", ai: "skipped", card: "done", usage: "done" } });
     expect(((await (await page.request.get("/api/settings/ai-consent")).json()) as { at: string | null }).at).toBeTruthy();
-    expect(await (await page.request.get("/api/engineer/card")).json()).toMatchObject({ city: w.cityName });
+    expect(await (await page.request.get("/api/engineer/card")).json()).toMatchObject({ city: w.cityName, currency: lang === "ar" ? "EGP" : "SAR" });
     expect(await (await page.request.get("/api/settings/usage-stats")).json()).toEqual({ on: false });
 
     // Without the AI note agreed, the chat leads to Connect AI alone, and back.

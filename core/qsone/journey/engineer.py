@@ -18,14 +18,15 @@ ENGINEER = "engineer"
 
 
 class Card(BaseModel):
-    """What PUT /engineer/card takes. The city is the engineer's own words, one line."""
+    """What PUT /engineer/card takes. The city is the engineer's own words, one line. The screen
+    sends the currency its country uses (EGP, SAR, AED) and none for "other"."""
 
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
     role: Literal["contractor", "consultant", "owner", "procurement"]
     country: Literal["EG", "SA", "AE", "other"]
     city: str = Field(default="", max_length=80, pattern=r"^[^\x00-\x1f\x7f]*$")
-    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
 
 
 _ROLES = {
@@ -53,7 +54,7 @@ def card(records: Records) -> dict:
 
 def save_card(records: Records, new: Card) -> dict:
     """Saves the card in Engineer Records, audited; an earlier card is updated, not added to."""
-    fields = new.model_dump()
+    fields = new.model_dump(exclude_none=True)  # "other" has no currency
     found = _found(records)
     if found is None:
         ledger.add_item(records, kind=KIND, actor=ENGINEER, fields=fields)
@@ -64,11 +65,13 @@ def save_card(records: Records, new: Card) -> dict:
 
 def card_line(saved: dict) -> str:
     """One line for the Lead QS's instructions, e.g. "The engineer is a contractor QS in
-    Cairo, Egypt; currency EGP." "" when there is no card."""
+    Cairo, Egypt; currency EGP.", without the currency when the card has none. "" when there
+    is no card."""
     try:
         valid = Card.model_validate(saved)
     except ValueError:
         return ""
     place = ", ".join(p for p in (valid.city, _COUNTRIES.get(valid.country, "")) if p)
     where = f" in {place}" if place else ""
-    return f"The engineer {_ROLES[valid.role]}{where}; currency {valid.currency}."
+    money = f"; currency {valid.currency}" if valid.currency else ""
+    return f"The engineer {_ROLES[valid.role]}{where}{money}."

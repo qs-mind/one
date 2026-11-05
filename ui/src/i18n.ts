@@ -5,7 +5,7 @@ export type Language = "ar" | "en";
 export type Text = { en: string; ar: string };
 
 export const texts = {
-  appName: { en: "QS Mind One", ar: "QS Mind One" },
+  appName: { en: "QS Mind ONE", ar: "QS Mind ONE" },
   otherLanguage: { en: "العربية", ar: "English" },
   aiKey: { en: "Claude key", ar: "مفتاح Claude" },
   message: { en: "Message to the Lead QS", ar: "رسالة إلى كبير مهندسي الكميات" },
@@ -630,7 +630,7 @@ export const texts = {
   // / بطاقة التعريف, "I understood this" card / بطاقة «فهمت كده», Close project / إقفال المشروع, Archived project / مشروع
   // مؤرشف, Recovery code / كود الاسترجاع, Backup key / مفتاح النسخة الاحتياطية. No text names a plan or a price.
   // Task 10: first launch. Every step has Skip and Back.
-  setupTitle: { en: "Set up One", ar: "جهّز One" },
+  setupTitle: { en: "Set up ONE", ar: "جهّز ONE" },
   setupStepOf: { en: "Step {n} of {total}", ar: "خطوة {n} من {total}" },
   setupSkip: { en: "Skip", ar: "تخطّى" },
   setupBack: { en: "Back", ar: "رجوع" },
@@ -647,12 +647,26 @@ export const texts = {
     en: "It keeps your Backup key, so a new computer gets your projects back. It is free, and you can skip it.",
     ar: "بيحفظ مفتاح النسخة الاحتياطية بتاعك، فلو غيّرت الجهاز مشاريعك بترجعلك. مجاني، وتقدر تتخطاه.",
   },
-  accountSignIn: { en: "Sign in with Google", ar: "سجّل دخولك بـ Google" },
+  // "QS Mind" in full, as the step's title names the account; QSM alone is not a name the engineer has seen.
+  accountSignIn: { en: "Sign in with QS Mind", ar: "سجّل دخولك بحساب QS Mind" },
+  accountSignInHow: {
+    en: "Your browser opens. Already signed in to QS Mind there? It goes straight through. If not, you sign in with Google.",
+    ar: "المتصفح هيفتح. لو إنت داخل على QS Mind فيه، هيكمّل على طول. لو لأ، هتسجّل دخولك بـ Google.",
+  },
+  accountOpening: { en: "Opening the sign-in…", ar: "بنفتح صفحة الدخول…" },
   accountWaiting: { en: "Finish signing in in your browser…", ar: "كمّل تسجيل الدخول في المتصفح…" },
   accountNoBrowser: { en: "If no browser opened, open this link:", ar: "لو المتصفح مافتحش، افتح اللينك ده:" },
+  accountElsewhere: {
+    en: "The browser opened on the computer running ONE. Not in front of it? Cancel, then use “Sign in on another device”.",
+    ar: "المتصفح اتفتح على الكمبيوتر اللي شغّال عليه ONE. مش قدامه؟ دوس «إلغاء» واستخدم «سجّل دخولك من جهاز تاني».",
+  },
   accountDevice: {
-    en: "Or open {uri} on any device and type this code:",
-    ar: "أو افتح {uri} على أي جهاز واكتب الكود ده:",
+    en: "On your phone or any computer, open {uri} and type this code:",
+    ar: "من موبايلك أو أي كمبيوتر، افتح {uri} واكتب الكود ده:",
+  },
+  accountDeviceWaiting: {
+    en: "Waiting for you to sign in there. ONE carries on here by itself.",
+    ar: "مستنيينك تدخل هناك. ONE هيكمّل هنا لوحده.",
   },
   accountUseDevice: { en: "Sign in on another device", ar: "سجّل دخولك من جهاز تاني" },
   accountSignedInAs: { en: "Signed in as {email}", ar: "داخل بحساب {email}" },
@@ -661,19 +675,20 @@ export const texts = {
   accountFailed: { en: "Sign-in did not finish. Try again.", ar: "تسجيل الدخول ماكملش. جرّب تاني." },
   connectAi: { en: "Connect AI", ar: "وصّل الذكاء الاصطناعي" },
   consentNeeded: {
-    en: "Before One uses AI, say yes to the note on where your text goes.",
-    ar: "قبل ما One يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين.",
+    en: "Before ONE uses AI, say yes to the note on where your text goes.",
+    ar: "قبل ما ONE يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين.",
   },
   consentTitle: { en: "Where your text goes", ar: "نصك بيروح فين" },
   consentBody: {
-    en: "When you ask One for something, your words and the parts of your files it needs go to the AI provider you choose. That provider is usually outside your country and works under its own policy. Nothing in a Confidential project is used outside it, and an On-device project uses only models on this computer.",
-    ar: "لما تطلب حاجة من One، كلامك والأجزاء اللي محتاجها من ملفاتك بتروح لمزوّد الذكاء الاصطناعي اللي إنت بتختاره. المزوّد ده غالبًا برّه بلدك وشغال بسياسته هو. المشروع السري مفيش حاجة منه بتتستخدم برّاه، والمشروع اللي على الجهاز بيستخدم نماذج على الجهاز ده بس.",
+    en: "When you ask ONE for something, your words and the parts of your files it needs go to the AI provider you choose. That provider is usually outside your country and works under its own policy. Nothing in a Confidential project is used outside it, and an On-device project uses only models on this computer.",
+    ar: "لما تطلب حاجة من ONE، كلامك والأجزاء اللي محتاجها من ملفاتك بتروح لمزوّد الذكاء الاصطناعي اللي إنت بتختاره. المزوّد ده غالبًا برّه بلدك وشغال بسياسته هو. المشروع السري مفيش حاجة منه بتتستخدم برّاه، والمشروع اللي على الجهاز بيستخدم نماذج على الجهاز ده بس.",
   },
   consentTerms: { en: "Terms of use", ar: "شروط الاستخدام" },
   consentPrivacy: { en: "Privacy policy", ar: "سياسة الخصوصية" },
   consentAgree: { en: "I understand", ar: "فهمت" },
+  consentGiven: { en: "You said yes to this note.", ar: "وافقت على الملاحظة دي." },
   consentNotSaved: { en: "Your answer was not saved. Try again.", ar: "ردك ماتحفظش. جرّب تاني." },
-  aiLinkTitle: { en: "How should One reach AI?", ar: "One يوصل للذكاء الاصطناعي إزاي؟" },
+  aiLinkTitle: { en: "How should ONE reach AI?", ar: "ONE يوصل للذكاء الاصطناعي إزاي؟" },
   aiLinkAfterConsent: { en: "Read the note above first.", ar: "اقرا الملاحظة اللي فوق الأول." },
   aiLinkClaudeCode: { en: "Claude Code", ar: "Claude Code" },
   aiLinkClaudeCodeHelp: {
@@ -692,7 +707,7 @@ export const texts = {
   },
   aiLinkCheck: { en: "Check", ar: "اتأكد" },
   aiLinkChecking: { en: "Checking…", ar: "بنتأكد…" },
-  aiLinkWorks: { en: "It works.", ar: "شغال." },
+  aiLinkWorks: { en: "It works. ONE is connected to AI.", ar: "شغال. ONE اتوصّل بالذكاء الاصطناعي." },
   aiLinkLater: {
     en: "No AI is connected. You can connect it later from AI settings.",
     ar: "مفيش ذكاء اصطناعي متوصّل. تقدر توصّله بعدين من إعدادات الذكاء الاصطناعي.",
@@ -713,19 +728,18 @@ export const texts = {
   cardCountryAE: { en: "United Arab Emirates", ar: "الإمارات" },
   cardCountryOther: { en: "Other", ar: "بلد تاني" },
   cardCity: { en: "City", ar: "المدينة" },
-  cardCurrency: { en: "Currency", ar: "العملة" },
-  cardCurrencyHelp: { en: "Three capital letters, such as EGP, SAR or AED.", ar: "تلات حروف إنجليزي كابيتال، زي EGP أو SAR أو AED." },
+  cardSaving: { en: "Saving the card…", ar: "بنحفظ البطاقة…" },
   cardNotSaved: { en: "The card was not saved. Check the currency, then try again.", ar: "البطاقة ماتحفظتش. راجع العملة وجرّب تاني." },
   cardNotSavedRetry: { en: "The card was not saved. Try again.", ar: "البطاقة ماتحفظتش. جرّب تاني." },
   usageTitle: { en: "Usage Stats", ar: "إحصائيات الاستخدام" },
   usageHelp: {
-    en: "Share a few numbers about how One is used, so QS Mind can make it better. You can change this any time in Settings.",
-    ar: "شارك شوية أرقام عن استخدامك لـ One، عشان QS Mind يحسّنه. تقدر تغيّر ده في أي وقت من الإعدادات.",
+    en: "Share a few numbers about how ONE is used, so QS Mind can make it better. You can change this any time in Settings.",
+    ar: "شارك شوية أرقام عن استخدامك لـ ONE، عشان QS Mind يحسّنه. تقدر تغيّر ده في أي وقت من الإعدادات.",
   },
   usageSentTitle: { en: "What is sent", ar: "اللي بيتبعت" },
   usageSent: {
-    en: "Crash reports (the kind of error and where in One's code it happened), and counts: Briefs finished, Desks used, AI cost and time, files added, backups made.",
-    ar: "تقارير الأعطال (نوع الخطأ ومكانه في كود One)، وأعداد: التكليفات اللي خلصت، والأقسام اللي اتستخدمت، وتكلفة ووقت الذكاء الاصطناعي، والملفات اللي اتضافت، والنسخ الاحتياطية اللي اتعملت.",
+    en: "Crash reports (the kind of error and where in ONE's code it happened), and counts: Briefs finished, Desks used, AI cost and time, files added, backups made.",
+    ar: "تقارير الأعطال (نوع الخطأ ومكانه في كود ONE)، وأعداد: التكليفات اللي خلصت، والأقسام اللي اتستخدمت، وتكلفة ووقت الذكاء الاصطناعي، والملفات اللي اتضافت، والنسخ الاحتياطية اللي اتعملت.",
   },
   usageNeverTitle: { en: "What is never sent", ar: "اللي عمره ما بيتبعت" },
   usageNever: {
@@ -735,7 +749,7 @@ export const texts = {
   usageShare: { en: "Share", ar: "شارك" },
   usageDontShare: { en: "Don't share", ar: "ماتشاركش" },
   usageSkipMeans: { en: "Skip means don't share.", ar: "التخطي معناه ماتشاركش." },
-  readyTitle: { en: "One is ready", ar: "One جاهز" },
+  readyTitle: { en: "ONE is ready", ar: "ONE جاهز" },
   readyDrop: { en: "Drag your tender folder here", ar: "اسحب فولدر المناقصة هنا" },
   readyChooseFolder: { en: "Choose folder", ar: "اختار فولدر" },
   readyImportOld: { en: "Import old work", ar: "استورد شغل قديم" },

@@ -1962,21 +1962,21 @@ ACCOUNT_EXPIRED = {
 }
 ACCOUNT_KEY_STORE_DOWN = {
     "en": (
-        "The system key store is not available, so One cannot keep you signed in. "
+        "The system key store is not available, so ONE cannot keep you signed in. "
         "Unlock it or turn it on, then sign in again."
     ),
     "ar": (
-        "مخزن المفاتيح في الجهاز مش متاح، فـ One مش هيقدر يفضّل دخولك متسجّل. "
+        "مخزن المفاتيح في الجهاز مش متاح، فـ ONE مش هيقدر يفضّل دخولك متسجّل. "
         "افتحه أو شغّله وسجّل دخولك تاني."
     ),
 }
 ACCOUNT_UNAVAILABLE = {  # a build without One's client id at the account (O1)
-    "en": "Signing in to the QS Mind account is not ready in this version of One yet.",
-    "ar": "تسجيل الدخول لحساب QS Mind لسه مش جاهز في النسخة دي من One.",
+    "en": "Signing in to the QS Mind account is not ready in this version of ONE yet.",
+    "ar": "تسجيل الدخول لحساب QS Mind لسه مش جاهز في النسخة دي من ONE.",
 }
 ACCOUNT_SIGNED_IN = {  # the loopback page in the browser, after the sign-in
-    "en": "Signed in. Go back to One.",
-    "ar": "دخولك اتسجّل. ارجع لـ One.",
+    "en": "Signed in. Go back to ONE.",
+    "ar": "دخولك اتسجّل. ارجع لـ ONE.",
 }
 
 # Backups, the Backup key and recovery codes.
