@@ -59,7 +59,8 @@ export type ProjectStatus = {
   stage?: Text;
   submission_date?: string;
   days_left?: number;
-  boq_value?: { value: string; currency: string; deliverable_id: string; revision: number | null; status: string };
+  /** `sample`: a number behind it is sample data; the screen labels it. */
+  boq_value?: { value: string; currency: string; deliverable_id: string; revision: number | null; status: string; sample?: boolean };
   open_comments?: number;
   waiting?: number;
 };

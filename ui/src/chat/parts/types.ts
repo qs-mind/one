@@ -1,5 +1,6 @@
 // The data parts a Brief's stream carries (Plan 4, Task 8). Each has a stable id, so the AI SDK updates it in place.
 import type { UIMessage } from "ai";
+import type { SelectionItem } from "../../canvas/types";
 import type { Text } from "../../i18n";
 
 export type BriefState =
@@ -80,8 +81,9 @@ export type OneData = {
   deliverable: DeliverableData;
 };
 
-/** A message the engineer sent while a Brief ran is marked as steering it. */
-export type OneMessage = UIMessage<{ steering?: boolean }, OneData>;
+/** A message the engineer sent while a Brief ran is marked as steering it; one sent with a canvas selection keeps
+ * it (Plan 7), shown as a chip. */
+export type OneMessage = UIMessage<{ steering?: boolean; selection?: SelectionItem[] }, OneData>;
 export type OnePart = OneMessage["parts"][number];
 
 /** The parts of one kind, in the order they first came. */
