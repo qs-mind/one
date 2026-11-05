@@ -16,7 +16,9 @@ export function Num({ cell }: { cell: NumberCell }) {
   const { sources, openSource } = useViewEnv();
   const source = cell.source ? sources[cell.source] : undefined;
   const shown = numberText(cell);
-  const chip = "inline-flex max-w-48 items-center rounded-full border border-slate px-2 text-xs leading-5 text-slate";
+  const chip = "inline-flex min-w-0 max-w-48 items-center rounded-full border border-slate px-2 text-xs leading-5 text-slate";
+  // one line: a long source name is cut, its full name on hover
+  const name = source ? <FileName name={source.title} fit /> : t("noSource");
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
       <bdi dir="ltr" className="font-semibold tabular-nums">
@@ -30,10 +32,10 @@ export function Num({ cell }: { cell: NumberCell }) {
           // a click from the keyboard (detail 0) moves the focus into the popover
           onClick={(event) => openSource(cell, event.currentTarget, event.detail === 0)}
         >
-          {source ? <FileName name={source.title} /> : t("noSource")}
+          {name}
         </button>
       ) : (
-        <span className={chip}>{source ? <FileName name={source.title} /> : t("noSource")}</span>
+        <span className={chip}>{name}</span>
       )}
     </span>
   );

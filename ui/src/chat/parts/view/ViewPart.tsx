@@ -12,6 +12,8 @@ import { viewBlocks } from "./registry";
 import type { ViewData } from "./types";
 import { Words } from "./Words";
 
+const POPOVER_WIDTH = 320; // SourcePopover's w-80
+
 type Opened = { cell: NumberCell; style: CSSProperties; from: HTMLElement; focus: boolean };
 
 export function ViewPart({ view, projectId }: { view: ViewData; projectId?: string }) {
@@ -25,9 +27,12 @@ export function ViewPart({ view, projectId }: { view: ViewData; projectId?: stri
       const root = box.current?.getBoundingClientRect();
       const at = from.getBoundingClientRect();
       if (!root) return;
-      // under the chip, lined up with its start edge (the right edge in an Arabic view)
+      // under the chip, lined up with its start edge (the right edge in an Arabic view), and never past the view's
+      // other edge: the popover is 20rem wide at most, and 90% of the view
       const rtl = getComputedStyle(box.current!).direction === "rtl";
-      const side = rtl ? { right: Math.max(root.right - at.right, 0) } : { left: Math.max(at.left - root.left, 0) };
+      const room = Math.max(root.width - Math.min(POPOVER_WIDTH, root.width * 0.9), 0);
+      const offset = Math.min(Math.max(rtl ? root.right - at.right : at.left - root.left, 0), room);
+      const side = rtl ? { right: offset } : { left: offset };
       setOpened({ cell, style: { top: at.bottom - root.top, ...side }, from, focus });
     };
     return { sources: view.sources, unsourced: view.unsourced, openSource: projectId ? openSource : undefined };
