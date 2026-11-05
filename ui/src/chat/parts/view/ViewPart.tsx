@@ -7,14 +7,27 @@ import { t, useLanguage } from "../../../i18n";
 import { SourcePopover } from "../../../viewers/sheet/SourcePopover";
 import { baseDirection } from "../../bidi";
 import { BlockBoundary } from "./BlockBoundary";
+import { Section } from "./blocks";
 import { type ViewEnv, ViewEnvContext } from "./env";
 import { viewBlocks } from "./registry";
-import type { ViewData } from "./types";
+import type { ViewBlock, ViewData } from "./types";
 import { Words } from "./Words";
 
 const POPOVER_WIDTH = 320; // SourcePopover's w-80
 
 type Opened = { cell: NumberCell; style: CSSProperties; from: HTMLElement; focus: boolean };
+
+/** The blocks in runs: each run of blocks with the same section together, under that title. */
+function sections(blocks: ViewBlock[]): { title: string | null; blocks: ViewBlock[] }[] {
+  const runs: { title: string | null; blocks: ViewBlock[] }[] = [];
+  for (const block of blocks) {
+    const title = block.section || null;
+    const last = runs.at(-1);
+    if (last && last.title === title) last.blocks.push(block);
+    else runs.push({ title, blocks: [block] });
+  }
+  return runs;
+}
 
 export function ViewPart({ view, projectId }: { view: ViewData; projectId?: string }) {
   useLanguage();
@@ -63,9 +76,13 @@ export function ViewPart({ view, projectId }: { view: ViewData; projectId?: stri
             <span className="rounded-full border border-slate px-2.5 text-xs leading-6">{t("sampleData")}</span>
           )}
         </header>
-        {view.blocks.map((block, i) => (
-          <BlockBoundary key={i} block={block} registry={viewBlocks} />
-        ))}
+        {sections(view.blocks).map((run, i) =>
+          run.title ? (
+            <Section key={i} title={run.title} blocks={run.blocks} />
+          ) : (
+            run.blocks.map((block, j) => <BlockBoundary key={`${i}.${j}`} block={block} registry={viewBlocks} />)
+          ),
+        )}
         {view.unsourced.length > 0 && <p className="text-slate">{t("noSourceNote")}</p>}
         {opened && projectId && (
           <SourcePopover

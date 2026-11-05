@@ -3,8 +3,12 @@ built only from ONE's own blocks, through the `show` tool.
 
 The model chooses what to show and how to lay it out; the core checks it and the screen draws it
 from vetted blocks (ui/src/chat/parts/view). Rules:
-- blocks: heading, prose, figures (label + number), table (columns + rows) and group (one level);
-  at most 24 in all;
+- blocks: heading, prose, figures (label + number) and table (columns + rows), at most 24; any
+  block may name its section, and the screen shows a run of blocks with one section under its
+  title, so a view is one level deep;
+- a table row has one fixed shape, its label, then its texts, then its numbers, under the
+  columns in that order: no free keys and no cell that may be words or a reference, since the
+  first bake-off (5 Nov 2026) found both broke a small model's function calls;
 - a number is never typed: it is a reference, `{"number": <number id>}` or a Sheet's cell
   `{"deliverable", "row", "column"}`, which the core resolves to its value, source and date
   (followed through corrections, as a Document's references are). An unknown reference, or a
@@ -39,8 +43,7 @@ from qsone.records.project import Records, RecordsError
 
 TOOL = "show"
 MAX_BLOCKS = 24
-LEAVES = ("heading", "prose", "figures", "table")
-KINDS = (*LEAVES, "group")
+KINDS = ("heading", "prose", "figures", "table")
 
 Id = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{32}$")]
 Key = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
@@ -69,12 +72,16 @@ class CellRef(_Closed):
 Num = NumberRef | CellRef
 
 
-class Heading(_Closed):
+class _Block(_Closed):
+    section: Short | None = Field(None, description="the section this block is shown under")
+
+
+class Heading(_Block):
     kind: Literal["heading"]
     text: Short
 
 
-class Prose(_Closed):
+class Prose(_Block):
     """Plain words; a blank line starts a paragraph. Never HTML."""
 
     kind: Literal["prose"]
@@ -86,7 +93,7 @@ class Figure(_Closed):
     value: Num
 
 
-class Figures(_Closed):
+class Figures(_Block):
     """A row of key figures."""
 
     kind: Literal["figures"]
@@ -94,31 +101,26 @@ class Figures(_Closed):
 
 
 class Column(_Closed):
-    key: Key
     label: Short
-    type: Literal["text", "number"] = "text"
 
 
-class Table(_Closed):
-    """Rows by column key: a number column takes references only, a text column words only."""
+class Row(_Closed):
+    """Its label, then its texts, then its numbers: the same counts in every row."""
+
+    label: Short
+    texts: list[Short] = Field(default_factory=list, max_length=6)
+    numbers: list[Num] = Field(default_factory=list, max_length=6)
+
+
+class Table(_Block):
+    """The columns head a row's label, then its texts, then its numbers, in that order."""
 
     kind: Literal["table"]
     columns: list[Column] = Field(min_length=1, max_length=8)
-    rows: list[dict[Key, Short | Num]] = Field(min_length=1, max_length=50)
+    rows: list[Row] = Field(min_length=1, max_length=50)
 
 
-Leaf = Annotated[Heading | Prose | Figures | Table, Field(discriminator="kind")]
-
-
-class Group(_Closed):
-    """Blocks shown together under a title; a group holds no group."""
-
-    kind: Literal["group"]
-    title: Short | None = None
-    blocks: list[Leaf] = Field(min_length=1, max_length=12)
-
-
-Block = Annotated[Heading | Prose | Figures | Table | Group, Field(discriminator="kind")]
+Block = Annotated[Heading | Prose | Figures | Table, Field(discriminator="kind")]
 
 
 class View(_Closed):
@@ -158,38 +160,23 @@ def _kind(block) -> str | None:
 
 
 def _drop_unknown(args: dict) -> tuple[dict, list[str]]:
-    """The arguments without blocks of a kind ONE does not have, and a note for each one dropped.
-    A group left with no blocks goes too."""
-    notes: list[str] = []
-
-    def note(place: str, kind) -> None:
-        if kind == "group":
-            notes.append(f"{place}: a group holds no group; it was left out.")
-        else:
-            notes.append(
-                f"{place}: ONE has no block «{kind}» (only {', '.join(KINDS)}); it was left out."
-            )
-
+    """The arguments without blocks of a kind ONE does not have, and a note for each one dropped."""
     blocks = args.get("blocks")
     if not isinstance(blocks, list):
-        return args, notes
+        return args, []
+    notes: list[str] = []
     kept = []
     for i, block in enumerate(blocks):
         kind = _kind(block)
-        if kind is not None and kind not in KINDS:
-            note(f"blocks[{i}]", kind)
-            continue
-        if kind == "group" and isinstance(block.get("blocks"), list):
-            inner = []
-            for j, leaf in enumerate(block["blocks"]):
-                if _kind(leaf) is not None and _kind(leaf) not in LEAVES:
-                    note(f"blocks[{i}].blocks[{j}]", _kind(leaf))
-                else:
-                    inner.append(leaf)
-            if not inner and block["blocks"]:
-                continue
-            block = block | {"blocks": inner}
-        kept.append(block)
+        if kind is None or kind in KINDS:
+            kept.append(block)
+        elif kind == "group":
+            notes.append(f"blocks[{i}]: there is no group; give each block a section instead.")
+        else:
+            notes.append(
+                f"blocks[{i}]: ONE has no block «{kind}» (only {', '.join(KINDS)}); "
+                "it was left out."
+            )
     return args | {"blocks": kept}, notes
 
 
@@ -216,38 +203,35 @@ def _validated(args: dict) -> View:
     except ValidationError as e:
         first = e.errors()[0]
         where = _place(first["loc"])
-        hint = f" {_REF_HINT}" if where.endswith(".value") else ""
+        ref = where.endswith(".value") or re.search(r"\.numbers\[\d+\]$", where)
+        hint = f" {_REF_HINT}" if ref else ""
         raise _Refused(f"«{where}»: {first['msg']}.{hint}") from None
 
 
-def _blocks(blocks: list[dict], base: str = "blocks"):
-    for i, block in enumerate(blocks):
-        here = f"{base}[{i}]"
-        if block["kind"] == "group":
-            yield from _blocks(block["blocks"], f"{here}.blocks")
-        else:
-            yield here, block
-
-
 def _check(data: dict) -> None:
-    """The rules a schema cannot hold: at most 24 blocks in all, each table's cells by its
-    columns, and no HTML in any text."""
-    count = sum(1 + len(b.get("blocks", ())) for b in data["blocks"])
-    if count > MAX_BLOCKS:
-        raise _Refused(f"«blocks»: {count} blocks, groups' blocks included; at most {MAX_BLOCKS}.")
-    for here, block in _blocks(data["blocks"]):
+    """The rules a schema cannot hold: each table's rows fit its columns, and no HTML in any
+    text."""
+    for i, block in enumerate(data["blocks"]):
         if block["kind"] != "table":
             continue
-        types = {c["key"]: c["type"] for c in block["columns"]}
+        width = len(block["columns"])
+        first = block["rows"][0]
         for j, row in enumerate(block["rows"]):
-            for key, value in row.items():
-                at = f"«{here}.rows[{j}].{key}»"
-                if key not in types:
-                    raise _Refused(f"{at}: the table has no column «{key}»: {', '.join(types)}.")
-                if types[key] == "number" and not isinstance(value, dict):
-                    raise _Refused(f"{at}: a number column takes a reference. {_REF_HINT}")
-                if types[key] == "text" and isinstance(value, dict):
-                    raise _Refused(f"{at}: a text column takes words; put numbers in a number one.")
+            at = f"«blocks[{i}].rows[{j}]»"
+            if (len(row["texts"]), len(row["numbers"])) != (
+                len(first["texts"]),
+                len(first["numbers"]),
+            ):
+                raise _Refused(
+                    f"{at}: every row has as many texts and as many numbers as the first; "
+                    f"the table has {width} columns."
+                )
+            if 1 + len(row["texts"]) + len(row["numbers"]) != width:
+                raise _Refused(
+                    f"{at}: the label, {len(row['texts'])} texts and {len(row['numbers'])} numbers "
+                    f"do not fit the table's {width} columns: one column for the label, then one "
+                    "for each text, then one for each number."
+                )
     for place, text in _texts(data):
         if _HTML.search(text):
             raise _Refused(f"«{place}»: no HTML or code; write plain words.")
@@ -257,9 +241,9 @@ def _texts(data: dict):
     """(place, text) for every text in the view."""
     yield "title", data["title"]
     for i, block in enumerate(data["blocks"]):
-        if block["kind"] == "group" and block.get("title"):
-            yield f"blocks[{i}].title", block["title"]
-    for here, block in _blocks(data["blocks"]):
+        here = f"blocks[{i}]"
+        if block.get("section"):
+            yield f"{here}.section", block["section"]
         if block["kind"] in ("heading", "prose"):
             yield f"{here}.text", block["text"]
         elif block["kind"] == "figures":
@@ -269,22 +253,22 @@ def _texts(data: dict):
             for j, column in enumerate(block["columns"]):
                 yield f"{here}.columns[{j}].label", column["label"]
             for j, row in enumerate(block["rows"]):
-                for key, value in row.items():
-                    if isinstance(value, str):
-                        yield f"{here}.rows[{j}].{key}", value
+                yield f"{here}.rows[{j}].label", row["label"]
+                for k, text in enumerate(row["texts"]):
+                    yield f"{here}.rows[{j}].texts[{k}]", text
 
 
 def _refs(data: dict):
     """(place, holder, key) for every number reference: holder[key] is the reference."""
-    for here, block in _blocks(data["blocks"]):
+    for i, block in enumerate(data["blocks"]):
+        here = f"blocks[{i}]"
         if block["kind"] == "figures":
             for j, item in enumerate(block["items"]):
                 yield f"{here}.items[{j}].value", item, "value"
         elif block["kind"] == "table":
             for j, row in enumerate(block["rows"]):
-                for key, value in row.items():
-                    if isinstance(value, dict):
-                        yield f"{here}.rows[{j}].{key}", row, key
+                for k in range(len(row["numbers"])):
+                    yield f"{here}.rows[{j}].numbers[{k}]", row["numbers"], k
 
 
 # Resolving --------------------------------------------------------------------------------------
@@ -454,22 +438,31 @@ def stored_views(rec: Records | None, brief_id: str, history: bytes) -> list[Dat
 _EXAMPLE = {
     "title": "ملخص التسعير",
     "blocks": [
-        {"kind": "heading", "text": "فئة الخرسانة المسلحة"},
         {
             "kind": "figures",
             "items": [{"label": "الفئة", "value": {"number": "6f1c0d2e9a4b4c7e8f3a2b1c0d9e8f7a"}}],
         },
-        {"kind": "prose", "text": "الفئة من عرض سعر المورد."},
+        {
+            "kind": "table",
+            "section": "البنود",
+            "columns": [{"label": "البند"}, {"label": "الوصف"}, {"label": "الكمية"}],
+            "rows": [
+                {
+                    "label": "03/02",
+                    "texts": ["خرسانة مسلحة"],
+                    "numbers": [{"number": "0b7e4c2a9d1f4e8a8c3b2a1d0e9f8c7b"}],
+                }
+            ],
+        },
     ],
 }
 
-_DOC = f"""Show the engineer a view in the chat when figures or a table say it better than \
-words. Blocks: heading, prose, figures (label, value), table (columns; rows by column key) and \
-group (title, blocks; one level); 24 at most. A number is never typed: \
-{{"number": "<number id>"}}, or a Sheet's cell \
-{{"deliverable": "<sheet id>", "row": "<row id>" or "total", "column": "<key>"}}; \
-ONE adds its value, source and date. Number columns take only these; text columns take \
-words. No HTML. sample: true for sample data.
+_DOC = f"""Show the engineer a view when figures or a table say it better than words. \
+Blocks: heading, prose, figures and table; 24 at most; any may take a section. A table row is \
+its label, then its texts, then its numbers, under columns in that order. A number is never \
+typed: {{"number": "<number id>"}} or a Sheet's cell \
+{{"deliverable": "<sheet id>", "row": "<row id>" or "total", "column": "<key>"}}; ONE adds its \
+value, source and date. Words in the engineer's language. No HTML. sample: true for sample data.
 Example:
 {json.dumps(_EXAMPLE, ensure_ascii=False)}"""
 
