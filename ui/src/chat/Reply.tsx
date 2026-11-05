@@ -20,6 +20,8 @@ function block(tag: string, className?: string) {
   };
 }
 
+const Table = block("table", "border-collapse");
+
 const components: Components = {
   p: block("p"),
   h1: block("h1", "font-semibold"),
@@ -33,7 +35,12 @@ const components: Components = {
   ol: block("ol", "list-decimal"),
   li: block("li", "ms-5"),
   blockquote: block("blockquote", "border-s-2 border-slate ps-3 text-slate"),
-  table: block("table", "border-collapse"),
+  // a wide table scrolls inside its own box, not the chat
+  table: (props) => (
+    <div className="overflow-x-auto">
+      <Table {...props} />
+    </div>
+  ),
   th: block("th", "border border-stone px-2 py-1 text-start font-semibold"),
   td: block("td", "border border-stone px-2 py-1"),
   pre: ({ node: _node, ...props }) => (

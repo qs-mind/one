@@ -11,10 +11,12 @@ import { SetupGate } from "./firstlaunch/FirstLaunch";
 import { importFolders } from "./import/importer";
 import { language, setLanguage } from "./i18n";
 import { App } from "./shell/App";
+import { installPointerFocus } from "./ui/pointerFocus";
 import { UpdateCard } from "./update/UpdateCard";
 
 setLanguage(language()); // put the remembered language and its direction on <html>
 installCrashReports(); // an error the screen does not catch: its class and our file:line, to Usage Stats
+installPointerFocus(); // focus rings for the keyboard only, not after a click
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

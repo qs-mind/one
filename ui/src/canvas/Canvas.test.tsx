@@ -343,8 +343,36 @@ describe("the Project Canvas", () => {
     await frameEl("تسعير a - عينة");
     const bar = screen.getByRole("toolbar", { name: texts.zoomControls.ar });
     expect(bar).toHaveAttribute("dir", "rtl");
-    expect(bar.style.right).toBe("16px");
     expect(within(bar).getByRole("button", { name: texts.arrangeByStage.ar })).toBeInTheDocument();
+  });
+
+  it("the minimap and the zoom controls are one block in the bottom inline-start corner, the controls under the map", async () => {
+    const { container } = show({ deliverables: [deliverable("a")] });
+    await frameEl("تسعير a - عينة");
+    const bar = screen.getByRole("toolbar", { name: texts.zoomControls.ar });
+    const map = container.querySelector<HTMLElement>(".react-flow__minimap")!;
+    const block = bar.parentElement!;
+    // one block: the map first, the controls under it, as wide as the map
+    expect(block).toBe(map.parentElement);
+    expect(block.firstElementChild).toBe(map);
+    expect(map.nextElementSibling).toBe(bar);
+    expect(map.style.position).toBe("static");
+    expect(bar).toHaveClass("w-full");
+    // the whole block counts as a cover, so Fit and new frames keep clear of it
+    expect(block).toHaveAttribute("data-canvas-cover");
+    // Arabic: the inline start is the right
+    expect(block.style.right).toBe("16px");
+    expect(block.style.left).toBe("");
+    expect(block).toHaveClass("bottom-4");
+  });
+
+  it("in English the block sits at the bottom left", async () => {
+    setLanguage("en");
+    const { container } = show({ deliverables: [deliverable("a", { language: "en", title: "BOQ pricing (sample)" })] });
+    await frameEl("BOQ pricing (sample)");
+    const block = container.querySelector<HTMLElement>(".react-flow__minimap")!.parentElement!;
+    expect(block.style.left).toBe("16px");
+    expect(block.style.right).toBe("");
   });
 
   it("the pane is ltr while the page is rtl, and a frame title keeps dir=auto", async () => {

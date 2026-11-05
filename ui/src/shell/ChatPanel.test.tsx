@@ -181,6 +181,34 @@ describe("the chat in the shell", () => {
     expect(screen.getByText("**as typed**")).toBeInTheDocument();
   });
 
+  it("a long word with no spaces breaks inside its bubble, only where it must; a table scrolls in its own box", async () => {
+    const word = "يسشبتشبتصبلقتسلبقسليسشبتشبتصبلق".repeat(4);
+    const parts = [
+      reply[0]!,
+      { type: "text-start", id: "t1" },
+      { type: "text-delta", id: "t1", delta: `${word}\n\n| البند | الكمية |\n|---|---|\n| ${word} | 12 |` },
+      { type: "text-end", id: "t1" },
+      { type: "finish" },
+    ];
+    core({ routes: { "POST /api/chat": (init) => streamed(parts, init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await box(), `${word}{enter}`);
+    await screen.findByRole("table");
+    const log = screen.getByRole("log", { name: texts.generalChat.ar });
+    // the whole chat (the engineer's bubble, replies, cards, file names) wraps a word that cannot fit, anywhere in it,
+    // and never by letter where it would fit (no break-all: it would split Arabic words); it never scrolls sideways
+    const chat = log.parentElement!;
+    expect(chat).toHaveClass("[overflow-wrap:anywhere]");
+    expect(log).toHaveClass("overflow-x-hidden");
+    expect(chat.querySelector("[class*='break-all']")).toBeNull();
+    expect(screen.getAllByText(word)[0]!.closest("[data-own]")).toBeInTheDocument();
+    // a reply's table keeps its words whole and scrolls inside its own box
+    const table = screen.getByRole("table");
+    expect(table.parentElement).toHaveClass("overflow-x-auto");
+    expect(chat).toHaveClass("[&_table]:[overflow-wrap:normal]");
+  });
+
   it("loads earlier messages when the chat opens, and joins a Brief still running", async () => {
     const earlier = [
       { id: "u1", role: "user", parts: [{ type: "text", text: "سعّر بند الخرسانة - عينة" }] },

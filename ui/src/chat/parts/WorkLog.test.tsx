@@ -3,7 +3,7 @@
 // into that line and open again. Every time comes from the core's timestamps.
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setLanguage, texts } from "../../i18n";
+import { count, setLanguage, texts } from "../../i18n";
 import { duration, ProgressLine, tick } from "./ProgressLine";
 import type { WorklogData, WorkStep } from "./types";
 
@@ -76,6 +76,69 @@ describe("the settled line", () => {
     expect(steps[2]).toHaveTextContent("50.0 ث");
     fireEvent.click(line);
     expect(screen.queryByText("بيسعّر البنود")).toBeNull();
+  });
+});
+
+describe("every duration and step count reads naturally", () => {
+  const S = 1000;
+  const M = 60 * S;
+  it.each([
+    [400, "أقل من ثانية", "under a second"],
+    [1 * S, "ثانية", "1s"],
+    [2 * S, "ثانيتين", "2s"],
+    [3 * S, "3 ثواني", "3s"],
+    [10 * S, "10 ثواني", "10s"],
+    [11 * S, "11 ثانية", "11s"],
+    [59 * S, "59 ثانية", "59s"],
+    [1 * M, "دقيقة", "1m"],
+    [2 * M, "دقيقتين", "2m"],
+    [5 * M, "5 دقايق", "5m"],
+    [1 * M + 1 * S, "دقيقة وثانية", "1m 1s"],
+    [2 * M + 2 * S, "دقيقتين وثانيتين", "2m 2s"],
+    [3 * M + 30 * S, "3 دقايق و30 ثانية", "3m 30s"],
+    [15 * M, "15 دقيقة", "15m"],
+    [60 * M, "ساعة", "1h"],
+    [2 * 60 * M, "ساعتين", "2h"],
+    [60 * M + 2 * M, "ساعة ودقيقتين", "1h 2m"],
+    [3 * 60 * M + 11 * M, "3 ساعات و11 دقيقة", "3h 11m"],
+  ])("%i ms: «%s», “%s”", (ms, ar, en) => {
+    expect(duration(ms, "ar")).toBe(ar);
+    expect(duration(ms, "en")).toBe(en);
+  });
+
+  it("never the colloquial misspelling «تانية»: a second is ثانية", () => {
+    for (const ms of [1_000, 2_000, 5_000, 30_000, 62_000]) expect(duration(ms, "ar")).not.toMatch(/تاني/);
+  });
+
+  it.each([
+    [1, "خطوة واحدة", "1 step"],
+    [2, "خطوتين", "2 steps"],
+    [3, "3 خطوات", "3 steps"],
+    [10, "10 خطوات", "10 steps"],
+    [11, "11 خطوة", "11 steps"],
+  ])("%i steps: «%s»", (n, ar, en) => {
+    expect(count("steps", n, {}, "ar")).toBe(ar);
+    expect(count("steps", n, {}, "en")).toBe(en);
+  });
+});
+
+describe("a Brief with no steps", () => {
+  const none: WorklogData = { started: T0, ended: at(2), steps: [] };
+
+  it("says only how long it worked: no step count, no button, no fold arrow", () => {
+    render(<ProgressLine items={[]} worklog={none} lang="ar" />);
+    expect(screen.getByText("اشتغل ثانيتين")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(document.body).not.toHaveTextContent("مفيش خطوات");
+    expect(document.body).not.toHaveTextContent("◂");
+    expect(document.body).not.toHaveTextContent("·");
+  });
+
+  it("in English too", () => {
+    setLanguage("en");
+    render(<ProgressLine items={[]} worklog={none} lang="en" />);
+    expect(screen.getByText("Worked for 2s")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });
 
