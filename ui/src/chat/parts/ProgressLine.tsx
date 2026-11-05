@@ -103,7 +103,7 @@ function Step({ step, lang, live }: { step: WorkStep; lang: Language; live: bool
       ) : (
         <span dir="auto">{pick(step.text, lang)}</span>
       )}
-      {took > 0 && (
+      {took >= 100 && ( // under a tenth of a second there is nothing honest to show
         <>
           {" "}
           <span className="tabular-nums">· {tick(took, lang)}</span>

@@ -936,7 +936,6 @@ export const texts = {
     en: "Press and hold to go ahead: this can't be taken back.",
     ar: "اضغط مطوّل عشان تكمّل: ده مش هينفع يترجع.",
   },
-  approvalTrace: { en: "{answer} · {title} · {time}", ar: "{answer} · {title} · {time}" },
   undo: { en: "Undo", ar: "تراجع" },
   undoDone: { en: "Back as it was.", ar: "رجع زي ما كان." },
   removedName: { en: "Removed «{name}»", ar: "اتشال «{name}»" },
