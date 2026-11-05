@@ -248,8 +248,8 @@ for (const lang of ["ar", "en"] as const) {
     await dialog.getByRole("button", { name: new RegExp(`^${say(lang, "aiLinkApiKey")}`) }).click();
     const next = dialog.getByRole("button", { name: say(lang, "setupNext"), exact: true });
     const skip = dialog.getByRole("button", { name: say(lang, "setupSkip"), exact: true });
-    // to the whole pixel: a sub-pixel settle of the dialog (0.4 px, 5 Nov 2026) is no move the eye sees
-    const box = async () => Object.fromEntries(Object.entries((await next.boundingBox())!).map(([k, v]) => [k, Math.round(v)]));
+    // within 1 px: a sub-pixel settle of the dialog (0.4 px, 5 Nov 2026) is no move the eye sees
+    const box = async () => (await next.boundingBox())!;
     const before = await box();
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
     await dialog.getByLabel(say(lang, "aiKeyLabel")).click();
@@ -258,7 +258,9 @@ for (const lang of ["ar", "en"] as const) {
     expected(walk, 409, "POST /api/settings/ai/check");
     await page.mouse.move(0, 0);
     await shot(page, "bar-failed", lang);
-    expect(await box(), "the failure never moves Next").toEqual(before);
+    const after = await box();
+    for (const k of ["x", "y", "width", "height"] as const)
+      expect(Math.abs(after[k] - before[k]), `the failure never moves Next (${k})`).toBeLessThanOrEqual(1);
     await inView(page, next, "Next with the failure, 1440×900");
     for (const [width, height, state] of [[380, 900, "bar-failed-380"], [720, 450, "bar-failed-zoom200"]] as const) {
       await page.setViewportSize({ width, height });

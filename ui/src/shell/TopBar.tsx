@@ -98,7 +98,7 @@ export function TopBar(props: TopBarProps) {
       )}
     </button>
   );
-  const ai =(opener?: HTMLElement | null) => (
+  const ai = (opener?: HTMLElement | null) => (
     <button
       type="button"
       aria-expanded={props.aiExpanded}
@@ -138,11 +138,11 @@ export function TopBar(props: TopBarProps) {
         data-region-start
         aria-expanded={panel === "projects"}
         title={t("projects")}
-        className={`${button} -ms-1 flex shrink-0 items-center gap-2 font-semibold text-ink`}
+        className={`${button} -ms-1 flex min-w-0 items-center gap-2 font-semibold text-ink`}
         onClick={(event) => onPanel("projects", event.currentTarget)}
       >
-        {/* the project's name is never cut: the status folds before it does */}
-        <span dir="auto">
+        {/* the project's name is cut last: the status folds, then the document's state and title give (DocumentSwitcher) */}
+        <span dir="auto" className="min-w-0 truncate">
           {project?.name ?? t("generalChat")}
         </span>
         {other && <ActivityMark state={other} label={fill(t("activityElsewhere"), { state: activityWord(other) })} />}

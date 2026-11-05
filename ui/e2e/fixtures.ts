@@ -366,6 +366,20 @@ export async function workspaceReady(page: Page, content?: Locator) {
 /** The document switcher: the open document's title, with its ▾, in the top bar. */
 export const switcher = (page: Page): Locator => page.locator('[data-region="topbar"] h1 button[aria-haspopup="menu"]');
 
+/** Whether the element's text is all seen: nothing past its own edges, and inside every ancestor that clips. */
+export const shownWhole = (l: Locator) =>
+  l.evaluate((el) => {
+    if (el.scrollWidth > el.clientWidth + 1) return false;
+    const r = el.getBoundingClientRect();
+    for (let a = el.parentElement; a; a = a.parentElement) {
+      const style = getComputedStyle(a);
+      if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+      const b = a.getBoundingClientRect();
+      if (r.left < b.left - 1 || r.right > b.right + 1 || r.top < b.top - 1 || r.bottom > b.bottom + 1) return false;
+    }
+    return r.left >= -1 && r.right <= innerWidth + 1;
+  });
+
 /** Picks a document from the switcher, by (part of) its name. */
 export async function openDocument(page: Page, name: string | RegExp) {
   await switcher(page).click();

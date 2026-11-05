@@ -36,7 +36,7 @@ describe("DocumentSwitcher", () => {
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(within(h1).getByRole("button", { name: /المقايسة المسعّرة/ })).toBeTruthy();
     expect(h1.parentElement!.textContent).toContain(`${texts.statusDraft.ar} · ${fill(texts.docRevision.ar, { n: 2 })}`);
-    expect(h1.parentElement!.textContent).toContain(texts.sampleNumbers.ar);
+    expect(screen.getByText(texts.sampleNumbers.ar)).toBeTruthy();
   });
 
   it("no sample label for real numbers", () => {

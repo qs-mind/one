@@ -2,12 +2,12 @@
 // the chat beside it at the end, never under it; the sheet 8 px under the top bar and 8 px above the window's foot;
 // one message box at the chat's foot; the placeholder whole at every width, the project's name and (from 1000 px)
 // the document's title never cut, the status folding into More before anything clips, nothing in the top bar run
-// over another and «الأرقام عينة» said whole; a document picked from the switcher shown in place, kept in the project
+// over another and «الأرقام عينة» said whole even with a long project name; More status shown at 1280 px; a document picked from the switcher shown in place, kept in the project
 // (a reload opens it) and left with Back; below 1000 px the chat a panel over the document; below 640 px the
 // document the window's width.
 import { expect, test, type Locator } from "@playwright/test";
-import { texts } from "../src/i18n";
-import { documentRegion, mockCore, openDocument, small, switcher, workspaceReady } from "./fixtures";
+import { count, texts } from "../src/i18n";
+import { documentRegion, mockCore, openDocument, shownWhole, small, switcher, workspaceReady } from "./fixtures";
 
 type Box = { x: number; y: number; width: number; height: number };
 const box = async (l: Locator) => (await l.boundingBox())!;
@@ -81,21 +81,34 @@ for (const language of ["ar", "en"] as const) {
         expect(b.x).toBeGreaterThanOrEqual(strip.x - 1);
         expect(b.x + b.width).toBeLessThanOrEqual(strip.x + strip.width + 1);
       }
+      // at 1280 px the long name leaves the status no room: what folds is under More status, and that is seen whole
+      if (width === 1280) {
+        const more = page.locator('[data-region="topbar"] [data-status="more"]');
+        await expect(more).toBeVisible();
+        expect(await shownWhole(more), "More status is seen whole").toBe(true);
+      }
     });
   }
 
-  for (const width of [640, 1000]) {
-    test(`at ${width} px nothing in the top bar runs over another, and «الأرقام عينة» is whole, ${language}`, async ({ page }) => {
+  const names = {
+    short: { ar: "مبنى إداري - عينة", en: "Office building (sample)" },
+    long: { ar: "برج إداري بالعاصمة الإدارية الجديدة - عينة", en: "Administrative tower, New Capital (sample)" },
+  };
+  for (const width of [640, 1000])
+    for (const name of ["short", "long"] as const)
+    test(`at ${width} px with a ${name} project name nothing in the top bar runs over another, and «الأرقام عينة» is whole, ${language}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });
       const scene = small();
-      scene.project.name = language === "ar" ? "مبنى إداري - عينة" : "Office building (sample)";
-      scene.status = { ...scene.status, waiting: 1 }; // the waiting dot and its words take their room too
+      // the name and the waiting words take the bar's room: the state, then the title (to a few words), then the name give
+      scene.project.name = names[name][language];
+      scene.status = { ...scene.status, waiting: 1 };
       await mockCore(page, scene, { language });
       await page.goto("/");
       await workspaceReady(page);
       const bar = page.locator('[data-region="topbar"]');
       // the bar's own items, side by side: the project, the document's title, what waits, search, the chat, More
-      const items = [page.locator('[data-region="topbar"] [data-region-start]'), switcher(page), ...(await bar.locator("button:visible").all())];
+      const label = bar.locator("[data-sample-label]");
+      const items = [page.locator('[data-region="topbar"] [data-region-start]'), switcher(page), label, ...(await bar.locator("button:visible").all())];
       const boxes = [];
       for (const item of items) boxes.push(await box(item));
       for (const [i, a] of boxes.entries())
@@ -104,14 +117,12 @@ for (const language of ["ar", "en"] as const) {
           const inside = (a.x >= b.x - 1 && a.x + a.width <= b.x + b.width + 1) || (b.x >= a.x - 1 && b.x + b.width <= a.x + a.width + 1);
           expect(apart || inside, "two items of the top bar run over each other").toBe(true);
         }
-      if (width >= 1000) {
-        const label = bar.getByText(texts.sampleNumbers[language], { exact: true });
-        const facts = await box(label.locator("xpath=ancestor::p[1]"));
-        const b = await box(label);
-        expect(b.x >= facts.x - 1 && b.x + b.width <= facts.x + facts.width + 1, "the sample label is said whole").toBe(true);
-      }
+      if (width >= 1000) await expect(bar).toContainText(count("decisionsWaiting", 1, {}, language));
+      await expect(label).toContainText(texts.sampleNumbers[language]);
+      expect(await shownWhole(label), "«الأرقام عينة» is seen whole").toBe(true);
+      // the title keeps a few words: its button never shrinks to the ▾ alone
+      expect((await box(switcher(page))).width, "the title keeps a few words").toBeGreaterThanOrEqual(80);
     });
-  }
 
   test(`a document picked from the switcher shows in place, is kept, and Back returns, ${language}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -160,6 +171,33 @@ for (const language of ["ar", "en"] as const) {
       expect(c.x).toBeGreaterThanOrEqual(b.x);
       expect(c.x + c.width).toBeLessThanOrEqual(b.x + b.width);
       expect(await cell.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    }
+  });
+
+  test(`the first project's backup ask keeps its words one block in the chat, its buttons under them, ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const scene = small();
+    scene.others = []; // the project about to be made is the only one, and no backup folder is picked: ONE asks once
+    await mockCore(page, scene, { language });
+    await page.route("**/api/backup", (route) => route.fulfill({ json: { folder: null } }));
+    await page.route("**/api/projects", (route) =>
+      route.request().method() === "POST" ? route.fulfill({ json: scene.project }) : route.fallback(),
+    );
+    await page.goto("/");
+    await workspaceReady(page);
+    await page.locator('[data-region="topbar"] [data-region-start]').click();
+    await page.getByRole("button", { name: texts.newProject[language] }).click();
+    await page.getByLabel(texts.projectName[language]).fill(scene.project.name);
+    await page.getByLabel(texts.projectName[language]).press("Enter");
+    const ask = page.getByRole("region", { name: texts.backupTitle[language] });
+    await expect(ask).toContainText(texts.backupAskFolder[language]);
+    const chat = await box(page.locator('aside[data-region="chat"]'));
+    expect(chat.width, "a chat about 320 px wide").toBeLessThanOrEqual(340);
+    const words = await box(ask.locator("p").first());
+    expect(words.width, "never a word a line").toBeGreaterThan(200);
+    for (const name of [texts.backupPickFolder[language], texts.backupLater[language]]) {
+      const button = await box(ask.getByRole("button", { name, exact: true }));
+      expect(button.y, `${name} wraps under the words`).toBeGreaterThanOrEqual(words.y + words.height - 1);
     }
   });
 

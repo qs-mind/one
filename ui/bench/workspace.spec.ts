@@ -8,6 +8,7 @@ import { copyFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type { Page, TestInfo } from "@playwright/test";
 import { count, texts } from "../src/i18n";
+import { shownWhole } from "../e2e/fixtures";
 import { expect, samplesDir, test } from "./bench";
 
 // the tender's two files, from core/tests/bench/samples.py (write_workspace): the client's BOQ and the supplier's quote
@@ -48,7 +49,7 @@ for (const lang of ["ar", "en"] as const) {
     test.setTimeout(300_000);
     const w = words[lang];
     const top = page.locator('[data-region="topbar"]');
-    const sample = top.getByText(texts.sampleNumbers[lang], { exact: true });
+    const sample = top.locator("[data-sample-label]");
     await walk.start(lang);
     await walk.createProject(lang === "ar" ? "مبنى إداري - عينة" : "Office building (sample)");
     await walk.addFiles(FILES, false);
@@ -64,7 +65,7 @@ for (const lang of ["ar", "en"] as const) {
     }).toPass({ timeout: 120_000 });
     // the first project's one-time backup question, put away: the approved screen is the decision's
     const ask = page.getByRole("region", { name: texts.backupTitle[lang] }).filter({ hasText: texts.backupAskFolder[lang] });
-    if (await ask.isVisible()) await ask.getByRole("button", { name: texts.backupLater[lang], exact: true }).click();
+    if (await ask.isVisible()) await ask.getByRole("button", { name: texts.backupLater[lang], exact: true }).click(); // its layout: layout.spec
     await expect(top.locator("[data-waiting-dot]")).toBeVisible();
     await expect(top).toContainText(count("decisionsWaiting", 1, {}, lang));
 
@@ -76,7 +77,8 @@ for (const lang of ["ar", "en"] as const) {
     for (const size of SIZES) {
       await page.setViewportSize(size);
       await page.waitForTimeout(400);
-      if (size.width >= 1000) await expect(sample, "the screen says the numbers are a sample").toBeVisible();
+      await expect(sample, "the screen says the numbers are a sample").toContainText(texts.sampleNumbers[lang]);
+      expect(await shownWhole(sample), "«الأرقام عينة» is seen whole").toBe(true);
       await expect(walk.chat.locator("[data-waiting]").first().or(page.locator("[data-chat-button]")).first()).toBeVisible();
       if (size.width >= 1000) {
         await question.first().evaluate((el) => el.scrollIntoView({ block: "end" })); // the whole card, its Send too
@@ -90,6 +92,13 @@ for (const lang of ["ar", "en"] as const) {
       await expect(card.locator("blockquote")).toContainText("3450");
       await expect(card.getByRole("button", { name: texts.sourceOpenPage[lang] })).toBeVisible();
       await page.waitForTimeout(300);
+      if (size.width >= 1000) {
+        // the card stays over the document it explains, never over the chat
+        const a = (await card.boundingBox())!;
+        const b = (await walk.chat.boundingBox())!;
+        const over = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+        expect(over, "the source card is not over the chat").toBe(false);
+      }
       await save(page, info, `boq-${lang}-${size.width}`);
     }
     await page.keyboard.press("Escape");
