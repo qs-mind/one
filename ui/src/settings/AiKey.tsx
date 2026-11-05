@@ -1,9 +1,10 @@
 // Add or replace the engineer's Claude key. The core keeps it in the system key store; the page never shows it again.
+// `plain`: the field alone, with no title or frame, inside another screen (the first launch's Connect AI).
 import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { t, useLanguage } from "../i18n";
 
-export function AiKey({ onSaved, onClose }: { onSaved: () => void; onClose?: () => void }) {
+export function AiKey({ onSaved, onClose, plain = false }: { onSaved: () => void; onClose?: () => void; plain?: boolean }) {
   useLanguage();
   const [value, setValue] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
@@ -25,18 +26,8 @@ export function AiKey({ onSaved, onClose }: { onSaved: () => void; onClose?: () 
     }
   }
 
-  return (
-    <section className="border-b border-stone px-4 py-4">
-      <div className="mx-auto flex max-w-2xl flex-col gap-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="font-semibold">{t("aiKeyTitle")}</h2>
-          {onClose && (
-            <button type="button" onClick={onClose} className="text-slate hover:text-ink">
-              {t("close")}
-            </button>
-          )}
-        </div>
-        {state === "saved" ? (
+  const body =
+    state === "saved" ? (
           <p role="status">{t("keyAdded")}</p>
         ) : (
           <form onSubmit={save} className="flex flex-col gap-3">
@@ -68,7 +59,21 @@ export function AiKey({ onSaved, onClose }: { onSaved: () => void; onClose?: () 
               )}
             </div>
           </form>
-        )}
+        );
+  if (plain) return body;
+
+  return (
+    <section className="border-b border-stone px-4 py-4">
+      <div className="mx-auto flex max-w-2xl flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-semibold">{t("aiKeyTitle")}</h2>
+          {onClose && (
+            <button type="button" onClick={onClose} className="text-slate hover:text-ink">
+              {t("close")}
+            </button>
+          )}
+        </div>
+        {body}
       </div>
     </section>
   );

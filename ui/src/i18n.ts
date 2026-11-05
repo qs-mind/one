@@ -651,6 +651,10 @@ export const texts = {
   accountSignOut: { en: "Sign out", ar: "سجّل خروج" },
   accountFailed: { en: "Sign-in did not finish. Try again.", ar: "تسجيل الدخول ماكملش. جرّب تاني." },
   connectAi: { en: "Connect AI", ar: "وصّل الذكاء الاصطناعي" },
+  consentNeeded: {
+    en: "Before One uses AI, say yes to the note on where your text goes.",
+    ar: "قبل ما One يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين.",
+  },
   consentTitle: { en: "Where your text goes", ar: "نصك بيروح فين" },
   consentBody: {
     en: "When you ask One for something, your words and the parts of your files it needs go to the AI provider you choose. That provider is usually outside your country and works under its own policy. Nothing in a Confidential project is used outside it, and an On-device project uses only models on this computer.",
@@ -730,6 +734,7 @@ export const texts = {
     ar: "كل فولدر هيبقى مشروع مؤرشف تقدر تدوّر فيه.",
   },
   readyLater: { en: "Start without a folder", ar: "ابدأ من غير فولدر" },
+  readyStart: { en: "Start", ar: "ابدأ" },
   // Task 11: tender folder import and the "I understood this" card.
   importDrop: { en: "Drop a folder here", ar: "سيب الفولدر هنا" },
   importChoose: { en: "Choose folder", ar: "اختار فولدر" },

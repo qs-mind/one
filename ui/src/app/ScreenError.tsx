@@ -1,7 +1,9 @@
 // The last net under the whole screen: a render error anywhere shows a plain message in both languages and a Reload
-// button, never a blank window. The error itself goes to the console (and so to the dev server's log).
+// button, never a blank window. The error itself goes to the console (and so to the dev server's log), and its class
+// and place in our code to Usage Stats (crash.ts).
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { t, texts } from "../i18n";
+import { reportCrash } from "./crash";
 
 export class ScreenError extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -12,6 +14,7 @@ export class ScreenError extends Component<{ children: ReactNode }, { failed: bo
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("The screen failed:", error, info.componentStack);
+    void reportCrash(error); // its class and our file:line only, and only if the engineer shares Usage Stats
   }
 
   render() {

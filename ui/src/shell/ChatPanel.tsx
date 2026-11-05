@@ -6,6 +6,7 @@
 // (data-canvas-cover), so the canvas shows its frames beside it, never under it.
 import { type ReactNode, useRef } from "react";
 import { ChatLog } from "../chat/Chat";
+import { ConsentNeeded } from "../firstlaunch/ConnectAi";
 import { dir, t, useLanguage } from "../i18n";
 import { type Ai, AiSettings } from "../settings/AiSettings";
 import type { ChatState } from "./useChats";
@@ -25,10 +26,12 @@ export type ChatBodyProps = {
   onOpenDeliverable?: (id: string) => void;
 };
 
-/** AI settings while nothing is connected, else the conversation. */
+/** AI settings while nothing is connected, else the conversation; above both, the way to the AI consent while the
+ * engineer has not given it (until then the core refuses every AI call). */
 export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpenDeliverable }: ChatBodyProps) {
   return (
     <>
+      <ConsentNeeded />
       {aiMain && (
         <div className={ai.connected === false ? "min-h-0 flex-1 overflow-y-auto" : "max-h-[50%] shrink-0 overflow-y-auto"}>
           <AiSettings ai={ai} onClose={ai.connected === false ? undefined : onAiClose} />
