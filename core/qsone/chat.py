@@ -15,7 +15,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
 from qsone import copy, keys
-from qsone.engine import roles
+from qsone.engine import roles, selection
 from qsone.engine.runner import BriefBusy, Engine, NoAI, reply_id
 from qsone.engine.stream import HEADERS, ui_stream
 from qsone.engine.types import TextDelta
@@ -64,8 +64,9 @@ def _last_text(body: dict) -> str:
 
 
 async def respond(request: Request, engine: Engine) -> Response:
-    """The AI SDK body `{id: chat id, messages}`: only the last user message is used. The chat
-    id is a project id or "general". 409 with `{"brief_id"}` while the chat has a Brief."""
+    """The AI SDK body `{id: chat id, messages, selection?}`: only the last user message is used.
+    The chat id is a project id or "general"; `selection` is what the engineer selected on the
+    canvas (Plan 7, up to 20 items). 409 with `{"brief_id"}` while the chat has a Brief."""
     try:
         body = json.loads(await request.body())
     except ValueError:
@@ -75,7 +76,12 @@ async def respond(request: Request, engine: Engine) -> Response:
     if not text or not isinstance(chat_id, str):
         return JSONResponse({"error": copy.CHAT_EMPTY}, status_code=422)
     try:
-        brief_id = await engine.start_brief(chat_id, text)
+        chosen = selection.read(body.get("selection"))
+    except ValueError:
+        answer = {"error": copy.CHAT_BAD_SELECTION, "field": "selection"}
+        return JSONResponse(answer, status_code=422)
+    try:
+        brief_id = await engine.start_brief(chat_id, text, selection=chosen)
     except BriefBusy as busy:
         return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
     except NoAI as none:

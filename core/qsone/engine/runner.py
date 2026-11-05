@@ -30,7 +30,7 @@ import json
 import logging
 import shutil
 from collections.abc import AsyncIterator, Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -69,10 +69,12 @@ from qsone.engine import (
     cards,
     checker,
     desks,
+    focus,
     general,
     numbers_guard,
     oneshot,
     roles,
+    selection,
     team,
     tools,
 )
@@ -317,6 +319,7 @@ class _AgentState:
     model: str
     state: str = "thinking"
     line: Text | None = None
+    focus: dict | None = None  # Plan 7's Focus: the frame it works on, from its tool calls
     at: str = field(default_factory=lambda: utc_now().isoformat())
 
 
@@ -340,6 +343,7 @@ class _Brief:
         self.brief_id: str = brief["id"]
         self.chat_id: str = brief["chat_id"]
         self.text: str = brief["text"]
+        self.selection: list[dict] | None = brief["selection"]  # on the canvas (Plan 7)
         self.state: BriefState = brief["status"]
         self.step: Text | None = brief["step"]
         self.instruction = instruction
@@ -373,7 +377,7 @@ class _Brief:
     def emit(self, event: Event) -> None:
         self.log.append(event)
         if isinstance(event, Progress):
-            self._agent(event.run_id, state="working", line=event.text)
+            self._agent(event.run_id, state="working", line=event.text, focus=event.focus)
             self.step = event.text
             if self.state == "running" and self.cancel_mode != "crash":
                 self.store.set_status(self.brief_id, "running", event.text)
@@ -409,7 +413,9 @@ class _Brief:
         model: str | None = None,
         state: str | None = None,
         line: Text | None = None,
+        focus: dict | None = None,
     ) -> None:
+        """`focus` None keeps the frame the agent was on."""
         found = self.agents.get(run_id)
         if found is None:
             if spec is None:
@@ -423,6 +429,8 @@ class _Brief:
             found.state = state
         if line is not None:
             found.line = line
+        if focus is not None:
+            found.focus = focus
         found.at = utc_now().isoformat()
         self.engine._publish(self.place.channel, {"type": "agent", "agent": self.agent_info(found)})
 
@@ -439,7 +447,7 @@ class _Brief:
             "state": a.state,
             "line": a.line,
             "brief_id": self.brief_id,
-            "focus": None,
+            "focus": a.focus,
             "at": a.at,
         }
 
@@ -615,6 +623,7 @@ class _Brief:
             embedder=meaning.embedder() if meaning is not None else None,
             reranker=meaning.reranker() if meaning is not None else None,
             services=services,
+            projects=self.engine.projects,
         )
 
     def _toolset(self, spec: AgentSpec, ctx: ToolContext):
@@ -635,7 +644,14 @@ class _Brief:
                     words = tool.activity(tool.args.model_validate(c.args_as_dict()))
                 except Exception:  # noqa: BLE001 - its own words are only for the Progress Line
                     pass
-            self.emit(Progress(self.brief_id, run_id, spec.name, words))
+            on = self._focus(c.tool_name, c.args_as_dict())
+            self.emit(Progress(self.brief_id, run_id, spec.name, words, on))
+
+    def _focus(self, tool: str, args: dict) -> dict | None:
+        try:
+            return focus.of(tool, args, self.place.rec)
+        except RecordsError:  # only for the canvas: the tool call itself says what is wrong
+            return None
 
     # Failures --------------------------------------------------------------------------------
 
@@ -728,7 +744,8 @@ class _Brief:
 
     def _instructions(self, choice: ModelChoice) -> str:
         said = f"You run on the model {choice.model}; say so when asked which model you are."
-        return said if not self.instruction else f"{said}\n\n{self.instruction}"
+        found = (said, self.instruction, selection.line(self.selection))
+        return "\n\n".join(part for part in found if part)
 
     async def _lead(self, *, report: bool = False) -> Any:
         assert self.lead_run_id is not None
@@ -873,6 +890,9 @@ class _Brief:
             mirror.append(ModelResponse(parts=[ToolCallPart(name, args, tool_call_id=call_id)]))
             mirror.append(ModelRequest(parts=[ToolReturnPart(name, text, tool_call_id=call_id)]))
             self._save(run_id, mirror)
+            on = self._focus(name, args)
+            if on is not None:
+                self._agent(run_id, focus=on)
 
         ctx = self.lead_ctx if run_id == self.lead_run_id else self._ctx(run_id, spec)
         token = self.engine.mcp.issue(RunScope(ctx, spec.tools, on_result))
@@ -924,6 +944,9 @@ class _Brief:
 
     async def _lead_job(self, run_id: str, spec: AgentSpec, choice: ModelChoice) -> str:
         self._agent(run_id, state="working", model=choice.model)
+        selected = selection.line(self.selection)
+        if selected is not None:  # Claude Code reads only its instructions file
+            spec = replace(spec, instructions=f"{spec.instructions}\n\n{selected}")
         return await self._job(run_id, spec, choice, self.text)
 
     # Specialists and the checker ---------------------------------------------------------------
@@ -1013,7 +1036,8 @@ class _Brief:
             ),
             None,
         )
-        spec = agents.lead_spec()
+        # The General chat's Lead has its three tools only; a project's has the project's.
+        spec = general.lead_spec() if self.place.rec is None else agents.lead_spec()
         if lead is None:
             self.lead_run_id = self.store.new_run(self.brief_id, spec, picked["lead"], None)
         else:
@@ -1267,8 +1291,10 @@ class Engine:
         *,
         instruction: str | None = None,
         output_type: type | None = None,
+        selection: list[dict] | None = None,
     ) -> str:
-        """Starts a Brief in the chat (a project id or "general"), under the caps. Raises
+        """Starts a Brief in the chat (a project id or "general"), under the caps. `selection`
+        is what the engineer selected on the canvas (`engine.selection.read`). Raises
         `BriefBusy`, `NoAI` and `RecordsError`."""
         place = self._place(chat_id)
         busy = self.active(chat_id)
@@ -1278,7 +1304,7 @@ class Engine:
         busy = self.active(chat_id)
         if busy is not None:
             raise BriefBusy(busy)
-        brief_id = place.store.new_brief(chat_id, text)
+        brief_id = place.store.new_brief(chat_id, text, selection)
         self._launch(
             _Brief(
                 self,
@@ -1417,13 +1443,14 @@ class Engine:
         messages = []
         for brief_id in ids:
             brief = place.store.brief(brief_id)
-            messages.append(
-                {
-                    "id": question_id(brief_id),
-                    "role": "user",
-                    "parts": [{"type": "text", "text": brief["text"]}],
-                }
-            )
+            question = {
+                "id": question_id(brief_id),
+                "role": "user",
+                "parts": [{"type": "text", "text": brief["text"]}],
+            }
+            if brief["selection"]:  # the chip on the engineer's message (Plan 7)
+                question["metadata"] = {"selection": brief["selection"]}
+            messages.append(question)
             running = self._briefs.get(brief_id)
             if running is not None:
                 parts = message_parts(running.log)
@@ -1455,6 +1482,10 @@ class Engine:
         """Plan 7's `ActivityEvent`s for the project, as they come."""
         return activity.subscribe(project_id)
 
+    def waiting(self, project_id: str) -> int:
+        """How many cards wait for the engineer in the project's running Briefs."""
+        return sum(len(b.waiting) for b in self._in(project_id))
+
 
 def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
     """A Brief as events again, from what is stored: the Lead's words, the Coordination Room,
@@ -1466,6 +1497,8 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
     reply = lead_text(_load(lead["history"])) if lead is not None else ""
     if reply:
         events.append(TextDelta(brief_id, reply))
+    if lead is not None and lead["history"]:
+        events += general.stored_cards(brief_id, agents.tool_returns(lead["history"]))
     for m in store.team(brief_id):
         events.append(TeamMessage(brief_id, m["id"], m["sender"], m["recipient"], m["text"]))
     with store.rec.read() as c:

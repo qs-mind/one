@@ -106,6 +106,37 @@ FILE_UNREADABLE = {
     "ar": "اتحفظ، بس One مقدرش يقراه (يا إما بايظ، يا إما مقفول بباسورد).",
 }
 
+FILE_NOT_FOUND = {
+    "en": "This file is not in Project Records.",
+    "ar": "الملف ده مش موجود في سجلات المشروع.",
+}
+
+# The Project Canvas (Plan 7).
+CANVAS_BAD_LAYOUT = {
+    "en": "The canvas layout was not saved: a frame's place or size is out of range.",
+    "ar": "ترتيب الكانفاس ماتحفظش: مكان أو مقاس إطار برّه الحدود.",
+}
+
+PAGE_NOT_FOUND = {
+    "en": "The file has no page with this number.",
+    "ar": "الملف مفيهوش صفحة بالرقم ده.",
+}
+
+FILE_HAS_NO_PAGES = {
+    "en": "Only a PDF file shows its pages; this file shows its text.",
+    "ar": "ملف الـ PDF بس هو اللي بيعرض صفحاته؛ الملف ده بيعرض النص بتاعه.",
+}
+
+PROJECT_IS_CONFIDENTIAL = {
+    "en": "This is a Confidential Project, so the General chat cannot hand anything to it.",
+    "ar": "ده مشروع سري، فالشات العام مايقدرش يحوّل له أي حاجة.",
+}
+
+CHAT_BAD_SELECTION = {
+    "en": "What was selected on the canvas could not be read, so the message was not sent.",
+    "ar": "اللي اتحدد على الكانفاس ماتقراش، فالرسالة ماتبعتتش.",
+}
+
 SEARCH_WORDS_ONLY = {
     "en": "Searching by words only until search by meaning is ready.",
     "ar": "البحث بالكلمات بس لحد ما البحث بالمعنى يجهز.",
@@ -1390,6 +1421,90 @@ BOQ_ROW_SKIPPED = {
     "en": "Row {row} was not imported: {why}",
     "ar": "الصف {row} مااتستوردش: {why}",
 }
+# Task 9: the import's own words. Why a row was left out ({field} is a BOQ_FIELDS pair).
+BOQ_WHY_TEXT = {
+    "en": "the {field} in column {column} is text, not a number",
+    "ar": "{field} في العمود {column} نص، مش رقم",
+}
+BOQ_WHY_DECIMALS = {
+    "en": "the {field} in column {column} has more than 6 decimals; check the cell in Excel",
+    "ar": "{field} في العمود {column} فيه أكتر من 6 أرقام عشرية؛ راجع الخانة في Excel",
+}
+BOQ_WHY_NO_UNIT = {"en": "a quantity with no unit", "ar": "كمية من غير وحدة"}
+BOQ_WHY_NO_DESCRIPTION = {"en": "numbers with no description", "ar": "أرقام من غير وصف"}
+BOQ_WHY_TOTAL = {"en": "a total row", "ar": "صف إجمالي"}
+BOQ_WHY_NUMBER_ONLY = {
+    "en": "a rate or amount with no quantity and no unit",
+    "ar": "فئة أو إجمالي من غير كمية ولا وحدة",
+}
+BOQ_WHY_HIDDEN = {"en": "the row is hidden in Excel", "ar": "الصف مخفي في Excel"}
+BOQ_WHY_HEADER = {"en": "the column headings again", "ar": "عناوين الأعمدة تاني"}
+BOQ_FIELDS = {
+    "code": {"en": "Item no.", "ar": "رقم البند"},
+    "description": {"en": "Description", "ar": "الوصف"},
+    "unit": {"en": "Unit", "ar": "الوحدة"},
+    "quantity": {"en": "Quantity", "ar": "الكمية"},
+    "rate": {"en": "Rate", "ar": "الفئة"},
+    "amount": {"en": "Amount", "ar": "الإجمالي"},
+}
+BOQ_FILE = {"en": "the BOQ file", "ar": "ملف المقايسة"}
+DOING_BOQ_PREVIEW = {
+    "en": "Look at the BOQ columns in {name}",
+    "ar": "يبص على أعمدة المقايسة في {name}",
+}
+BOQ_NOT_EXCEL = {
+    "en": "This file is not an Excel workbook (.xlsx or .xls); files_read reads it.",
+    "ar": "الملف ده مش ملف Excel (.xlsx أو .xls)؛ files_read بيقراه.",
+}
+BOQ_NO_ROWS = {
+    "en": "No BOQ rows were found below the header row with these columns. Check the header row "
+    "and the columns with boq_preview.",
+    "ar": "مالقيناش صفوف مقايسة تحت صف العناوين بالأعمدة دي. راجع صف العناوين والأعمدة بـ "
+    "boq_preview.",
+}
+BOQ_NEEDS_CURRENCY = {
+    "en": "Rates and amounts need their currency: three letters, e.g. EGP, SAR, AED.",
+    "ar": "الفئات والإجماليات محتاجة عملتها: تلات حروف، زي EGP أو SAR أو AED.",
+}
+# The card that shows the column mapping before anything is written.
+BOQ_CONFIRM_TITLE = {
+    "en": "Import the BOQ from {name}, sheet {sheet}?",
+    "ar": "أستورد المقايسة من {name}، شيت {sheet}؟",
+}
+BOQ_CONFIRM_DETAIL = {
+    "en": "Rows {first} to {last}: {items} items and {headings} headings; {skipped} rows left "
+    "out. Tick each column that is right. An unticked rate or amount is left out.",
+    "ar": "الصفوف من {first} لـ {last}: {items} بند و{headings} عنوان؛ {skipped} صف متسابين. "
+    "علّم على كل عمود صح. الفئة أو الإجمالي اللي مش متعلّم عليه مش هيتستورد.",
+}
+BOQ_CONFIRM_HIDDEN = {
+    "en": "{count} rows hidden in Excel are left out.",
+    "ar": "{count} صف مخفيين في Excel متسابين.",
+}
+BOQ_CONFIRM_HIDDEN_IN = {
+    "en": "{count} rows hidden in Excel are included.",
+    "ar": "{count} صف مخفيين في Excel داخلين في الاستيراد.",
+}
+BOQ_CONFIRM_FLAGGED = {
+    "en": "{count} rows have hidden text (white, tiny or invisible) or look like orders to an "
+    "AI; they are imported as data only.",
+    "ar": "{count} صف فيهم نص مخفي (أبيض أو صغير جداً أو مش ظاهر) أو شكلهم أوامر لذكاء "
+    "اصطناعي؛ بيتستوردوا كبيانات بس.",
+}
+BOQ_CARD_COLUMNS = {
+    "field": {"en": "What", "ar": "البيان"},
+    "column": {"en": "Column", "ar": "العمود"},
+    "header": {"en": "Its heading in the file", "ar": "عنوانه في الملف"},
+    "example": {"en": "First values", "ar": "أول القيم"},
+}
+BOQ_NOT_CONFIRMED = {
+    "en": "The engineer did not confirm the columns, so nothing was imported.",
+    "ar": "المهندس ماأكدش الأعمدة، فمااتستوردش حاجة.",
+}
+BOQ_REQUIRED_UNTICKED = {
+    "en": "The engineer did not tick the {fields} column, so nothing was imported.",
+    "ar": "المهندس ماعلّمش على عمود {fields}، فمااتستوردش حاجة.",
+}
 
 # Evidence for numbers.
 SOURCE_NOT_EVIDENCE = {
@@ -1482,8 +1597,45 @@ PRICES_COUNTRY = {
 
 # The Sandbox.
 SANDBOX_NOT_READY = {
-    "en": "The Sandbox's Python is missing or damaged, so no code can run. Reinstall One.",
-    "ar": "بايثون الصندوق المعزول ناقص أو بايظ، فمفيش كود هيشتغل. نزّل One تاني.",
+    "en": (
+        "The Sandbox's Python is missing or damaged, so no code ran. "
+        "One downloads it again (about 16 MB) the next time a script runs."
+    ),
+    "ar": (
+        "بايثون الصندوق المعزول ناقص أو بايظ، فمفيش كود اشتغل. "
+        "One هينزّله تاني (حوالي 16 ميجا) أول ما سكريبت يشتغل."
+    ),
+}
+SANDBOX_DOWNLOAD_FAILED = {
+    "en": (
+        "The Sandbox's Python did not download (no internet, or the server did not answer). "
+        "What came so far is kept. Try again."
+    ),
+    "ar": (
+        "بايثون الصندوق المعزول مانزلش (مفيش نت، أو السيرفر مارَدّش). "
+        "اللي نزل لحد دلوقتي محفوظ. جرّب تاني."
+    ),
+}
+SANDBOX_NO_SPACE = {
+    "en": (
+        "There is not enough free space: the Sandbox's Python needs about 300 MB while it "
+        "downloads. Free some space, then try again."
+    ),
+    "ar": (
+        "مفيش مساحة فاضية كفاية: بايثون الصندوق المعزول محتاج حوالي 300 ميجا وهو بينزل. "
+        "فضّي شوية مساحة وجرّب تاني."
+    ),
+}
+SANDBOX_SCRIPT_TOO_BIG = {
+    "en": (
+        "The script is larger than 200 KB. "
+        "Send a shorter one that reads its data from the input files."
+    ),
+    "ar": "السكريبت أكبر من 200 كيلو. ابعت واحد أقصر بيقرا بياناته من ملفات الإدخال.",
+}
+SANDBOX_RUN_UNKNOWN = {
+    "en": "There is no Sandbox run with this id here. A sandbox_run result gives its run id.",
+    "ar": "مفيش تشغيلة في الصندوق المعزول بالرقم ده هنا. نتيجة sandbox_run فيها رقم التشغيلة.",
 }
 SANDBOX_SYNTAX = {
     "en": "The script has a mistake on line {line}: {message}",

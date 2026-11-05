@@ -322,4 +322,17 @@ CREATE TRIGGER keep_policy_no_delete BEFORE DELETE ON keep_policy
   BEGIN SELECT RAISE(ABORT, 'What-to-keep answers are never deleted'); END;
 """
 
-MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4, TOOLS_SQL]
+# The Project Canvas (Plan 7): where each frame sits and the last view, keyed `kind:ref`. Screen
+# layout, not project facts: not audited, and floats are allowed. A Brief keeps what the engineer
+# had selected on the canvas when sending it (JSON list of SelectionItem, or NULL).
+CANVAS_SQL = """
+CREATE TABLE canvas_frames (
+  key TEXT PRIMARY KEY CHECK (key GLOB '[a-z]*:*'),
+  x REAL NOT NULL, y REAL NOT NULL, w REAL NOT NULL, h REAL NOT NULL,
+  z INTEGER NOT NULL DEFAULT 0, collapsed INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL);
+CREATE TABLE canvas_view (id INTEGER PRIMARY KEY CHECK (id = 1),
+  x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL, updated_at TEXT NOT NULL);
+ALTER TABLE briefs ADD COLUMN selection TEXT CHECK (selection IS NULL OR json_valid(selection))
+"""
+
+MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4, TOOLS_SQL, CANVAS_SQL]
