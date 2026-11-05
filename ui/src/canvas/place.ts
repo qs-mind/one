@@ -24,6 +24,8 @@ export function sizeFor(key: FrameKey, info: { kind?: DeliverableInfo["kind"]; a
       if (info.kind === "sheet") return { w: 960, h: 640 };
       if (info.kind === "document") return { w: 720, h: 900 };
       return { w: 720, h: 560 };
+    case "clientboq":
+      return { w: 960, h: 640 };
     case "desk":
       return { w: 320, h: Math.max(MIN_H, 64 + 48 * (info.agents ?? 0)) };
     default:

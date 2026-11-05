@@ -60,7 +60,7 @@ def set_meta(client, project, **values):
 def test_layout_round_trips_and_survives_a_restart(data_dir):
     with TestClient(create_app(SECRET, data_dir=data_dir)) as c:
         pid = c.post("/projects", json={"name": "برج - عينة"}, headers=AUTH).json()["id"]
-        assert layout(c, pid) == {"frames": [], "view": None}
+        assert layout(c, pid) == {"frames": [], "view": None, "client_boqs": []}
         r = put_frames(c, pid, FRAMES)
         assert r.status_code == 200 and r.json() == {"ok": True}
         view = {"x": -300, "y": 80, "zoom": 0.85}
