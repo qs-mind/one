@@ -57,7 +57,7 @@ describe("the live store", () => {
   afterEach(() => {
     for (const stop of stops) stop();
     vi.useRealTimers();
-    leadFromChat("ready");
+    leadFromChat(false);
   });
 
   it("loads the team when it starts and clears it when it stops", async () => {
@@ -148,9 +148,9 @@ describe("the live store", () => {
     const { result } = renderHook(() => useTeamAgents());
     const lead = () => result.current.find((a) => a.kind === "lead");
     expect(lead()).toMatchObject({ state: "idle", role: texts.roleLead });
-    act(() => leadFromChat("streaming"));
+    act(() => leadFromChat(true));
     expect(lead()?.state).toBe("thinking");
-    act(() => leadFromChat("ready"));
+    act(() => leadFromChat(false));
     expect(lead()?.state).toBe("idle");
   });
 
@@ -159,7 +159,7 @@ describe("the live store", () => {
     stops.push(run.stop);
     await settle();
     const { result } = renderHook(() => useTeamAgents());
-    act(() => leadFromChat("streaming"));
+    act(() => leadFromChat(true));
     expect(result.current.filter((a) => a.kind === "lead").map((a) => [a.id, a.state])).toEqual([["lead1", "working"]]);
   });
 

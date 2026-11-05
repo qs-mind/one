@@ -184,10 +184,10 @@ function stop(run: Running) {
   }
 }
 
-/** Starts the live team of these sources until `signal` aborts. Several parts of the screen may start the same
- * sources (the canvas, the shell): they share one store, which stops when the last of them stops. Other sources
- * replace the running ones. */
-export function startActivity(sources: ProjectSources, signal: AbortSignal) {
+/** Starts the live team of these sources until `signal` aborts; `team`, when the caller has just read it (the
+ * canvas does), saves reading it again. Several parts of the screen may start the same sources: they share one
+ * store, which stops when the last of them stops. Other sources replace the running ones. */
+export function startActivity(sources: ProjectSources, signal: AbortSignal, team?: Team) {
   if (signal.aborted) return;
   if (running?.sources !== sources) {
     if (running) stop(running);
@@ -195,7 +195,8 @@ export function startActivity(sources: ProjectSources, signal: AbortSignal) {
     const controller = new AbortController();
     const run: Running = { sources, controller, starters: 0, timer: setInterval(tick, TICK_MS) };
     running = run;
-    loadTeam(run);
+    if (team) applyTeam(team, Date.now());
+    else loadTeam(run);
     sources.activity(enqueue, controller.signal, () => loadTeam(run));
   }
   const run = running!;
@@ -211,8 +212,8 @@ export function startActivity(sources: ProjectSources, signal: AbortSignal) {
 }
 
 /** Before Plan 4 sends the team, the Lead QS shows the chat's status: thinking while a reply is on its way. */
-export function leadFromChat(status: "submitted" | "streaming" | "ready" | "error") {
-  const next = status === "submitted" || status === "streaming" ? "thinking" : "idle";
+export function leadFromChat(thinking: boolean) {
+  const next = thinking ? "thinking" : "idle";
   if (next === leadState) return;
   leadState = next;
   publish();

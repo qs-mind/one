@@ -43,7 +43,9 @@ export function useFollowCamera() {
   const agent = useAgent(id ?? "");
   const flow = useReactFlow();
   const store = useStoreApi();
-  const moving = useRef(0); // our own moves under way: the view changes they make are not the engineer's
+  // Until then the view moves by our own hand, not the engineer's. A time, not the move's promise: a move the
+  // engineer interrupts never settles.
+  const ownUntil = useRef(0);
   const target = agent && cursorShown(agent) ? agent.focus!.frame : null;
 
   useEffect(() => {
@@ -58,18 +60,15 @@ export function useFollowCamera() {
     const w = node.width ?? node.measured.width ?? 0;
     const h = node.height ?? node.measured.height ?? STRIP_H;
     const { x, y } = node.internals.positionAbsolute;
-    moving.current += 1;
-    void flow
-      .setCenter(x + w / 2, y + h / 2, { zoom: state.transform[2], duration: glide() })
-      .finally(() => {
-        moving.current -= 1;
-      });
+    const duration = glide();
+    ownUntil.current = performance.now() + duration + 100;
+    void flow.setCenter(x + w / 2, y + h / 2, { zoom: state.transform[2], duration });
   }, [id, target, flow, store]);
 
   useEffect(() => {
     if (!id) return;
     return store.subscribe((state, previous) => {
-      if (state.transform !== previous.transform && moving.current === 0) stopFollowing();
+      if (state.transform !== previous.transform && performance.now() >= ownUntil.current) stopFollowing();
     });
   }, [id, store]);
 }

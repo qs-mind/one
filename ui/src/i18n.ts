@@ -476,6 +476,7 @@ export const texts = {
   agentOnAt: { en: "On «{title}», {place}", ar: "على «{title}»، {place}" },
   anchorRow: { en: "item {row}", ar: "البند {row}" },
   anchorPage: { en: "page {page}", ar: "صفحة {page}" },
+  teamNowCount: { en: "Working now: {n}", ar: "الشغالين دلوقتي: {n}" },
   follow: { en: "Follow", ar: "تابع" },
   followRole: { en: "Follow {role}", ar: "تابع {role}" },
   stopRole: { en: "Stop the Brief {role} is on", ar: "وقّف التكليف اللي {role} شغال عليه" },

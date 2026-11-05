@@ -2,10 +2,11 @@
 // running agent shows as idle; nothing else is made up.
 import type { Node, NodeProps } from "@xyflow/react";
 import { dir, texts, useLanguage } from "../../i18n";
-import type { AgentInfo } from "../types";
-import { AgentRow, Frame, frameTitle, memoFrame, type TeamData } from "./Frame";
+import { useTeamAgents, type LiveAgent } from "../live/activity";
+import { AgentCard } from "../live/AgentCard";
+import { Frame, frameTitle, memoFrame, type TeamData } from "./Frame";
 
-const idle = (kind: "lead" | "checker"): AgentInfo => ({
+const idle = (kind: "lead" | "checker"): LiveAgent => ({
   id: `idle-${kind}`,
   kind,
   role: kind === "lead" ? texts.roleLead : texts.roleChecker,
@@ -16,11 +17,13 @@ const idle = (kind: "lead" | "checker"): AgentInfo => ({
   brief_id: null,
   focus: null,
   at: "",
+  noNews: false,
 });
 
 function TeamFrameView(props: NodeProps<Node<TeamData, "team">>) {
   useLanguage();
-  const { agents, collapsed } = props.data;
+  const { collapsed } = props.data;
+  const agents = useTeamAgents(); // from the live store: an agent's move never re-renders the canvas
   const rows = [
     ...(agents.some((a) => a.kind === "lead") ? [] : [idle("lead")]),
     ...(agents.some((a) => a.kind === "checker") ? [] : [idle("checker")]),
@@ -36,13 +39,13 @@ function TeamFrameView(props: NodeProps<Node<TeamData, "team">>) {
     >
       <ul className="flex flex-col divide-y divide-ink/10">
         {rows.map((agent) => (
-          <AgentRow key={agent.id} agent={agent} />
+          <AgentCard key={agent.id} agent={agent} />
         ))}
       </ul>
     </Frame>
   );
 }
 
-const order = (a: AgentInfo) => ({ lead: 0, checker: 1, specialist: 2, quick: 3 })[a.kind];
+const order = (a: LiveAgent) => ({ lead: 0, checker: 1, specialist: 2, quick: 3 })[a.kind];
 
 export const TeamFrame = memoFrame(TeamFrameView);
