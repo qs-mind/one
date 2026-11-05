@@ -3,12 +3,15 @@
 // title and switcher are in the top bar (DocumentHead). Alt and the arrow that points back (→ in Arabic, ← in English) go Back, to the same row. A newly shown document fades in
 // over 200 ms (at once with reduced motion). A selection in the document is the composer's chip; a source opened
 // from its card is marked in the file, or said once when its place cannot be.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { dir, t, useLanguage } from "../i18n";
 import { isMod, isTyping } from "../project/keys";
 import { useAgents, type LiveAgent } from "../project/live/activity";
 import { select } from "../project/selection";
 import type { Anchor, DocKey, Opened, ProjectSources, ViewerHandle } from "../project/types";
+import { importInto } from "../import/importer";
+import { holdsFolder } from "../import/walk";
+import { addToRecords } from "../records/RecordsPanel";
 import { revealSource, REVEAL_WAIT_MS } from "../sources/mark";
 import { play } from "../ui/motion";
 import { useOpened, workspaceApi } from "./api";
@@ -66,6 +69,27 @@ function useSourceMark(opened: Opened): boolean {
     };
   }, [opened]);
   return unmarked === opened;
+}
+
+const carriesFiles = (event: DragEvent) => event.dataTransfer?.types?.includes("Files") ?? false;
+
+/** Files or a folder dropped anywhere on the document: a folder (a tender's) goes into the project with its folders,
+ * files go to Project Records (Project files opens to show them come). The window never opens what was dropped. */
+function dropHandlers(projectId: string, opened: Opened) {
+  return {
+    onDragOver(event: DragEvent) {
+      if (carriesFiles(event)) event.preventDefault();
+    },
+    onDrop(event: DragEvent) {
+      if (event.defaultPrevented || !carriesFiles(event)) return; // Project files took it itself
+      event.preventDefault();
+      if (holdsFolder(event.dataTransfer.items)) return void importInto(projectId, event.dataTransfer);
+      const files = Array.from(event.dataTransfer.files);
+      if (!files.length) return;
+      if (opened.key !== "files:all") workspaceApi.open("files:all"); // Back returns to the document
+      addToRecords(files);
+    },
+  };
 }
 
 /** One document as shown: it fades in as it comes (keyed by the document, so each one starts fresh). */
@@ -135,7 +159,13 @@ function Open({ projectId, sources, documents, opened }: { projectId: string; so
   };
 
   return (
-    <section data-region="document" aria-label={titleOf(documents, opened.key) ?? t("projectFiles")} tabIndex={-1} className="flex min-h-0 min-w-0 flex-1 flex-col outline-none">
+    <section
+      data-region="document"
+      aria-label={titleOf(documents, opened.key) ?? t("projectFiles")}
+      tabIndex={-1}
+      className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
+      {...dropHandlers(projectId, opened)}
+    >
       <div data-document-sheet className="relative min-h-0 flex-1 overflow-hidden rounded-[10px] bg-paper ring-1 ring-slate/18">
         <Shown key={opened.key}>
           <div

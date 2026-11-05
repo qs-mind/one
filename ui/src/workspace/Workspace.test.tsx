@@ -13,6 +13,7 @@ import type { ViewerProps } from "../project/types";
 import { setCurrentProject } from "../records/project";
 import { App } from "../shell/App";
 import { core, P1 } from "../shell/testing";
+import { importInto } from "../import/importer";
 import { workspaceApi } from "./api";
 import { markFor, openSourceFile } from "./reveal";
 import { sourceKeys } from "../sources/targets";
@@ -41,6 +42,7 @@ function StandIn({ deliverableId, onSelection, ref }: ViewerProps) {
 }
 
 vi.mock("../viewers/registry", () => ({ viewerFor: () => StandIn }));
+vi.mock("../import/importer", async (actual) => ({ ...(await actual<typeof import("../import/importer")>()), importInto: vi.fn() }));
 
 const A = entry({ id: "dA", title: "المقايسة المسعّرة - عينة" });
 const B = entry({ id: "dB", title: "خطاب العطاء - عينة", kind: "document" });
@@ -230,5 +232,75 @@ describe("the workspace", () => {
     );
     await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).querySelector("[data-working-dot]")).not.toBeNull());
     stop.abort();
+  });
+});
+
+describe("dropping on the open document", () => {
+  const info = (name: string) => ({ id: `id-${name}`, name, status: "read", note: null, replaces: null });
+  const folder = (name: string) => ({ kind: "file", webkitGetAsEntry: () => ({ isDirectory: true, isFile: false, name }) });
+
+  it("files dropped on a Deliverable go to Project Records: Project files opens and shows them come", async () => {
+    setCurrentProject(P1);
+    const fetch = core({
+      routes: {
+        [`POST /api/projects/p1/files?name=${encodeURIComponent("أ - عينة.csv")}`]: () => Response.json(info("أ - عينة.csv"), { status: 201 }),
+        [`POST /api/projects/p1/files?name=${encodeURIComponent("ب - عينة.csv")}`]: () => Response.json(info("ب - عينة.csv"), { status: 201 }),
+      },
+    });
+    const sources = fakeSources({ deliverables: [A], workspace: { key: "deliverable:dA", anchor: null } });
+    render(<App sourcesFor={() => sources} />);
+    const region = await waitFor(() => {
+      const found = document.querySelector<HTMLElement>('[data-region="document"]');
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    await screen.findByTestId("viewer-dA");
+    const transfer = { types: ["Files"], files: [new File(["a"], "أ - عينة.csv"), new File(["b"], "ب - عينة.csv")], items: [] };
+    expect(fireEvent.dragOver(screen.getByTestId("viewer-dA"), { dataTransfer: transfer })).toBe(false); // the window keeps the page
+    expect(fireEvent.drop(screen.getByTestId("viewer-dA"), { dataTransfer: transfer })).toBe(false);
+    expect(region).toBeInTheDocument();
+    expect(workspaceApi.current()?.key).toBe("files:all");
+    expect(await screen.findByText(/ب - عينة/)).toBeInTheDocument();
+    const posted = fetch.mock.calls.filter(([url, init]) => String(url).startsWith("/api/projects/p1/files?") && init?.method === "POST");
+    expect(posted.map(([url]) => decodeURIComponent(String(url).split("?name=")[1]!))).toEqual(["أ - عينة.csv", "ب - عينة.csv"]);
+    act(() => void workspaceApi.back()); // Back returns to the Deliverable
+    expect(workspaceApi.current()?.key).toBe("deliverable:dA");
+  });
+
+  it("files dropped on Project files itself are added there, once", async () => {
+    setCurrentProject(P1);
+    const fetch = core({
+      routes: {
+        [`POST /api/projects/p1/files?name=${encodeURIComponent("أ - عينة.csv")}`]: () => Response.json(info("أ - عينة.csv"), { status: 201 }),
+      },
+    });
+    render(<App sourcesFor={() => fakeSources({ workspace: { key: "files:all", anchor: null } })} />);
+    const area = await screen.findByText(texts.dropHere.ar);
+    fireEvent.drop(area, { dataTransfer: { types: ["Files"], files: [new File(["a"], "أ - عينة.csv")], items: [] } });
+    expect(await screen.findByText(/أ - عينة/)).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fetch.mock.calls.filter(([url, init]) => String(url).startsWith("/api/projects/p1/files?") && init?.method === "POST")).toHaveLength(1);
+  });
+
+  it("a tender folder dropped on the document goes into the open project", async () => {
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({ deliverables: [A], workspace: { key: "deliverable:dA", anchor: null } });
+    render(<App sourcesFor={() => sources} />);
+    const viewer = await screen.findByTestId("viewer-dA");
+    const transfer = { types: ["Files"], files: [], items: [folder("المناقصة - عينة")] };
+    expect(fireEvent.drop(viewer, { dataTransfer: transfer })).toBe(false);
+    expect(importInto).toHaveBeenCalledWith("p1", expect.objectContaining({ types: ["Files"] }));
+    expect(workspaceApi.current()?.key).toBe("deliverable:dA"); // the import says how it went in the chat
+  });
+
+  it("files dropped on the chat beside it never make the window open them", async () => {
+    setCurrentProject(P1);
+    core();
+    render(<App sourcesFor={() => fakeSources({ deliverables: [A], workspace: { key: "deliverable:dA", anchor: null } })} />);
+    const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
+    const transfer = { types: ["Files"], files: [new File(["a"], "أ - عينة.csv")], items: [] };
+    expect(fireEvent.dragOver(chat, { dataTransfer: transfer })).toBe(false);
+    expect(fireEvent.drop(chat, { dataTransfer: transfer })).toBe(false);
   });
 });

@@ -352,7 +352,13 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               // dense (5 Nov): the room is the data's: 8 px under the top bar and above the window's foot, 12 px at
               // the sides and between the document and the chat
               // below 640 px the document loses its side gutters: the phone's width is all the data's
-              <main className={`relative flex min-h-0 flex-1 gap-3 py-2 ${small ? "px-0" : "px-3"}`}>
+              <main
+                className={`relative flex min-h-0 flex-1 gap-3 py-2 ${small ? "px-0" : "px-3"}`}
+                // files dropped beside the document (the chat, the gutters) are taken by nothing: the window must
+                // not open them in its place (dragDropEnabled is off, so the webview's own drop is the page's)
+                onDragOver={(event) => event.dataTransfer.types.includes("Files") && event.preventDefault()}
+                onDrop={(event) => event.dataTransfer.types.includes("Files") && event.preventDefault()}
+              >
                 {documents ? (
                   <Workspace projectId={project.id} sources={sources} documents={documents} />
                 ) : (
