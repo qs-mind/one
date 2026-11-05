@@ -297,6 +297,18 @@ describe("SheetViewer", () => {
     expect(cellOf("03/02", "amount")).toHaveAttribute("aria-readonly", "true");
   });
 
+  it("the grid is one Tab stop: the buttons in its cells (fold, ✓ ✗, the total) are reached on the active cell only", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SheetViewer projectId={P} view={sheet({ pending: 1 })} changes={[change("c1")]} />);
+    const grid = container.querySelector<HTMLElement>(".rdg")!;
+    const tabbable = () => [...grid.querySelectorAll<HTMLElement>("button, [tabindex]")].filter((el) => el.tabIndex >= 0);
+    expect(grid.querySelectorAll("button").length).toBeGreaterThan(2); // folds, ✓ ✗ and the total are there
+    expect(tabbable().filter((el) => el.matches("button"))).toEqual([]);
+    // on the active cell its button is the next Tab stop, and only its
+    await user.click(cellOf("03/02", "rate"));
+    expect(tabbable().filter((el) => el.matches("button")).map((el) => el.getAttribute("aria-label"))).toEqual([texts.sheetAccept.ar, texts.sheetReject.ar]);
+  });
+
   it("✓ accepts and ✗ rejects that change only", async () => {
     const user = userEvent.setup();
     const onChanged = vi.fn();

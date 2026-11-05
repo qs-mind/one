@@ -39,7 +39,8 @@ export type GridProps<R extends SheetRow> = {
   rows: R[];
   direction: "rtl" | "ltr";
   rowHeight: (row: R) => number;
-  renderCell: (row: R, column: SheetColumn, selected: boolean) => ReactNode;
+  /** `tabIndex` is the grid's own for what the cell holds: 0 on the active cell only, so the grid is one Tab stop. */
+  renderCell: (row: R, column: SheetColumn, selected: boolean, tabIndex: number) => ReactNode;
   onCommit: (row: R, column: SheetColumn, text: string) => void;
   selection: Range | null;
   onSelection: (range: Range | null) => void;
@@ -53,7 +54,7 @@ export type GridProps<R extends SheetRow> = {
   /** A class for a row of the owner's (the change review dims the rows with no change). */
   rowClass?: (row: R) => string | undefined;
   /** One row pinned at the bottom: the bill total. */
-  summary?: (column: SheetColumn) => ReactNode;
+  summary?: (column: SheetColumn, tabIndex: number) => ReactNode;
   label?: string;
   /** Off only in tests that need every row in the DOM. */
   virtualize?: boolean;
@@ -141,19 +142,19 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
         minWidth: 40,
         frozen: column.frozen,
         editable: (g: GridRow<R>) => canEdit(g.row, column),
-        renderCell: ({ row: g, rowIdx }) => {
+        renderCell: ({ row: g, rowIdx, tabIndex }) => {
           const selected = inRange(selection, rowIdx, col);
           return (
             <div
               className={`-mx-3 flex h-full items-center px-3 ${selected ? "bg-copper/10" : ""}`}
               data-selected={selected || undefined}
             >
-              {renderCell(g.row, column, selected)}
+              {renderCell(g.row, column, selected, tabIndex)}
             </div>
           );
         },
         renderEditCell: (p) => <Editor {...p} text={editText(p.row.row, column)} wrap={column.wrap} />,
-        ...(summary ? { renderSummaryCell: () => summary(column) } : {}),
+        ...(summary ? { renderSummaryCell: ({ tabIndex }) => summary(column, tabIndex) } : {}),
       })),
     [columns, selection, renderCell, canEdit, editText, summary],
   );

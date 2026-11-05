@@ -295,10 +295,11 @@ export function SheetViewer(props: SheetViewerProps) {
 
   const current = props.review?.current ?? null;
   const renderCell = useCallback(
-    (row: ViewRow, column: SheetColumn) => {
+    (row: ViewRow, column: SheetColumn, _selected: boolean, tabIndex: number) => {
       const vc = byKey.get(column.key)!;
       return (
         <SheetCell
+          tabIndex={tabIndex}
           row={row}
           column={vc}
           titleColumn={titleColumn}
@@ -329,7 +330,7 @@ export function SheetViewer(props: SheetViewerProps) {
   const total = view.total;
   const totalColumn = columns.find((c) => c.kind === "calc")?.key;
   const summary = useCallback(
-    (column: SheetColumn) => {
+    (column: SheetColumn, tabIndex: number) => {
       if (column.key === titleColumn)
         return (
           <span dir="auto" className="font-bold">
@@ -340,6 +341,7 @@ export function SheetViewer(props: SheetViewerProps) {
       return (
         <button
           type="button"
+          tabIndex={tabIndex}
           className="w-full text-end font-bold hover:text-copper"
           onClick={(event) => openSource(total, event.currentTarget, event.detail === 0, pick(texts.sheetTotal, view.language))}
         >

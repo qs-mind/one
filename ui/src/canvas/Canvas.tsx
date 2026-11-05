@@ -739,6 +739,15 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     if (key === focused.current) return;
     focused.current = key;
     refreshLive();
+    // Tab onto a frame that is off screen or under the chat: the view pans to it (React Flow's own pan counts a frame
+    // half under the chat as seen, and knows nothing of the chat); a click never moves the view
+    const el = event.target as HTMLElement;
+    const node = key && el.matches(".react-flow__node:focus-visible") && nodesRef.current.find((n) => n.id === key);
+    if (!node) return;
+    const frame = placedOf(node);
+    const view = seen();
+    if (!inView({ x: frame.x, y: frame.y, w: Math.min(frame.w, view.w), h: STRIP_H }, view))
+      fitTo([frame], { keepZoom: true, margin: MARGIN, minZoom: READABLE, atStart: frame.w > view.w });
   }
 
   function onDragOver(event: DragEvent<HTMLElement>) {
