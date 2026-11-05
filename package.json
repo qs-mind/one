@@ -18,6 +18,10 @@
     "test:bench": "playwright test --config playwright.bench.config.ts",
     "test:core": "node scripts/python.mjs -m pytest core",
     "lint:core": "node scripts/python.mjs -m ruff check core && node scripts/python.mjs -m ruff format --check core",
+    "package:core": "node scripts/package-core.mjs",
+    "smoke:core": "node scripts/smoke-core.mjs",
+    "notices": "node scripts/notices.mjs",
+    "package": "npm run package:core && npm run smoke:core && tauri build --config desktop/tauri.release.conf.json -- --locked",
     "sandbox:fetch": "node scripts/python.mjs -m qsone.sandbox.runtime",
     "check": "npm run typecheck && npm run lint:core && cargo clippy --manifest-path desktop/Cargo.toml -- -D warnings",
     "tauri": "tauri"

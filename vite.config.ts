@@ -16,7 +16,7 @@ export default defineConfig(({ command }) => ({
   test: {
     root: ".",
     environment: "jsdom",
-    include: ["ui/src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
+    include: ["ui/src/**/*.test.{ts,tsx}", "scripts/**/*.test.{ts,mjs}"],
     setupFiles: ["ui/src/test-setup.ts"],
     testTimeout: 20000, // a busy machine or CI runner must not fail a correct test
   },

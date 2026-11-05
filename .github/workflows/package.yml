@@ -1,0 +1,82 @@
+# Packages the core as an embedded Python on Linux, Windows and macOS and smoke-tests it (Plan 8 Task 3): the pinned
+# python-build-standalone runtime, the hashed runtime.lock, trimmed and bytecode only, the licence gate, then the
+# packaged core started from a clean environment (/health, /about, /about/native, exit when stdin closes). It runs
+# only when something that changes the package changes; the installers themselves are built by the release workflow.
+# Actions are pinned to commit SHAs; the comment names the release.
+name: Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/package-*"
+      - "scripts/smoke-core.mjs"
+      - "scripts/notices.mjs"
+      - "core/runtime.*"
+      - "core/pyproject.toml"
+      - "desktop/**"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "scripts/package-*"
+      - "scripts/smoke-core.mjs"
+      - "scripts/notices.mjs"
+      - "core/runtime.*"
+      - "core/pyproject.toml"
+      - "desktop/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: package (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-22.04: the oldest glibc the AppImage is built on; macos-15: Apple Silicon.
+        os: [ubuntu-22.04, windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.7"
+
+      # The notices list the shell's Rust crates with `cargo metadata`; rustup reads rust-toolchain.toml.
+      - name: Rust from rust-toolchain.toml
+        run: rustup toolchain install && rustc --version
+
+      - run: npm ci --ignore-scripts
+
+      - name: The core's runtime, cached by its pin
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache
+          key: python-runtime-${{ runner.os }}-${{ hashFiles('core/runtime.json') }}
+
+      - run: npm run package:core
+      - run: npm run smoke:core
+
+      - name: Package size
+        run: |
+          du -sh build/core
+          tar -C build -czf - core | wc -c

@@ -1,0 +1,28 @@
+{
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://github.com/qs-mind/one/releases/latest/download/latest.json"],
+      "pubkey": ""
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": false,
+    "targets": ["nsis", "appimage", "app", "dmg"],
+    "publisher": "QS Mind",
+    "category": "Productivity",
+    "resources": {
+      "../build/core/": "core/"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "Arabic"]
+      }
+    },
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "13.0"
+    }
+  }
+}
