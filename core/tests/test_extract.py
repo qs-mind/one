@@ -1,4 +1,8 @@
 import datetime as dt
+import io
+
+import openpyxl
+import xlwt
 
 from qsone.records.extract import Piece, chunk, extract
 from tests.samples import sample_pdf, sample_xls, sample_xlsx
@@ -59,7 +63,7 @@ def test_broken_pdf_is_unreadable():
 
 
 def test_unknown_kind_is_stored():
-    x = extract("مخطط - عينة.dwg", b"AC1032 sample")
+    x = extract("نموذج - عينة.rvt", b"\xd0\xcf\x11\xe0 sample")
     assert (x.kind, x.status, x.note, x.pieces) == ("other", "stored", "FILE_NOT_READ_YET", [])
 
 
@@ -91,3 +95,49 @@ def test_chunk_splits_long_pages_and_keeps_the_locator():
         Piece({"line": 1}, "xxxx"),
         Piece({"line": 1}, "xx"),
     ]
+
+
+NOTE = "ملحوظة:-\n1- يتم اعتماد الرسومات التنفيذية قبل البدء - عينة\n2- " + "شرط طويل " * 20
+
+
+def _merged_note_xlsx() -> bytes:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "BOQ"
+    ws.append(["أعمال النجارة"])
+    ws.append([NOTE])
+    ws.merge_cells("A2:F2")
+    for n in range(1, 6):
+        ws.append([f"12-{n}", "باب خشب - عينة", "عدد", n, 4700])
+    ws.append(["Supply and install access control - sample"])
+    ws.append(["Supply and install access control - sample", "Each", 3])
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+def _merged_note_xls() -> bytes:
+    wb = xlwt.Workbook(encoding="utf-8")
+    ws = wb.add_sheet("BOQ")
+    ws.write(0, 0, "أعمال النجارة")
+    ws.write_merge(1, 1, 0, 5, NOTE)
+    for n in range(1, 6):
+        for c, v in enumerate([f"12-{n}", "باب خشب - عينة", "عدد", n, 4700]):
+            ws.write(1 + n, c, v)
+    ws.write(7, 0, "Supply and install access control - sample")
+    for c, v in enumerate(["Supply and install access control - sample", "Each", 3]):
+        ws.write(8, c, v)
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
+
+
+def test_a_long_merged_note_is_read_once_not_carried_as_a_heading():
+    for name, data in [("عينة.xlsx", _merged_note_xlsx()), ("عينة.xls", _merged_note_xls())]:
+        x = extract(name, data)
+        texts = [p.text for p in x.pieces]
+        assert sum("يتم اعتماد الرسومات" in t for t in texts) == 1, name
+        # the items keep the section heading above the note
+        assert texts[2] == "أعمال النجارة | 12-1 | باب خشب - عينة | عدد | 1 | 4700", name
+        # a heading is not repeated in a row that already holds it
+        assert texts[-1] == "Supply and install access control - sample | Each | 3", name
