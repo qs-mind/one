@@ -198,7 +198,9 @@ async def test_run_passes_only_safe_flags_and_env(log, work, monkeypatch):
     assert "--no-session-persistence" not in argv  # Claude Code keeps its copy (the default)
     assert not any(name.startswith("ANTHROPIC") for name in run["env_names"])
     assert "MCP_TOOL_TIMEOUT" in run["env_names"]
-    assert set(run["env_names"]) <= set(claude_code.ENV_NAMES) | {"MCP_TOOL_TIMEOUT"}
+    # macOS adds __CF_USER_TEXT_ENCODING to every process it starts; One does not pass it
+    added_by_os = {"__CF_USER_TEXT_ENCODING"}
+    assert set(run["env_names"]) - added_by_os <= set(claude_code.ENV_NAMES) | {"MCP_TOOL_TIMEOUT"}
     assert run["files"]["--system-prompt-file"] == INSTRUCTIONS
     mcp = json.loads(run["files"]["--mcp-config"])
     assert mcp == {

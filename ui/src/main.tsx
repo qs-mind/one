@@ -1,3 +1,4 @@
+import "./polyfills";
 import "@fontsource-variable/kumbh-sans";
 import "@fontsource/zain/arabic-400.css";
 import "@fontsource/zain/arabic-700.css";
