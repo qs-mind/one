@@ -39,7 +39,8 @@ export type SheetViewerProps = {
 
 const NONE: never[] = [];
 
-function StatusChips({ view }: { view: SheetView }) {
+/** The status chips with text labels (never colour alone); the Document viewer shows the same. */
+export function StatusChips({ view }: { view: Pick<SheetView, "status" | "code" | "same_provider" | "off_desk"> }) {
   const status =
     view.status === "signed_off"
       ? t("statusSignedOff")

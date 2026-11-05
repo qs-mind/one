@@ -267,6 +267,16 @@ export const texts = {
     en: "Moved: the text it was on has changed.",
     ar: "اتنقلت: النص اللي كانت عليه اتغيّر.",
   },
+  docUntracedCount: {
+    en: "{n} numbers with no source (dotted underline): they are not linked to Project Records.",
+    ar: "{n} أرقام من غير مصدر (تحتها خط منقّط): مش مربوطة بسجلات المشروع.",
+  },
+  docRefMissing: { en: "This number was not found in Project Records", ar: "الرقم ده مش لاقيينه في سجلات المشروع" },
+  docMoveSuggested: { en: "Suggested: move this paragraph", ar: "مقترح: نقل الفقرة دي" },
+  docCommitHint: {
+    en: "An edit is sent as a suggested change when you leave the paragraph or press Ctrl+Enter.",
+    ar: "التعديل بيتبعت كتعديل مقترح لما تسيب الفقرة أو تدوس Ctrl+Enter.",
+  },
   reviewChanges: { en: "Suggested changes", ar: "التعديلات المقترحة" },
   reviewAcceptAll: { en: "Accept all", ar: "اقبل الكل" },
   reviewAcceptMine: { en: "Accept all mine", ar: "اقبل كل تعديلاتي" },

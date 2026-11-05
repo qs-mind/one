@@ -150,6 +150,8 @@ export type Change = {
   after: ViewCell | null;
   follows: CellChange[];
   note?: Text | null; // e.g. NUMBER_WAS_CALCULATED
+  /** A Document block change: the core's word segments, old → new (Task 3). */
+  segments?: Segment[];
 };
 
 /** Where a comment sits, keyed on part ids and column keys (never A1 addresses). */
