@@ -6,6 +6,7 @@ stays plain text; a reload shows the same view.
 Scripted models only; no real AI. Synthetic «عينة» data only."""
 
 import json
+import re
 
 import pytest
 from pydantic_ai import ModelRetry
@@ -63,12 +64,40 @@ def test_the_tool_schema_comes_from_the_view_model():
     assert tool.args.model_json_schema() == view.View.model_json_schema()
     assert tool.roles == frozenset({"lead"}) and tool.risk == "read"
     schema = json.dumps(view.View.model_json_schema())
-    for kind in ("heading", "prose", "figures", "table", "group"):
+    for kind in ("heading", "prose", "figures", "table"):
         assert f'"{kind}"' in schema
-    assert '"chart"' not in schema and '"ask"' not in schema and '"open"' not in schema
+    for kind in ("group", "chart", "ask", "open"):
+        assert f'"{kind}"' not in schema
     recipe, example = tool.description.rsplit("\nExample:\n", 1)
     assert tool.example == json.loads(example) and len(tool.description.split()) <= 120
     view.View.model_validate(tool.example)
+
+
+def test_a_table_row_has_one_fixed_shape_a_small_model_can_fill():
+    """The first bake-off (5 Nov 2026): free-form row keys and text-or-reference cells broke
+    Gemini's function calls. A row is now {label, texts, numbers}: no free key, no cell that may
+    be words or a reference, no column type; a value's place decides what it is."""
+    defs = view.View.model_json_schema()["$defs"]
+    row = defs["Row"]
+    assert set(row["properties"]) == {"label", "texts", "numbers"}
+    assert row["additionalProperties"] is False and "propertyNames" not in json.dumps(defs)
+    texts = row["properties"]["texts"]["items"]
+    assert texts["type"] == "string" and "anyOf" not in texts
+    refs = [r["$ref"] for r in row["properties"]["numbers"]["items"]["anyOf"]]
+    assert refs == ["#/$defs/NumberRef", "#/$defs/CellRef"]  # objects only, as a figure's value
+    assert set(defs["Column"]["properties"]) == {"label"}
+    for block in ("Heading", "Prose", "Figures", "Table"):  # one level: a section title, no group
+        assert "section" in defs[block]["properties"]
+
+
+def test_the_tool_text_and_the_leads_name_no_language():
+    """The bake-off: a language named in the instructions pulled English requests into Arabic.
+    The words follow the engineer's language, whatever it is."""
+    recipe = REGISTRY["show"].description.rsplit("\nExample:\n", 1)[0]
+    lead, general_lead = agents.lead_spec().instructions, general.lead_spec().instructions
+    for text in (recipe, lead, general_lead):
+        assert not re.search(r"arabic|english|egyptian|عربي|إنجليزي", text, re.IGNORECASE)
+    assert "engineer's language" in recipe and "engineer's language" in lead
 
 
 def test_the_project_lead_has_show_and_the_general_chat_lead_has_not():
@@ -125,24 +154,47 @@ async def test_a_sheet_cell_resolves_and_a_cell_with_no_number_is_refused(rec):
     assert "no number" in str(refused.value) and views(host) == []
 
 
-async def test_a_table_takes_references_in_number_columns_and_words_in_text_columns(ledger):
-    ctx, host, ids = ledger
-    columns = [
-        {"key": "item", "label": "البند", "type": "text"},
-        {"key": "rate", "label": "الفئة", "type": "number"},
-    ]
-    rows = [{"item": "03/02 - عينة", "rate": {"number": ids["rate"]}}]
-    await show(ctx, blocks=[{"kind": "table", "columns": columns, "rows": rows}])
-    [shown] = views(host)
-    [row] = shown.data["blocks"][0]["rows"]
-    assert row["item"] == "03/02 - عينة" and row["rate"]["value"] == "39850.50"
+def table(*rows: dict, columns=("البند", "الوصف", "الفئة")) -> dict:
+    return {"kind": "table", "columns": [{"label": c} for c in columns], "rows": list(rows)}
 
-    with pytest.raises(ModelRetry) as refused:  # a typed number in a number column
-        await show(ctx, blocks=[{"kind": "table", "columns": columns, "rows": [{"rate": "12"}]}])
-    assert "blocks[0].rows[0].rate" in str(refused.value)
-    # a column it does not have; the Brief's one retry is used, so it answers in words
-    out = await show(ctx, blocks=[{"kind": "table", "columns": columns, "rows": [{"qty": "1"}]}])
-    assert out["shown"] is None and "qty" in out["note"]
+
+async def test_a_table_row_is_its_label_then_its_texts_then_its_numbers(ledger):
+    ctx, host, ids = ledger
+    row = {"label": "03/02 - عينة", "texts": ["خرسانة مسلحة"], "numbers": [{"number": ids["rate"]}]}
+    await show(ctx, blocks=[table(row)])
+    [shown] = views(host)
+    [out] = shown.data["blocks"][0]["rows"]
+    assert out["label"] == "03/02 - عينة" and out["texts"] == ["خرسانة مسلحة"]
+    assert out["numbers"][0]["value"] == "39850.50" and out["numbers"][0]["currency"] == "EGP"
+    assert [c["label"] for c in shown.data["blocks"][0]["columns"]] == ["البند", "الوصف", "الفئة"]
+
+    host.events.clear()  # texts and numbers may be left out: a table of labels only
+    await show(ctx, blocks=[table({"label": "بند - عينة"}, columns=("البند",))])
+    [labels] = views(host)
+    assert labels.data["blocks"][0]["rows"] == [{"label": "بند - عينة", "texts": [], "numbers": []}]
+
+
+async def test_a_typed_number_in_a_table_is_refused_with_its_place(ledger):
+    ctx, host, _ = ledger
+    row = {"label": "03/02", "texts": ["خرسانة"], "numbers": ["12"]}
+    with pytest.raises(ModelRetry) as refused:
+        await show(ctx, blocks=[{"kind": "heading", "text": "عنوان"}, table(row)])
+    assert "blocks[1].rows[0].numbers[0]" in str(refused.value)
+    assert '{"number": "<number id>"}' in str(refused.value) and views(host) == []
+
+
+async def test_every_row_fits_the_columns(ledger):
+    ctx, host, ids = ledger
+    ref = {"number": ids["rate"]}
+    good = {"label": "03/01", "texts": ["خرسانة"], "numbers": [ref]}
+    short = {"label": "03/02", "texts": [], "numbers": [ref]}  # one cell short of the columns
+    with pytest.raises(ModelRetry) as refused:
+        await show(ctx, blocks=[table(good, short)])
+    message = str(refused.value)
+    assert "blocks[0].rows[1]" in message and "3 columns" in message and views(host) == []
+    # rows that agree with each other but not with the columns; the one retry is used, so words
+    out = await show(ctx, blocks=[table(good, good, columns=("البند", "الفئة"))])
+    assert out["shown"] is None and "2 columns" in out["note"]
 
 
 # Words ----------------------------------------------------------------------------------------
@@ -197,25 +249,28 @@ async def test_an_unknown_block_kind_is_dropped_with_a_note(ledger):
     blocks = [
         {"kind": "chart", "type": "bar"},
         {"kind": "prose", "text": "نص - عينة"},
-        {"kind": "group", "title": "مجموعة", "blocks": [{"kind": "ask", "label": "x"}]},
+        {"kind": "group", "title": "مجموعة", "blocks": [{"kind": "prose", "text": "x"}]},
     ]
     out = await show(ctx, blocks=blocks)
     [shown] = views(host)
-    assert [b["kind"] for b in shown.data["blocks"]] == ["prose"]  # an emptied group goes too
+    assert [b["kind"] for b in shown.data["blocks"]] == ["prose"]
     assert len(out["dropped"]) == 2
     assert "chart" in out["dropped"][0] and "blocks[0]" in out["dropped"][0]
-    assert "ask" in out["dropped"][1] and "blocks[2].blocks[0]" in out["dropped"][1]
+    assert "group" in out["dropped"][1] and "section" in out["dropped"][1]  # a group is a section
 
 
-async def test_a_group_holds_one_level_only(ledger):
-    ctx, host, _ = ledger
-    inner = {"kind": "group", "title": None, "blocks": [{"kind": "prose", "text": "نص"}]}
-    outer = {"kind": "group", "title": "خارج", "blocks": [inner, {"kind": "prose", "text": "نص"}]}
-    blocks = [outer]
+async def test_a_section_title_puts_blocks_together_and_goes_through_the_guard(ledger):
+    ctx, host, ids = ledger
+    section = "الفئة 777 - عينة"
+    blocks = [
+        {"kind": "heading", "text": "عنوان - عينة"},
+        figures({"number": ids["rate"]}) | {"section": section},
+        {"kind": "prose", "text": "نص - عينة", "section": section},
+    ]
     out = await show(ctx, blocks=blocks)
     [shown] = views(host)
-    assert [b["kind"] for b in shown.data["blocks"][0]["blocks"]] == ["prose"]
-    assert "group" in out["dropped"][0]
+    assert [b["section"] for b in shown.data["blocks"]] == [None, section, section]
+    assert out["unsourced"] == ["777"]
 
 
 # In a Brief, and after a reload ---------------------------------------------------------------
