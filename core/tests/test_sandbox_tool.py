@@ -196,8 +196,8 @@ async def test_urls_go_through_the_web_gate(rec):
     assert list(sent["inputs"]) == ["url-1"]
     assert sent["inputs"]["url-1"] == files.read_original(rec, page["file_id"])
     [row] = runs(rec)
-    assert row["inputs"] == [{"name": "url-1", "url": URL, "log_id": page["id"],
-                              "file_id": page["file_id"], "sha256": sha(sent["inputs"]["url-1"])}]  # fmt: skip
+    kept = {"name": "url-1", "url": URL, "log_id": page["id"], "file_id": page["file_id"]}
+    assert row["inputs"] == [kept | {"sha256": sha(sent["inputs"]["url-1"])}]
     assert f"url-1 = web:{page['id']}" in out
 
 
@@ -277,7 +277,9 @@ async def test_inputs_over_64_mb(rec, monkeypatch):
 
 
 async def test_outputs_too_large_are_plain(rec):
-    ctx = ctx_for(rec, sandbox=FakeSandbox(lambda *a: RunResult(None, None, error="output too large")))
+    ctx = ctx_for(
+        rec, sandbox=FakeSandbox(lambda *a: RunResult(None, None, error="output too large"))
+    )
     out = await call("sandbox_run", {"script": "pass"}, ctx)
     assert out.startswith("not done: " + copy.SANDBOX_TOO_MUCH["en"])
 
@@ -301,9 +303,7 @@ async def test_sandbox_is_not_a_number_source(rec):
         await call("add_source", {"kind": "sandbox", "ref": f"sandbox:{run_id(out)}"}, ctx)
     made = runs(rec)[0]["outputs"]["files"][0]["file_id"]
     with pytest.raises(ModelRetry, match="QS Calc Engine"):  # nor a file the script made
-        await call(
-            "add_source", {"kind": "boq", "file_id": made, "locator": {"page": 1}}, ctx
-        )
+        await call("add_source", {"kind": "boq", "file_id": made, "locator": {"page": 1}}, ctx)
 
 
 # sandbox_rerun -------------------------------------------------------------------------------
@@ -312,7 +312,9 @@ async def test_sandbox_is_not_a_number_source(rec):
 async def test_rerun_says_same(rec):
     boq = add(rec, "مقايسة - عينة.xlsx", BOQ)
     ctx = ctx_for(rec)
-    out = await call("sandbox_run", {"script": RESHAPE_SCRIPT, "inputs": [boq], "params": {"n": 2}}, ctx)
+    out = await call(
+        "sandbox_run", {"script": RESHAPE_SCRIPT, "inputs": [boq], "params": {"n": 2}}, ctx
+    )
     before = (len(files.list_files(rec, include_old=True)), len(runs(rec)))
     ctx.services.clock.advance(3600)  # an hour later: the first run's clock is used again
     checker = ctx_for(rec, sandbox=ctx.services.sandbox, agent=checker_spec())

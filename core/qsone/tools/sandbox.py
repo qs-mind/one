@@ -194,10 +194,8 @@ async def _pages(ctx: ToolContext, rec: Records, urls: list[str], data: dict, ke
         page = await asyncio.to_thread(files.read_original, rec, row["file_id"])
         name = f"url-{n}"
         data[name] = page
-        kept.append(
-            {"name": name, "url": url, "log_id": row["id"], "file_id": row["file_id"],
-             "sha256": _sha(page)}  # fmt: skip
-        )
+        where = {"url": url, "log_id": row["id"], "file_id": row["file_id"]}
+        kept.append({"name": name, **where, "sha256": _sha(page)})
     _too_much(sum(len(d) for d in data.values()), "urls")
     return None
 
