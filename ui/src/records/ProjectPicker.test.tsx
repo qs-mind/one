@@ -1,9 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Chat } from "../chat/Chat";
 import { setLanguage, texts } from "../i18n";
+import { App } from "../shell/App";
 import { currentProject, setCurrentProject } from "./project";
+
+vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
 
 // Sample projects, as the core lists them.
 const school = { id: "a".repeat(32), name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00.000000+00:00" };
@@ -28,6 +30,9 @@ function core(routes: Record<string, Route>) {
 }
 
 const picker = () => screen.getByRole("region", { name: texts.projects.ar });
+/** The top bar's project button: the project's name, or "General chat" with none open. */
+const switcher = (name: string = texts.generalChat.ar) =>
+  within(screen.getByRole("banner")).getByRole("button", { name: new RegExp(name) });
 const called = (fetch: ReturnType<typeof core>, method: string, url: string) =>
   fetch.mock.calls.filter(([u, init]) => String(u) === url && (init?.method ?? "GET") === method);
 
@@ -50,14 +55,14 @@ describe("ProjectPicker", () => {
       [`POST /api/projects/${school.id}/open`]: () => Response.json({ ...school, open: true }),
     });
     const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: texts.projects.ar }));
+    render(<App />);
+    await user.click(switcher());
 
     expect(await within(picker()).findByRole("button", { name: tower.name })).toBeInTheDocument();
     expect(within(picker()).getByText(damaged.ar)).toBeInTheDocument(); // listed with its reason, not hidden
     await user.click(within(picker()).getByRole("button", { name: school.name }));
 
-    expect(await screen.findByRole("button", { name: school.name })).toBeInTheDocument();
+    await waitFor(() => expect(switcher(school.name)).toBeInTheDocument());
     expect(screen.queryByRole("region", { name: texts.projects.ar })).not.toBeInTheDocument();
     expect(called(fetch, "POST", `/api/projects/${school.id}/open`)).toHaveLength(1);
     expect(currentProject()?.id).toBe(school.id);
@@ -79,8 +84,8 @@ describe("ProjectPicker", () => {
       [`POST /api/projects/${tower.id}/open`]: () => Response.json({ ...tower, open: true }), // remembered on start
     });
     const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: tower.name }));
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: new RegExp(tower.name) }));
     const current = await within(picker()).findByRole("button", { name: new RegExp(tower.name) });
     expect(current).toHaveAttribute("aria-current", "true");
     expect(current).toHaveTextContent(texts.open.ar);
@@ -95,8 +100,8 @@ describe("ProjectPicker", () => {
       "POST /api/projects": () => Response.json({ ...school, open: true }, { status: 201 }),
     });
     const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: texts.projects.ar }));
+    render(<App />);
+    await user.click(switcher());
     expect(await within(picker()).findByText(texts.noProjects.ar)).toBeInTheDocument();
 
     const name = within(picker()).getByLabelText(texts.projectName.ar);
@@ -104,7 +109,7 @@ describe("ProjectPicker", () => {
     await user.type(name, "  مدرسة - عينة ");
     await user.click(within(picker()).getByRole("button", { name: texts.create.ar }));
 
-    expect(await screen.findByRole("button", { name: school.name })).toBeInTheDocument();
+    await waitFor(() => expect(switcher(school.name)).toBeInTheDocument());
     const [, init] = called(fetch, "POST", "/api/projects")[0]!;
     expect(JSON.parse(String(init!.body))).toEqual({ name: "مدرسة - عينة" });
     expect(currentProject()?.id).toBe(school.id);
@@ -120,8 +125,8 @@ describe("ProjectPicker", () => {
       [`POST /api/projects/${school.id}/open`]: () => Response.json({ error: missing }, { status: 409 }),
     });
     const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: texts.projects.ar }));
+    render(<App />);
+    await user.click(switcher());
     await user.click(await within(picker()).findByRole("button", { name: school.name }));
 
     expect(await within(picker()).findByRole("alert")).toHaveTextContent(missing.ar);
@@ -131,8 +136,8 @@ describe("ProjectPicker", () => {
   it("a remembered project opens on start", async () => {
     localStorage.setItem("qsone.project", school.id);
     core({ [`POST /api/projects/${school.id}/open`]: () => Response.json({ ...school, open: true }) });
-    render(<Chat />);
-    expect(await screen.findByRole("button", { name: school.name })).toBeInTheDocument();
+    render(<App />);
+    await waitFor(() => expect(switcher(school.name)).toBeInTheDocument());
   });
 
   it("a remembered project that cannot open is forgotten, and the picker shows", async () => {
@@ -141,10 +146,10 @@ describe("ProjectPicker", () => {
       "GET /api/projects": () => Response.json({ projects: [] }),
       [`POST /api/projects/${school.id}/open`]: () => Response.json({ error: damaged }, { status: 409 }),
     });
-    render(<Chat />);
+    render(<App />);
     expect(await screen.findByRole("region", { name: texts.projects.ar })).toBeInTheDocument();
     expect(localStorage.getItem("qsone.project")).toBeNull();
-    expect(screen.getByRole("button", { name: texts.projects.ar })).toBeInTheDocument();
+    expect(switcher()).toBeInTheDocument();
   });
 
   it("works from the keyboard", async () => {
@@ -153,21 +158,21 @@ describe("ProjectPicker", () => {
       [`POST /api/projects/${school.id}/open`]: () => Response.json({ ...school, open: true }),
     });
     const user = userEvent.setup();
-    render(<Chat />);
+    render(<App />);
     await user.tab();
-    expect(screen.getByRole("button", { name: texts.projects.ar })).toHaveFocus();
+    expect(switcher()).toHaveFocus();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(within(picker()).getByRole("button", { name: school.name })).toHaveFocus());
     await user.keyboard("{Enter}");
-    expect(await screen.findByRole("button", { name: school.name })).toBeInTheDocument();
+    await waitFor(() => expect(switcher(school.name)).toHaveFocus()); // focus back on the top bar's button
   });
 
   it("shows its labels in English too", async () => {
     setLanguage("en");
     core({ "GET /api/projects": () => Response.json({ projects: [] }) });
     const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: texts.projects.en }));
+    render(<App />);
+    await user.click(switcher(texts.generalChat.en));
     const region = screen.getByRole("region", { name: texts.projects.en });
     expect(await within(region).findByText(texts.noProjects.en)).toBeInTheDocument();
     expect(within(region).getByLabelText(texts.projectName.en)).toBeInTheDocument();

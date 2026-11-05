@@ -441,6 +441,7 @@ export const texts = {
   expand: { en: "Open the frame", ar: "افتح الإطار" },
   selected: { en: "Selected: {name}", ar: "المختار: {name}" },
   selectedMany: { en: "{n} selected", ar: "{n} مختارين" },
+  selectedRange: { en: "{title}, {label}", ar: "{title}، {label}" },
   clearSelection: { en: "Clear the selection", ar: "شيل الاختيار" },
   commandBox: {
     en: "Tell the Lead QS what to do with the selection",
@@ -493,6 +494,23 @@ export const texts = {
   // React Flow's own labels (its ariaLabelConfig); a key never removes a frame, so none mentions Delete.
   flowNodeHelp: { en: "Press Enter to go into the frame and Esc to come back.", ar: "دوس Enter عشان تدخل الإطار وEsc عشان ترجع." },
   flowNodeMoved: { en: "Frame moved to {x}, {y}", ar: "الإطار اتنقل لـ {x}، {y}" },
+  // Plan 7 Task 6 (the shell: top bar, floating chat, command bar, palette, General chat)
+  searchKeys: { en: "Search {keys}", ar: "بحث {keys}" },
+  more: { en: "More", ar: "أكتر" },
+  chatWidth: { en: "Chat width", ar: "عرض الشات" },
+  actionCheck: { en: "Check this", ar: "راجع ده" },
+  actionSources: { en: "Explain the sources", ar: "اشرح المصادر" },
+  actionAskFile: { en: "Ask about this file", ar: "اسأل عن الملف ده" },
+  actionSaveDesk: { en: "Save this Desk", ar: "احفظ القسم ده" },
+  actionWhatDoing: { en: "What are you doing?", ar: "بتعمل إيه دلوقتي؟" },
+  handOffAbout: { en: "This is about «{name}». Continue there?", ar: "ده بخصوص «{name}». نكمّل هناك؟" },
+  noProjectYet: { en: "No project for this yet.", ar: "لسه مفيش مشروع للموضوع ده." },
+  boqFrom: { en: "From «{title}»", ar: "من «{title}»" },
+  notIssued: { en: "No Revision issued yet", ar: "لسه مطلعش إصدار" },
+  paletteSearch: { en: "Search frames, commands and Project Records", ar: "دوّر في الإطارات والأوامر وسجلات المشروع" },
+  paletteFrames: { en: "Frames", ar: "الإطارات" },
+  paletteCommands: { en: "Commands", ar: "الأوامر" },
+  paletteRecords: { en: "In Project Records", ar: "في سجلات المشروع" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";
