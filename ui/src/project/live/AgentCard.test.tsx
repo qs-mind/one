@@ -136,12 +136,10 @@ describe("the agent card", () => {
     expect(await within(el).findByRole("alert")).toHaveTextContent(texts.stopFailed.ar);
   });
 
-  it("no Brief, no Stop; nothing to point at, nothing to open; never a Follow", async () => {
+  it("no Brief, no Stop; nothing to point at, nothing to open", async () => {
     showTeam({ desks: [], agents: [agent("est", { brief_id: null, focus: null })] });
     const el = await card("est");
     expect(within(el).queryByRole("button")).toBeNull();
-    showTeam({ desks: [], agents: [agent("on", { focus: { frame: "deliverable:boq", anchor: null } })] });
-    expect(screen.queryByRole("button", { name: texts.follow.ar })).toBeNull();
   });
 
   it("a silent agent's card says no news; a waiting one says it needs you in copper", async () => {

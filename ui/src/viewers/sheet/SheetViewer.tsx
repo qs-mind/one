@@ -35,7 +35,7 @@ export type SheetViewerProps = {
   changes?: Change[];
   comments?: Thread[];
   /** "workspace" is "full" without its title shown: the workspace names the open document. */
-  mode?: "frame" | "full" | "workspace";
+  mode?: "full" | "workspace";
   /** After a change is sent, accepted or rejected: the owner refetches the view and the changes. */
   onChanged?: () => void;
   onSelection?: (range: SheetRange | null) => void;
@@ -238,7 +238,7 @@ export function SheetViewer(props: SheetViewerProps) {
     report(a && b && c && d ? { from: { row: a.id, column: c.key }, to: { row: b.id, column: d.key } } : null);
   }, [selection, rows, columns]);
 
-  /** A box inside the viewer, in its own unscaled pixels (the viewer may sit in a CSS-scaled canvas frame). */
+  /** A box inside the viewer, in its own unscaled pixels (the viewer may sit in a CSS-scaled box). */
   function boxOf(el: HTMLElement): DOMRect | null {
     const box = root.current;
     if (!box) return null;
@@ -379,14 +379,11 @@ export function SheetViewer(props: SheetViewerProps) {
     [titleColumn, totalColumn, total, view.language, view.id],
   );
 
-  // in a frame, the frame's strip already says the client's document is read only: it is not said twice, and the
-  // header, with nothing left to show, keeps only the title for screen readers
-  const badge = readOnly && props.mode !== "frame";
   // as the open document, the top bar says its title, state, Revision and that its numbers are sample: this row
   // shows only what the bar does not (read only, what waits for review, an unusual provider or Desk)
   const workspace = props.mode === "workspace";
-  const extra = badge || view.pending > 0 || !!view.same_provider || !!view.off_desk || !!props.onToggleFullScreen;
-  const shown = workspace ? extra : !readOnly || badge || full || !!props.onToggleFullScreen;
+  const extra = readOnly || view.pending > 0 || !!view.same_provider || !!view.off_desk || !!props.onToggleFullScreen;
+  const shown = workspace ? extra : !readOnly || full || !!props.onToggleFullScreen;
   return (
     <div
       ref={root}
@@ -404,11 +401,11 @@ export function SheetViewer(props: SheetViewerProps) {
           {view.title}
         </h2>
         {readOnly ? (
-          badge && <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
+          readOnly && <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
         ) : (
           <>
             {/* in the workspace, its head line already says the status and the Revision */}
-            <StatusChips view={view} status={props.mode !== "frame" && props.mode !== "workspace"} />
+            <StatusChips view={view} status={props.mode !== "workspace"} />
             {!workspace && <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>}
             {view.revision && !workspace && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
             {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}

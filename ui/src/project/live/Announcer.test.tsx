@@ -2,11 +2,25 @@ import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fill, setLanguage, texts } from "../../i18n";
 import { fakeSources } from "../fake";
+import type { AgentInfo } from "../types";
 import { startActivity } from "./activity";
 import { ANNOUNCE_GAP_MS, ANNOUNCE_HOLD_MS, Announcer } from "./Announcer";
-import { agent } from "../../canvas/live/testing";
 
 const role = "مهندس التسعير est - عينة";
+
+const agent = (id: string, fields: Partial<AgentInfo> = {}): AgentInfo => ({
+  id,
+  kind: "specialist",
+  role: { en: `Estimator ${id} (sample)`, ar: `مهندس التسعير ${id} - عينة` },
+  desk_id: null,
+  model: "claude-sonnet-5",
+  state: "working",
+  line: null,
+  brief_id: "b1",
+  focus: { frame: "deliverable:boq", anchor: null },
+  at: "2026-11-05T09:00:00+00:00",
+  ...fields,
+});
 
 describe("the Announcer", () => {
   let controller: AbortController;

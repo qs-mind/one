@@ -4,7 +4,11 @@
 // The mock keeps what the screen writes (layout saves, chat requests), so a test can check them and a reload sees
 // the saved layout, as it would from the project's own file.
 import type { Page, Request, Route } from "@playwright/test";
-import type { ActivityEvent, AgentInfo, FileInfo, FilePiece, FrameKey, Placed, ProjectStatus, Team, View } from "../src/project/types";
+import type { ActivityEvent, AgentInfo, FileInfo, FilePiece, FrameKey, ProjectStatus, Team } from "../src/project/types";
+
+// The canvas layout the e2e mock still serves (Task 11 rewrites the specs and this file).
+type Placed = { key: FrameKey; x: number; y: number; w: number; h: number; z: number; collapsed: boolean };
+type View = { x: number; y: number; zoom: number };
 import type { DeliverableInfo, DocumentView, SheetView, View as DeliverableView } from "../src/deliverables/types";
 
 export type Project = { id: string; name: string; created_at: string };

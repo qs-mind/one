@@ -1,6 +1,6 @@
 // A client BOQ as boq_import read it: the client's own document, read only. It runs the Sheet viewer with nothing
 // editable; each number opens its source (the client's file, sheet, row and cell). It reloads when the file is
-// imported again. It is not a Deliverable. The canvas frame loads it with the same hook.
+// imported again. It is not a Deliverable.
 import { useEffect, useState } from "react";
 import type { SheetView } from "../../deliverables/types";
 import { pick, t, texts, useLanguage, type Text } from "../../i18n";

@@ -154,21 +154,6 @@ describe("BOQ change review", () => {
     await waitFor(() => expect(fetch.mock.calls.some(([u, i]) => String(u) === "/api/undo/tok" && i?.method === "POST")).toBe(true));
   });
 
-  it("in a canvas frame, accepting in a cell shows the Undo there too", async () => {
-    const user = userEvent.setup();
-    const fetch = core({
-      ...viewRoutes(sheet({ pending: 1 }), { pending: [sourced] }),
-      [`POST ${accept}`]: () => json({ version: 4, accepted: ["c1"], stale: [], undo: "tok", window_ms: 6000 }),
-      "POST /api/undo/tok": () => new Response(null, { status: 204 }),
-    });
-    render(<DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={fakeLive().subscribe} />);
-    await screen.findByText("03/02");
-    await user.click(within(rowOf("03/02")).getByRole("button", { name: texts.sheetAccept.ar }));
-    const notice = await screen.findByText(texts.reviewAcceptedShort.ar);
-    await user.click(within(notice.closest('[role="status"]') as HTMLElement).getByRole("button", { name: texts.undo.ar }));
-    expect(fetch.mock.calls.some(([u, i]) => String(u) === "/api/undo/tok" && i?.method === "POST")).toBe(true);
-  });
-
   it("rejects one change, and accepts or rejects all of them", async () => {
     const user = userEvent.setup();
     const fetch = board([sourced, typed], {

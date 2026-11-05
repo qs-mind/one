@@ -1,5 +1,5 @@
 // The project's sources over /api: the only place that knows the routes of Plans 2, 4 and 6 and of this plan's core
-// (Task 2). A 404 from a route a later plan adds answers empty, so the canvas shows only what is real.
+// (Task 2). A 404 from a route a later plan adds answers empty, so the screen shows only what is real.
 import type { ComponentType } from "react";
 import { subscribeActivity } from "../activity";
 import { api } from "../api";
@@ -9,7 +9,7 @@ import type { Text } from "../i18n";
 import { texts } from "../i18n";
 import { uploadFile } from "../records/RecordsPanel";
 import type { SheetView } from "../deliverables/types";
-import type { Anchor, ClientBoqInfo, DeliverableInfo, DocKey, FileInfo, FilePiece, Placed,ProjectSources, Team, View, ViewerProps } from "./types";
+import type { Anchor, ClientBoqInfo, DeliverableInfo, DocKey, FileInfo, FilePiece, ProjectSources, Team, ViewerProps } from "./types";
 
 /** A refused call, with the core's line in both languages. */
 export class SourceError extends Error {
@@ -30,9 +30,9 @@ export function viewerFor(kind: DeliverableInfo["kind"]): ComponentType<ViewerPr
   return registry?.viewerFor?.(kind) ?? null;
 }
 
-async function json<T>(url: string, empty: T, init?: RequestInit): Promise<T> {
+async function json<T>(url: string, empty?: T, init?: RequestInit): Promise<T> {
   const response = await api(url, init).catch(() => undefined);
-  if (response?.status === 404) return empty;
+  if (response?.status === 404 && empty !== undefined) return empty;
   if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
   return (await response.json()) as T;
 }
@@ -44,7 +44,6 @@ async function put(url: string, body: unknown, keepalive: boolean): Promise<void
     body: JSON.stringify(body),
     keepalive,
   }).catch(() => undefined);
-  if (response?.status === 404) return; // Task 2's routes are not there yet: nothing to keep the layout in
   if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
 }
 
@@ -63,16 +62,7 @@ export function httpSources(projectId: string): ProjectSources {
     },
     team: () => json<Team>(`${base}/team`, { desks: [], agents: [] }),
     status: () => json(`${base}/status`, {}),
-    layout: () =>
-      json<{ frames: Placed[]; view: View | null; client_boqs?: ClientBoqInfo[] }>(`${base}/canvas`, { frames: [], view: null }),
-    saveFrames: (frames, removed, keepalive = false) => put(`${base}/canvas/frames`, { frames, removed }, keepalive),
-    saveView: (view, keepalive = false) => put(`${base}/canvas/view`, view, keepalive),
-    workspace: () =>
-      json<{ open: DocKey | null; anchor: Anchor | null; client_boqs: ClientBoqInfo[] }>(`${base}/workspace`, {
-        open: null,
-        anchor: null,
-        client_boqs: [],
-      }),
+    workspace: () => json<{ open: DocKey | null; anchor: Anchor | null; client_boqs: ClientBoqInfo[] }>(`${base}/workspace`),
     saveWorkspace: (opened, keepalive = false) => put(`${base}/workspace`, opened, keepalive),
     activity(onEvent, signal, onReconnect) {
       if (signal.aborted) return;
