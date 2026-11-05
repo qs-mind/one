@@ -23,7 +23,7 @@ import { onBriefStarted } from "../import/importer";
 import { CloseProject } from "../journey/CloseProject";
 import { dir, useLanguage } from "../i18n";
 import { restoreProject, useProject } from "../records/project";
-import { leaveProject, ProjectPicker } from "../records/ProjectPicker";
+import { leaveProject, openChat, ProjectPicker } from "../records/ProjectPicker";
 import { RecordsPanel } from "../records/RecordsPanel";
 import { AiSettings, useAiSettings } from "../settings/AiSettings";
 import { Connectors } from "../settings/Connectors";
@@ -31,6 +31,7 @@ import { SearchKey } from "../settings/SearchKey";
 import { CHAT_WIDTH, ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 import { DeliverablePanel, useDeliverablePanel } from "./DeliverablePanel";
+import { GENERAL, useActivity } from "./chatActivity";
 import { onOpenPanel } from "./FixAction";
 import { FloatingPanel } from "./FloatingPanel";
 import { GeneralChat } from "./GeneralChat";
@@ -91,6 +92,8 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const [status, setStatus] = useState<ProjectStatus>({});
   const liveWaiting = useWaiting(); // the live stream's count, once it has said one; until then the status's
   const waiting = liveWaiting ?? status.waiting ?? 0;
+  // "Waiting for you" counts every chat that waits: this project's cards, and each other chat waiting on the engineer
+  const waitingElsewhere = useActivity().filter((c) => c.state === "waiting" && c.chat_id !== (project?.id ?? GENERAL));
 
   // The import reports and the backup question are cards at the chat's foot (Notices), never over the canvas: a new
   // one opens a folded chat, so it is seen.
@@ -300,8 +303,8 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
           panel={panel}
           onPanel={togglePanel}
           aiExpanded={panel === "ai" || aiMain}
-          waiting={waiting}
-          onWaiting={showWaiting}
+          waiting={waiting + waitingElsewhere.length}
+          onWaiting={() => (waiting > 0 || !waitingElsewhere[0] ? showWaiting() : void openChat(waitingElsewhere[0].chat_id))}
           onPalette={(origin) => {
             setPaletteOrigin(origin);
             setPaletteOpen(true);

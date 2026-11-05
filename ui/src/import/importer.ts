@@ -150,8 +150,8 @@ export async function importFolders(source: DataTransfer | FileList | File[] | P
   for (const group of groups) {
     const job: Job = { key: next++, name: group.name, old, done: 0, total: group.picked.length };
     changed([...jobs, job]);
-    const made = old ? await createOwn(group.name) : await create(group.name);
-    const taken = "taken" in made && made.taken ? await openTaken(made.taken) : undefined;
+    const made: { project?: Project; taken?: Project; line?: Text } = old ? await createOwn(group.name) : await create(group.name);
+    const taken = made.taken ? await openTaken(made.taken) : undefined;
     if (taken) {
       // a tender of that name is here already: its files go into it, never into a second one
       update(job.key, { projectId: taken.id, into: true });

@@ -46,6 +46,7 @@ function take(next: ChatActivity[]) {
   chats = next.filter((c) => c !== here);
   for (const c of chats) {
     if (!answered || c.state === "working" || before.get(c.chat_id) === heard.get(c.chat_id)) continue;
+    if (c.chat_id === openChat) continue; // the chat on the screen shows its own card: no «‹name› مستنيك» in it
     notice = { chatId: c.chat_id, name: c.name, state: c.state };
   }
   // a notice says what is true now: a chat that stopped waiting takes its notice with it
