@@ -78,7 +78,7 @@ describe("ComparePanel", () => {
     expect(screen.getByText("03/04").closest("del")).not.toBeNull(); // only in the older one
     expect(screen.getByText(texts.reviewRemoved.ar)).toBeInTheDocument();
     expect(screen.queryByText("03/01")).toBeNull(); // unchanged rows are left out
-    expect(screen.getByText("4,997,770.00 EGP")).toBeInTheDocument();
+    expect(screen.getByText("4,997,770.00 ج.م.")).toBeInTheDocument();
   });
 
   it("in a Document, the words struck and inserted", async () => {
@@ -118,6 +118,44 @@ describe("VersionsPanel", () => {
     const compared = fetch.mock.calls.map(([u]) => String(u)).find((u) => u.includes("/compare"))!;
     expect(new URL(compared, "http://x").searchParams.get("from")).toBe("r:1");
     expect(new URL(compared, "http://x").searchParams.get("to")).toBe("v:2");
+  });
+});
+
+describe("versions and issues, in words that do not look alike (tender day)", () => {
+  it("says what a saved version is and what an issue is; a version with no change says so in words", async () => {
+    core({
+      [`GET ${d}/versions`]: () =>
+        json({
+          versions: [
+            { n: 1, at: "2026-11-05T08:00:00.000000+00:00", by: "lead_qs", changes: [] },
+            { n: 2, at: "2026-11-05T09:00:00.000000+00:00", by: "engineer", changes: ["b"] },
+          ],
+          revisions: [],
+        }),
+    });
+    render(<VersionsPanel projectId="p1" view={sheet()} />);
+    expect(await screen.findByText(texts.reviewVersionsHelp.ar)).toBeInTheDocument();
+    expect(screen.getByText(texts.reviewRevisionsHelp.ar)).toBeInTheDocument();
+    expect(screen.getByText(texts.deliverableNoRevision.ar)).toBeInTheDocument();
+    expect(texts.deliverableNoRevision.ar).not.toContain("إصدار"); // «لسه مفيش إصدار» read like «نسخة 1»
+    expect(screen.getByText(texts.reviewVersionNoChanges.ar)).toBeInTheDocument();
+    expect(screen.queryByText("0 تعديل")).toBeNull();
+  });
+
+  it("compare writes money as the page does, and its arrow goes from old to new in Arabic", async () => {
+    const rate = (value: string) => n(value, `r-${value}`, { unit: "m3", currency: "EGP" });
+    core({
+      [`GET ${d}/compare`]: () =>
+        json({ rows: [{ id: "p3", change: "changed", cells: { rate: { from: rate("3795"), to: rate("3985") } } }], total: { from: calc("1400690.50", "t1"), to: calc("1426948.50", "t2") } }),
+      [`GET ${d}`]: () => json(sheet()),
+    });
+    render(<ComparePanel projectId="p1" deliverableId={D} from="v:1" to="v:2" />);
+    const old = await screen.findByText(/3,795\.00/);
+    expect(old.textContent).toContain("ج.م.");
+    expect(document.body.textContent).not.toContain("EGP");
+    const line = old.closest("li")!;
+    expect(line.textContent).toContain("←");
+    expect(line.textContent).not.toContain("→");
   });
 });
 

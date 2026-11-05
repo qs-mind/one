@@ -349,6 +349,26 @@ describe("FirstLaunch", () => {
     expect(opened).toHaveBeenCalledWith("ai");
   });
 
+  it("another AI provider: its form comes into view, clear of the buttons' bar (tender day: it opened below the fold)", async () => {
+    mockCore({ "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }) });
+    const scrolled: { el: Element; how: ScrollIntoViewOptions | boolean | undefined }[] = [];
+    Element.prototype.scrollIntoView = function (this: Element, how?: ScrollIntoViewOptions | boolean) {
+      scrolled.push({ el: this, how });
+    };
+    try {
+      const user = userEvent.setup();
+      flowAt("ai");
+      await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkStandard.en) }));
+      const name = screen.getByLabelText(texts.providerName.en);
+      await waitFor(() => expect(scrolled.some(({ el }) => el.contains(name))).toBe(true));
+      const { el, how } = scrolled.find(({ el }) => el.contains(name))!;
+      expect(how).toMatchObject({ block: "nearest" });
+      expect(el).toHaveClass("scroll-mb-28"); // kept above the sticky bar of Back, Skip and Next
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
   it("another AI provider whose check fails says why, and takes the link out again", async () => {
     const link = { id: "standard:g2", kind: "model", name: "Gemini - sample", provider: "google", on_device: false, key_set: true, error: null };
     const refused = { en: "Gemini - sample refused the key.", ar: "Gemini - sample رفض المفتاح." };

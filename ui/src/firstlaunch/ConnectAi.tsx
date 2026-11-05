@@ -12,6 +12,7 @@ import { coreLine, send } from "../core";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
 import { KEY_MIN, useLiveKey } from "../ui/live";
+import { DUR, reducedMotion } from "../ui/motion";
 import { Feedback, type Nav, openSetup, option, primary, quiet, secondary, StepScreen } from "./parts";
 
 // The consent, as GET /settings/ai-consent says: `at` is null until the engineer said yes to `text_version`.
@@ -108,6 +109,17 @@ export function ConnectAi({ nav }: { nav: Nav }) {
     if (mine === runs.current) setCheck(answer);
   }
 
+  // What a choice shows comes into view, clear of the step's bar (another provider's form opened below the fold): once
+  // drawn, and again once the step has grown to it
+  const shown = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!via) return;
+    const reveal = () => shown.current?.scrollIntoView?.({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+    reveal();
+    const timer = setTimeout(reveal, DUR.long + 20);
+    return () => clearTimeout(timer);
+  }, [via]);
+
   function choose(chosen: Via) {
     runs.current++; // a check still running for the other choice is no longer this screen's answer
     setVia(chosen);
@@ -175,7 +187,7 @@ export function ConnectAi({ nav }: { nav: Nav }) {
         </div>
 
         {/* what the choice shows keeps one height (the key field's), so the buttons under it never move */}
-        <div className="min-h-40">
+        <div ref={shown} className="min-h-40 scroll-mb-28">
           {via === "claude_code" && (
             <div className="flex flex-col gap-2">
               {found?.found && <p className="fl-rise">{fill(t("aiLinkClaudeCodeFound"), { version: found.version ?? "" })}</p>}

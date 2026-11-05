@@ -290,13 +290,29 @@ def test_a_corrected_number_names_the_current_one(boq):
     assert refused(run, boq, "r", inputs={"r": {"number": "x" * 32}}).key == "CALC_NUMBER_NOT_FOUND"
 
 
-def test_two_current_numbers_of_one_name(boq):
+def test_a_newer_number_of_one_name_is_the_one_read(boq):
     with boq.read() as c:
         item = find_item(c, "03/02")["id"]
     record_number(
         boq, item_id=item, name="rate", value="1", unit="m3", currency="EGP",
         source_id=source_id(boq, "quote"), dated=DATED, actor="estimator",
     )  # fmt: skip
+    r = run(boq, "r", inputs={"r": {"item": "03/02", "name": "rate"}})
+    assert [q.value for q in r.inputs["r"].values] == [Decimal("1")]
+
+
+def test_two_current_numbers_of_one_name(boq):
+    """Records written before 5 Nov 2026 can hold two; the engine still names them."""
+    with boq.read() as c:
+        item = find_item(c, "03/02")["id"]
+        [row] = c.execute(
+            "SELECT * FROM numbers WHERE item_id = ? AND name = 'rate'", (item,)
+        ).fetchall()
+    with boq.write("estimator") as c:
+        c.execute(
+            "INSERT INTO numbers VALUES (" + ", ".join("?" * len(row)) + ")",
+            ("e" * 32, *row[1:3], "1", *row[4:]),
+        )
     e = refused(run, boq, "r", inputs={"r": {"item": "03/02", "name": "rate"}})
     assert (e.key, e.values["n"], e.values["item"]) == ("CALC_NUMBER_AMBIGUOUS", 2, "03/02")
     assert refused(run, boq, "rate", item="03/02").key == "CALC_NUMBER_AMBIGUOUS"

@@ -1,15 +1,18 @@
 // The folder imports under way and their reports, one value for the page like records/project.ts, so an import
 // started on the first launch's Ready screen carries on in the app. Three ways in:
 // - a tender folder, with no project open: a new project named after the folder, its files, then the
-//   "I understood this" Brief (POST /understand), whose card comes in the project chat;
-// - old work: each folder its own project, archived without the AI step; "Understand it" later unarchives it first;
+//   "I understood this" Brief (POST /understand), whose card comes in the project chat. With a project open, the
+//   folder goes into it; when a project of that name is here already, into that one: two projects never share a
+//   name (the core refuses it, 409 with the one there);
+// - old work: each folder its own project, archived without the AI step; "Understand it" later unarchives it first.
+//   A name taken already gets "(2)", "(3)"…;
 // - a folder dropped on an open project's canvas: its files go into that project, with their folders.
 import { useSyncExternalStore } from "react";
 import { api } from "../api";
 import { askForBackupFolder } from "../backup/ask";
 import { coreLine, type Fix, fixOf, send } from "../core";
 import { type Text, texts } from "../i18n";
-import { type Project, switchProject } from "../records/project";
+import { currentProject, type Project, switchProject } from "../records/project";
 import { byTopFolder, entriesOf, fromEntries, fromInput, oldProjects, type Picked, type Report, upload } from "./walk";
 
 export type Job = {
@@ -84,10 +87,29 @@ async function picking(source: DataTransfer | FileList | File[] | Picked[]): Pro
   return entries.length ? { picked: await fromEntries(entries), chosen: false } : { picked: fromInput(source.files), chosen: true };
 }
 
-async function create(name: string): Promise<{ project?: Project; line?: Text }> {
+async function create(name: string): Promise<{ project?: Project; taken?: Project; line?: Text }> {
   const response = await send("/projects", "POST", { name: name.slice(0, 200) });
   if (response?.ok) return { project: (await response.json()) as Project };
+  if (response?.status === 409) {
+    const body = (await response.clone().json().catch(() => ({}))) as { project?: Project };
+    if (body.project) return { taken: body.project };
+  }
   return { line: await coreLine(response, texts.projectNotCreated) };
+}
+
+/** Old work: a project of its own, "(2)", "(3)"… after the name when it is taken. */
+async function createOwn(name: string): Promise<{ project?: Project; line?: Text }> {
+  for (let n = 1; n <= 20; n++) {
+    const made = await create(n === 1 ? name : `${name.slice(0, 190)} (${n})`);
+    if (!made.taken) return made;
+  }
+  return { line: texts.projectNotCreated };
+}
+
+/** The project of that name, opened, for a tender folder to go into. */
+async function openTaken(project: Project): Promise<Project | undefined> {
+  const response = await send(`/projects/${encodeURIComponent(project.id)}/open`, "POST");
+  return response?.ok ? ((await response.json()) as Project) : undefined;
 }
 
 async function understand(projectId: string): Promise<Pick<Job, "understanding" | "understandingFix" | "briefId">> {
@@ -120,13 +142,23 @@ async function run(job: Job, picked: Picked[], { understandAfter }: { understand
 export async function importFolders(source: DataTransfer | FileList | File[] | Picked[], { old }: { old: boolean }) {
   const { picked, chosen } = await picking(source);
   if (!picked.length) return;
+  const open = currentProject();
+  if (!old && open && !open.archived_at) return importInto(open.id, picked); // the tender open now takes it
   // a tender is one project, named after the (first) folder; old work is one project per folder dropped, or per
   // folder inside the one chosen
   const groups = !old ? [{ name: byTopFolder(picked)[0]!.name, picked }] : chosen ? oldProjects(picked) : byTopFolder(picked);
   for (const group of groups) {
     const job: Job = { key: next++, name: group.name, old, done: 0, total: group.picked.length };
     changed([...jobs, job]);
-    const made = await create(group.name);
+    const made: { project?: Project; taken?: Project; line?: Text } = old ? await createOwn(group.name) : await create(group.name);
+    const taken = made.taken ? await openTaken(made.taken) : undefined;
+    if (taken) {
+      // a tender of that name is here already: its files go into it, never into a second one
+      update(job.key, { projectId: taken.id, into: true });
+      switchProject(taken);
+      await run({ ...job, projectId: taken.id, into: true }, group.picked, { understandAfter: false });
+      continue;
+    }
     if (!made.project) {
       update(job.key, { failed: made.line });
       continue;

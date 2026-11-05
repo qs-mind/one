@@ -77,6 +77,8 @@ export type ViewRow = {
   code?: string;
   title?: string; // a section's title
   cells: Record<string, ViewCell>;
+  /** The core's plain words when this item's records hold two current numbers of one name. */
+  problem?: { en: string; ar: string };
 };
 
 type ViewHead = {

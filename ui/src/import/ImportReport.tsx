@@ -52,7 +52,9 @@ function Counts({ report }: { report: Report }) {
         {report.zips > 0 && <li>{fill(t("importZips"), { n: report.zips })}</li>}
       </ul>
       <Names label={t("importTooBig")} names={report.tooBig} />
+      <Names label={t("importLocked")} names={report.locked} />
       <Names label={t("importUnreadable")} names={report.unreadable} />
+      <Names label={t("importEmpty")} names={report.empty} />
       <Names label={t("importFailed")} names={report.failed} />
     </div>
   );
@@ -66,7 +68,7 @@ function CountsLine({ report }: { report: Report }) {
     report.notRead > 0 && fill(t("importNotRead"), { n: report.notRead }),
     report.zips > 0 && fill(t("importZips"), { n: report.zips }),
   ].filter(Boolean);
-  const missed = report.tooBig.length + report.unreadable.length + report.failed.length;
+  const missed = report.tooBig.length + report.locked.length + report.unreadable.length + report.empty.length + report.failed.length;
   return (
     <div className="flex flex-col gap-2">
       <p className="text-slate">{parts.join(" · ")}</p>
@@ -78,7 +80,9 @@ function CountsLine({ report }: { report: Report }) {
           </summary>
           <div className="mt-2 flex flex-col gap-2">
             <Names label={t("importTooBig")} names={report.tooBig} />
+            <Names label={t("importLocked")} names={report.locked} />
             <Names label={t("importUnreadable")} names={report.unreadable} />
+            <Names label={t("importEmpty")} names={report.empty} />
             <Names label={t("importFailed")} names={report.failed} />
           </div>
         </details>

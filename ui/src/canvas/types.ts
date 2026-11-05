@@ -42,6 +42,8 @@ export type AgentInfo = {
   role: Text;
   desk_id: string | null;
   model: string;
+  /** The model's name as the sheet gives it («Gemini 3.1 Flash Lite»); null when it is not on the sheet. */
+  model_name?: string | null;
   /** The model's provider, for its company's logo; null when the core does not know it. */
   provider?: string | null;
   state: "idle" | "thinking" | "working" | "waiting" | "done" | "failed";
@@ -70,7 +72,17 @@ export type ProjectStatus = {
   submission_date?: string;
   days_left?: number;
   /** `sample`: a number behind it is sample data; the screen labels it. */
-  boq_value?: { value: string; currency: string; deliverable_id: string; revision: number | null; status: string; sample?: boolean };
+  boq_value?: {
+    value: string;
+    currency: string;
+    deliverable_id: string;
+    revision: number | null;
+    status: string;
+    sample?: boolean;
+    /** What the total covers: the Sheet's items, of the client BOQ's items (when one was imported). */
+    items?: number;
+    of?: number;
+  };
   open_comments?: number;
   waiting?: number;
 };

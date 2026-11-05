@@ -33,7 +33,7 @@ from qsone.calc import tool as calc_tool
 from qsone.calc.errors import CalcError
 from qsone.calc.units import UnitTable
 from qsone.engine import truth
-from qsone.engine.tools import ModelRetry, Tool, ToolContext, register
+from qsone.engine.tools import ModelRetry, Tool, ToolContext, register, say_refused
 from qsone.engine.types import Card, Text
 from qsone.records import keep, ledger, search
 from qsone.records.project import Records, RecordsError
@@ -875,6 +875,7 @@ def _calc(name: str) -> Tool:
         payload = args.model_dump(mode="json", exclude_unset=True)
         reply = await asyncio.to_thread(calc_tool.call, rec, name, payload, actor=_actor(ctx))
         if "error" in reply:
+            say_refused(ctx, reply["error"])
             raise ModelRetry(_calc_retry(name, reply))
         return _json(reply)
 

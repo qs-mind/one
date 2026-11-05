@@ -1,6 +1,6 @@
 // The work log in the chat: once the running Brief sends it, Thinking shimmers once, at the head of its steps; when
 // the Brief ends it settles to the real time and step count.
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../i18n";
@@ -45,5 +45,20 @@ describe("the work log in the chat", () => {
     await user.type(await box(), "سعّر{enter}");
     expect(await screen.findByRole("button", { name: "اشتغل 42 ثانية · خطوة واحدة" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText(texts.thinking.ar)).toBeNull();
+  });
+
+  it("an Arabic Brief's log reads in English once the page is English: what is stored in both shows in the page's (tender day)", async () => {
+    const done = { type: "data-status", id: "b1", data: { state: "done", step: null } };
+    const said = { type: "data-progress", id: "p1", data: { agent: lead, text: read, lang: "ar" } };
+    const end = "2026-11-05T08:00:42.000Z";
+    core({ routes: { "POST /api/chat": (init) => streamed([...reply.slice(0, 2), said, log(end, end), done, ...reply.slice(2)], init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await box(), "سعّر{enter}");
+    await screen.findByRole("button", { name: "اشتغل 42 ثانية · خطوة واحدة" });
+    act(() => setLanguage("en"));
+    const folded = await screen.findByRole("button", { name: /42/ });
+    expect(folded.textContent).not.toMatch(/[؀-ۿ]/);
+    expect(folded.closest("[lang]")).toHaveAttribute("lang", "en");
   });
 });

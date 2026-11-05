@@ -427,6 +427,38 @@ def _numbers(conn, item_ids: list[str], at: str) -> tuple[dict, dict]:
     return by_item, sources
 
 
+def _conflicts(conn, item_ids: list[str]) -> dict[str, dict[str, list[str]]]:
+    """The names an item now holds more than one current number of, with their values oldest
+    first: {item id: {name: [values]}}. Only records written before 5 Nov 2026 can have them."""
+    rows = conn.execute(
+        "SELECT item_id, name, value FROM numbers WHERE valid_until IS NULL"
+        " AND item_id IN (SELECT value FROM json_each(:ids)) AND (item_id, name) IN ("
+        "  SELECT item_id, name FROM numbers WHERE valid_until IS NULL"
+        "  AND item_id IN (SELECT value FROM json_each(:ids))"
+        "  GROUP BY item_id, name HAVING count(*) > 1)"
+        " ORDER BY recorded_at, rowid",
+        {"ids": _dump(item_ids)},
+    ).fetchall()
+    found: dict[str, dict[str, list[str]]] = {}
+    for item_id, name, value in rows:
+        found.setdefault(item_id, {}).setdefault(name, []).append(value)
+    return found
+
+
+def _problem(conflicts: dict[str, list[str]]) -> dict | None:
+    """A row's problem in plain words: its first name with two current numbers."""
+    for name, found in conflicts.items():
+        label = copy.BOQ_FIELDS.get(name, {"en": name, "ar": name})
+        shown = {"en": ", ".join(found), "ar": " و".join(found)}
+        return {
+            lang: copy.ROW_NUMBERS_CONFLICT[lang].format(
+                n=len(found), name=label[lang], values=shown[lang]
+            )
+            for lang in ("en", "ar")
+        }
+    return None
+
+
 def _read_number(row) -> tuple:
     """A row of `_NUMBER_COLUMNS` as (item id, name, cell, source id, source)."""
     number_id, item_id, name, value, unit, currency, source_id, dated = row[:8]
@@ -543,6 +575,7 @@ def _sheet_view(conn, d: str, bill: str | None, tmpl: dict, at: str) -> dict:
         )
     }  # the newest row of each item wins
     numbers, sources = _numbers(conn, item_ids, at)
+    conflicts = _conflicts(conn, item_ids)
     columns = tmpl["columns"]
     read = [(column, template.source_of(column)) for column in columns]
     editable = [c["key"] for c in columns if template.kind_of(c) == "number" and c.get("edit")]
@@ -575,17 +608,19 @@ def _sheet_view(conn, d: str, bill: str | None, tmpl: dict, at: str) -> dict:
         done += all(key in cells for key in editable)
         for key in incomplete:
             incomplete[key] += key not in cells
-        rows.append(
-            {
-                "id": part_id,
-                "kind": "item",
-                "item_id": item_id,
-                "item_version": item.get("version"),
-                "version": version,
-                "code": item.get("code"),
-                "cells": cells,
-            }
-        )
+        row = {
+            "id": part_id,
+            "kind": "item",
+            "item_id": item_id,
+            "item_version": item.get("version"),
+            "version": version,
+            "code": item.get("code"),
+            "cells": cells,
+        }
+        problem = _problem(conflicts.get(item_id, {}))
+        if problem is not None:
+            row["problem"] = problem
+        rows.append(row)
     on_bill = numbers.get(bill, {})
     shown = [cell for on_item in numbers.values() for cell in on_item.values()]
     return {

@@ -19,6 +19,8 @@ import type {
 
 /** What an accept answers: the version it saved, and, when Undo can take it back, its Undo token and window. */
 export type Accepted = { version: number | null; accepted: string[]; stale: string[]; undo?: string; window_ms?: number };
+/** A reject's answer, with its Undo: the changes wait again. */
+export type Rejected = { rejected: string[]; undo?: string; window_ms?: number };
 
 export type Answer<T> = { ok: true; data: T } | { ok: false; error: Text; field: string | null; status: number };
 export type FileBytes = { bytes: Uint8Array; name: string; type: string };
@@ -91,7 +93,7 @@ export const deliverablesApi = {
       which,
     ),
   reject: (p: string, d: string, ids: string[]) =>
-    call<{ rejected: string[] }>(`${base(p)}/deliverables/${id(d)}/changes/reject`, "POST", { ids }),
+    call<Rejected>(`${base(p)}/deliverables/${id(d)}/changes/reject`, "POST", { ids }),
   versions: (p: string, d: string) => call<Versions>(`${base(p)}/deliverables/${id(d)}/versions`),
   /** from and to are "v:<n>" (a Saved version) or "r:<n>" (a Revision). */
   compare: (p: string, d: string, from: string, to: string) =>

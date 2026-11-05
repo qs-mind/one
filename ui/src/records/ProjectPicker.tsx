@@ -161,8 +161,9 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
   /** One chat's row: its name, then a word in Slate (Open, what its Briefs do with their mark, or archived). */
   const chatRow = (chatId: string, name: string, onClick: () => void, archived?: boolean) => {
     const here = chatId === (current?.id ?? GENERAL);
-    const state = here ? undefined : stateOf(activity, chatId);
-    const word = here ? t("open") : state ? activityWord(state) : archived ? t("archivedReadOnly") : undefined;
+    const state = stateOf(activity, chatId); // the open one too: a project that waits says so, open or not
+    const doing = state ? activityWord(state) : undefined;
+    const word = here ? (doing ? `${t("open")} · ${doing}` : t("open")) : (doing ?? (archived ? t("archivedReadOnly") : undefined));
     return (
       <button
         type="button"

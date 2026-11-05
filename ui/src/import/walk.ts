@@ -13,6 +13,10 @@ export type Report = {
   notRead: number;
   tooBig: string[];
   unreadable: string[];
+  /** Locked with a password (core: FILE_LOCKED): an open copy is needed. */
+  locked: string[];
+  /** Read, but its sheets are empty (core: FILE_SHEETS_EMPTY). */
+  empty: string[];
   zips: number;
   /** Not added because the core refused or could not be reached: worth trying again. */
   failed: string[];
@@ -103,13 +107,15 @@ export function oldProjects(picked: Picked[]): { name: string; picked: Picked[] 
   return [...groups].map(([name, files]) => ({ name, picked: files }));
 }
 
-type FileAnswer = { status?: string; duplicate?: boolean };
+type FileAnswer = { status?: string; duplicate?: boolean; note_key?: string | null };
 type ZipAnswer = { zip: true; files: FileAnswer[]; skipped: { name: string; error?: { en?: string } }[] };
 
 function count(report: Report, info: FileAnswer, name: string) {
   if (info.duplicate) return void (report.duplicates += 1);
   report.added += 1;
-  if (info.status === "stored") report.notRead += 1;
+  if (info.note_key === "FILE_LOCKED") report.locked.push(name);
+  else if (info.note_key === "FILE_SHEETS_EMPTY") report.empty.push(name);
+  else if (info.status === "stored") report.notRead += 1;
   else if (info.status === "unreadable") report.unreadable.push(name);
 }
 
@@ -119,7 +125,7 @@ export async function upload(
   picked: Picked[],
   onProgress: (done: number, of: number) => void,
 ): Promise<Report> {
-  const report: Report = { added: 0, duplicates: 0, notRead: 0, tooBig: [], unreadable: [], zips: 0, failed: [] };
+  const report: Report = { added: 0, duplicates: 0, notRead: 0, tooBig: [], unreadable: [], locked: [], empty: [], zips: 0, failed: [] };
   onProgress(0, picked.length);
   for (const [index, { file, folder }] of picked.entries()) {
     if (file.size > MAX_FILE_BYTES) {

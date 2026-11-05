@@ -209,6 +209,25 @@ describe("the chat in the shell", () => {
     expect(chat).toHaveClass("[&_table]:[overflow-wrap:normal]");
   });
 
+  it("a table pasted from Excel shows as a table in the engineer's bubble, and goes to the core as it was pasted", async () => {
+    const fetch = core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    const pasted = "راجع دول:\nالبند\tالكمية\tالفئة\n01-01\t51.3\t2500\n01-02\t59.8\t2500";
+    await user.click(await box());
+    await user.paste(pasted);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls(fetch, "POST", "/api/chat")).toHaveLength(1));
+    const sent = bodyOf(calls(fetch, "POST", "/api/chat")[0]![1]) as { messages: { parts: { text: string }[] }[] };
+    expect(sent.messages[0]!.parts[0]!.text).toBe(pasted);
+    const own = (await screen.findByText("راجع دول:")).closest("[data-own]") as HTMLElement;
+    const table = within(own).getByRole("table");
+    expect(within(table).getAllByRole("row")).toHaveLength(3);
+    expect(within(table).getAllByRole("cell").map((c) => c.textContent)).toContain("59.8");
+    expect(table.parentElement).toHaveClass("overflow-x-auto"); // a wide one scrolls in its own box
+    expect(own.querySelectorAll("p")).toHaveLength(1); // the words before it, not 4 paragraphs
+  });
+
   it("loads earlier messages when the chat opens, and joins a Brief still running", async () => {
     const earlier = [
       { id: "u1", role: "user", parts: [{ type: "text", text: "سعّر بند الخرسانة - عينة" }] },

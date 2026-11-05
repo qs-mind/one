@@ -30,7 +30,10 @@ def bench(data_dir, serve_app, tmp_path):
 
 def _answer(client: httpx.Client, card_id: str, card: dict) -> None:
     payload = card.get("payload") or {}
-    if card["kind"] == "rows":
+    if card["kind"] == "rows" and payload.get("meanings"):  # a BOQ's columns, as mapped
+        answers = {r["column"]: r["meaning"] for r in payload["rows"]}
+        body = {"choice": "keep", "answers": answers}
+    elif card["kind"] == "rows":
         body = {"choice": "keep", "rows_ok": list(range(len(payload["rows"])))}
     elif card["kind"] == "question":
         answers = {

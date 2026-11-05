@@ -50,6 +50,15 @@ def test_create_list_close_open(client):
     assert r.status_code == 200 and r.json() == body
 
 
+def test_two_projects_never_share_a_name(client, project):
+    """Tender day: a folder imported while a project was open made a second «… - عينة»."""
+    for name in ("مدرسة - عينة", " مدرسة  - عينة "):
+        r = client.post("/projects", json={"name": name}, headers=AUTH)
+        assert r.status_code == 409 and r.json()["error"] == copy.PROJECT_NAME_TAKEN
+        assert r.json()["field"] == "name" and r.json()["project"]["id"] == project
+    assert len(client.get("/projects", headers=AUTH).json()["projects"]) == 1
+
+
 def test_list_is_newest_first(client):
     names = ["أول - عينة", "تاني - عينة", "تالت - عينة"]
     for name in names:
@@ -81,6 +90,7 @@ def test_upload_then_search_with_page_and_row(client, project):
     assert r.status_code == 201
     info = r.json()
     assert info["status"] == "read" and info["name"] == BOQ and info["note"] is None
+    assert info["note_key"] is None
     assert info["duplicate"] is False and info["replaces"] is None and info["chunks"] == 1
     assert client.get(f"/projects/{project}/files", headers=AUTH).json() == {"files": [info]}
 

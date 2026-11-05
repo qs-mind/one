@@ -227,27 +227,41 @@ def _now(rec: Records) -> str:
 # boq_import -------------------------------------------------------------------------------------
 
 _IMPORT_DOC = f"""Import a client BOQ sheet from Excel into the Source Ledger after boq_preview: \
-each row below the header becomes an item, a heading, or a row left out with its reason. Each \
-quantity, rate and amount is recorded with its cell as its source.
-- columns: letters for description, unit and quantity (needed), and code, rate, amount.
-- currency: needed with rate or amount. dated: the BOQ's own date, if written. rows: "5-200" \
-for part. hidden_rows: skip (default), or include after asking the engineer.
-The engineer confirms the columns on a card first. Returns import_id and counts: quote them.
+each row below the header becomes an item, a heading, or a row left out and why. Each \
+quantity, rate and amount keeps its cell as its source.
+- columns: letters for description, unit and quantity (needed), and code, rate, amount, \
+description_2 (another description column).
+- currency: needed with rate or amount. dated: the BOQ's date, if written. rows: "5-200" \
+for part. hidden_rows: skip (default), or include once the engineer agrees.
+The engineer sets the columns on a card first. Returns import_id and counts: quote them.
 Example:
 {_json(_IMPORT_EXAMPLE)}"""
 
 
+NONE = "none"  # a column the import leaves out
+MEANINGS = (*boq.FIELDS, NONE)
+
+
 def _card(ctx: ToolContext, p: boq.Plan) -> Card:
+    """The rows card: one row per column of the sheet with its heading and first values, and
+    what it holds as mapped; the engineer sets each column's meaning (a question per column)."""
     lang = _language(ctx)
+    meaning = {letter: f for f, letter in p.columns.items()}
     rows = [
         {
-            "field": copy.BOQ_FIELDS[f][lang],
             "column": letter,
-            "header": p.headers.get(f, "")[:CELL_CHARS],
-            "example": copy.listed(list(p.examples.get(f, ())))[lang][:80],
+            "header": " ".join(info["header"].split())[:CELL_CHARS],
+            "example": copy.listed(info["examples"])[lang][:80],
+            "meaning": meaning.get(letter, NONE),
         }
-        for f, letter in p.columns.items()
+        for letter, info in p.sheet_columns.items()
     ]
+    rows += [  # a mapped column with nothing in it still shows, so it can be set right
+        {"column": letter, "header": "", "example": "", "meaning": f}
+        for f, letter in p.columns.items()
+        if letter not in p.sheet_columns
+    ]
+    rows.sort(key=lambda r: boq.column(r["column"]))
     counts = {
         "first": str(p.first_row),
         "last": str(p.last_row),
@@ -277,9 +291,36 @@ def _card(ctx: ToolContext, p: boq.Plan) -> Card:
         payload={
             "columns": [{"key": k, "label": label} for k, label in copy.BOQ_CARD_COLUMNS.items()],
             "rows": rows,
-            "tick": True,
+            "meaning_column": "meaning",
+            "meanings": [
+                {"key": m, "label": copy.BOQ_FIELDS.get(m, copy.BOQ_NOT_USED)} for m in MEANINGS
+            ],
+            "questions": [
+                {"id": r["column"], "text": r["column"], "options": list(MEANINGS)} for r in rows
+            ],
         },
     )
+
+
+def _columns_set(p: boq.Plan, answer: dict) -> dict[str, str] | dict:
+    """{field: letter} as the engineer set them on the card; the mapped columns as they are when
+    the answer carries no meanings (a host that only says keep). A not-done text instead when a
+    needed field is not set, or a field is set on two columns."""
+    meanings = answer["answers"]
+    if not meanings:
+        return dict(p.columns)
+    columns: dict[str, str] = {}
+    twice = []
+    for letter, field_ in sorted(meanings.items(), key=lambda kv: boq.column(kv[0])):
+        if field_ == NONE:
+            continue
+        if field_ in columns:
+            twice.append(field_)
+        columns.setdefault(field_, letter)
+    if twice:
+        fields = {lang: ", ".join(copy.BOQ_FIELDS[f][lang] for f in twice) for lang in ("en", "ar")}
+        return {"not_done": copy.fill(copy.BOQ_MEANING_TWICE, fields=fields)}
+    return {f: columns[f] for f in boq.FIELDS if f in columns}
 
 
 def _plan(rec: Records, args: ImportArgs, columns: dict[str, str]) -> boq.Plan:
@@ -402,16 +443,19 @@ async def _import(ctx: ToolContext, args: ImportArgs) -> str:
     if answer["choice"] != KEEP:
         instead = "ask the engineer which columns hold what (ask_engineer), then boq_import again"
         return cite.not_done(copy.BOQ_NOT_CONFIRMED, instead=instead)
-    shown = list(p.columns)
-    ticked = {shown[i] for i in answer["rows_ok"] if 0 <= i < len(shown)}
-    missing = [f for f in boq.REQUIRED if f not in ticked]
+    columns = _columns_set(p, answer)
+    again = "call boq_preview, ask the engineer, then map again"
+    if "not_done" in columns:
+        return cite.not_done(columns["not_done"], instead=again)
+    missing = [f for f in boq.REQUIRED if f not in columns]
     if missing:
         fields = {
             lang: ", ".join(copy.BOQ_FIELDS[f][lang] for f in missing) for lang in ("en", "ar")
         }
         text = copy.fill(copy.BOQ_REQUIRED_UNTICKED, fields=fields)
-        return cite.not_done(text, instead="call boq_preview, ask the engineer, then map again")
-    columns = {f: p.columns[f] for f in shown if f in ticked}
+        return cite.not_done(text, instead=again)
+    if {"rate", "amount"} & set(columns) and args.currency is None:
+        return cite.not_done(copy.BOQ_NEEDS_CURRENCY, instead="boq_import again with currency")
     if columns != p.columns:
         p = await asyncio.to_thread(_plan, rec, args, columns)
     out = await asyncio.to_thread(_write, ctx, rec, args, p)

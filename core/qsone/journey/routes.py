@@ -6,6 +6,7 @@ and the archive."""
 import asyncio
 import webbrowser
 from typing import Any, Literal
+from uuid import uuid4
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -163,9 +164,15 @@ def router(engine: Any) -> APIRouter:
                 model = listed[0].choice
             if model is None:
                 return JSONResponse(copy.error(copy.NO_AI), 409)
-            failed = await engine_connectors.check(f"{model.connector}/{model.model}", among=found)
+            used: list = []
+            failed = await engine_connectors.check(
+                f"{model.connector}/{model.model}", among=found, on_usage=used.append
+            )
             if failed:
                 return JSONResponse(copy.error(failed), 409)
+            card = next((c for c in listed if c.choice == model), None)
+            if used and card is not None:
+                _count_check(card, used[0])
             await _check_defaults(listed, {model}, found)
             usage.track("ai_link", via="standard")
             return JSONResponse({"ok": True})
@@ -185,6 +192,20 @@ def router(engine: Any) -> APIRouter:
             return _not_saved()
         usage.track("ai_link", via="claude_code")
         return JSONResponse({"ok": True})
+
+    def _count_check(card, used) -> None:
+        """The check's tokens in the cost book, as any call's (tender day: it was not counted)."""
+        if engine.cost_book() is None:
+            return
+        engine.spending.after_response(
+            brief_id=f"check-{uuid4().hex}",
+            project_id=None,
+            run_id=uuid4().hex,
+            role="lead",
+            card=card,
+            input_tokens=used.input_tokens or 0,
+            output_tokens=used.output_tokens or 0,
+        )
 
     @r.get("/engineer/card")
     def get_card() -> dict:

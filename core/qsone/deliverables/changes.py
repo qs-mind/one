@@ -392,7 +392,9 @@ def _records_try(rec, head: dict) -> dict:
     try:
         with rec.write(CALC_ACTOR) as conn:
             if head["kind"] == "sheet":
-                calc.bring_up_to_date(rec, head["id"], actor=CALC_ACTOR)
+                # a row the engine refuses (two current rates, say) stays as it is: the view
+                # names its problem; it never locks the Deliverable
+                calc.bring_up_to_date(rec, head["id"], actor=CALC_ACTOR, skipped=[])
             store.save_version(conn, rec, head["id"], by=CALC_ACTOR, change_ids=[])
             out.append(store.view(rec, head["id"]))
             raise _Undo
@@ -545,3 +547,24 @@ def reject(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: s
             _decide(conn, rec, found[change_id], "rejected", actor=actor)
     events.publish_deliverable(rec, rec.id, deliverable_id)
     return list(change_ids)
+
+
+def unreject(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: str) -> list[str]:
+    """Undo after a reject: the named changes that are still rejected wait again (nothing else
+    was written by the reject, so nothing else moves). Returns their ids. Only the engineer."""
+    _engineer_only(actor)
+    with rec.write(actor) as conn:
+        back = [
+            c
+            for c in _changes(
+                conn,
+                deliverable_id,
+                "AND status = 'rejected' AND id IN (SELECT value FROM json_each(?))",
+                (_dump(change_ids),),
+            )
+        ]
+        for change in back:
+            _decide(conn, rec, change, "pending", actor=actor)
+    if back:
+        events.publish_deliverable(rec, rec.id, deliverable_id)
+    return [c.id for c in back]

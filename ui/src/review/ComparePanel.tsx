@@ -49,6 +49,8 @@ export function ComparePanel({ projectId, deliverableId, from, to }: ComparePane
     );
   if (!found) return <p className="text-slate">{t("deliverableLoading")}</p>;
   const { diff, a, b } = found;
+  // from old to new in the reading direction: ← in Arabic, → in English
+  const arrow = dir(b.language) === "rtl" ? "←" : "→";
   // A row's name comes from the side it is on: a removed row is only in the older view.
   const name = (id: string) => (b.kind === "sheet" && b.rows.some((r) => r.id === id) ? rowName(b, id) : rowName(a, id));
 
@@ -79,7 +81,7 @@ export function ComparePanel({ projectId, deliverableId, from, to }: ComparePane
                           <bdi dir="auto">{cellValue(cell.from)}</bdi>
                         </del>
                         <span aria-hidden className="text-slate">
-                          →
+                          {arrow}
                         </span>
                         <ins className="text-ink no-underline">
                           <bdi dir="auto">{cellValue(cell.to)}</bdi>
@@ -99,7 +101,7 @@ export function ComparePanel({ projectId, deliverableId, from, to }: ComparePane
               <bdi dir="auto">{cellValue(total.from)}</bdi>
             </del>
             <span aria-hidden className="text-slate">
-              →
+              {arrow}
             </span>
             <bdi dir="auto">{cellValue(total.to)}</bdi>
           </p>

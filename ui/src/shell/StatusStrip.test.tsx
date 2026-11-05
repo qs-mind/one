@@ -25,4 +25,15 @@ describe("StatusStrip", () => {
     expect(chip.querySelector(".sr-only")?.textContent).toBe(new Intl.NumberFormat("en-GB", { style: "currency", currency: "EGP", notation: "compact", maximumFractionDigits: 1 }).format(48900000));
     expect(chip).toHaveTextContent(texts.sampleData.en); // still labelled sample data
   });
+
+  it("says what the BOQ so far covers: 4 of 325 items", () => {
+    const covers = (items: number, of?: number): ProjectStatus => ({ boq_value: { ...boq("1400000.00").boq_value!, items, of } });
+    const { rerender } = render(<StatusStrip status={covers(4, 325)} />);
+    expect(screen.getByRole("button", { name: new RegExp(texts.boqSoFar.en) })).toHaveTextContent("4 of 325 items");
+    setLanguage("ar");
+    rerender(<StatusStrip status={covers(4, 325)} />);
+    expect(screen.getByRole("button", { name: new RegExp(texts.boqSoFar.ar) })).toHaveTextContent("4 من 325 بند");
+    rerender(<StatusStrip status={covers(6)} />);
+    expect(screen.getByRole("button", { name: new RegExp(texts.boqSoFar.ar) })).toHaveTextContent("6 بنود");
+  });
 });

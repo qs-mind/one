@@ -44,11 +44,13 @@ from qsone.records.files import read_original
 from qsone.records.hidden import _xlsx_sheets
 from qsone.records.project import Records, RecordsError
 
-FIELDS = ("code", "description", "unit", "quantity", "rate", "amount")
+FIELDS = ("code", "description", "description_2", "unit", "quantity", "rate", "amount")
+TEXTS = ("code", "description", "description_2", "unit")
 REQUIRED = ("description", "unit", "quantity")
 NUMBERS = ("quantity", "rate", "amount")
 MAX_DECIMALS = 6
 PREVIEW_ROWS = 30
+EXAMPLE_ROWS = 40  # rows below the header read for each column's first values
 KINDS = ("xlsx", "xls")
 ITEM, HEADING = "boq_item", "boq_heading"
 
@@ -309,23 +311,83 @@ def heading_field(text: str) -> str | None:
 
 
 def _named(row: dict[int, Cell]) -> dict[str, str]:
-    """field -> column letter, for the first column whose heading names each field."""
+    """field -> column letter, for the first column whose heading names each field; a second
+    description column (the other language of a bilingual BOQ) is `description_2`."""
     found: dict[str, str] = {}
     for col in sorted(row):
         name = heading_field(_text(row[col].value)) if isinstance(row[col].value, str) else None
+        if name == "description" and name in found:
+            name = "description_2"
         if name and name not in found:
             found[name] = letters(col)
     return found
 
 
-def _header_guess(sheet: Sheet, upto: int) -> int | None:
+_IN_WORDS = re.compile(r"كتاب|حروف|words", re.IGNORECASE)  # a rate "in words": never the number
+
+
+def _spans(sheet: Sheet, r: int) -> list[tuple[int, int]]:
+    """The (left, right) columns of each range merged across row `r` alone."""
+    return [(left, right) for top, left, bottom, right in sheet.merges if top == bottom == r]
+
+
+def _two_rows(sheet: Sheet, r: int, named: dict[str, str]) -> dict[str, str] | None:
+    """When row r+1 holds only the sub-headings under row r's merged headings (a two-row
+    header: «الوصف / Description» over «عربي» and «English», «سعر الوحدة» over «رقماً» and
+    «كتابةً»), the columns those sub-headings give; else None."""
+    below = {c: t for c, cell in sheet.cells.get(r + 1, {}).items() if (t := _text(cell.value))}
+    spans = _spans(sheet, r)
+    if not below or not spans:
+        return None
+    if any(not any(left <= c <= right for left, right in spans) for c in below):
+        return None
+    out = dict(named)
+    for left, right in spans:
+        field_ = next((f for f, letter in named.items() if column(letter) == left), None)
+        subs = [c for c in range(left, right + 1) if c in below]
+        if field_ is None or not subs:
+            continue
+        if field_ == "description":
+            out["description"] = letters(subs[0])
+            if len(subs) > 1 and "description_2" not in named:
+                out["description_2"] = letters(subs[1])
+        else:
+            figures = [c for c in subs if not _IN_WORDS.search(below[c])]
+            out[field_] = letters(figures[0] if figures else subs[0])
+    return {f: out[f] for f in FIELDS if f in out}
+
+
+def guess(sheet: Sheet, upto: int) -> tuple[int | None, dict[str, str]]:
+    """The header row and the columns its headings name: the first row (up to `upto`) naming
+    three fields, among them the description or the quantity. A two-row merged header gives
+    its second row and the columns its sub-headings pick (`_two_rows`)."""
     for r in sorted(sheet.cells):
         if r > upto:
             break
         named = _named(sheet.cells[r])
         if len(named) >= 3 and ("description" in named or "quantity" in named):
-            return r
-    return None
+            two = _two_rows(sheet, r, named)
+            return (r, named) if two is None else (r + 1, two)
+    return None, {}
+
+
+def heading_text(sheet: Sheet, header_row: int, col: int) -> str:
+    """A column's heading as the engineer reads it: the header row's cell, after the heading
+    merged above it when the header is two rows («الوصف / Description · عربي»), or the merged
+    cell it sits under (a heading merged down both rows)."""
+    parts = []
+    for top, left, bottom, right in sheet.merges:
+        if left <= col <= right and top < header_row <= bottom:  # merged down into the row
+            cell = sheet.cells.get(top, {}).get(left)
+            return _text(cell.value) if cell is not None else ""
+        if left <= col <= right and top == bottom == header_row - 1:  # merged across above it
+            cell = sheet.cells.get(top, {}).get(left)
+            if cell is not None and _text(cell.value):
+                parts.append(_text(cell.value))
+    own = sheet.cells.get(header_row, {}).get(col)
+    if own is not None and _text(own.value):
+        parts.append(_text(own.value))
+    return " · ".join(parts)
 
 
 def preview(rec: Records, file_id: str, sheet: str | None, *, rows: int = PREVIEW_ROWS) -> dict:
@@ -335,7 +397,7 @@ def preview(rec: Records, file_id: str, sheet: str | None, *, rows: int = PREVIE
     book = workbook(rec, file_id)
     names, ws = read(book, sheet)
     shown = sorted(ws.cells)[:rows]
-    guess = _header_guess(ws, shown[-1] if shown else 0)
+    header, columns = guess(ws, shown[-1] if shown else 0)
     merged = sorted({r for top, _, bottom, _ in ws.merges for r in range(top, bottom + 1)})
     return {
         "name": book.name,
@@ -353,8 +415,8 @@ def preview(rec: Records, file_id: str, sheet: str | None, *, rows: int = PREVIE
             }
             for r in shown
         ],
-        "header_guess": guess,
-        "columns_guess": {} if guess is None else _named(ws.cells[guess]),
+        "header_guess": header,
+        "columns_guess": columns,
         "hidden_rows": [r for r in shown if r in ws.hidden_rows],
         "merged_rows": [r for r in shown if r in set(merged)],
         "last_row": ws.last_row,
@@ -377,10 +439,11 @@ class Row:
     row: int
     kind: str  # ITEM or HEADING
     code: str | None
-    description: str
+    description: str  # the description column's, else the second one's; "" when neither has one
     unit: str | None
     numbers: dict[str, tuple[str, str]]  # field -> (exact text, column letter)
     hidden: bool
+    description_2: str | None = None  # the other language's, when both are written
 
 
 @dataclass(frozen=True)
@@ -397,6 +460,7 @@ class Plan:
     last_row: int
     headers: dict[str, str]  # field -> the heading in the file
     examples: dict[str, list[str]]  # field -> its first values
+    sheet_columns: dict[str, dict]  # letter -> {"header", "examples"}: each column with content
     hidden_rows: list[int]  # hidden rows with content, imported or not
     flagged_rows: list[int]  # imported rows with hidden text or orders to an AI
     no_quantity: list[int]  # items with a unit and no quantity yet
@@ -433,6 +497,26 @@ def _origins(sheet: Sheet, columns: dict[str, int]) -> dict[tuple[int, str], tup
                 elif (r, texts[f]) != (top, left):
                     out[(r, f)] = (top, left)
     return out
+
+
+def _sheet_columns(sheet: Sheet, header_row: int, first: int, last: int) -> dict[str, dict]:
+    """Each column with a heading or a value in the first rows below the header, left to right:
+    letter -> {"header": its heading as read, "examples": its first three values}."""
+    seen = [r for r in sorted(sheet.cells) if first <= r <= last][:EXAMPLE_ROWS]
+    found: dict[str, dict] = {}
+    for c in sorted(
+        {c for r in [header_row - 1, header_row, *seen] for c in sheet.cells.get(r, {})}
+    ):
+        values: list[str] = []
+        for r in seen:
+            cell = sheet.cells[r].get(c)
+            text = _text(cell.value, cell.fmt) if cell is not None else ""
+            if text and text not in values:
+                values.append(text)
+        header = heading_text(sheet, header_row, c)
+        if header or values:
+            found[letters(c)] = {"header": header, "examples": values[:3]}
+    return found
 
 
 def _flagged(rec: Records, file_id: str, sheet: str) -> set[int]:
@@ -504,7 +588,7 @@ def plan(
     skipped: list[dict] = []
     hidden_rows, no_quantity, already = [], [], 0
     for r in range(first, last + 1):
-        texts = {f: _text(*raw(r, f)) for f in ("code", "description", "unit")}
+        texts = {f: _text(*raw(r, f)) for f in TEXTS}
         values = {f: raw(r, f) for f in NUMBERS}
         if not any(texts.values()) and all(_text(v) == "" for v, _ in values.values()):
             continue  # an empty row
@@ -539,10 +623,13 @@ def plan(
             words = copy.BOQ_WHY_TEXT if why == "text" else copy.BOQ_WHY_DECIMALS
             skip(r, copy.fill(words, field=copy.BOQ_FIELDS[f], column=letters(cols[f])))
             continue
-        code, description, unit = (texts[f] or None for f in ("code", "description", "unit"))
+        code, own, second, unit = (texts[f] or None for f in TEXTS)
+        description, other = (own, second) if own else (second, None)
         if "quantity" in numbers and unit is None:
             skip(r, copy.BOQ_WHY_NO_UNIT)
             continue
+        if description is None and code and "quantity" in numbers:
+            description = ""  # a code and a quantity are an item, whatever its description
         if numbers and description is None:
             skip(r, copy.BOQ_WHY_NO_DESCRIPTION)
             continue
@@ -554,7 +641,7 @@ def plan(
         kind = ITEM if unit is not None else HEADING
         if kind == ITEM and "quantity" not in numbers:
             no_quantity.append(r)
-        out.append(Row(r, kind, code, description, unit, numbers, is_hidden))
+        out.append(Row(r, kind, code, description, unit, numbers, is_hidden, other))
 
     if not out and not already:
         raise RecordsError(copy.BOQ_NO_ROWS, status=422, field="header_row")
@@ -563,6 +650,7 @@ def plan(
         if row.kind != ITEM:
             continue
         values = {"code": row.code, "description": row.description, "unit": row.unit}
+        values |= {"description_2": row.description_2}
         values |= {f: t for f, (t, _) in row.numbers.items()}
         for f in cols:
             if values.get(f) and len(examples[f]) < 3:
@@ -580,6 +668,7 @@ def plan(
         last_row=last,
         headers=headers,
         examples=examples,
+        sheet_columns=_sheet_columns(ws, header_row, first, last),
         hidden_rows=hidden_rows,
         flagged_rows=sorted(r.row for r in out if r.row in flagged),
         no_quantity=no_quantity,
@@ -647,6 +736,8 @@ def write(
         import_id, at = uuid4().hex, rec.clock()
         for order, row in enumerate(p.rows, 1):
             fields: dict = {"description": row.description}
+            if row.description_2 is not None:
+                fields["description_2"] = row.description_2
             if row.unit is not None:
                 fields["unit"] = row.unit
             fields |= {"order": order, "file_id": p.file_id, "sheet": p.sheet, "row": row.row}

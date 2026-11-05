@@ -6,7 +6,7 @@
 // value (220 ms, ONE's ease; at once with reduced motion) and the viewer scrolls to it. Changes that no longer apply
 // are listed in plain words.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { deliverablesApi, type Accepted } from "../deliverables/api";
+import { deliverablesApi, type Accepted, type Rejected } from "../deliverables/api";
 import type { Anchor } from "../canvas/types";
 import type { CellChange, Change, RecordsCell, Segment, View } from "../deliverables/types";
 import { asCell, isNumber } from "../deliverables/types";
@@ -33,6 +33,8 @@ export type ChangesPanelProps = {
   announce?: (line: string) => void;
   /** After an accept: its answer (with its Undo), and whether it came from the keyboard (the focus stays here). */
   onAccepted?: (answer: Accepted, how: { keys: boolean }) => void;
+  /** After a reject, with its Undo («اترفض · تراجع»). */
+  onRejected?: (answer: Rejected, how: { keys: boolean }) => void;
   /** The change the engineer is on, for the viewer to show it; null when none waits. */
   onCurrent?: (change: Change | null) => void;
 };
@@ -211,7 +213,7 @@ function SourceOf({ view, change, open }: { view: View; change: Change; open: (f
   );
 }
 
-export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLocate, announce, onAccepted, onCurrent }: ChangesPanelProps) {
+export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLocate, announce, onAccepted, onRejected, onCurrent }: ChangesPanelProps) {
   const [failed, setFailed] = useState<Text | null>(null);
   const [updateFirst, setUpdateFirst] = useState<string[] | null>(null); // ids refused until the update joins them
   const [busy, setBusy] = useState(false);
@@ -262,7 +264,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
       void accept({ ids: [currentChange.id] }, true);
     } else if (event.code === "KeyR") {
       event.preventDefault();
-      void reject([currentChange.id]);
+      void reject([currentChange.id], true);
     }
   }
 
@@ -285,7 +287,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
     onChanged();
   }
 
-  async function reject(ids: string[]) {
+  async function reject(ids: string[], keys = false) {
     setBusy(true);
     setFailed(null);
     setUpdateFirst(null);
@@ -293,6 +295,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
     setBusy(false);
     if (!answer.ok) return setFailed(answer.error);
     announce?.(t("reviewRejected"));
+    onRejected?.(answer.data, { keys });
     onChanged();
   }
 

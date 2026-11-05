@@ -40,7 +40,7 @@ import { deskCounts, startActivity, useDeskCounts, workedOn } from "./live/activ
 import { isMac, isMod, isTyping, matches } from "./keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
-import { freeArea, MARGIN, PREFERRED, READABLE, readable, TOGETHER, worldOf } from "./cover";
+import { freeArea, MARGIN, PREFERRED, READABLE, readable, revealed, TOGETHER, worldOf } from "./cover";
 import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
 import { importInto } from "../import/importer";
 import { holdsFolder } from "../import/walk";
@@ -362,7 +362,8 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   const seen = useCallback(() => worldOf(free(), store.getState().transform), [free, store]);
 
   /** Brings the frames in line with the project's data: new things placed, gone things removed, data refreshed. A
-   * frame added while the engineer works goes in the free area they see, or the view pans to show it. */
+   * frame added while the engineer works goes in the free area they see, or the view moves to show it with the frames
+   * they see (cover.ts, revealed), or stays when those cannot all come along. */
   const rebuild = useCallback(() => {
     const kept: FrameNode[] = [];
     const removed: FrameKey[] = [];
@@ -390,8 +391,24 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     for (const key of removed) committed.current.delete(key);
     if (added.length || removed.length || kept.some((n, i) => n !== nodesRef.current[i])) setNodes(kept);
     if (added.length || removed.length) saver.frames(added, removed);
-    if (added.length && !added.every((p) => inView({ ...p, h: p.collapsed ? STRIP_H : p.h }, view))) fitTo(added, { keepZoom: true, margin: MARGIN, minZoom: READABLE });
-  }, [saver, setNodes, seen, fitTo]);
+    const shownBox = (p: Placed) => ({ ...p, h: p.collapsed ? STRIP_H : p.h });
+    if (added.length && !added.every((p) => inView(shownBox(p), view))) {
+      // the view goes to the new frames with the ones the engineer was looking at, whole, as long as all stay
+      // readable; when they cannot all come along it stays, so nothing they watch leaves (the new frame is a pan away)
+      const newKeys = new Set(added.map((p) => p.key));
+      const others = kept.map(placedOf).filter((p) => !newKeys.has(p.key));
+      const whole = others.filter((p) => inView(shownBox(p), view));
+      const partial = others.filter((p) => {
+        const b = shownBox(p);
+        return !inView(b, view) && b.x < view.x + view.w && b.x + b.w > view.x && b.y < view.y + view.h && b.y + b.h > view.y;
+      });
+      const shown = revealed(added.map(shownBox), whole.map(shownBox), partial.map(shownBox), free());
+      if (shown) {
+        const keys = new Set(shown.map((p) => p.key));
+        fitTo([...added, ...others].filter((p) => keys.has(p.key)), { keepZoom: true, margin: MARGIN, minZoom: READABLE });
+      }
+    }
+  }, [saver, setNodes, seen, fitTo, free]);
 
   /** Moves frames to a layout (arrange, undo, redo, fold); saves what changed. */
   const applyLayout = useCallback(

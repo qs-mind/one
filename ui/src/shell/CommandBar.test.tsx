@@ -48,6 +48,35 @@ describe("CommandBar", () => {
     expect(within(bubble).getByText(whole(chip))).toBeInTheDocument();
   });
 
+  it("the selection goes with one message only: sent, it clears, so the next message goes without it (tender day)", async () => {
+    const fetch = core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await box();
+    act(() => select([pricing]));
+    await user.type(await box(), "سعّرها{enter}");
+    await waitFor(() => expect(calls(fetch, "POST", "/api/chat")).toHaveLength(1));
+    const bar = screen.getByRole("region", { name: texts.commandBar.ar });
+    await waitFor(() => expect(within(bar).queryByRole("button", { name: texts.clearSelection.ar })).toBeNull());
+  });
+
+  it("Escape clears the selection: in the box, and anywhere nothing else takes it", async () => {
+    core({});
+    const user = userEvent.setup();
+    render(<App />);
+    await box();
+    const bar = screen.getByRole("region", { name: texts.commandBar.ar });
+    const clear = () => within(bar).queryByRole("button", { name: texts.clearSelection.ar });
+    act(() => select([pricing]));
+    await user.click(await box());
+    await user.keyboard("{Escape}");
+    expect(clear()).toBeNull();
+    act(() => select([pricing]));
+    act(() => (document.activeElement as HTMLElement | null)?.blur());
+    await user.keyboard("{Escape}");
+    expect(clear()).toBeNull();
+  });
+
   it("several frames selected say how many, and ✕ clears the selection", async () => {
     core();
     const user = userEvent.setup();

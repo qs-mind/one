@@ -236,3 +236,19 @@ describe("the chip's time", () => {
     expect(tick(65_000, "en")).toBe("1m 05s");
   });
 });
+
+describe("the steps' keys", () => {
+  it("two steps at the same moment by the same agent never share a React key", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const twins: WorklogData = {
+      started: T0,
+      ended: at(9),
+      steps: [step("بيقرا المقايسة", 1, 2), step("بيسعّر البنود", 1, 3), step("بيراجع الأسعار", 1, 9)],
+    };
+    render(<ProgressLine items={[]} worklog={twins} lang="ar" />);
+    fireEvent.click(screen.getAllByRole("button")[0]!);
+    expect(screen.getByText("بيراجع الأسعار")).toBeInTheDocument();
+    expect(errors.mock.calls.filter((c) => String(c[0]).includes("same key"))).toEqual([]);
+    errors.mockRestore();
+  });
+});

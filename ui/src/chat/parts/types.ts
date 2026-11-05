@@ -34,6 +34,10 @@ export type CardPayload = {
   number_column?: string;
   row_sources?: (Source | null)[];
   tick?: boolean;
+  /** A BOQ import's card: what each row (a column of the sheet) may hold, the row key holding its meaning as
+   * mapped, and a question per column (its letter); the answers are each column's meaning. */
+  meanings?: { key: string; label: Text }[];
+  meaning_column?: string;
   connector?: { name: string; transport: "stdio" | "http"; runs: string };
   tools?: ConnectorTool[];
   /** A price card's model (core: costs._ask_unknown_price). */

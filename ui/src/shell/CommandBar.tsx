@@ -98,6 +98,7 @@ export function CommandBar({
   function enqueue() {
     queue.add(draft, selection);
     setDraft("");
+    if (selection.length) select([]); // the selection went with these words: the next ones go without it
   }
 
   /** The next queued message goes, as if sent now: a new Brief. One that does not go waits at the head. */
@@ -130,6 +131,7 @@ export function CommandBar({
     }
     const model = picked && settings?.sheet.some((item) => keyOf(item) === keyOf(picked)) ? picked : undefined;
     const sent = await chat.send(words, selection, { model, effort });
+    if (sent && selection.length) select([]); // used: the next message goes without it
     if (sent) onSent?.();
     else if (typed) {
       takeSentFrom(); // the words stay in the box
@@ -224,6 +226,9 @@ export function CommandBar({
               // while ONE works, Enter queues; Ctrl/⌘+Enter interrupts: it steers the Brief now
               if (chat.running && !(event.ctrlKey || event.metaKey) && draft.trim()) enqueue();
               else void submit(draft, true);
+            } else if (event.key === "Escape" && selection.length > 0) {
+              event.preventDefault(); // first Escape: the selection goes; the next folds the box
+              select([]);
             } else if (event.key === "Escape" && draft === "" && open) {
               event.preventDefault();
               setDismissed(true);

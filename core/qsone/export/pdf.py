@@ -57,9 +57,23 @@ def to_pdf(view: dict) -> bytes:
         raise ValueError("only a Sheet or a Document exports to PDF")
     check_draft(view)
     head = _page(view["language"], view["title"], marks(view), state(view))
+    head["head"] = _head(view)
     if view["kind"] == "sheet":
         return _compile("sheet.typ", head | _sheet(view))
     return _compile("document.typ", head | {"blocks": _Blocks(view).all()})
+
+
+def _head(view: dict) -> list[str]:
+    """The header block on page 1: project, client, submission date and the export's date (Cairo),
+    then "Prepared with ONE". `view["head"]` holds what the route knows; a value it lacks is left
+    out, never guessed."""
+    language, given = view["language"], view.get("head") or {}
+    lines = [
+        f"{say('head_' + key, language)}: {isolate(str(given[key]))}"
+        for key in ("project", "client", "submission", "date")
+        if given.get(key)
+    ]
+    return [*lines, say("prepared", language)]
 
 
 # Sheets.

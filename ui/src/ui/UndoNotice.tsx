@@ -3,10 +3,13 @@
 // Pointing at it, or focusing Undo, pauses the line and the core's window with it, so the time shown is the time there
 // is. Undo takes it back (`onUndone`); when the window ends the removal is for good (`onEnd`). Too late at the core:
 // the core's own words say so. With reduced motion the line does not move; the window is just as long.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { coreLine, send } from "../core";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 import { reducedMotion } from "./motion";
+
+/** Undo from elsewhere: Ctrl+Z on the grid the change was made in. */
+export type UndoHandle = { undo(): void };
 
 export function UndoNotice({
   label,
@@ -15,6 +18,7 @@ export function UndoNotice({
   onUndone,
   onEnd,
   takeFocus = true,
+  ref,
 }: {
   /** What was removed: «اتشال «عينة»». */
   label: string;
@@ -25,6 +29,7 @@ export function UndoNotice({
   onEnd: () => void;
   /** Off when the focus is still somewhere useful (a keyboard review going on); else it comes here. */
   takeFocus?: boolean;
+  ref?: Ref<UndoHandle>;
 }) {
   useLanguage();
   const box = useRef<HTMLDivElement>(null);
@@ -82,6 +87,8 @@ export function UndoNotice({
     void send(`${path}/resume`, "POST");
     run();
   }
+
+  useImperativeHandle(ref, () => ({ undo: () => void (ended.current ? undefined : undo()) }));
 
   async function undo() {
     clearTimeout(timer.current);

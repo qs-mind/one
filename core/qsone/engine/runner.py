@@ -558,6 +558,8 @@ class _Brief:
             "model": a.model,
             # the model's provider on this Brief's sheet, for its company's logo (None: not on it)
             "provider": next((c.provider for c in self.sheet if c.choice.model == a.model), None),
+            # its name as the sheet gives it («Gemini 3.1 Flash Lite»): never the raw id
+            "model_name": next((c.name for c in self.sheet if c.choice.model == a.model), None),
             "state": a.state,
             "line": a.line,
             "lang": self.lang,  # the line's language: the Brief's
@@ -1449,10 +1451,8 @@ class _Brief:
             log.exception("brief %s failed", self.brief_id)
             usage.crash(error)  # a bug in One: its class and line, never the message
             self._withdraw()
-            provider = "ONE"
-            if self.lead_run_id is not None:
-                provider = self._provider(self.store.run(self.lead_run_id)["choice"])
-            self.set_state("failed", copy.fill(copy.AI_FAILED, provider=provider))
+            # only `_attempts` knows a provider's error; anything that reaches here is ONE's own
+            self.set_state("failed", copy.CORE_FAILED)
         finally:
             self.finished = True
             for token in tuple(self.tokens):

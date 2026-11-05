@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fill, setLanguage, texts } from "../../i18n";
 import { fakeSources } from "../fake";
 import { startActivity } from "./activity";
-import { ANNOUNCE_GAP_MS, Announcer } from "./Announcer";
+import { ANNOUNCE_GAP_MS, ANNOUNCE_HOLD_MS, Announcer } from "./Announcer";
 import { agent } from "./testing";
 
 const role = "مهندس التسعير est - عينة";
@@ -64,6 +64,18 @@ describe("the Announcer", () => {
     expect(region).toHaveTextContent(
       `${fill(texts.announceFailed.ar, { role })}. ${fill(texts.announceWaiting.ar, { role: texts.roleChecker.ar })}`,
     );
+  });
+
+  it("never leaves «… is working» behind once it is said: the region empties again", async () => {
+    const fake = start();
+    await act(async () => {});
+    emit(fake, agent("est", { state: "idle" }));
+    emit(fake, agent("est", { state: "working" }));
+    const region = screen.getByRole("status");
+    expect(region).toHaveTextContent(fill(texts.announceWorking.ar, { role }));
+    emit(fake, agent("est", { state: "idle" })); // nothing to say about it, and nothing runs now
+    act(() => vi.advanceTimersByTime(ANNOUNCE_HOLD_MS));
+    expect(region).toHaveTextContent(/^$/);
   });
 
   it("says when a working agent goes silent", async () => {

@@ -34,13 +34,15 @@ ROWS = [
 ]
 
 
-def keep(*rows: int) -> str:
-    """The engineer's answer to the rows card: keep, with these rows ticked."""
-    return json.dumps({"choice": "keep", "rows_ok": list(rows)})
+def keep(**meanings: str) -> str:
+    """The engineer's answer to the rows card: keep, with each column's meaning by its letter
+    ({"E": "none"} leaves column E out)."""
+    return json.dumps({"choice": "keep", "answers": meanings, "rows_ok": []})
 
 
 def keep_all() -> str:
-    return keep(*range(len(boq.FIELDS)))
+    """Keep, with the columns as mapped."""
+    return json.dumps({"choice": "keep", "answers": {}, "rows_ok": []})
 
 
 def add_boq(rec, data: bytes, name: str = "مقايسة - عينة.xlsx") -> str:
@@ -296,8 +298,14 @@ async def test_import_makes_items_headings_and_sourced_numbers(ctx):
     }
 
     (card,) = ctx.host.cards
-    assert card.kind == "rows" and card.options == ("keep", "no") and card.payload["tick"]
+    assert card.kind == "rows" and card.options == ("keep", "no")
     assert [r["column"] for r in card.payload["rows"]] == ["A", "B", "C", "D"]
+    assert [r["meaning"] for r in card.payload["rows"]] == [
+        "code",
+        "description",
+        "unit",
+        "quantity",
+    ]
     assert card.payload["rows"][3]["header"] == "الكمية"
     assert card.payload["rows"][3]["example"].startswith("120.5")
     assert "2 items and 1 heading" in card.detail["en"]
@@ -484,7 +492,8 @@ async def test_rows_limits_the_import(ctx):
 async def test_an_unticked_rate_is_left_out(rec):
     rows = [["03/02", "خرسانة - عينة", "م3", 120, 39850.5, 4782060]]
     f = add_boq(rec, sample_boq_xlsx(rows))
-    ctx = tool_ctx(rec, answers={"rows": keep(0, 1, 2, 3, 5)})  # rate (4) unticked
+    columns = {"A": "code", "B": "description", "C": "unit", "D": "quantity", "F": "amount"}
+    ctx = tool_ctx(rec, answers={"rows": keep(**columns, E="none")})  # the rate left out
     out = await run_import(ctx, f, columns=PRICED, currency="EGP")
     assert data_of(out)["columns"] == COLUMNS | {"amount": "F"}
     names = [n.name for n in ledger.numbers(rec, item(rec, "03/02")["id"])]
@@ -501,9 +510,9 @@ async def test_no_imports_nothing(rec):
 
 async def test_an_unticked_quantity_imports_nothing(rec):
     f = add_boq(rec, sample_boq_xlsx(ROWS))
-    ctx = tool_ctx(rec, answers={"rows": keep(0, 1, 2)})
+    ctx = tool_ctx(rec, answers={"rows": keep(A="code", B="description", C="unit", D="none")})
     out = await run_import(ctx, f)
-    assert out.startswith("not done: The engineer did not tick the Quantity column")
+    assert out.startswith("not done: The engineer did not set the Quantity column")
     assert "boq_preview" in out and items(rec) == []
 
 

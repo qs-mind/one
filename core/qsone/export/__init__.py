@@ -102,24 +102,45 @@ def who(actor: str | None, language: str) -> str:
 
 
 def source_kind(kind: str, language: str) -> str:
-    """Who or what entered a number, from its source kind."""
+    """What a number came from, in words: the engineer, the QS Calc Engine, sample data, or the
+    kind of file or source («مقايسة», «عرض سعر»…); a kind with no words of its own reads «مستند»."""
     known = {
         "engineer": copy.ENTERED_BY_ENGINEER,
         "calculation": copy.EXPORT_LABELS["calc_engine"],
         "sample": copy.SAMPLE_DATA,
     }
-    return known[kind][language] if kind in known else kind
+    if kind in known:
+        return known[kind][language]
+    return copy.EXPORT_LABELS.get(f"kind_{kind}", copy.EXPORT_LABELS["kind_document"])[language]
+
+
+_PLACES = ("page", "sheet", "row", "column", "cell", "line", "layer")  # in reading order
 
 
 def place(locator: dict, language: str) -> str:
-    """Where in its file a source stands: «صفحة 3», «ورقة BOQ، صف 12»."""
-    parts = []
-    for key, value in locator.items():
-        if key == "calculation":
-            continue  # a calculation's place is its formula, already the source's title
-        label = say(key, language) if key in {"page", "sheet", "row", "cell"} else key
-        parts.append(f"{label} {value}")
+    """Where in its file a source stands, in words: «صفحة 3», «ورقة BOQ، صف 12، عمود E». Ids
+    and how a date was found (`dated_how`) are not places: they are left out."""
+    parts = [
+        f"{say(k, language)} {locator[k]}" for k in _PLACES if locator.get(k) not in (None, "")
+    ]
     return ("، " if language == "ar" else ", ").join(parts)
+
+
+_DATED_HOW = {"received": copy.DATED_RECEIVED, "read": copy.DATED_READ}
+_FN = re.compile(r"\b(sum|count|avg|min|max)\s*\(\s*([A-Za-z_]\w*)\s*\)")
+_NAME = re.compile(r"\b[A-Za-z_]\w*\b")
+_OPS = str.maketrans({"*": "×", "/": "÷"})
+
+
+def formula_words(formula: str, language: str) -> str:
+    """A calculation's formula as a reader says it: "quantity * rate" → «الكمية × الفئة»,
+    "sum(amount)" → «مجموع الإجمالي». A name with no words of its own stays as written."""
+
+    def word(name: str) -> str:
+        return copy.BOQ_FIELDS[name][language] if name in copy.BOQ_FIELDS else name
+
+    text = _FN.sub(lambda m: f"{say('fn_' + m[1], language)} {word(m[2])}", formula)
+    return " ".join(_NAME.sub(lambda m: word(m[0]), text).translate(_OPS).split())
 
 
 def shown_numbers(view: dict):
@@ -142,13 +163,21 @@ def source_line(view: dict, cell: dict) -> dict:
     """A number's source as the sources list shows it."""
     language = view["language"]
     source = view["sources"].get(cell.get("source"), {})
+    locator = source.get("locator") or {}
+    title, file = source.get("title") or "", source.get("file_name") or ""
+    if source.get("kind") == "calculation":
+        title = formula_words(title, language)
+    elif title == file:
+        title = ""  # the file is named once, in its own column
+    dated = cell.get("dated") or source.get("dated") or ""
+    how = _DATED_HOW.get(locator.get("dated_how"))
     return {
         "unit": cell.get("currency") or cell.get("unit") or "",
-        "title": source.get("title") or "",
-        "file": source.get("file_name") or "",
-        "place": place(source.get("locator") or {}, language),
+        "title": title,
+        "file": file,
+        "place": place(locator, language),
         "link": source.get("url") or "",
-        "dated": cell.get("dated") or source.get("dated") or "",
+        "dated": f"{dated} ({how[language]})" if dated and how else dated,
         "kind": source_kind(source.get("kind", ""), language),
     }
 
