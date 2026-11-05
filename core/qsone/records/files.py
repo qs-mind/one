@@ -32,13 +32,14 @@ class FileInfo:
     added_at: str
     replaces: str | None
     valid_until: str | None
+    flags: int = 0  # hidden-text flags (file_flags rows)
     duplicate: bool = False
 
 
 _INFO = (
     "SELECT f.id, f.name, f.kind, f.size, f.sha256, f.status, f.note, f.pages,"
     " (SELECT count(*) FROM chunks c WHERE c.file_id = f.id), f.added_at, f.replaces,"
-    " f.valid_until FROM files f"
+    " f.valid_until, (SELECT count(*) FROM file_flags g WHERE g.file_id = f.id) FROM files f"
 )
 
 
@@ -135,6 +136,13 @@ def add_file(
             )
             indexed.append((cur.lastrowid, piece.text))
         search.index_words(conn, indexed)
+        conn.executemany(
+            "INSERT INTO file_flags(file_id, kind, locator, excerpt, count) VALUES (?, ?, ?, ?, ?)",
+            (
+                (file_id, f.kind, json.dumps(f.locator, ensure_ascii=False), f.excerpt, f.count)
+                for f in extracted.flags
+            ),
+        )
         # Set only when missing: an older version stays, so `ensure_index` still rebuilds it.
         conn.execute(
             "INSERT INTO meta(key, value) VALUES ('normaliser_version', ?)"
@@ -156,6 +164,7 @@ def add_file(
         at,
         replaces,
         None,
+        len(extracted.flags),
     )
 
 

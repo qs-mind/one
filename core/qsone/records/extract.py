@@ -1,53 +1,139 @@
-"""Text from dropped files: PDF, Excel, CSV and plain text, each in pieces with where it came from.
-Everything is read from memory, never from a temporary file."""
+"""Text from dropped files: PDF, Excel, CSV, plain text, Word, DXF, IFC and saved web pages, each
+in pieces with where it came from, and flags for text a person does not see. Images, old Word
+files and DWG drawings are kept with a plain note. Everything is read from memory, never from a
+temporary file."""
 
 import csv
 import datetime as dt
 import io
-from dataclasses import dataclass
+import zipfile
+from dataclasses import dataclass, field
 from typing import Literal
 
 import openpyxl
 import pypdfium2 as pdfium
 import xlrd
 
+from qsone.records import hidden
 from qsone.records.arabic import display_text
+from qsone.records.hidden import Flag
 
 Status = Literal["read", "partly_read", "stored", "unreadable"]
 
 
 @dataclass(frozen=True)
 class Piece:
-    locator: dict  # {"page": 3} | {"sheet": "BOQ", "row": 23} | {"line": 10}
+    locator: dict  # {"page": 3} | {"sheet": "BOQ", "row": 23} | {"line": 10} | {"layer": "A"}…
     text: str
 
 
 @dataclass(frozen=True)
 class Extracted:
-    kind: str  # pdf, xlsx, xls, csv, txt, other
+    kind: str  # pdf, xlsx, xls, csv, txt, web, docx, doc, dxf, dwg, ifc, png, jpg, webp, other
     status: Status
-    pages: int | None  # PDF pages or workbook sheets
+    pages: int | None  # PDF pages, workbook sheets, or 1 for an image
     pieces: list[Piece]
     note: str | None  # name of a copy.py text, e.g. "FILE_SCANNED_PAGES"
+    flags: list[Flag] = field(default_factory=list)  # hidden text and orders to an AI
 
 
-_KINDS = {"pdf": "pdf", "xlsx": "xlsx", "xlsm": "xlsx", "xls": "xls", "csv": "csv", "txt": "txt"}
-_MAGIC = {"pdf": b"%PDF-", "xlsx": b"PK\x03\x04", "xls": b"\xd0\xcf\x11\xe0"}
+_KINDS = {
+    "pdf": "pdf",
+    "xlsx": "xlsx",
+    "xlsm": "xlsx",
+    "xls": "xls",
+    "csv": "csv",
+    "txt": "txt",
+    "web": "web",
+    "docx": "docx",
+    "doc": "doc",
+    "dxf": "dxf",
+    "dwg": "dwg",
+    "ifc": "ifc",
+    "png": "png",
+    "jpg": "jpg",
+    "jpeg": "jpg",
+    "webp": "webp",
+}
+_MAGIC = {
+    "pdf": b"%PDF-",
+    "xlsx": b"PK\x03\x04",
+    "xls": b"\xd0\xcf\x11\xe0",
+    "doc": b"\xd0\xcf\x11\xe0",
+    "docx": b"PK\x03\x04",
+    "dwg": b"AC",
+    "png": b"\x89PNG\r\n\x1a\n",
+    "jpg": b"\xff\xd8\xff",
+    "webp": b"RIFF",
+}
+# Kept but not read, each with the note that says what to do.
+_STORED = {"doc": "FILE_OLD_WORD", "dwg": "FILE_DWG_NOT_YET"}
+_IMAGES = {"png", "jpg", "webp"}
+
+
+def _looks_right(kind: str, data: bytes) -> bool:
+    """The content matches the name's kind, by its first bytes (and, for Word, its parts)."""
+    if not data.startswith(_MAGIC.get(kind, b"")):
+        return False
+    if kind == "webp":
+        return data[8:12] == b"WEBP"
+    if kind == "docx":
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                return "word/document.xml" in z.namelist()
+        except zipfile.BadZipFile:
+            return False
+    if kind == "dxf":
+        from qsone.records.readers import dxf
+
+        return dxf.is_ascii(data) or dxf.is_binary(data)
+    if kind == "ifc":
+        from qsone.records.readers import ifc
+
+        return ifc.is_ifc(data)
+    return True
 
 
 def extract(name: str, data: bytes) -> Extracted:
     kind = _KINDS.get(name.rsplit(".", 1)[1].lower()) if "." in name else None
-    if kind is None or not data.startswith(_MAGIC.get(kind, b"")):
+    if kind is None or not _looks_right(kind, data):
         return Extracted("other", "stored", None, [], "FILE_NOT_READ_YET")
+    if kind in _STORED:
+        return Extracted(kind, "stored", None, [], _STORED[kind])
+    if kind in _IMAGES:
+        return Extracted(kind, "stored", 1, [], "FILE_IMAGE_STORED")
     if kind == "pdf":
-        return _pdf(data)
-    if kind in ("xlsx", "xls"):
-        try:
-            sheets = _xlsx(data) if kind == "xlsx" else _xls(data)
-        except Exception:  # the readers raise many kinds of error on a damaged or locked file
-            return Extracted(kind, "unreadable", None, [], "FILE_UNREADABLE")
-        pieces = [p for sheet, rows in sheets for p in _table(sheet, rows)]
-        return Extracted(kind, "read", len(sheets), pieces, None)
+        x = _pdf(data)
+    elif kind in ("xlsx", "xls", "docx", "dxf", "ifc"):
+        x = _reader(kind, data)
+    else:
+        x = _text(kind, data)
+    ai = hidden.ai_instruction_flags(x.pieces)
+    return Extracted(x.kind, x.status, x.pages, x.pieces, x.note, x.flags + ai) if ai else x
+
+
+def _reader(kind: str, data: bytes) -> Extracted:
+    # imported here: the readers import Piece from this module
+    from qsone.records.readers import docx, dxf, ifc
+
+    if kind == "dxf" and dxf.is_binary(data):
+        return Extracted(kind, "stored", None, [], "FILE_DWG_NOT_YET")
+    try:
+        if kind in ("xlsx", "xls"):
+            sheets, flags = _xlsx(data) if kind == "xlsx" else _xls(data)
+            pieces = [p for sheet, rows in sheets for p in _table(sheet, rows)]
+            return Extracted(kind, "read", len(sheets), pieces, None, flags)
+        if kind == "docx":
+            pieces, flags, vanished = docx.read(data)
+            # vanished text is not in the pieces, but is still checked for orders to an AI
+            flags += hidden.ai_instruction_flags(vanished)
+            return Extracted(kind, "read", None, pieces, None, flags)
+        return Extracted(kind, "read", None, (dxf if kind == "dxf" else ifc).read(data), None)
+    except Exception:  # the readers raise many kinds of error on a damaged or locked file
+        return Extracted(kind, "unreadable", None, [], "FILE_UNREADABLE")
+
+
+def _text(kind: str, data: bytes) -> Extracted:
     try:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -80,7 +166,7 @@ def chunk(pieces: list[Piece], max_chars: int = 800) -> list[Piece]:
 
 
 def _pdf(data: bytes) -> Extracted:
-    pieces, pdf = [], None
+    pieces, flags, pdf = [], [], None
     try:
         pdf = pdfium.PdfDocument(data)
         pages = len(pdf)
@@ -88,6 +174,7 @@ def _pdf(data: bytes) -> Extracted:
             page = pdf[i]
             textpage = page.get_textpage()
             text = display_text(textpage.get_text_range())
+            flags += hidden.pdf_page_flags(page, textpage, i + 1)
             textpage.close()
             page.close()
             if text:
@@ -98,33 +185,38 @@ def _pdf(data: bytes) -> Extracted:
         if pdf is not None:
             pdf.close()
     if len(pieces) == pages:
-        return Extracted("pdf", "read", pages, pieces, None)
+        return Extracted("pdf", "read", pages, pieces, None, flags)
     status = "partly_read" if pieces else "unreadable"
-    return Extracted("pdf", status, pages, pieces, "FILE_SCANNED_PAGES")
+    return Extracted("pdf", status, pages, pieces, "FILE_SCANNED_PAGES", flags)
 
 
-def _xlsx(data: bytes) -> list[tuple[str, list]]:
+def _xlsx(data: bytes) -> tuple[list[tuple[str, list]], list[Flag]]:
     wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     try:
         sheets = []
         for ws in wb.worksheets:
             ws.reset_dimensions()  # a wrong <dimension> in the file would cut rows or columns
             sheets.append((ws.title, list(ws.iter_rows(values_only=True))))
-        return sheets
     finally:
         wb.close()
+    return sheets, hidden.xlsx_flags(data)
 
 
-def _xls(data: bytes) -> list[tuple[str, list]]:
-    book = xlrd.open_workbook(file_contents=data)
+def _xls(data: bytes) -> tuple[list[tuple[str, list]], list[Flag]]:
+    # formatting_info gives hidden rows and columns and the cell fonts, for the flags
+    book = xlrd.open_workbook(file_contents=data, formatting_info=True)
     try:
-        return [
+        sheets = [
             (
                 sheet.name,
                 [[_xls_value(c, book.datemode) for c in sheet.row(r)] for r in range(sheet.nrows)],
             )
             for sheet in book.sheets()
         ]
+        flags = hidden.xls_flags(
+            book, lambda sheet, r, c: _cell(_xls_value(sheet.cell(r, c), book.datemode))
+        )
+        return sheets, flags
     finally:
         book.release_resources()
 
@@ -151,20 +243,31 @@ def _cell(value) -> str:
     return "" if value is None else str(value)
 
 
+HEADING_CHARS = 80
+
+
 def _table(sheet: str, rows: list) -> list[Piece]:
-    """One piece per non-empty row, after the nearest heading above it: a row with a single text
-    cell and no numbers."""
+    """One piece per non-empty row, after the nearest heading above it: a row with a single short
+    text cell (one line, at most 80 characters) and no numbers. A long note, often a merged cell
+    across the sheet, is read once in its own row: carried as a heading it would repeat in every
+    row below. A heading is not added to a row that already holds it."""
     pieces, heading = [], None
     for n, row in enumerate(rows, 1):
         values = [v for v in row if _cell(v)]
         cells = [_cell(v) for v in values]
         if not cells:
             continue
-        pieces.append(
-            Piece({"sheet": sheet, "row": n}, " | ".join([heading, *cells] if heading else cells))
-        )
-        if len(values) == 1 and isinstance(values[0], str) and any(ch.isalpha() for ch in cells[0]):
-            heading = cells[0]
+        carried = [heading, *cells] if heading and heading not in cells else cells
+        pieces.append(Piece({"sheet": sheet, "row": n}, " | ".join(carried)))
+        text = cells[0]
+        if (
+            len(values) == 1
+            and isinstance(values[0], str)
+            and any(ch.isalpha() for ch in text)
+            and len(text) <= HEADING_CHARS
+            and "\n" not in text
+        ):
+            heading = text
     return pieces
 
 
