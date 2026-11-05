@@ -102,6 +102,8 @@ export function core({ keySet = true, routes = {} }: { keySet?: boolean; routes?
       return Response.json({ caps, recommended: caps });
     }
     if (key === "GET /api/briefs/unfinished") return Response.json({ briefs: [] });
+    if (key === "GET /api/briefs/activity") return Response.json({ chats: [] });
+    if (/^POST \/api\/chat\/[^/]+\/seen$/.test(key)) return new Response(null, { status: 204 });
     if (key === "GET /api/projects") return Response.json({ projects: [{ ...P2, open: false }, { ...P1, open: false }] });
     const opened = /^POST \/api\/projects\/(p\d)\/open$/.exec(key)?.[1];
     if (opened) return Response.json(opened === "p1" ? P1 : P2);

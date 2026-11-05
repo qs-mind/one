@@ -18,7 +18,7 @@ const words = {
   ar: {
     general: "الشات العام",
     projectName: "اسم المشروع",
-    create: "إنشاء",
+    newProject: "مشروع جديد",
     records: "سجلات المشروع",
     message: "رسالة إلى كبير مهندسي الكميات",
     send: "إرسال",
@@ -35,7 +35,7 @@ const words = {
   en: {
     general: "General chat",
     projectName: "Project name",
-    create: "Create",
+    newProject: "New project",
     records: "Project Records",
     message: "Message to the Lead QS",
     send: "Send",
@@ -122,8 +122,9 @@ export class Walk {
   async createProject(name: string) {
     const top = this.page.locator('[data-region="topbar"]');
     await top.getByRole("button", { name: this.w.general }).click();
+    await this.page.getByRole("button", { name: this.w.newProject }).click(); // the row turns into the name field
     await this.page.getByLabel(this.w.projectName).fill(name);
-    await this.page.getByRole("button", { name: this.w.create, exact: true }).click();
+    await this.page.getByLabel(this.w.projectName).press("Enter");
     await expect(top.getByRole("button", { name })).toBeVisible();
     await expect(this.page.locator('[data-region="canvas"]')).toBeVisible();
     const list = (await (await this.page.request.get("/api/projects")).json()) as { projects: { id: string; name: string }[] };

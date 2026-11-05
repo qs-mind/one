@@ -3,6 +3,8 @@
 // then the search field (it opens the palette from itself), the Deliverables and Project Records. AI settings and the other language are always in More: they are
 // set once, not used every hour, and so is Setup, the first launch's steps again. Below 900 px the status folds into one Status button and the rest into More; below
 // 1280 px search and the panels fold into More too: the project's name is never cut. The chrome mirrors in Arabic.
+// The project button carries one small mark when another chat needs a look (chatActivity.ts): working, waiting for
+// you, failed, or done since you last looked; this chat is the one on the screen, so it is seen.
 import { useRef } from "react";
 import { Mark } from "../brand/Mark";
 import type { ProjectSources, ProjectStatus } from "../canvas/types";
@@ -15,6 +17,8 @@ import { fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { centreOf, withTransition } from "../ui/viewTransition";
+import { ActivityMark, activityWord } from "./ActivityMark";
+import { elsewhere, GENERAL, useActivity, useOpenChat } from "./chatActivity";
 import { useCompact } from "./regions";
 import { StatusStrip } from "./StatusStrip";
 
@@ -50,6 +54,9 @@ export function TopBar(props: TopBarProps) {
   const more = useRef<HTMLButtonElement>(null);
   const keys = isMac() ? "⌘K" : "Ctrl K";
   const compact = useCompact(); // the tools fold into More before the project name or the status would be cut
+  const chatId = project?.id ?? GENERAL;
+  useOpenChat(chatId);
+  const other = elsewhere(useActivity(), chatId);
 
   const search = (
     <button type="button" className={button} onClick={() => props.onPalette()}>
@@ -141,6 +148,7 @@ export function TopBar(props: TopBarProps) {
         <span dir="auto">
           {project?.name ?? t("generalChat")}
         </span>
+        {other && <ActivityMark state={other} label={fill(t("activityElsewhere"), { state: activityWord(other) })} />}
         <span aria-hidden="true" className="text-xs text-slate">▾</span>
       </button>
       {project?.archived_at && (
