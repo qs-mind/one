@@ -83,4 +83,29 @@ describe("WorkingLine", () => {
     await waitFor(() => expect(lines()).toHaveLength(1));
     expect(lines()[0]!.getAttribute("title")).toBe("مقدّر، مراجع");
   });
+
+  it("is hoverable: the line takes pointer events and carries the title, the layer does not", async () => {
+    render(<WorkingLine handle={handleAt(rect(40))} agents={[agent()]} opened={OPENED} box={box()} />);
+    await waitFor(() => expect(lines()).toHaveLength(1));
+    const line = lines()[0] as HTMLElement;
+    expect(line.style.pointerEvents).toBe("auto");
+    expect(line.getAttribute("title")).toBe("Estimator");
+    expect(line.parentElement!.className).toContain("pointer-events-none");
+  });
+
+  it("sits at the inline start, right in Arabic", async () => {
+    setLanguage("ar");
+    render(<WorkingLine handle={handleAt(rect(40))} agents={[agent()]} opened={OPENED} box={box()} />);
+    await waitFor(() => expect(lines()).toHaveLength(1));
+    const line = lines()[0] as HTMLElement;
+    expect(line.parentElement!.getAttribute("dir")).toBe("rtl");
+    expect(line.style.insetInlineStart).toBe("0px");
+  });
+
+  it("draws nothing for a row fully above the box, and a line for a partly visible one", async () => {
+    const { rerender } = render(<WorkingLine handle={handleAt(rect(-30, 24))} agents={[agent()]} opened={OPENED} box={box(0, 500)} />);
+    expect(lines()).toHaveLength(0);
+    rerender(<WorkingLine handle={handleAt(rect(-10, 24))} agents={[agent()]} opened={OPENED} box={box(0, 500)} />);
+    await waitFor(() => expect(lines()).toHaveLength(1));
+  });
 });

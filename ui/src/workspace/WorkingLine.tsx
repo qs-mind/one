@@ -84,9 +84,11 @@ export function WorkingLine(props: {
           data-working-line=""
           aria-hidden="true"
           title={l.roles.join(comma)}
-          className="absolute top-0 w-0.5 bg-slate"
-          style={{ insetInlineStart: 0, height: l.h, transform: `translateY(${l.y}px)` }}
-        />
+          className="absolute top-0 w-2"
+          style={{ insetInlineStart: 0, height: l.h, transform: `translateY(${l.y}px)`, pointerEvents: "auto" }}
+        >
+          <div className="h-full w-0.5 bg-slate" />
+        </div>
       ))}
     </div>
   );
