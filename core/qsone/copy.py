@@ -1360,6 +1360,22 @@ OCR_ASK = {
     "en": "Read {pages} scanned pages with {model}? About {cost}.",
     "ar": "أقرا {pages} صفحة متصورة بـ {model}؟ تقريباً {cost}.",
 }
+OCR_ASK_UNKNOWN = {
+    "en": (
+        "Read {pages} scanned pages with {model}? One cannot tell the cost: it has no known price."
+    ),
+    "ar": "أقرا {pages} صفحة متصورة بـ {model}؟ One مش عارف التكلفة: النموذج ملوش سعر معروف.",
+}
+OCR_COST = {"en": "{usd} USD", "ar": "{usd} دولار"}
+OCR_COST_EQUIVALENT = {
+    "en": "{usd} USD of equivalent cost on your Claude subscription",
+    "ar": "{usd} دولار تكلفة مكافئة على اشتراك Claude بتاعك",
+}
+OCR_IMAGE_KIND = {
+    "en": "One reads PNG and JPEG images. Save this image as PNG or JPEG, then drop it again.",
+    "ar": "One بيقرا صور PNG و JPEG. احفظ الصورة دي PNG أو JPEG وارميها تاني.",
+}
+A_FILE = {"en": "a file", "ar": "ملف"}  # DOING_FILES_READ's {name} before the file is known
 
 # BOQ import.
 BOQ_NO_SHEET = {

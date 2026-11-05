@@ -1,6 +1,7 @@
 """Files in Project Records. The original is kept inside the encrypted file in pieces, found again
 by its SHA-256; its text goes in chunks and into the word index. A file dropped again under the same
-name with new content is a new version; the old one is kept and marked "valid until"."""
+name with new content is a new version; the old one is kept and marked "valid until". A scanned
+page's text, read later by the engineer's AI from its image, is added with `add_ocr_pages`."""
 
 import hashlib
 import json
@@ -10,9 +11,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from qsone import copy
-from qsone.records import audit, search
-from qsone.records.arabic import NORMALISER_VERSION
-from qsone.records.extract import chunk, extract
+from qsone.records import audit, hidden, search
+from qsone.records.arabic import NORMALISER_VERSION, display_text
+from qsone.records.extract import Piece, chunk, extract
 from qsone.records.hidden import Flag
 from qsone.records.project import Records, RecordsError
 
@@ -177,6 +178,91 @@ def add_file(
         None,
         len(all_flags),
     )
+
+
+def file_info(rec: Records, file_id: str) -> FileInfo | None:
+    """One file, current or old; None for an unknown id."""
+    with rec.read() as conn:
+        row = conn.execute(f"{_INFO} WHERE f.id = ?", (file_id,)).fetchone()
+    return None if row is None else FileInfo(*row)
+
+
+def read_pages(conn, file_id: str) -> set[int]:
+    """The pages of a file that have text: a text layer, or read from the page image."""
+    rows = conn.execute(
+        "SELECT DISTINCT json_extract(locator, '$.page') FROM chunks"
+        " WHERE file_id = ? AND json_extract(locator, '$.page') IS NOT NULL",
+        (file_id,),
+    )
+    return {int(page) for (page,) in rows}
+
+
+def add_ocr_pages(
+    rec: Records, file_id: str, pages: dict[int, str], *, read_by: str, actor: str
+) -> int:
+    """Stores the text the engineer's AI read from page images (a scanned PDF page, or an image
+    as page 1): chunks with the locator {"page": n, "read_by": <model id>}, the word index,
+    flags for lines that look like orders to an AI, the file's status, and one audit row. A
+    page that already has text is left as it is; a page read as empty is kept as read. Vectors
+    come from Plan 2b's worker, which embeds every chunk that has none. Returns how many pages
+    were stored. Raises `RecordsError`: FILE_NOT_IN_PROJECT, or FILE_PAGES_OUT_OF_RANGE
+    (field "pages")."""
+    with rec.write(actor) as conn:
+        row = conn.execute(
+            "SELECT pages, status, note FROM files WHERE id = ?", (file_id,)
+        ).fetchone()
+        if row is None:
+            raise RecordsError(copy.FILE_NOT_IN_PROJECT, status=422, field="file_id")
+        count, status, note = row
+        if count is None or any(not 1 <= n <= count for n in pages):
+            text = copy.fill(copy.FILE_PAGES_OUT_OF_RANGE, pages=str(count or 0))
+            raise RecordsError(text, status=422, field="pages")
+        done = read_pages(conn, file_id)
+        new = {n: display_text(t) for n, t in sorted(pages.items()) if n not in done}
+        if not new:
+            return 0
+        (seq,) = conn.execute(
+            "SELECT coalesce(max(seq), -1) + 1 FROM chunks WHERE file_id = ?", (file_id,)
+        ).fetchone()
+        pieces = []
+        for n, text in new.items():
+            locator = {"page": n, "read_by": read_by}
+            # an empty page is kept as one empty chunk, so it counts as read
+            pieces += chunk([Piece(locator, text)]) or [Piece(locator, "")]
+        indexed = []
+        for piece in pieces:
+            cur = conn.execute(
+                "INSERT INTO chunks(file_id, seq, locator, text) VALUES (?, ?, ?, ?)",
+                (file_id, seq, json.dumps(piece.locator, ensure_ascii=False), piece.text),
+            )
+            indexed.append((cur.lastrowid, piece.text))
+            seq += 1
+        search.index_words(conn, indexed)
+        conn.executemany(
+            "INSERT INTO file_flags(file_id, kind, locator, excerpt, count) VALUES (?, ?, ?, ?, ?)",
+            (
+                (file_id, f.kind, json.dumps(f.locator, ensure_ascii=False), f.excerpt, f.count)
+                for f in hidden.ai_instruction_flags([p for p in pieces if p.text])
+            ),
+        )
+        complete = len(done) + len(new) >= count
+        after = {"status": "read" if complete else "partly_read"}
+        after["note"] = None if complete else "FILE_SCANNED_PAGES"
+        conn.execute(
+            "UPDATE files SET status = ?, note = ? WHERE id = ?",
+            (after["status"], after["note"], file_id),
+        )
+        audit.record(
+            conn,
+            at=rec.clock(),
+            actor=actor,
+            action="read_pages",
+            table="files",
+            row_id=file_id,
+            before={"status": status, "note": note},
+            after=after | {"pages": list(new), "read_by": read_by},
+        )
+    return len(new)
 
 
 def list_files(rec: Records, *, include_old: bool = False) -> list[FileInfo]:
