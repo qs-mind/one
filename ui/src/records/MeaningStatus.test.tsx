@@ -71,12 +71,12 @@ describe("MeaningStatus", () => {
     const user = userEvent.setup();
     render(<MeaningStatus projectId={project} />);
 
-    expect(await screen.findByText("جارٍ تنزيل نموذج البحث: 420 MB من 1.2 GB")).toHaveAttribute("role", "status");
+    expect(await screen.findByText("بننزّل نموذج البحث: 420 MB من 1.2 GB")).toHaveAttribute("role", "status");
     now = status({ state: "stopped", done_bytes: 420_000_000 });
     await user.click(screen.getByRole("button", { name: texts.meaningStop.ar }));
 
     expect(posted(fetch)).toEqual(["/api/meaning/stop"]);
-    expect(await screen.findByText("توقّف التنزيل عند 420 MB من 1.2 GB.")).toBeInTheDocument();
+    expect(await screen.findByText("التنزيل وقف عند 420 MB من 1.2 GB.")).toBeInTheDocument();
     now = status({ state: "downloading", done_bytes: 420_000_000 });
     await user.click(screen.getByRole("button", { name: texts.meaningResume.ar }));
     expect(posted(fetch)).toEqual(["/api/meaning/stop", "/api/meaning/download"]);
@@ -149,12 +149,12 @@ describe("MeaningStatus", () => {
     const user = userEvent.setup();
     render(<MeaningStatus projectId={project} />);
 
-    expect(await screen.findByText("جارٍ تجهيز البحث بالمعنى: 120 من 400 جزء")).toBeInTheDocument();
+    expect(await screen.findByText("بنجهّز البحث بالمعنى: 120 من 400 جزء")).toBeInTheDocument();
     now = status({ state: "ready", done_bytes: total }, { state: "indexing", done: 124, total: 400 }, true);
     await user.click(screen.getByRole("button", { name: texts.meaningPause.ar }));
 
     expect(posted(fetch)).toEqual(["/api/meaning/pause"]);
-    expect(await screen.findByText("متوقف مؤقتًا عند 124 من 400 جزء.")).toBeInTheDocument();
+    expect(await screen.findByText("واقف عند 124 من 400 جزء.")).toBeInTheDocument();
     now = status({ state: "ready", done_bytes: total }, { state: "ready", done: 400, total: 400 });
     await user.click(screen.getByRole("button", { name: texts.meaningResume.ar }));
     expect(posted(fetch)).toEqual(["/api/meaning/pause", "/api/meaning/resume"]);
