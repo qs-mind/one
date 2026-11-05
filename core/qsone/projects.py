@@ -30,6 +30,7 @@ from qsone.records.project import FILE_NAME, Records, RecordsError
 
 if TYPE_CHECKING:
     from qsone.backup.runner import Backups
+    from qsone.engine.runner import Engine
 
 log = logging.getLogger(__name__)
 ACTOR = "engineer"  # every HTTP call is the engineer at the screen
@@ -325,8 +326,11 @@ def _hit(h: search.Hit) -> dict:
     }
 
 
-def router(projects: Projects, meaning: Meaning | None = None) -> APIRouter:
-    """With `meaning`, search uses the search models once they are ready."""
+def router(
+    projects: Projects, meaning: Meaning | None = None, engine: "Engine | None" = None
+) -> APIRouter:
+    """With `meaning`, search uses the search models once they are ready. With `engine`, a
+    project whose Brief runs stays open until the Brief ends."""
     r = APIRouter()
 
     def wake() -> None:
@@ -344,11 +348,15 @@ def router(projects: Projects, meaning: Meaning | None = None) -> APIRouter:
     @r.post("/projects/{project_id}/open")
     def open_project(project_id: str) -> dict:
         opened = projects.open(project_id)
+        if engine is not None:
+            engine.opened(project_id)
         wake()
         return opened
 
     @r.post("/projects/{project_id}/close")
     def close_project(project_id: str) -> dict:
+        if engine is not None and engine.keep_open(project_id):
+            return {"open": True}  # it closes when its Brief ends
         projects.close(project_id)
         return {"open": False}
 

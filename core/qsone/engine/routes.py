@@ -293,6 +293,16 @@ def briefs_router(engine: Any) -> APIRouter:
             return refused(copy.BRIEF_NOT_RUNNING, 409)
         return Response(status_code=202)
 
+    @router.get("/briefs/activity")
+    def chats_activity() -> dict:
+        """What every chat's Briefs do now, for the screen outside each chat (it polls)."""
+        return {"chats": engine.chats()}
+
+    @router.post("/chat/{chat_id}/seen")
+    def chat_seen(chat_id: str) -> Response:
+        engine.seen(chat_id)
+        return Response(status_code=204)
+
     @router.get("/briefs/unfinished")
     def unfinished() -> dict:
         return {"briefs": engine.unfinished()}

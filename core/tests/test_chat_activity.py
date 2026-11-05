@@ -2,7 +2,10 @@
 projects' rows and the notice (GET /briefs/activity, POST /chat/{id}/seen). And a project's file
 stays open while a Brief runs in it, so moving to another project never cuts the Brief short.
 
-Scripted models only, behind fake connectors; no test calls a real AI. Synthetic «عينة» data only."""
+Scripted models only, behind fake connectors; no test calls a real AI. Synthetic «عينة» data
+only."""
+
+# ruff: noqa: F811 (the engine fixtures, imported)
 
 import asyncio
 import threading
@@ -17,7 +20,7 @@ from tests.engine_fakes import call, scripted
 from tests.engine_fakes import text as said
 from tests.team_samples import BRIEF
 from tests.test_engine_routes import Waits, app_with, message
-from tests.test_engine_runner import (  # noqa: F401 (fixtures)
+from tests.test_engine_runner import (  # noqa: F401
     PLAN,
     finish,
     links,
@@ -171,4 +174,3 @@ def test_closing_a_project_keeps_it_open_while_its_brief_runs():
                 break
             threading.Event().wait(0.01)
         assert made["id"] not in dict(app.state.projects.opened())
-

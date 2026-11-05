@@ -193,7 +193,7 @@ def create_app(
     app.state.backups = backups
     app.state.account = account
     app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
-    app.include_router(projects.router(registry, service))
+    app.include_router(projects.router(registry, service, engine))
     app.include_router(meaning_routes.router(service))
     app.include_router(calc_routes.router(registry))
     app.include_router(deliverables_api.router(registry, trash))

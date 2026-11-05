@@ -1266,6 +1266,8 @@ class Engine:
         self._agent_slots = asyncio.Semaphore(max_agents)
         self._briefs: dict[str, _Brief] = {}
         self._outputs: dict[str, Any] = {}
+        self._ended_unseen: dict[str, dict] = {}  # chat id: its last Brief, done or failed, unseen
+        self._close_after: set[str] = set()  # projects to close when their Brief ends
         self._general: Records | None = None
         self.book: CostBook
         self.spending: Spending
@@ -1365,6 +1367,13 @@ class Engine:
         self._outputs[brief.brief_id] = brief.output
         if brief.cancel_mode == "crash":
             return
+        if brief.state in ("done", "failed"):
+            self._ended_unseen[brief.chat_id] = _chat_activity(brief, brief.state)
+        else:  # stopped by the engineer, or paused with the core: nothing to tell
+            self._ended_unseen.pop(brief.chat_id, None)
+        if brief.chat_id in self._close_after and self.active(brief.chat_id) is None:
+            self._close_after.discard(brief.chat_id)
+            asyncio.get_running_loop().run_in_executor(None, self._close, brief.chat_id)
         for agent in brief.agents.values():
             self._publish(brief.place.channel, {"type": "agent-gone", "id": agent.run_id})
         if brief.state in ("done", "stopped", "failed"):
@@ -1435,6 +1444,7 @@ class Engine:
 
     def _launch(self, brief: _Brief) -> None:
         self._briefs[brief.brief_id] = brief
+        self._ended_unseen.pop(brief.chat_id, None)  # the chat's new Brief is what it does now
         brief.task = asyncio.create_task(brief.main(), name=f"brief-{brief.brief_id}")
 
     async def result(self, brief_id: str) -> Any:
@@ -1600,6 +1610,54 @@ class Engine:
     def waiting(self, project_id: str) -> int:
         """How many cards wait for the engineer in the project's running Briefs."""
         return sum(len(b.waiting) for b in self._in(project_id))
+
+    # Every chat at once, for the screen outside each chat (the top bar, the projects, notices)
+
+    def chats(self) -> list[dict]:
+        """Each chat with a running Brief ("working", or "waiting" while a card waits for the
+        engineer) or a last Brief that ended unseen ("done", "failed"), as
+        `{chat_id, brief_id, state, name}` (`name`: the project's, None for the General chat).
+        From memory only: no project file is opened, so the screen may ask every few seconds."""
+        found = {
+            b.chat_id: _chat_activity(b, "waiting" if b.waiting else "working")
+            for b in self._briefs.values()
+            if not b.finished
+        }
+        ended = [e for chat_id, e in self._ended_unseen.items() if chat_id not in found]
+        return list(found.values()) + ended
+
+    def seen(self, chat_id: str) -> None:
+        """The engineer has the chat open: its ended Brief's mark clears."""
+        self._ended_unseen.pop(chat_id, None)
+
+    def keep_open(self, project_id: str) -> bool:
+        """Asked before the screen closes a project: True while a Brief runs in it, whose file
+        then stays open and closes when the Brief ends, so moving on never cuts it short."""
+        if self.active(project_id) is None:
+            return False
+        self._close_after.add(project_id)
+        return True
+
+    def opened(self, project_id: str) -> None:
+        """The project was opened again: it stays open after its Brief ends."""
+        self._close_after.discard(project_id)
+
+    def _close(self, project_id: str) -> None:
+        try:
+            self.projects.close(project_id)
+        except (RecordsError, OSError) as e:  # it closes with the core anyway
+            log.warning(
+                "project %s did not close after its Brief (%s)", project_id, type(e).__name__
+            )
+
+
+def _chat_activity(brief: _Brief, state: str) -> dict:
+    return {
+        "chat_id": brief.chat_id,
+        "brief_id": brief.brief_id,
+        "state": state,
+        "name": brief.place.project_name,
+    }
 
 
 def _tool_results(runs: list[dict]) -> list[str]:
