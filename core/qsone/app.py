@@ -1,5 +1,6 @@
+import asyncio
 import secrets
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -15,8 +16,10 @@ from starlette.responses import Response
 
 from qsone import chat, copy, keys, models, projects
 from qsone.calc import routes as calc_routes
+from qsone.engine import connectors as engine_connectors
 from qsone.engine import mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
+from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
@@ -40,24 +43,26 @@ class ModelIn(BaseModel):
 
 def create_app(
     secret: str,
-    model_factory: chat.ModelFactory | None = None,
+    connectors: Callable[[], list] | None = None,
     models_lister: models.ModelLister | None = None,
     data_dir: Path | None = None,
     meaning: Callable[[projects.Projects], Meaning] | None = None,
     ai_http: httpx2.AsyncClient | None = None,
+    sleep: Callable[[float], Awaitable] | None = None,
 ) -> FastAPI:
     """Build the core app. Every route needs `Authorization: Bearer <secret>`.
 
-    `model_factory` gives the Lead QS model (None when no key is saved); tests inject a
-    PydanticAI `FunctionModel`. `models_lister` lists the models a key can use; tests inject
-    a fake, so no test calls Anthropic. Projects live in `data_dir/projects/` (default: the app
-    data folder); they are all closed when the app stops. `meaning` builds the search-by-meaning
-    service for the app's projects (default: the real models in `<data folder>/models`); tests
-    inject sample specs, a fake hub and test doubles. `ai_http` reaches the AI providers for the
-    AI settings (default: each provider's own client); tests inject a fake transport.
+    `connectors` gives the AI Connectors the Brief Runner uses (default: the ones the engineer
+    set up); tests inject fakes with scripted models. `models_lister` lists the models a key can
+    use; tests inject a fake, so no test calls Anthropic. Projects live in `data_dir/projects/`
+    (default: the app data folder); they are all closed when the app stops. `meaning` builds the
+    search-by-meaning service for the app's projects (default: the real models in
+    `<data folder>/models`); tests inject sample specs, a fake hub and test doubles. `ai_http`
+    reaches the AI providers for the AI settings and the Brief Runner (default: each provider's
+    own client); tests inject a fake transport. `sleep` is the Brief Runner's wait between
+    retries (default: `asyncio.sleep`).
     """
     expected = f"Bearer {secret}".encode()
-    model_factory = model_factory or chat.default_model
     models_lister = models_lister or models.list_models
 
     def check_secret(request: Request) -> None:
@@ -69,12 +74,22 @@ def create_app(
     registry = projects.Projects(folder)
     service = meaning(registry) if meaning else Meaning(registry, Path(folder) / "models")
     mcp = mcp_server.McpGate()
+    engine = Engine(
+        projects=registry,
+        data_dir=Path(folder),
+        connectors=connectors or (lambda: engine_connectors.connectors(http_client=ai_http)),
+        sleep=sleep or asyncio.sleep,
+        mcp=mcp,
+        meaning=service,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         service.start()
+        await engine.start()  # never continues a Brief by itself
         async with mcp.running():
             yield
+            await engine.shutdown()  # each Brief keeps its Checkpoint
         service.stop()
         registry.close_all()
 
@@ -88,11 +103,20 @@ def create_app(
     app.state.projects = registry
     app.state.meaning = service
     app.state.mcp = mcp
+    app.state.engine = engine
     app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
     app.include_router(calc_routes.router(registry))
     app.include_router(engine_routes.settings_router(ai_http))
+    app.include_router(engine_routes.briefs_router(engine))
+
+    @app.middleware("http")
+    async def learn_base_url(request: Request, call_next):
+        # Claude Code reaches the MCP server at the core's own address.
+        if engine.base_url is None:
+            engine.base_url = str(request.base_url)
+        return await call_next(request)
 
     @app.exception_handler(RecordsError)
     async def records_error(request: Request, exc: RecordsError) -> JSONResponse:
@@ -110,7 +134,7 @@ def create_app(
 
     @app.post("/chat")
     async def chat_stream(request: Request) -> Response:
-        return await chat.respond(request, model_factory)
+        return await chat.respond(request, engine)
 
     @app.get("/settings/ai-key")
     def ai_key_status(provider: Provider = "anthropic") -> dict:

@@ -14,7 +14,7 @@ import contextvars
 import json
 import logging
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -41,6 +41,9 @@ _SECURITY = TransportSecuritySettings(
 class RunScope:
     ctx: ToolContext
     tools: tuple[str, ...]
+    # Told each successful call (name, arguments, result): a run on Claude Code keeps no history
+    # in One, so the Brief Runner keeps what its tools gave, for the numbers guard.
+    on_result: Callable[[str, dict, str], None] | None = None
 
 
 _scope: contextvars.ContextVar[RunScope | None] = contextvars.ContextVar("mcp_run", default=None)
@@ -72,8 +75,9 @@ async def _call_tool(ctx, params: types.CallToolRequestParams) -> types.CallTool
         return _result(
             f"There is no tool «{name}». Use one of the tools you were given.", error=True
         )
+    args = dict(params.arguments or {})
     try:
-        return _result(await tools.call(name, dict(params.arguments or {}), scope.ctx))
+        text = await tools.call(name, args, scope.ctx)
     except tools.ModelRetry as e:
         return _result(e.message, error=True)
     except Denied:
@@ -81,6 +85,9 @@ async def _call_tool(ctx, params: types.CallToolRequestParams) -> types.CallTool
     except Exception:
         log.exception("MCP tool %s failed in run %s", name, scope.ctx.run_id)
         return _result(f"{name} failed inside One. Tell the engineer; do not retry it.", error=True)
+    if scope.on_result is not None:
+        scope.on_result(name, args, text)
+    return _result(text)
 
 
 class McpGate:

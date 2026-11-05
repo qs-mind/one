@@ -1,7 +1,10 @@
 """The engine's HTTP routes. Settings part (Plan 4 Task 3): AI Connectors, the Model Data Sheet,
 the model for each role, and entered prices. Spending Caps and what was spent (Task 6). The
-engineer's own Claude Code (Task 5). Money goes out as exact decimal text."""
+engineer's own Claude Code (Task 5). Money goes out as exact decimal text. The Brief Runner's
+chat stream, Brief controls, cards, and Plan 7's team and activity (Task 8)."""
 
+import asyncio
+import json
 from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -13,7 +16,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
-from starlette.responses import Response
+from starlette.responses import Response, StreamingResponse
 
 from qsone import copy, keys, settings
 from qsone.engine import cards, connectors, costs, general, roles
@@ -226,5 +229,115 @@ def settings_router(
             return costs.summary(CostBook(rec), brief_id=brief_id, now=datetime.now(UTC))
         finally:
             rec.close()
+
+    return router
+
+
+# The Brief Runner (Task 8) ----------------------------------------------------------------------
+
+ACTIVITY_PING = 15  # seconds between keep-alive comments on the activity stream
+
+
+class SteerIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class CardChoiceIn(BaseModel):
+    choice: str = Field(min_length=1, max_length=200)
+
+
+def briefs_router(engine: Any) -> APIRouter:
+    """The chat's stream and messages, the Brief controls, the cards, and Plan 7's team and
+    activity. `engine` is the app's `runner.Engine`."""
+    from qsone.chat import stream
+    from qsone.engine.runner import BriefBusy, reply_id
+
+    router = APIRouter()
+
+    def refused(text: Text, status: int) -> JSONResponse:
+        return JSONResponse({"error": text}, status_code=status)
+
+    @router.get("/chat/{chat_id}/stream")
+    def chat_stream(chat_id: str) -> Response:
+        """204 when no Brief runs in the chat; else its stream, replayed from its start."""
+        brief_id = engine.active(chat_id)
+        if brief_id is None:
+            return Response(status_code=204)
+        return stream(engine.events(brief_id), reply_id(brief_id))
+
+    @router.get("/chat/{chat_id}/messages")
+    def chat_messages(chat_id: str) -> dict:
+        return {"messages": engine.chat_messages(chat_id)}
+
+    @router.post("/briefs/{brief_id}/stop")
+    async def stop(brief_id: str) -> JSONResponse:
+        try:
+            await engine.stop(brief_id)
+        except LookupError:
+            return refused(copy.BRIEF_NOT_RUNNING, 409)
+        return JSONResponse({"state": "stopped"})
+
+    @router.post("/briefs/{brief_id}/steer")
+    async def steer(brief_id: str, body: SteerIn) -> Response:
+        try:
+            await engine.steer(brief_id, body.text)
+        except LookupError:
+            return refused(copy.BRIEF_NOT_RUNNING, 409)
+        return Response(status_code=202)
+
+    @router.get("/briefs/unfinished")
+    def unfinished() -> dict:
+        return {"briefs": engine.unfinished()}
+
+    @router.post("/briefs/{brief_id}/continue")
+    async def continue_brief(brief_id: str) -> JSONResponse:
+        try:
+            await engine.continue_brief(brief_id)
+        except BriefBusy as busy:
+            return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
+        except LookupError:
+            return refused(copy.BRIEF_NOT_FOUND, 404)
+        return JSONResponse({"state": "running"})
+
+    @router.post("/cards/{card_id}")
+    async def answer(card_id: str, body: CardChoiceIn) -> Response:
+        options = engine.options(card_id)
+        try:
+            await engine.answer(card_id, body.choice)
+        except ValueError:
+            return JSONResponse({"error": copy.CARD_CHOICE, "options": options}, status_code=422)
+        except LookupError:
+            return refused(copy.CARD_GONE, 404)
+        return Response(status_code=204)
+
+    @router.get("/projects/{project_id}/team")
+    def team(project_id: str) -> dict:
+        return engine.team(project_id)
+
+    @router.get("/projects/{project_id}/activity")
+    def activity(project_id: str) -> StreamingResponse:
+        async def lines():
+            events = engine.activity(project_id)
+            pending = None
+            try:
+                while True:
+                    pending = pending or asyncio.ensure_future(anext(events))
+                    done, _ = await asyncio.wait({pending}, timeout=ACTIVITY_PING)
+                    if not done:
+                        yield ": ping\n\n"
+                        continue
+                    event, pending = pending.result(), None
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            finally:
+                if pending is not None:  # ends the subscription inside the generator, too
+                    pending.cancel()
+                    await asyncio.gather(pending, return_exceptions=True)
+                await events.aclose()
+
+        return StreamingResponse(
+            lines(), media_type="text/event-stream", headers={"cache-control": "no-cache"}
+        )
 
     return router
