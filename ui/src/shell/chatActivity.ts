@@ -27,7 +27,6 @@ let users = 0;
 let round = 0; // a stopped poll's late answer is dropped
 let timer: ReturnType<typeof setTimeout> | undefined;
 const listeners = new Set<() => void>();
-const noticeListeners = new Set<(notice: ActivityNotice) => void>();
 
 function changed() {
   for (const listener of listeners) listener();
@@ -48,7 +47,6 @@ function take(next: ChatActivity[]) {
   for (const c of chats) {
     if (!answered || c.state === "working" || before.get(c.chat_id) === heard.get(c.chat_id)) continue;
     notice = { chatId: c.chat_id, name: c.name, state: c.state };
-    for (const listener of noticeListeners) listener(notice);
   }
   // a notice says what is true now: a chat that stopped waiting takes its notice with it
   if (notice && chats.find((c) => c.chat_id === notice!.chatId)?.state !== notice.state) notice = undefined;
@@ -89,7 +87,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Every chat with something to show, but the open one; polled while a screen listens. */
+/** Every chat with something to show (the open chat's ended Brief is seen at once); polled while a screen listens. */
 export function useActivity(): ChatActivity[] {
   return useSyncExternalStore(subscribe, () => chats);
 }
@@ -97,12 +95,6 @@ export function useActivity(): ChatActivity[] {
 /** The newest change in another chat (done, failed, now waiting), until it is opened, dismissed or no longer true. */
 export function useActivityNotice(): ActivityNotice | undefined {
   return useSyncExternalStore(subscribe, () => notice);
-}
-
-/** Calls `listener` with each new notice, as it comes (the system notification). */
-export function onActivityNotice(listener: (notice: ActivityNotice) => void): () => void {
-  noticeListeners.add(listener);
-  return () => noticeListeners.delete(listener);
 }
 
 export function dismissNotice() {
