@@ -35,6 +35,40 @@ describe("createWorkspaceSaver", () => {
     expect(second.saved.workspace).toHaveLength(1);
   });
 
+  it("flush resolves once every save sent so far is answered, the one already on its way too", async () => {
+    vi.useRealTimers();
+    const answered: string[] = [];
+    let answer!: () => void;
+    const saver = createWorkspaceSaver({
+      saveWorkspace: (opened) =>
+        new Promise<void>((resolve) => {
+          answer = () => {
+            answered.push(opened.key);
+            resolve();
+          };
+        }),
+    }, 0);
+    saver.save({ key: "file:a", anchor: null });
+    await new Promise((resolve) => setTimeout(resolve, 5)); // the save went by itself: it is on its way
+    let done = false;
+    const flushed = saver.flush().then(() => void (done = true));
+    await Promise.resolve();
+    expect(done).toBe(false); // still waiting for the core
+    answer();
+    await flushed;
+    expect(answered).toEqual(["file:a"]);
+  });
+
+  it("sends the anchor as it was when saved, not as it moves on after", () => {
+    const s = fakeSources({});
+    const saver = createWorkspaceSaver(s);
+    const opened = { key: "file:a" as const, anchor: { page: 2 } };
+    saver.save(opened);
+    saver.flush();
+    opened.anchor = { page: 5 };
+    expect(s.saved.workspace[0]!.opened).toEqual({ key: "file:a", anchor: { page: 2 } });
+  });
+
   it("flush with keepalive sends what waits, once", () => {
     const s = fakeSources({});
     const saver = createWorkspaceSaver(s);

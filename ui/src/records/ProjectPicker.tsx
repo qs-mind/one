@@ -14,7 +14,7 @@ import { GENERAL, stateOf, useActivity } from "../shell/chatActivity";
 import { Glide } from "../ui/Glide";
 import { useScrollEdges } from "../ui/useScrollEdges";
 import { unarchive } from "./Archived";
-import { currentProject, type Project, setCurrentProject, switchProject, useProject } from "./project";
+import { closeAfter, currentProject, type Project, setCurrentProject, switchProject, useProject, whenSent } from "./project";
 
 type Listed = (Project & { open: boolean }) | { id: string; error: Text };
 type List = { state: "loading" } | { state: "ready"; projects: Listed[] } | { state: "failed"; line: Text };
@@ -26,8 +26,9 @@ const NEW = "new";
 /** Goes to the General chat: no project is current, and the one that was is closed in the core. */
 export function leaveProject() {
   const before = currentProject();
+  const leaving = before ? whenSent() : null; // its open document is saved before the core closes it
   setCurrentProject(undefined);
-  if (before) void api(`/projects/${before.id}/close`, { method: "POST" }).catch(() => undefined);
+  if (before && leaving) closeAfter(before.id, leaving);
 }
 
 /** Opens the project in the core and makes it current; the core's plain reason when it does not open. */
