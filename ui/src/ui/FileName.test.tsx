@@ -6,7 +6,7 @@ import { TIP_DELAY } from "./Tip";
 afterEach(() => vi.useRealTimers());
 
 describe("FileName", () => {
-  it("isolates the extension left to right after the name", () => {
+  it("the extension follows the name's own direction, so the dot stays by the name (tender day: «عينةxlsx.»)", () => {
     expect(splitName("مواصفات - عينة اختبار (sample spec).docx")).toEqual(["مواصفات - عينة اختبار (sample spec)", ".docx"]);
     expect(splitName(".env")).toEqual([".env", ""]);
     expect(splitName("بدون امتداد")).toEqual(["بدون امتداد", ""]);
@@ -14,8 +14,14 @@ describe("FileName", () => {
     const outer = container.firstElementChild!;
     expect(outer.tagName).toBe("BDI");
     expect(outer.getAttribute("dir")).toBe("auto");
-    expect(outer.querySelector('bdi[dir="ltr"]')?.textContent).toBe(".docx");
+    // isolated left to right, «.docx» would draw its dot at the far left of an Arabic name: «مواصفاتdocx.»
+    expect(outer.querySelector('[dir="ltr"]')).toBeNull();
     expect(outer.textContent).toBe("مواصفات.docx");
+
+    const listed = render(<FileName name="01 المقايسة - عينة.xlsx" fit />).container.querySelector("[data-file-name]")!;
+    expect(listed.querySelector('[dir="ltr"]')).toBeNull();
+    expect(listed.lastElementChild).toHaveClass("shrink-0", "whitespace-nowrap");
+    expect(listed.lastElementChild).toHaveTextContent(".xlsx");
   });
 
   it("keeps the Latin words at the end of an Arabic name with the extension, one left-to-right run (never «.docx(sample spec»)", () => {
