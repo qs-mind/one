@@ -31,7 +31,7 @@ import { GeneralChat } from "./GeneralChat";
 import { Palette } from "./Palette";
 import { moveRegion, useNarrow } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
-import { useChats } from "./useChats";
+import { showsWaitingCard, useChats } from "./useChats";
 
 /** The dev-only sample mode (?sample=1): the canvas shows sample data, labelled. Release builds drop it. */
 function sampleMode(): boolean {
@@ -46,6 +46,7 @@ let sessionWidth = CHAT_WIDTH.start;
 /** The zoom controls take the bottom inline start; the command bar sits between them and the chat. */
 const ZOOM_SPACE = 272;
 const STATUS_RELOAD_MS = 1000;
+const WAITING_SYNC_MS = 1500;
 
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
@@ -82,6 +83,20 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   useEffect(() => {
     leadFromChat(chat.running); // before Plan 4 sends a Lead QS, the team shows the chat's own
   }, [chat.running]);
+
+  // "Waiting for you" never points at a card the chat cannot show: when the core counts a waiting card that the
+  // chat's messages lack for a moment, the chat is read again from the core (once per count).
+  const synced = useRef<number>(0);
+  const lacksCard = project !== undefined && waiting > 0 && !showsWaitingCard(chat.messages);
+  useEffect(() => {
+    if (waiting === 0) synced.current = 0;
+    if (!lacksCard || synced.current === waiting) return;
+    const timer = setTimeout(() => {
+      synced.current = waiting;
+      void chat.resync();
+    }, WAITING_SYNC_MS);
+    return () => clearTimeout(timer);
+  }, [lacksCard, waiting, chat.resync]);
 
   useEffect(() => {
     // a remembered project that no longer opens is forgotten, and the projects show

@@ -273,3 +273,26 @@ def test_lead_on_the_subscription_link_end_to_end(serve_app, data_dir, tmp_path,
     [run] = read_fake_log(log)
     assert run["ended"] == "done"
     assert not (data_dir / WORK).exists() or not any((data_dir / WORK).iterdir())
+
+
+# A quiet Brief keeps its stream alive (founder's run, 5 Nov: a card never reached the window) ----
+
+
+async def test_a_quiet_brief_stream_sends_heartbeats_and_still_every_part(monkeypatch):
+    from qsone.engine import stream as ui
+    from qsone.engine.types import Asked, Card, Progress
+
+    monkeypatch.setattr(ui, "HEARTBEAT_S", 0.01)
+    words = {"en": "Import?", "ar": "أستورد؟"}
+    card = Card("c1", "rows", words, words, ("keep", "no"))
+
+    async def events():
+        yield Progress("b1", "r1", copy.ROLE_LEAD, {"en": "Look", "ar": "يبص"})
+        await asyncio.sleep(0.05)  # a long quiet step
+        yield Asked("b1", card)
+
+    lines = [line async for line in ui.ui_stream(events(), message_id="a1")]
+    assert ui.HEARTBEAT in lines
+    kinds = [json.loads(line[6:])["type"] for line in lines if line.startswith("data: {")]
+    assert kinds.index("data-progress") < kinds.index("data-card")
+    assert lines[-1] == "data: [DONE]\n\n"

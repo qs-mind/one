@@ -10,6 +10,7 @@ is its plain {en, ar} words as JSON, as the screen reads it.
 
 No PydanticAI here: the chunks are written as the protocol defines them."""
 
+import asyncio
 import json
 from collections.abc import AsyncIterator, Iterable
 
@@ -29,6 +30,12 @@ from qsone.engine.types import (
 )
 
 HEADERS = {"x-vercel-ai-ui-message-stream": "v1", "cache-control": "no-cache"}
+# A Brief can be quiet for minutes (a long tool, a card waiting for the engineer). An SSE comment
+# this often keeps the connection from being dropped as idle by the window or a proxy on the way;
+# the screen's parser skips comments.
+HEARTBEAT_S = 15.0
+HEARTBEAT = ": keep-alive\n\n"
+_END = object()
 
 
 def _card(card) -> dict:
@@ -120,15 +127,47 @@ def text_id(message_id: str) -> str:
     return f"{message_id}-text"
 
 
+async def _beating(events: AsyncIterator[Event]) -> AsyncIterator[Event | None]:
+    """`events`, with a None after each HEARTBEAT_S without one."""
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def pump() -> None:
+        try:
+            async for event in events:
+                queue.put_nowait(event)
+        except Exception as error:  # noqa: BLE001 - raised again by the reader below
+            queue.put_nowait(error)
+        queue.put_nowait(_END)
+
+    task = asyncio.create_task(pump())
+    try:
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), HEARTBEAT_S)
+            except TimeoutError:
+                yield None
+                continue
+            if item is _END:
+                return
+            if isinstance(item, Exception):
+                raise item
+            yield item
+    finally:
+        task.cancel()
+
+
 async def ui_stream(events: AsyncIterator[Event], *, message_id: str) -> AsyncIterator[str]:
     """SSE lines, from `start` (with `message_id`, the stored id of the Brief's reply) to
-    `data: [DONE]`. Ends when `events` ends."""
+    `data: [DONE]`, with a heartbeat comment while the Brief is quiet. Ends when `events` ends."""
     parts = _Parts()
     yield _sse({"type": "start", "messageId": message_id})
     yield _sse({"type": "start-step"})
     text_open = False
     failed: dict | None = None
-    async for event in events:
+    async for event in _beating(events):
+        if event is None:
+            yield HEARTBEAT
+            continue
         if isinstance(event, TextDelta):
             if not text_open:
                 text_open = True
