@@ -1,5 +1,5 @@
 // A card that comes while a Brief is at work shows at once, without reloading the chat (founder's run, 5 Nov).
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeSources } from "../canvas/fake";
@@ -135,6 +135,77 @@ describe("a card that comes mid-Brief", () => {
     act(() => live.close()); // the connection is gone before the card came
     expect(await screen.findByText("الصفوف من 5 لـ 200.", {}, { timeout: 4000 })).toBeInTheDocument();
     expect(fetch.mock.calls.some(([url]) => String(url) === "/api/chat/p1/stream")).toBe(true);
+  });
+
+  it("scrolled up, new content shows “New below”; a card that comes to wait is brought into view", async () => {
+    setCurrentProject(P1);
+    const live = liveStream();
+    core({ routes: { "POST /api/chat": () => live.response() } });
+    const intoView = vi.fn();
+    Element.prototype.scrollIntoView = intoView;
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole("textbox", { name: texts.message.ar }), "استورد الـ BOQ{enter}");
+    act(() => {
+      live.send({ type: "start", messageId: "a1" });
+      live.send(status("running"));
+      live.send(progress(1));
+    });
+    await screen.findByText("يبص على أعمدة المقايسة 1");
+    const log = screen.getByRole("log");
+    const scrollTo = vi.fn();
+    Object.assign(log, { scrollTo });
+    Object.defineProperties(log, {
+      scrollHeight: { value: 2000, configurable: true },
+      clientHeight: { value: 300, configurable: true },
+      scrollTop: { value: 100, configurable: true, writable: true },
+    });
+    act(() => void log.dispatchEvent(new Event("scroll"))); // the engineer scrolled up to read
+    act(() => live.send(progress(2)));
+    const below = await screen.findByRole("button", { name: texts.newBelow.ar });
+    expect(scrollTo).not.toHaveBeenCalled(); // the log stays where the engineer reads
+    act(() => {
+      live.send(status("waiting_engineer"));
+      live.send({ type: "data-card", id: "c1", data: rows });
+    });
+    await screen.findByText("الصفوف من 5 لـ 200.");
+    await waitFor(() => expect(intoView).toHaveBeenCalled());
+    expect((intoView.mock.contexts[0] as HTMLElement).dataset.card).toBe("c1");
+    await user.click(below);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 2000 });
+    expect(screen.queryByRole("button", { name: texts.newBelow.ar })).not.toBeInTheDocument();
+  });
+
+  it("the engineer's own Arabic message with English in it: one block per line, the English isolated", async () => {
+    setCurrentProject(P1);
+    const live = liveStream();
+    core({ routes: { "POST /api/chat": () => live.response() } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole("textbox", { name: texts.message.ar }), "اقرا الـ BOQ{shift>}{enter}{/shift}وقولي الإجمالي{enter}");
+    const first = await screen.findByText((_, el) => el?.tagName === "P" && el.textContent === "اقرا الـ BOQ");
+    expect(first).toHaveAttribute("dir", "auto");
+    expect(first.querySelector("bdi")).toHaveTextContent("BOQ");
+    expect(first.nextElementSibling).toHaveTextContent("وقولي الإجمالي");
+  });
+
+  it("an older reply with no language on its progress follows the engineer's message, in the English page", async () => {
+    setLanguage("en");
+    setCurrentProject(P1);
+    const old = {
+      type: "data-progress",
+      id: "run-1",
+      data: { agent, text: { en: "Look at the BOQ columns", ar: "يبص على أعمدة المقايسة" } },
+    };
+    const messages = [
+      { id: "u1", role: "user", parts: [{ type: "text", text: "اقرا الـ BOQ وقولي إجمالي البنود" }] },
+      { id: "a1", role: "assistant", parts: [old] },
+    ];
+    core({ routes: { "GET /api/chat/p1/messages": () => Response.json({ messages }) } });
+    render(<App />);
+    const line = await screen.findByRole("list", { name: texts.progressLine.en });
+    expect(line).toHaveTextContent("يبص على أعمدة المقايسة");
+    expect(line).not.toHaveTextContent("Look at");
   });
 
   it("“Waiting for you” with no card in the chat reads the chat again from the core", async () => {

@@ -96,6 +96,33 @@ describe("RowsCard", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("each cell finds its own direction; a long value shows two lines, all of it in the title; the table scrolls", () => {
+    const long = "بالمتر المكعب حفر لزوم الأساسات وخلافة طبقاً للأبعاد والبيانات بالرسومات والمناسيب في boq-priced.xls";
+    const boq = { ...rows, payload: { ...rows.payload, rows: [{ description: long, rate: "1-1, 1-3, 1-4" }] } };
+    const { container } = render(<ApprovalCard id="c2" card={boq} />);
+    const cell = screen.getByTitle(long);
+    expect(cell.tagName).toBe("TD");
+    expect(cell).toHaveAttribute("dir", "auto");
+    expect(cell.firstElementChild).toHaveClass("line-clamp-2");
+    expect(cell.querySelector("bdi")).toHaveTextContent("boq-priced.xls"); // the English run stays whole
+    expect(cell).toHaveTextContent(long);
+    expect(screen.getByTitle("1-1, 1-3, 1-4")).toHaveAttribute("dir", "auto");
+    const scroller = container.querySelector("[data-rows-scroll]")!;
+    expect(scroller).toHaveClass("overflow-x-auto"); // columns keep their width; the card scrolls sideways
+    expect(scroller.querySelector("table")).toHaveClass("w-max");
+  });
+
+  it("speaks the Brief's language: an Arabic Brief's card in the English page", () => {
+    setLanguage("en");
+    render(<ApprovalCard id="c2" card={rows} lang="ar" />);
+    expect(screen.getByRole("heading", { name: rows.title.ar })).toBeInTheDocument();
+    expect(screen.getByText(rows.detail.ar)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "البند" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.keepTicked.ar })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "احفظ الصف 1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading").closest("section")).toHaveAttribute("dir", "rtl");
+  });
+
   it("a table to read, with no ticks, is answered with the plain choice", async () => {
     const fetch = core({ "POST /api/cards/c3": () => new Response(null, { status: 204 }) });
     const user = userEvent.setup();

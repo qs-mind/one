@@ -613,6 +613,8 @@ export const texts = {
   paletteFrames: { en: "Frames", ar: "الإطارات" },
   paletteCommands: { en: "Commands", ar: "الأوامر" },
   paletteRecords: { en: "In Project Records", ar: "في سجلات المشروع" },
+  newBelow: { en: "New below ↓", ar: "جديد تحت ↓" },
+  moreStatus: { en: "More status", ar: "باقي الحالة" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";
@@ -652,8 +654,16 @@ export function pick(text: Text, lang: Language = current): string {
   return text[lang];
 }
 
-export function t(key: keyof typeof texts): string {
-  return pick(texts[key]);
+export function t(key: keyof typeof texts, lang: Language = current): string {
+  return pick(texts[key], lang);
+}
+
+/** The language of a Brief, the engineer's, from the message that started it (the core's rule, in
+ * core/qsone/engine/types.py brief_language): English when it has more Latin letters than Arabic ones, else Arabic. */
+export function languageOf(text: string): Language {
+  const latin = text.match(/[A-Za-z]/g)?.length ?? 0;
+  const arabic = text.match(/[؀-ۿ]/g)?.length ?? 0;
+  return latin > arabic ? "en" : "ar";
 }
 
 /** Puts values into a text's blanks: fill("Page {page}", { page: 3 }) is "Page 3". */

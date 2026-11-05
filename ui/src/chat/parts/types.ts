@@ -1,7 +1,7 @@
 // The data parts a Brief's stream carries (Plan 4, Task 8). Each has a stable id, so the AI SDK updates it in place.
 import type { UIMessage } from "ai";
 import type { SelectionItem } from "../../canvas/types";
-import type { Text } from "../../i18n";
+import type { Language, Text } from "../../i18n";
 
 export type BriefState =
   | "queued"
@@ -13,8 +13,8 @@ export type BriefState =
   | "done"
   | "failed";
 
-/** data-progress, id = the agent run: what that agent is doing now. */
-export type ProgressData = { agent: Text; text: Text };
+/** data-progress, id = the agent run: what that agent is doing now, and the Brief's language to show it in. */
+export type ProgressData = { agent: Text; text: Text; lang?: Language };
 /** data-team, id = the message: one message between agents, for the Coordination Room. */
 export type TeamData = { sender: Text; recipient: Text; text: string };
 /** One question on a card, written by the agent in the engineer's language. */

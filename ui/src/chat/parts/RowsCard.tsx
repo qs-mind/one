@@ -1,13 +1,26 @@
 // A table card (kind "rows"): prices to keep (prices_propose), the columns of a BOQ import (boq_import). With `tick`, the
 // engineer ticks the rows to take, and Keep sends them as rows_ok; Refuse sends none. Once sent, or settled in the
 // stream, the rows left out are struck through (never by colour alone) and a line says how many were kept.
+// The card is narrow (the chat): the table keeps its columns readable and scrolls sideways inside the card; each cell
+// finds its own direction, and a long value shows two lines with the whole of it as the cell's title.
 import { useState } from "react";
+import { BidiText } from "../bidi";
 import { fill, pick, t } from "../../i18n";
 import type { CardKindProps } from "./cardKinds";
 
 const REFUSE = "no"; // takes nothing: no rows (core/qsone/engine/types.py)
 
-export function RowsCard({ card, onAnswer, sending, label }: CardKindProps) {
+function Cell({ value }: { value: string }) {
+  return (
+    <td dir="auto" title={value || undefined} className="min-w-[5rem] max-w-[14rem] px-2 py-1 align-top">
+      <span className="line-clamp-2 break-words">
+        <BidiText text={value} />
+      </span>
+    </td>
+  );
+}
+
+export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps) {
   const [ticked, setTicked] = useState<number[]>([]);
   const payload = card.payload ?? {};
   const columns = payload.columns ?? [];
@@ -26,46 +39,51 @@ export function RowsCard({ card, onAnswer, sending, label }: CardKindProps) {
   return (
     <>
       {rows.length > 0 && (
-        <table className="text-start">
-          <thead>
-            <tr>
-              {open && tickable && <th />}
-              {columns.map((c) => (
-                <th key={c.key} scope="col" className="px-2 text-start font-semibold">
-                  {pick(c.label)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr
-                key={i}
-                className={!open && payload.tick && !shownTicked.includes(i) ? "text-slate line-through" : undefined}
-              >
-                {open && tickable && (
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={fill(t("tickRow"), { n: i + 1 })}
-                      checked={ticked.includes(i)}
-                      disabled={sending}
-                      onChange={() => tick(i)}
-                    />
-                  </td>
-                )}
+        <div data-rows-scroll className="-mx-1 max-w-full overflow-x-auto px-1">
+          <table className="w-max min-w-full border-collapse text-start">
+            <thead>
+              <tr>
+                {open && tickable && <th />}
                 {columns.map((c) => (
-                  <td key={c.key} dir="auto" className="px-2">
-                    {row[c.key] ?? ""}
-                  </td>
+                  <th
+                    key={c.key}
+                    scope="col"
+                    dir="auto"
+                    className="min-w-[5rem] max-w-[14rem] px-2 py-1 text-start align-bottom font-semibold"
+                  >
+                    {pick(c.label, lang)}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr
+                  key={i}
+                  className={`border-t border-stone ${!open && payload.tick && !shownTicked.includes(i) ? "text-slate line-through" : ""}`}
+                >
+                  {open && tickable && (
+                    <td className="px-1 py-1 align-top">
+                      <input
+                        type="checkbox"
+                        aria-label={fill(t("tickRow", lang), { n: i + 1 })}
+                        checked={ticked.includes(i)}
+                        disabled={sending}
+                        onChange={() => tick(i)}
+                      />
+                    </td>
+                  )}
+                  {columns.map((c) => (
+                    <Cell key={c.key} value={row[c.key] ?? ""} />
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {settled && tickable && (
-        <p className="text-slate">{fill(t("rowsKept"), { n: shownTicked.length, total: rows.length })}</p>
+        <p className="text-slate">{fill(t("rowsKept", lang), { n: shownTicked.length, total: rows.length })}</p>
       )}
       {open && (
         <div className="flex flex-wrap gap-2">

@@ -42,6 +42,14 @@ describe("the agent card", () => {
     await waitFor(() => expect(currentSelection()).toEqual([{ kind: "deliverable", id: "boq", title: "تسعير boq - عينة" }]));
   });
 
+  it("its line is in its Brief's language, not the page's", async () => {
+    setLanguage("en");
+    const est = agent("est", { line: { en: "Look at the BOQ columns", ar: "يبص على أعمدة المقايسة" }, lang: "ar" });
+    showCanvas({ team: { desks: [], agents: [est] } });
+    const frame = await screen.findByRole("group", { name: texts.projectTeam.en });
+    await waitFor(() => expect(frame.querySelector('[data-agent="est"]')).toHaveTextContent("يبص على أعمدة المقايسة"));
+  });
+
   it("Stop calls the core for the agent's Brief", async () => {
     const fetch = vi.fn(async (url: string) =>
       url.startsWith("/api/briefs/") ? Response.json({ state: "stopped" }) : new Response(null, { status: 404 }),

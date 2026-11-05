@@ -49,6 +49,20 @@ describe("ProgressLine", () => {
     expect(lines[1]).toHaveTextContent(estimator.ar);
   });
 
+  it("speaks the Brief's language, not the page's: an Arabic Brief in the English page", () => {
+    setLanguage("en");
+    const text = { en: "Look at the BOQ columns in boq-priced.xls", ar: "يبص على أعمدة المقايسة في boq-priced.xls" };
+    const { rerender } = render(<ProgressLine items={[{ id: "r1", data: { agent: lead, text, lang: "ar" } }]} />);
+    const line = screen.getByRole("listitem");
+    expect(line).toHaveTextContent(`${lead.ar} ${text.ar}`);
+    expect(line).toHaveAttribute("dir", "rtl");
+    // an older part with no language follows the Brief's from the chat; the page's only with neither
+    rerender(<ProgressLine items={[{ id: "r1", data: { agent: lead, text } }]} lang="ar" />);
+    expect(screen.getByRole("listitem")).toHaveTextContent(text.ar);
+    rerender(<ProgressLine items={[{ id: "r1", data: { agent: lead, text } }]} />);
+    expect(screen.getByRole("listitem")).toHaveTextContent(text.en);
+  });
+
   it("shows nothing with no agent at work", () => {
     const { container } = render(<ProgressLine items={[]} />);
     expect(container).toBeEmptyDOMElement();

@@ -47,6 +47,7 @@ let sessionWidth = CHAT_WIDTH.start;
 const ZOOM_SPACE = 272;
 const STATUS_RELOAD_MS = 1000;
 const WAITING_SYNC_MS = 1500;
+const WAITING_FRAMES = 30;
 
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
@@ -153,9 +154,18 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
 
   const projectsButton = () => document.querySelector<HTMLElement>('[data-region="topbar"] [data-region-start]');
 
+  /** "Waiting for you": the chat opens at the first waiting card, scrolled to it, its first button focused. The chat
+   * may still be opening, or reading the card from the core: a few frames are given for it to show. */
   function showWaiting() {
     setChatShown(true);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-waiting] button")?.focus());
+    let frames = WAITING_FRAMES;
+    const go = () => {
+      const card = document.querySelector<HTMLElement>("[data-waiting]");
+      if (!card) return void (frames-- > 0 && requestAnimationFrame(go));
+      card.scrollIntoView?.({ block: "center" });
+      card.querySelector<HTMLElement>("button, input, textarea, select")?.focus({ preventScroll: true });
+    };
+    requestAnimationFrame(go);
   }
 
   function openDeliverable(id: string) {

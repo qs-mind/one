@@ -13,6 +13,8 @@ import { bodyOf, calls, core, P1, reply, running, streamed } from "./testing";
 vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
+/** A reply's paragraph by its whole text (its English runs sit in their own <bdi>). */
+const findReply = (text: RegExp) => screen.findByText((_, el) => el?.tagName === "P" && text.test(el.textContent ?? ""));
 
 beforeEach(() => {
   setLanguage("ar");
@@ -26,7 +28,7 @@ describe("the chat in the shell", () => {
     render(<App />);
     await user.type(await box(), "سعّر البند ده{enter}");
 
-    const answer = await screen.findByText(/مرحبا Hello/);
+    const answer = await findReply(/مرحبا Hello/);
     expect(answer.closest("[dir]")).toHaveAttribute("dir", "auto"); // mixed Arabic and English lines render right
     expect(screen.getByText("سعّر البند ده")).toBeInTheDocument();
     const [, init] = calls(fetch, "POST", "/api/chat")[0]!;
@@ -125,7 +127,7 @@ describe("the chat in the shell", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(await box(), "كمان بند 04/01{enter}");
-    expect(await screen.findByText(/مرحبا Hello/)).toBeInTheDocument();
+    expect(await findReply(/مرحبا Hello/)).toBeInTheDocument();
     const [, init] = calls(fetch, "POST", "/api/briefs/b9/steer")[0]!;
     expect(bodyOf(init)).toEqual({ text: "كمان بند 04/01" });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -195,7 +197,7 @@ describe("the chat in the shell", () => {
     render(<App />);
     expect(await screen.findByText("سعّر بند الخرسانة - عينة")).toBeInTheDocument();
     expect(screen.getByText(texts.codeA.ar)).toBeInTheDocument();
-    expect(await screen.findByText(/مرحبا Hello/)).toBeInTheDocument();
+    expect(await findReply(/مرحبا Hello/)).toBeInTheDocument();
     const items = screen.getAllByRole("listitem").map((item) => item.textContent);
     expect(items.findIndex((text) => text?.includes("والحديد؟"))).toBeLessThan(
       items.findIndex((text) => text?.includes("مرحبا Hello")),
@@ -228,7 +230,7 @@ describe("the chat in the shell", () => {
     expect(calls(fetch, "POST", "/api/briefs/b1/continue")).toHaveLength(0); // never by itself
 
     await user.click(screen.getByRole("button", { name: texts.continue.ar }));
-    expect(await screen.findByText(/مرحبا Hello/)).toBeInTheDocument(); // its stream joined
+    expect(await findReply(/مرحبا Hello/)).toBeInTheDocument(); // its stream joined
     expect(calls(fetch, "POST", "/api/briefs/b1/continue")).toHaveLength(1);
   });
 
