@@ -7,9 +7,9 @@
 // you, failed, or done since you last looked; this chat is the one on the screen, so it is seen.
 import { useRef } from "react";
 import { Mark } from "../brand/Mark";
-import type { ProjectSources, ProjectStatus } from "../canvas/types";
-import { isMac } from "../canvas/keys";
-import { Following, TeamNow } from "../canvas/live/TeamNow";
+import type { ProjectSources, ProjectStatus } from "../project/types";
+import { isMac } from "../project/keys";
+import { Following, TeamNow } from "../project/live/TeamNow";
 import { send } from "../core";
 import { openSetup } from "../firstlaunch/parts";
 import { chooseFolder } from "../import/FolderDrop";

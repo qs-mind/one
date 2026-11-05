@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { freeRect, readable, revealed, READABLE, worldOf } from "./cover";
 import { inView, placeInView } from "./place";
-import type { Placed } from "./types";
+import type { Placed } from "../project/types";
 
 // The canvas pane at 1440 × 852 under the top bar, as the founder's window had it.
 const pane = { x: 0, y: 48, w: 1440, h: 852 };

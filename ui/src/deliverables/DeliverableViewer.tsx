@@ -3,7 +3,7 @@
 // Sheet or Document viewer only, filling its container; in `mode="full"` it is the review board: the viewer, then
 // Changes, Comments, Versions and Close-out, with the exports. Everything it draws stays inside its own box.
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Anchor, ViewerProps } from "../canvas/types";
+import type { Anchor, ViewerProps } from "../project/types";
 import { fill, language, pick, t, useLanguage } from "../i18n";
 import { ChangesPanel } from "../review/ChangesPanel";
 import { CommentsPanel } from "../review/CommentsPanel";
@@ -16,7 +16,7 @@ import { TabUnderline } from "../ui/TabUnderline";
 import { DocumentViewer, type DocumentHandle } from "../viewers/document/DocumentViewer";
 import type { TextAnchor } from "../viewers/document/plate";
 import { UndoNotice, type UndoHandle } from "../ui/UndoNotice";
-import { isMod, isTyping } from "../canvas/keys";
+import { isMod, isTyping } from "../project/keys";
 import { SheetViewer, type SheetHandle, type SheetRange } from "../viewers/sheet/SheetViewer";
 import { deliverablesApi, type Accepted, type Rejected } from "./api";
 import type { CommentAnchor, FillPlanInfo, View } from "./types";

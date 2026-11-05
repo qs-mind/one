@@ -2,8 +2,8 @@
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Canvas } from "../Canvas";
-import { fakeSources, type FakeOptions } from "../fake";
-import type { AgentInfo, DeliverableInfo, Placed } from "../types";
+import { fakeSources, type FakeOptions } from "../../project/fake";
+import type { AgentInfo, DeliverableInfo, Placed } from "../../project/types";
 
 const original = Object.getOwnPropertyDescriptors(HTMLElement.prototype);
 

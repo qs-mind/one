@@ -6,9 +6,9 @@ import { STRIP_H } from "../place";
 import { Cursors, STACK_PX, STRIP_INSET } from "./Cursors";
 import { agent, paneSize, restorePane, showCanvas } from "./testing";
 
-vi.mock("../sources", async (original) => {
-  const { FakeViewer } = await import("./testViewer");
-  return { ...(await original<typeof import("../sources")>()), viewerFor: (kind: string) => (kind === "sheet" ? FakeViewer : null) };
+vi.mock("../../project/sources", async (original) => {
+  const { FakeViewer } = await import("../../project/live/testViewer");
+  return { ...(await original<typeof import("../../project/sources")>()), viewerFor: (kind: string) => (kind === "sheet" ? FakeViewer : null) };
 });
 
 const transform = (id: string) => screen.getByTestId(`cursor-${id}`).style.transform;

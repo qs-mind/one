@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fill, setLanguage, texts } from "../../i18n";
 import { canvasApi } from "../api";
 import { Canvas } from "../Canvas";
-import { fakeSources, type FakeOptions } from "../fake";
-import type { FileInfo, Placed } from "../types";
+import { fakeSources, type FakeOptions } from "../../project/fake";
+import type { FileInfo, Placed } from "../../project/types";
 
 // React Flow measures its renderer element; give it a real size (jsdom has no layout).
 const original = Object.getOwnPropertyDescriptors(HTMLElement.prototype);

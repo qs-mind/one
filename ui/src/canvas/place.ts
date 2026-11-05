@@ -1,6 +1,6 @@
 // Where a new frame goes: the first free slot, scanning rows in reading order from the top-left (English) or the
 // top-right (Arabic) of the occupied area. A frame already placed never moves, and frames never overlap.
-import type { DeliverableInfo, FrameKey, Placed } from "./types";
+import type { DeliverableInfo, FrameKey, Placed } from "../project/types";
 
 /** The height of a frame's name strip, and of a folded frame. */
 export const STRIP_H = 52;

@@ -9,7 +9,7 @@
 // message never starts a Brief, which costs money, while ONE's window is closed.
 import { generateId } from "ai";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { SelectionItem } from "../canvas/types";
+import type { SelectionItem } from "../project/types";
 import { fill, t, useLanguage } from "../i18n";
 import { DUR, play } from "../ui/motion";
 

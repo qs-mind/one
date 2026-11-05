@@ -2,7 +2,7 @@
 // with) and each Brief's reply with its Progress Line, Coordination Room, cards, costs, Review codes and Deliverable
 // cards. The shell owns the chat itself (ui/src/shell/useChats.ts) and its composer, the command bar.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { SelectionItem } from "../canvas/types";
+import type { SelectionItem } from "../project/types";
 import { type Fix, fixOf } from "../core";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
 import { dir, fill, pick, t, type Text, useLanguage } from "../i18n";

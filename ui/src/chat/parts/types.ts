@@ -1,6 +1,6 @@
 // The data parts a Brief's stream carries (Plan 4, Task 8). Each has a stable id, so the AI SDK updates it in place.
 import type { UIMessage } from "ai";
-import type { SelectionItem } from "../../canvas/types";
+import type { SelectionItem } from "../../project/types";
 import type { Source } from "../../deliverables/types";
 import type { Language, Text } from "../../i18n";
 import type { ViewData } from "./view/types";

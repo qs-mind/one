@@ -1,6 +1,6 @@
 // What the rest of the screen asks of the canvas (the chat's Open, the palette, the command bar). The mounted canvas
 // registers the real functions; with no canvas on screen every call does nothing.
-import type { Anchor, FrameKey, Placed } from "./types";
+import type { Anchor, FrameKey, Placed } from "../project/types";
 
 export type CanvasApi = {
   /** `mark`: the frame shows where the view went (a soft outline that fades), when sent there from elsewhere. */

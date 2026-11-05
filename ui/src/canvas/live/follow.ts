@@ -4,8 +4,8 @@ import { useReactFlow, useStoreApi } from "@xyflow/react";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { freeArea } from "../cover";
 import { STRIP_H } from "../place";
-import { cursorShown, useAgent } from "./activity";
-import { glide } from "./motion";
+import { cursorShown, useAgent } from "../../project/live/activity";
+import { glide } from "../../project/live/motion";
 
 const listeners = new Set<() => void>();
 let followed: string | null = null;

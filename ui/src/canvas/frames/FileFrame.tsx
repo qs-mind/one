@@ -4,7 +4,7 @@
 import { useStore, type Node, type NodeProps } from "@xyflow/react";
 import { useEffect, useState } from "react";
 import { dir, fill, t, useLanguage } from "../../i18n";
-import type { FilePiece } from "../types";
+import type { FilePiece } from "../../project/types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type FileData } from "./Frame";
 import { FileName } from "../../ui/FileName";
 import { Segmented } from "../../ui/Segmented";

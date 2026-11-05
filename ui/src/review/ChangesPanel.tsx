@@ -7,7 +7,7 @@
 // are listed in plain words.
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { deliverablesApi, type Accepted, type Rejected } from "../deliverables/api";
-import type { Anchor } from "../canvas/types";
+import type { Anchor } from "../project/types";
 import type { CellChange, Change, RecordsCell, Segment, View } from "../deliverables/types";
 import { asCell, isNumber } from "../deliverables/types";
 import { fill, pick, t, type Text } from "../i18n";

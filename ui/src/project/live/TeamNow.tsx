@@ -4,7 +4,7 @@ import { pick, fill, t, useLanguage } from "../../i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import { useAgent, useAgents, type LiveAgent } from "./activity";
 import { stateText } from "./AgentCard";
-import { stopFollowing, useFollowing } from "./follow";
+import { stopFollowing, useFollowing } from "../../canvas/live/follow";
 
 const button = "whitespace-nowrap rounded-lg px-3 py-1.5 hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
 const now = (a: LiveAgent) => a.state === "working" || a.state === "thinking" || a.state === "waiting";

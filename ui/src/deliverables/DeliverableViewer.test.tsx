@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ViewerHandle } from "../canvas/types";
+import type { ViewerHandle } from "../project/types";
 import { fill, setLanguage, texts } from "../i18n";
 import { viewerFor } from "../viewers/registry";
 import { DeliverableCard } from "./DeliverableCard";

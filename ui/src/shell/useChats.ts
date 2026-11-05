@@ -6,7 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, generateId } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import type { SelectionItem } from "../canvas/types";
+import type { SelectionItem } from "../project/types";
 import type { Unfinished } from "../chat/parts/ContinueBriefs";
 import { activeBrief, type OneMessage, type OnePart, partsOf } from "../chat/parts/types";
 import { coreLine, send as sendJson } from "../core";

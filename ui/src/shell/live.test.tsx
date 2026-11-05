@@ -2,7 +2,7 @@
 // the top bar from the live store, one Announcer.
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { fakeSources } from "../canvas/fake";
+import { fakeSources } from "../project/fake";
 import { agent, layout, paneSize, restorePane } from "../canvas/live/testing";
 import { fill, setLanguage, texts } from "../i18n";
 import { setCurrentProject } from "../records/project";

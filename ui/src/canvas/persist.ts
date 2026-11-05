@@ -1,7 +1,7 @@
 // Layout saves, batched (decision 4): frames 500 ms after the last change, the view 1 s after the last pan or zoom,
 // merged per frame. `flush` sends what is waiting at once (project switch, pagehide with keepalive). Nothing goes to
 // web storage: the layout lives only in the project's encrypted file.
-import type { FrameKey, Placed, ProjectSources, View } from "./types";
+import type { FrameKey, Placed, ProjectSources, View } from "../project/types";
 
 export type Saver = {
   frames(changed: readonly Placed[], removed: readonly FrameKey[]): void;

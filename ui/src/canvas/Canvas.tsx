@@ -36,16 +36,16 @@ import {
   type FrameNode,
 } from "./frames/Frame";
 import { TeamFrame } from "./frames/TeamFrame";
-import { deskCounts, startActivity, useDeskCounts, workedOn } from "./live/activity";
-import { isMac, isMod, isTyping, matches } from "./keys";
+import { deskCounts, startActivity, useDeskCounts, workedOn } from "../project/live/activity";
+import { isMac, isMod, isTyping, matches } from "../project/keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
 import { freeArea, MARGIN, PREFERRED, READABLE, readable, revealed, TOGETHER, worldOf } from "./cover";
 import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
 import { importInto } from "../import/importer";
 import { holdsFolder } from "../import/walk";
-import { select } from "./selection";
-import { SourceError } from "./sources";
+import { select } from "../project/selection";
+import { SourceError } from "../project/sources";
 import { markFrame } from "./mark";
 import { ease } from "../ui/motion";
 import { Tip } from "../ui/Tip";
@@ -60,7 +60,7 @@ import type {
   Placed,
   ProjectSources,
   SelectionItem,
-} from "./types";
+} from "../project/types";
 
 export type CanvasProps = {
   projectId: string;

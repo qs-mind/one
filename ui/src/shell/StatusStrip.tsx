@@ -4,7 +4,7 @@
 // button rather than being cut: the stage first, then the open comments, the BOQ so far; the submission date stays
 // longest.
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
-import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../canvas/types";
+import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../project/types";
 import { count, fill, language, pick, t, useLanguage } from "../i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { RollingNumber } from "../ui/RollingNumber";

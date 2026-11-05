@@ -2,7 +2,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeSources } from "../canvas/fake";
+import { fakeSources } from "../project/fake";
 import { setLanguage, texts } from "../i18n";
 import { setCurrentProject } from "../records/project";
 import { App } from "./App";

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api } from "../api";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
-import type { FileInfo } from "../canvas/types";
+import type { FileInfo } from "../project/types";
 import { coreLine } from "../core";
 import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";

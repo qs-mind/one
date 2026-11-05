@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { canvasApi } from "../canvas/api";
-import { fakeSources } from "../canvas/fake";
+import { fakeSources } from "../project/fake";
 import { entry } from "../deliverables/fixtures";
 import { fill, setLanguage, texts } from "../i18n";
 import { currentProject, setCurrentProject } from "../records/project";

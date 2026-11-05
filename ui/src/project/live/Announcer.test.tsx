@@ -4,7 +4,7 @@ import { fill, setLanguage, texts } from "../../i18n";
 import { fakeSources } from "../fake";
 import { startActivity } from "./activity";
 import { ANNOUNCE_GAP_MS, ANNOUNCE_HOLD_MS, Announcer } from "./Announcer";
-import { agent } from "./testing";
+import { agent } from "../../canvas/live/testing";
 
 const role = "مهندس التسعير est - عينة";
 

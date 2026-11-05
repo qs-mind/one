@@ -6,7 +6,7 @@ import { createContext, memo, useContext, type ComponentType, type ReactNode } f
 import { count, fill, pick, t, useLanguage } from "../../i18n";
 import { lod, type Detail } from "../lod";
 import { MIN_H, MIN_W, STRIP_H } from "../place";
-import type { Anchor, ClientBoqInfo, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
+import type { Anchor, ClientBoqInfo, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../../project/types";
 import { FileName } from "../../ui/FileName";
 import { Tip } from "../../ui/Tip";
 

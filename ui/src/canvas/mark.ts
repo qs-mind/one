@@ -2,7 +2,7 @@
 // round it while the view glides there, fading once it has arrived. No glow, no shadow. With reduced motion the view
 // jumps and the outline shows still for a moment, then goes at once.
 import { DUR, play, reducedMotion } from "../ui/motion";
-import type { FrameKey } from "./types";
+import type { FrameKey } from "../project/types";
 
 const SOFT_INK = "rgb(14 15 18 / 0.45)";
 const CLEAR_INK = "rgb(14 15 18 / 0)";

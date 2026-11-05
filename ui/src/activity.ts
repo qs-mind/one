@@ -2,7 +2,7 @@
 // the screen listen (the canvas, the agent cards, Plan 6's viewers). Read with fetch, not EventSource, so the Tauri
 // fetch shim carries it in release builds. Nothing is kept: after a reconnect each listener reloads its lists.
 import { api } from "./api";
-import type { ActivityEvent } from "./canvas/types";
+import type { ActivityEvent } from "./project/types";
 
 type Subscriber = { listener: (event: ActivityEvent) => void; onReconnect?: () => void };
 type Stream = { subscribers: Set<Subscriber>; controller: AbortController };

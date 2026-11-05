@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { canvasApi } from "../canvas/api";
-import type { FrameKey, ProjectSources } from "../canvas/types";
+import type { FrameKey, ProjectSources } from "../project/types";
 import { openSetup } from "../firstlaunch/parts";
 import { fill, language, pick, setLanguage, t, useLanguage } from "../i18n";
 import { type Project, switchProject } from "../records/project";

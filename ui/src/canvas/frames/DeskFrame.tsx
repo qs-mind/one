@@ -2,9 +2,9 @@
 // ("Pricing Desk: 2 working"), so Desks stay quiet in daily work until the engineer opens one.
 import type { Node, NodeProps } from "@xyflow/react";
 import { dir, t, useLanguage } from "../../i18n";
-import { useDeskAgents } from "../live/activity";
-import { AgentCard } from "../live/AgentCard";
-import type { DeskInfo } from "../types";
+import { useDeskAgents } from "../../project/live/activity";
+import { AgentCard } from "../../project/live/AgentCard";
+import type { DeskInfo } from "../../project/types";
 import { Frame, frameTitle, memoFrame, type DeskData } from "./Frame";
 
 const stageText: Record<DeskInfo["stage"], "deskTemporary" | "deskDraft" | "deskApproved"> = {
