@@ -2,6 +2,7 @@
 import type { UIMessage } from "ai";
 import type { SelectionItem } from "../../canvas/types";
 import type { Language, Text } from "../../i18n";
+import type { ViewData } from "./view/types";
 
 export type BriefState =
   | "queued"
@@ -90,6 +91,8 @@ export type OneData = {
   status: StatusData;
   deliverable: DeliverableData;
   understood: UnderstoodData;
+  /** data-view, id = the view (decision 16.1): what the Lead QS chose to show, from ONE's blocks. */
+  view: ViewData;
 };
 
 /** A message the engineer sent while a Brief ran is marked as steering it; one sent with a canvas selection keeps

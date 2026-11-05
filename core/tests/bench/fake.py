@@ -3,8 +3,9 @@
 The brain is stateless: each request it reads what it was given (the tools offered, the output
 tool, the Brief, the tool results so far) and picks the next step of the Brief's scenario. A
 scenario is chosen by a keyword in the Brief: "bench:chat", "bench:question", "bench:boq",
-"bench:deliverable", "bench:team"; the Briefs One starts itself (a tender folder's "I understood
-this", a project's lessons) have their own; anything else is the full tender walk-through.
+"bench:deliverable", "bench:team", "bench:view" (a view of the first item's numbers); the Briefs
+One starts itself (a tender folder's "I understood this", a project's lessons) have their own;
+anything else is the full tender walk-through.
 Each step is tried once: a tool that refuses is noted in core.log and the brain moves on, so it
 never loops. Every text it writes says it is a bench reply, and it writes no number of its own.
 """
@@ -37,7 +38,9 @@ log = logging.getLogger("qsone.bench")
 
 USAGE = (600, 120)  # tokens in and out of every bench response: 0.0012 USD at the sample prices
 PRICE_SOURCE = "bench sample price, not real"
-SCENARIOS = ("chat", "question", "boq", "deliverable", "team", "full", "understand", "lessons")
+SCENARIOS = (
+    *("chat", "question", "boq", "deliverable", "team", "full", "understand", "lessons", "view"),
+)
 _KEYWORD = re.compile(r"bench:(\w+)")
 _ARABIC = re.compile(r"[؀-ۿ]")
 _LATIN = re.compile(r"[A-Za-z]")
@@ -357,6 +360,49 @@ def _lesson(seen: Seen) -> Step:
     return _call("lesson", "note_lesson", {"text": text, "kind": "method"})
 
 
+def _first_item_numbers(seen: Seen) -> Step | None:
+    result, ok = seen.done.get("items", ("", False))
+    items = [i["id"] for i in _data(result).get("items", []) if isinstance(i, dict)] if ok else []
+    return _call("numbers", "ledger_numbers", {"item": items[0]}) if items else None
+
+
+def _view(seen: Seen) -> Step | None:
+    """A view of the first imported item's numbers (decision 16.1): each figure and each number
+    cell a reference to a ledger number, so the screen shows it with its source chip."""
+    result, ok = seen.done.get("numbers", ("", False))
+    numbers = [n for n in _data(result).get("numbers", []) if isinstance(n, dict)] if ok else []
+    if not numbers:
+        return None
+    columns = [
+        {"key": "name", "label": _words(seen, "Number", "الرقم"), "type": "text"},
+        {"key": "value", "label": _words(seen, "Value", "القيمة"), "type": "number"},
+    ]
+    note = _words(
+        seen,
+        "(bench reply, not a real AI) Each figure opens its source.",
+        "(رد تجريبي من منصة الاختبار، وليس ذكاء اصطناعي حقيقي) كل رقم بيفتح مصدره.",
+    )
+    blocks = [
+        {"kind": "heading", "text": _words(seen, "First BOQ item (bench)", "أول بند (تجريبي)")},
+        {
+            "kind": "figures",
+            "items": [{"label": n["name"], "value": {"number": n["id"]}} for n in numbers[:4]],
+        },
+        {
+            "kind": "table",
+            "columns": columns,
+            "rows": [{"name": n["name"], "value": {"number": n["id"]}} for n in numbers],
+        },
+        {
+            "kind": "group",
+            "title": _words(seen, "About this view", "عن العرض ده"),
+            "blocks": [{"kind": "prose", "text": note}],
+        },
+    ]
+    title = _words(seen, "BOQ at a glance (bench sample)", "نظرة على المقايسة (عينة تجريبية)")
+    return _call("view", "show", {"title": title, "sample": True, "blocks": blocks})
+
+
 BOQ = (_files_step, _preview, _import, _items)
 LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "chat": (),
@@ -366,6 +412,7 @@ LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "team": (_plan, _build, _delegate),
     "understand": (_files_step, _preview, _import, _understood),
     "lessons": (_lesson,),
+    "view": (*BOQ, _first_item_numbers, _view),
     "full": (
         _files_step,
         _read_spec,
@@ -395,6 +442,8 @@ _STEP_OF = {
     _letter: "letter",
     _understood: "understood",
     _lesson: "lesson",
+    _first_item_numbers: "numbers",
+    _view: "view",
 }
 
 

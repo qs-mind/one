@@ -34,6 +34,21 @@ test("Deliverables from a BOQ, in English", async ({ walk }) => {
   await walk.notInClientFlag(); // the fake prices one row of its own: the Checking QS flags it
 });
 
+test("a view of sourced numbers, in Arabic (decision 16.1)", async ({ walk }) => {
+  await walk.start("ar");
+  await walk.createProject("عرض عينة - منصة الاختبار");
+  await walk.addFiles();
+  await walk.brief("bench:view اعرض أرقام أول بند");
+  const view = walk.chat.getByRole("region", { name: "نظرة على المقايسة (عينة تجريبية)" });
+  await expect.soft(view, "the view is in the chat").toBeVisible();
+  await expect.soft(view, "an Arabic view reads right to left").toHaveAttribute("dir", "rtl");
+  await expect.soft(view.getByText("بيانات تجريبية"), "the view is labelled sample data").toBeVisible();
+  await walk.shot("view");
+  await view.getByRole("button", { name: /جاي منين/ }).first().click();
+  await expect.soft(walk.page.getByRole("dialog", { name: "المصدر" }), "a number opens its source").toBeVisible();
+  await walk.shot("view-source");
+});
+
 test("a question card, in English", async ({ walk }) => {
   await walk.start("en");
   await walk.createProject("Sample question - test bench");
