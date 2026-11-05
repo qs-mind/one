@@ -117,7 +117,8 @@ def _client_items(rec: Records) -> int | None:
 def _boq_value(rec: Records) -> dict | None:
     """The total of the most recently updated BOQ Sheet, with its Deliverable and Revision, and
     `sample` when any number behind it is sample data (the screen labels it). `items` is how many
-    items the Sheet has, and `of` how many the client's BOQ has (when one was imported): the total
+    items the Sheet has, `priced` how many of them have every number they need (the top bar says
+    how many are left), and `of` how many the client's BOQ has (when one was imported): the total
     says what it covers, «٤ من ٣٢٥ بند»."""
     with rec.read() as conn:
         found = conn.execute(
@@ -138,6 +139,7 @@ def _boq_value(rec: Records) -> dict | None:
         "status": entry["status"],
         "sample": entry["sample"],
         "items": (entry["progress"] or {}).get("total", 0),
+        "priced": (entry["progress"] or {}).get("done", 0),
     } | ({"of": of} if (of := _client_items(rec)) else {})
 
 

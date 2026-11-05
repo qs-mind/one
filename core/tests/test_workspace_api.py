@@ -177,6 +177,7 @@ def test_status_names_the_boq_value_by_its_deliverable(client, project):
             "status": "draft",
             "sample": True,  # the sample sheet's rates come from a sample source
             "items": 6,  # what the total covers: the Sheet's items (no client BOQ imported here)
+            "priced": 6,  # every item has the numbers its columns ask for
         }
     }
 

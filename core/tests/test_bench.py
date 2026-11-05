@@ -174,6 +174,7 @@ def test_the_workspace_screens_have_a_quoted_rate_a_letter_and_a_decision(bench,
     # the BOQ so far counts the client's items: the sheet has each of them, no more
     boq = client.get(f"/projects/{project}/status").json()["boq_value"]
     assert boq["items"] == boq["of"] == len([r for r in samples.WORKSPACE_ROWS if r[0]])
+    assert boq["priced"] == 1  # one rate priced so far: the top bar says the rest are left
 
 
 def test_the_tender_folder_is_understood(bench, tmp_path):
