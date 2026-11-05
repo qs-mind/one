@@ -18,6 +18,8 @@ import { restoreProject, useProject } from "../records/project";
 import { leaveProject, ProjectPicker } from "../records/ProjectPicker";
 import { RecordsPanel } from "../records/RecordsPanel";
 import { AiSettings, useAiSettings } from "../settings/AiSettings";
+import { Connectors } from "../settings/Connectors";
+import { SearchKey } from "../settings/SearchKey";
 import { CHAT_WIDTH, ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 import { DeliverablePanel, useDeliverablePanel } from "./DeliverablePanel";
@@ -175,7 +177,13 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
 
   const floatingPanel = panel && (
     <FloatingPanel onClose={closePanel}>
-      {panel === "ai" && <AiSettings ai={ai} onClose={closePanel} />}
+      {panel === "ai" && (
+        <>
+          <AiSettings ai={ai} onClose={closePanel} />
+          <SearchKey />
+          <Connectors />
+        </>
+      )}
       {panel === "projects" && <ProjectPicker onClose={closePanel} />}
       {panel === "records" && project && (
         <RecordsPanel onClose={closePanel} onPickProject={() => setPanel("projects")} />
