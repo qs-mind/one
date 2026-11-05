@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import stat
+import subprocess
 import sys
 import time
 from decimal import Decimal
@@ -413,6 +414,29 @@ async def test_steer_writes_one_more_user_line(log, work):
     assert users[1]["message"]["content"] == [{"type": "text", "text": "خلّي السعر بالجنيه - عينة"}]
     with pytest.raises(LookupError):
         await connector.steer("run-1", "no run - sample")
+
+
+def test_two_runs_started_at_once_get_their_own_numbers(log):
+    """The fake numbers its runs with a counter, not by counting the log, so two processes
+    started together each play their own run of the script."""
+    script = {"runs": [[{"text": f"run {n}"}, "result"] for n in range(3)]}
+    argv = [*fake_claude_command(script=script, log=log), "-p", "--verbose"]
+    argv += ["--input-format", "stream-json", "--output-format", "stream-json"]
+    line = json.dumps({"type": "user", "message": {"role": "user", "content": "عينة"}}) + "\n"
+    started_together = [
+        subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        for _ in range(3)
+    ]
+    answers = []
+    for process in started_together:
+        out, _ = process.communicate(line, timeout=30)
+        [result] = [v for v in map(json.loads, out.splitlines()) if v["type"] == "result"]
+        answers.append(result["result"])
+    assert sorted(answers) == ["run 0", "run 1", "run 2"]
+    runs = read_fake_log(log)
+    assert [run["n"] for run in runs] == [0, 1, 2]
+    assert [run["ended"] for run in runs] == ["done", "done", "done"]
+    assert all(len(run["stdin"]) == 1 for run in runs)
 
 
 async def test_cards_are_the_aliases_on_the_subscription(log):

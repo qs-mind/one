@@ -1119,6 +1119,10 @@ class Engine:
             self.book = CostBook(self._general)
             self.spending = Spending(self.book, clock=self.clock)
 
+    def cost_book(self) -> CostBook | None:
+        """The open cost book, or None before `start` or while the file is not open."""
+        return self.book if self._general is not None and self._general.is_open else None
+
     async def start(self) -> None:
         """Opens the Engineer Records file. Never continues a Brief by itself. A file that does
         not open leaves the app up: each Brief then answers why, in plain words."""
