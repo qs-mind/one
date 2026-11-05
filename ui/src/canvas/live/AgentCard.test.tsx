@@ -42,6 +42,20 @@ describe("the agent card", () => {
     await waitFor(() => expect(currentSelection()).toEqual([{ kind: "deliverable", id: "boq", title: "تسعير boq - عينة" }]));
   });
 
+  it("fits its frame: its words wrap, a long frame name keeps to one line, nothing pushes it sideways", async () => {
+    const est = agent("est", {
+      line: { en: "Importing the BOQ (sample)", ar: "يستورد المقايسة من جدول كميات - عينة اختبار (sample BOQ).xlsx، شيت BOQ" },
+      focus: { frame: "deliverable:boq", anchor: null },
+    });
+    showCanvas({ team: { desks: [], agents: [est] } });
+    const el = await card("est");
+    expect(el).toHaveClass("min-w-0", "[overflow-wrap:anywhere]");
+    const on = within(el).getByRole("button", { name: fill(texts.agentOn.ar, { title: "تسعير boq - عينة" }) });
+    expect(on).toHaveClass("min-w-0", "max-w-full");
+    expect(on.querySelector("[data-file-name]")).toHaveTextContent("تسعير boq - عينة"); // cut with «…», never the card
+    expect(within(el).getByText("claude-sonnet-5")).toHaveClass("min-w-0", "truncate");
+  });
+
   it("its model has its company's logo; one not on the sheet has the neutral mark", async () => {
     showCanvas({ team: { desks: [], agents: [agent("est", { provider: "anthropic" }), agent("qs", { provider: null })] } });
     const model = (id: string) => card(id).then((el) => within(el).getByText("claude-sonnet-5").closest("span")!);

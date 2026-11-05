@@ -367,6 +367,11 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
             opener.current = projectsButton();
             setPanel("projects");
           }}
+          onPanel={(kind) => {
+            if (kind === "ai" && aiMain) return setChatShown(true); // the settings are already where the chat is
+            opener.current = document.querySelector<HTMLElement>("[data-search-field]") ?? projectsButton();
+            setPanel(kind);
+          }}
         />
         <Announcer />
       </div>

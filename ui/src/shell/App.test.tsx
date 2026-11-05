@@ -267,6 +267,38 @@ describe("the palette", () => {
     await user.click(within(dialog).getByRole("option", { name: texts.fitAll.ar }));
     expect(fit).toHaveBeenCalled();
   });
+
+  it("each command says what it does, none reads like another; the panels and Usage Stats are there too", async () => {
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await box();
+    fireEvent.keyDown(document, { code: "KeyK", ctrlKey: true });
+    let dialog = await screen.findByRole("dialog", { name: texts.palette.ar });
+    const names = within(dialog).getAllByRole("option").map((o) => o.textContent ?? "");
+    for (const key of ["fitAll", "arrangeByStageCommand", "tidy", "records", "deliverablesButton", "ai", "backupTitle", "usageTitle"] as const)
+      expect(names, key).toContain(texts[key].ar);
+    expect(new Set(names).size).toBe(names.length);
+    expect(texts.tidy.ar).not.toMatch(/^(نظّم|رتّب)/); // never «نظّم» next to «رتّب»: one says rows, one columns by stage
+    await user.click(within(dialog).getByRole("option", { name: texts.backupTitle.ar }));
+    expect(await screen.findByRole("heading", { name: texts.backupTitle.ar })).toBeInTheDocument();
+    fireEvent.keyDown(document, { code: "KeyK", ctrlKey: true });
+    dialog = await screen.findByRole("dialog", { name: texts.palette.ar });
+    await user.click(within(dialog).getByRole("option", { name: texts.records.ar }));
+    expect(await screen.findByRole("heading", { name: texts.records.ar })).toBeInTheDocument();
+  });
+
+  it("in the General chat the palette's field never mentions frames", async () => {
+    core();
+    render(<App />);
+    await box();
+    fireEvent.keyDown(document, { code: "KeyK", ctrlKey: true });
+    const dialog = await screen.findByRole("dialog", { name: texts.palette.ar });
+    expect(within(dialog).getByRole("combobox")).toHaveAttribute("placeholder", texts.paletteSearchGeneral.ar);
+    expect(texts.paletteSearchGeneral.ar).not.toContain("الإطارات");
+    expect(texts.paletteSearchGeneral.en).not.toMatch(/frame/i);
+  });
 });
 
 describe("keyboard and layout", () => {
@@ -352,6 +384,12 @@ describe("the import reports and the backup question", () => {
     const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
     const question = within(chat).getByRole("region", { name: texts.backupTitle.ar });
     expect(question.closest("[data-notices]")).not.toBeNull();
+    // one compact line: the question, its action and a dismiss; the path field opens only when asked for
+    expect(within(question).getAllByRole("button").map((b) => b.textContent)).toEqual([texts.backupPickFolder.ar, texts.backupLater.ar]);
+    expect(within(question).queryByRole("textbox")).toBeNull();
+    expect(question).not.toHaveTextContent(texts.backupNoFolder.ar);
+    await user.click(within(question).getByRole("button", { name: texts.backupPickFolder.ar }));
+    expect(within(question).getByRole("textbox", { name: texts.backupFolderPath.ar })).toBeInTheDocument();
     await user.click(within(question).getByRole("button", { name: texts.backupLater.ar }));
     expect(within(chat).queryByRole("region", { name: texts.backupTitle.ar })).toBeNull();
   });

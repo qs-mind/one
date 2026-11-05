@@ -41,7 +41,7 @@ export const texts = {
   },
   reload: { en: "Reload", ar: "إعادة التحميل" },
   // Plan 4 (agent engine). Arabic in plain Egyptian colloquial, as in core/qsone/copy.py, until the founder picks.
-  ai: { en: "AI", ar: "الذكاء الاصطناعي" },
+  ai: { en: "AI settings", ar: "إعدادات الذكاء الاصطناعي" },
   aiTitle: { en: "AI settings", ar: "إعدادات الذكاء الاصطناعي" },
   // the action a core text gets where it shows away from its fix (shell/FixAction.tsx), and a check's own retry
   openAiSettings: { en: "Open AI settings", ar: "افتح إعدادات الذكاء الاصطناعي" },
@@ -548,7 +548,9 @@ export const texts = {
   zoomControls: { en: "Zoom controls", ar: "أدوات التكبير" },
   fitAll: { en: "Show everything", ar: "اعرض كل حاجة" },
   arrangeByStage: { en: "Arrange by stage", ar: "رتّب حسب المرحلة" },
-  tidy: { en: "Tidy up", ar: "نظّم" },
+  tidy: { en: "Line frames up in rows", ar: "رصّ الإطارات في صفوف" },
+  // the palette says what each layout does, so the two never read the same
+  arrangeByStageCommand: { en: "Arrange frames in columns by stage", ar: "رتّب الإطارات في أعمدة حسب المرحلة" },
   undoLayout: { en: "Undo the layout change", ar: "ارجع في الترتيب" },
   minimap: { en: "Map of the canvas", ar: "خريطة الكانفاس" },
   projectFiles: { en: "Project files", ar: "ملفات المشروع" },
@@ -654,6 +656,7 @@ export const texts = {
   boqFrom: { en: "From «{title}»", ar: "من «{title}»" },
   notIssued: { en: "No Revision issued yet", ar: "لسه مطلعش إصدار" },
   paletteSearch: { en: "Search frames, commands and Project Records", ar: "دوّر في الإطارات والأوامر وسجلات المشروع" },
+  paletteSearchGeneral: { en: "Search commands and projects", ar: "دوّر في الأوامر والمشاريع" },
   paletteFrames: { en: "Frames", ar: "الإطارات" },
   paletteCommands: { en: "Commands", ar: "الأوامر" },
   paletteRecords: { en: "In Project Records", ar: "في سجلات المشروع" },
@@ -668,7 +671,7 @@ export const texts = {
   setupSkip: { en: "Skip", ar: "تخطّى" },
   setupBack: { en: "Back", ar: "رجوع" },
   setupNext: { en: "Next", ar: "التالي" },
-  setupAgain: { en: "Setup", ar: "الإعداد" },
+  setupAgain: { en: "Setup again", ar: "أول تشغيل" },
   setupAgainHelp: { en: "Go through the first steps again.", ar: "امشي على خطوات البداية تاني." },
   setupNotSaved: { en: "This step was not saved. Try again.", ar: "الخطوة دي ماتحفظتش. جرّب تاني." },
   languageTitle: { en: "Choose your language", ar: "اختار لغتك" },

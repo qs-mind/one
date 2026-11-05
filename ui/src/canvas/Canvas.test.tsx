@@ -344,6 +344,21 @@ describe("the Project Canvas", () => {
     const bar = screen.getByRole("toolbar", { name: texts.zoomControls.ar });
     expect(bar).toHaveAttribute("dir", "rtl");
     expect(within(bar).getByRole("button", { name: texts.arrangeByStage.ar })).toBeInTheDocument();
+    // Show everything is reachable from the zoom controls too, not only the palette
+    const fit = within(bar).getByRole("button", { name: texts.fitAll.ar });
+    act(() => canvasApi.focusFrame("team:core"));
+    fireEvent.click(fit);
+    expect(await frameEl("تسعير a - عينة")).toBeInTheDocument();
+  });
+
+  it("Arrange by stage then shows the whole new layout: every frame in view, none left out", async () => {
+    show({ deliverables: [deliverable("a"), deliverable("b", { kind: "document" }), deliverable("c"), deliverable("d")] });
+    await frameEl("تسعير a - عينة");
+    act(() => canvasApi.focusFrame("team:core")); // the view is somewhere else
+    act(() => canvasApi.arrange("stage"));
+    for (const id of ["a", "b", "c", "d"]) expect(await frameEl(`تسعير ${id} - عينة`)).toBeInTheDocument();
+    expect(await frameEl(texts.projectFiles.ar)).toBeInTheDocument();
+    expect(await frameEl(texts.projectTeam.ar)).toBeInTheDocument();
   });
 
   it("the minimap and the zoom controls are one block in the bottom inline-start corner, the controls under the map", async () => {
