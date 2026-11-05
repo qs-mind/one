@@ -89,7 +89,8 @@ export type UnsourcedData = { values: string[] };
  * the reply writes them, with that number's id and exact value; the reply opens each into its source card. */
 export type SourcedData = { numbers: Record<string, { id: string; value: string }> };
 /** data-status, id = the Brief. */
-export type StatusData = { state: BriefState; step: Text | null };
+/** `fix`: a failed Brief's fix, as the core says (core.ts Fix). */
+export type StatusData = { state: BriefState; step: Text | null; fix?: string };
 /** data-deliverable, id = the Deliverable (Plan 6): the Lead QS made it; the chat shows its card. */
 export type DeliverableData = { id: string };
 /** data-understood, id = understood-<Brief id> (Plan 8): the Lead QS read a tender folder; the chat shows the

@@ -306,6 +306,15 @@ AI_FAILED = {
     "en": "The work stopped because of a problem with {provider}. The work so far is saved.",
     "ar": "الشغل وقف بسبب مشكلة في {provider}. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
 }
+# The provider's own reason, in plain words (audit B7): a model it retired, and the one it names.
+MODEL_GONE_TRY = {
+    "en": "{provider} says {model} is no longer available; try {other}. Pick it in AI settings.",
+    "ar": "{provider} بيقول إن {model} مبقاش متاح؛ جرّب {other}. اختاره من إعدادات الذكاء الاصطناعي.",
+}
+MODEL_GONE = {
+    "en": "{provider} says {model} is not available. Pick another model in AI settings.",
+    "ar": "{provider} بيقول إن {model} مش متاح. اختار نموذج تاني من إعدادات الذكاء الاصطناعي.",
+}
 
 # The one tiny check (first launch, AI settings): there is no work to save yet.
 AI_CHECK_FAILED = {
@@ -2203,6 +2212,8 @@ FIXES = {
         NO_AI,
         AI_KEY_REFUSED,
         PRICE_UNKNOWN,
+        MODEL_GONE_TRY,
+        MODEL_GONE,
         WEB_NO_SEARCH,
         WEB_SEARCH_KEY_REFUSED,
         WEB_SEARCH_LIMIT,

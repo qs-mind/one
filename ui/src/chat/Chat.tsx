@@ -77,6 +77,8 @@ function OwnText({ text }: { text: string }) {
   ));
 }
 
+const failedReply = (parts: OnePart[]) => partsOf(parts, "status").at(-1)?.data.state === "failed";
+
 function BriefReply({
   parts,
   lang,
@@ -88,6 +90,7 @@ function BriefReply({
   const progress = partsOf(parts, "progress");
   // the Brief's own language: the core's word for it, else the engineer's message's
   const said = progress.find((item) => item.data.lang)?.data.lang ?? lang;
+  const status = partsOf(parts, "status").at(-1)?.data;
   return (
     <div className="flex flex-col gap-4">
       <ProgressLine items={progress} worklog={partsOf(parts, "worklog").at(-1)?.data} lang={said} live={live} />
@@ -120,6 +123,13 @@ function BriefReply({
           <DeliverableCard key={part.id} projectId={projectId} id={part.data.id} onOpen={onOpenDeliverable} />
         ))}
       <HandOffCards parts={parts} />
+      {status?.state === "failed" && status.step && (
+        // a failed Brief keeps its reason and its fix in its reply, after later messages too (audit B7)
+        <div role="alert" className="flex flex-col gap-2 text-copper">
+          <p dir="auto">{pick(status.step, said)}</p>
+          <FixAction fix={fixOf(status.fix)} lang={said} />
+        </div>
+      )}
     </div>
   );
 }
@@ -270,7 +280,8 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
               <span className={reduced ? "text-slate" : "shimmer"}>{t("thinking")}</span>
             </li>
           )}
-          {error && <ErrorLine error={error} />}
+          {/* a failed Brief's reply says it already, with its fix */}
+          {error && !(lastReply >= 0 && failedReply(messages[lastReply]!.parts)) && <ErrorLine error={error} />}
           {failed && (
             <li role="alert" className="text-copper">
               {pick(failed)}

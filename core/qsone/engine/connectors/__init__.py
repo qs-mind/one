@@ -10,6 +10,7 @@ Keys live only in the key store, under the connector's id ("anthropic", "standar
 """
 
 import logging
+import re
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal, Protocol
 
@@ -161,6 +162,40 @@ def key_refused(provider: str) -> Text:
     return copy.fill(copy.AI_KEY_REFUSED, provider=provider)
 
 
+_SUGGESTED = re.compile(r"\buse (?:models/)?([A-Za-z0-9][\w.-]*[\w])", re.IGNORECASE)
+
+
+def _said(error: BaseException) -> str:
+    """The provider's own message in an HTTP error's body (Google sends a list of one)."""
+    body = getattr(error, "body", None)
+    if isinstance(body, list) and body:
+        body = body[0]
+    if isinstance(body, dict):
+        inner = body.get("error")
+        found = inner.get("message") if isinstance(inner, dict) else body.get("message")
+        if isinstance(found, str):
+            return found
+    found = getattr(error, "message", None)
+    return found if isinstance(found, str) else ""
+
+
+def provider_reason(error: BaseException, provider: str, model: str) -> Text | None:
+    """The provider's reason in plain words, when ONE knows it (audit B7): a model it retired or
+    does not serve (with the one it suggests), or Google's 400 for a wrong key. None otherwise:
+    the provider's own words go to core.log only."""
+    status = getattr(error, "status_code", None)
+    said = _said(error)
+    if status == 400 and "api key not valid" in said.lower():
+        return key_refused(provider)
+    if status != 404:
+        return None
+    name = model.removeprefix("models/")
+    suggested = _SUGGESTED.search(said)
+    if suggested and suggested.group(1) != name:
+        return copy.fill(copy.MODEL_GONE_TRY, provider=provider, model=name, other=suggested[1])
+    return copy.fill(copy.MODEL_GONE, provider=provider, model=name)
+
+
 def plain_error(error: Exception, provider: str) -> Text:
     """The {en, ar} words for a provider's error; its own words go to core.log only."""
     if isinstance(
@@ -190,6 +225,9 @@ def plain_error(error: Exception, provider: str) -> Text:
     ):
         text = copy.AI_BUSY
     else:  # a plain HTTP error: ModelHTTPError, or the SDKs' APIStatusError
+        said = provider_reason(error, provider, str(getattr(error, "model_name", "") or ""))
+        if said is not None:
+            return said
         status = getattr(error, "status_code", None)
         if status in (401, 403):
             return key_refused(provider)

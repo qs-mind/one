@@ -734,8 +734,9 @@ class _Brief:
                 log.warning("run %s on %s: %s %s", run_id, choice.connector, kind, error)
                 if kind == "auth":
                     raise _Fail(connectors_mod.key_refused(provider)) from None
-                if kind == "other":
-                    raise _Fail(copy.fill(copy.AI_FAILED, provider=provider)) from None
+                if kind == "other":  # the provider's reason when ONE knows it (audit B7)
+                    said = connectors_mod.provider_reason(error, provider, choice.model)
+                    raise _Fail(said or copy.fill(copy.AI_FAILED, provider=provider)) from None
                 if kind == "offline":
                     before = self.step
                     self.set_state("waiting_connection", copy.WAITING_INTERNET)
