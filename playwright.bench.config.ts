@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // The bench walks (ui/bench): the real screen and the real core with the bench's fake AI, on port 1442. Not the
 // mocked e2e tests (playwright.config.ts). One Chromium, one worker: the founder's dev app runs on this machine too.
 // Screenshots go to test-results/bench/shots (git-ignored), and to $QSONE_BENCH_SHOTS when it is set.
-const port = 1442;
+const port = Number(process.env.QSONE_BENCH_PORT || 1442); // another worktree's bench may hold 1442
 
 export default defineConfig({
   testDir: "ui/bench",
@@ -17,7 +17,7 @@ export default defineConfig({
   webServer: {
     command: "node scripts/bench.mjs",
     url: `http://127.0.0.1:${port}/`,
-    reuseExistingServer: true,
+    reuseExistingServer: false, // never attach to another worktree's bench
     timeout: 120_000,
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } }],
