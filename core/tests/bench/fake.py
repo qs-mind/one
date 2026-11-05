@@ -325,9 +325,14 @@ def _understood(seen: Seen) -> Step | None:
     boq = _file(seen, ("xlsx", "xls", "excel"))
     if boq is None:
         return None
+    preview, ok = seen.done.get("preview", ("", False))
+    found = _NEXT_IMPORT.search(preview) if ok else None
+    # the BOQ's own sheet, as the preview names it: "BOQ" was refused on any other sheet name,
+    # so the card never showed (tender day, 5 Nov 2026)
+    sheet = json.loads(found.group(1)).get("sheet", "BOQ") if found else "BOQ"
 
     def at(row: int, value: str) -> dict:
-        return {"value": value, "file_id": boq, "locator": {"sheet": "BOQ", "row": row}}
+        return {"value": value, "file_id": boq, "locator": {"sheet": sheet, "row": row}}
 
     def label(kind: str) -> str:
         if kind.lower() in ("xlsx", "xls", "excel"):

@@ -25,7 +25,7 @@ BOQ_ROWS = [
 def write_boq(path: Path) -> Path:
     book = openpyxl.Workbook()
     sheet = book.active
-    sheet.title = "BOQ"
+    sheet.title = "المقايسة"  # as the tender pack names it: the bench fake must read the name
     sheet.sheet_view.rightToLeft = True
     sheet.append(["جدول كميات - عينة اختبار، أرقام غير حقيقية"])
     sheet.append(["رقم البند", "الوصف", "الوحدة", "الكمية", "الفئة", "القيمة"])

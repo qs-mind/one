@@ -157,6 +157,10 @@ def test_the_tender_folder_is_understood(bench, tmp_path):
     kinds, reply, events = run(client, project, copy.UNDERSTAND_BRIEF["ar"])
     assert kinds == ["rows"] and "رفضت" not in reply
     assert any(e["type"] == "data-understood" for e in events)
+    # and the chat read back has it: the card was in neither live nor stored chat (5 Nov 2026)
+    stored = client.get(f"/chat/{project}/messages").json()["messages"]
+    parts = [p["type"] for m in stored for p in m.get("parts", [])]
+    assert "data-understood" in parts
     facts = client.get(f"/projects/{project}/facts").json()
     assert facts["facts"]["client"]["source"]["file_name"] == samples.BOQ_NAME
     assert facts["facts"]["items_count"]["value"] == "4"

@@ -182,6 +182,36 @@ async def test_the_tool_refuses_with_the_fix_and_saves_nothing(rec, letter):
     assert [e.name for e in ctx.host.events if isinstance(e, Data)] == ["understood"]
 
 
+async def test_a_fact_at_a_wrong_place_is_found_by_its_value(rec):
+    # Gemini gave {"page": 1} for a text file, was refused three times, and no card showed
+    ctx = tool_ctx(rec)
+    email = "Subject: مناقصة - عينة\nالعميل: هيئة المباني - عينة\nمدة سريان العرض ٩٠ يوم\n"
+    mail = add_file(rec, "إيميل العميل - عينة.txt", email.encode(), actor="engineer").id
+    fact = {"client": {"value": "هيئة المباني - عينة", "file_id": mail, "locator": {"page": 1}}}
+    out = json.loads(await call("understood", fact, ctx))
+    assert out["saved"] is True and "not_saved" not in out
+    source = understand.facts(rec)["facts"]["client"]["source"]
+    assert source["file_id"] == mail and "page" not in source["locator"]
+    assert [e.name for e in ctx.host.events if isinstance(e, Data)] == ["understood"]
+
+
+async def test_what_checks_is_saved_and_the_rest_is_named(rec, letter):
+    # the card always shows what checks; what does not is named to the Lead to fix
+    ctx = tool_ctx(rec)
+    args = {
+        "client": {"value": "هيئة - عينة", "file_id": letter, "locator": {"page": 2}},
+        "contract_type": {"value": "مش في الملف - عينة", "file_id": "nope", "locator": {"page": 1}},
+        "missing": ["تقرير التربة - عينة"],
+    }
+    out = json.loads(await call("understood", args, ctx))
+    assert out["facts"] == ["client"] and "nope" in out["not_saved"][0]
+    assert set(understand.facts(rec)["facts"]) == {"client"}
+    assert [e.name for e in ctx.host.events if isinstance(e, Data)] == ["understood"]
+    # a call that fixes a fact keeps the missing documents
+    await call("understood", {"client": args["client"]}, ctx)
+    assert understand.facts(rec)["missing"] == ["تقرير التربة - عينة"]
+
+
 def test_the_instruction_is_short_and_only_the_project_lead_has_the_tool():
     assert agents.words(understand.INSTRUCTION) <= 120
     assert "understood" in agents.lead_spec().tools
