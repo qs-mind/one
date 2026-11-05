@@ -1,7 +1,8 @@
 // Search and commands (Ctrl/Cmd+K): the frames on the canvas by title (Enter focuses one), the shell's commands and
 // the projects, and a search of Project Records (a hit opens its file's frame at its page). For now this is also the
-// Project Index's quick way in: every Deliverable is a frame.
-import { useEffect, useState } from "react";
+// Project Index's quick way in: every Deliverable is a frame. Opened from the top bar's search field, it grows from
+// the field in place (scaled and clipped from its rect, 220 ms) and closes back into it; from Ctrl K, it just opens.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { canvasApi } from "../canvas/api";
 import type { FrameKey, ProjectSources } from "../canvas/types";
@@ -9,6 +10,8 @@ import { fill, language, pick, setLanguage, t, useLanguage } from "../i18n";
 import { type Project, switchProject } from "../records/project";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { FileName } from "../ui/FileName";
+import { DUR, play } from "../ui/motion";
+import { withTransition } from "../ui/viewTransition";
 
 type Hit = { file_id: string; file_name: string; locator: Record<string, string | number>; text: string };
 
@@ -33,8 +36,29 @@ async function frameTitles(sources: ProjectSources): Promise<Map<FrameKey, strin
   return titles;
 }
 
+/** The palette's box as if it stood in `field`: moved there and scaled to its width, showing only its top band. */
+function atField(box: DOMRect, field: DOMRect): Keyframe {
+  const scale = box.width ? field.width / box.width : 1;
+  const hidden = Math.max(0, box.height - field.height / scale);
+  return {
+    transformOrigin: "0 0",
+    transform: `translate(${field.left - box.left}px, ${field.top - box.top}px) scale(${scale})`,
+    clipPath: `inset(0 0 ${hidden}px 0 round ${8 / scale}px)`,
+    opacity: 0,
+  };
+}
+const inPlace: Keyframe = { transformOrigin: "0 0", transform: "none", clipPath: "inset(0 0 0 0 round 14px)", opacity: 1 };
+
+// The dialog's box and the dim behind it (ui/dialog.tsx renders the dim just before the box).
+function parts(input: HTMLElement | null) {
+  const box = input?.closest<HTMLElement>("[role='dialog']") ?? undefined;
+  const dim = box?.previousElementSibling instanceof HTMLElement ? box.previousElementSibling : undefined;
+  return { box, dim };
+}
+
 export function Palette({
   open,
+  origin,
   onOpenChange,
   project,
   sources,
@@ -44,6 +68,8 @@ export function Palette({
   onNewProject,
 }: {
   open: boolean;
+  /** The search field's place, when it opened the palette. */
+  origin?: DOMRect;
   onOpenChange(open: boolean): void;
   project: Project | undefined;
   sources: ProjectSources | undefined;
@@ -58,6 +84,48 @@ export function Palette({
   const [projects, setProjects] = useState<Project[]>([]);
   const [hits, setHits] = useState<Hit[]>([]);
   const projectId = project?.id;
+  const input = useRef<HTMLInputElement | null>(null);
+  const closing = useRef(false);
+  const refocus = useRef(false);
+
+  useEffect(() => {
+    // Radix gives the focus back only to a DialogTrigger, and the field is not one: back to the field, once the
+    // dialog (and its focus trap) is gone
+    if (open || !refocus.current) return;
+    refocus.current = false;
+    document.querySelector<HTMLElement>("[data-search-field]")?.focus();
+  }, [open]);
+
+  // Opened from the field: grow from it as the box appears, once for each box (never again on a re-render).
+  const grown = useRef<HTMLElement>(undefined);
+  const grow = useCallback(
+    (node: HTMLInputElement | null) => {
+      input.current = node;
+      const { box, dim } = parts(node);
+      if (!box || !origin || grown.current === box) return;
+      grown.current = box;
+      void play(box, [atField(box.getBoundingClientRect(), origin), inPlace], DUR.base);
+      if (dim) void play(dim, [{ opacity: 0 }, { opacity: 1 }], DUR.base);
+    },
+    [origin],
+  );
+
+  // Escape or a click outside: back into the field (where it is now), then close. Choosing an item closes at once.
+  async function change(next: boolean) {
+    const { box, dim } = parts(input.current);
+    if (next || !origin || !box) return onOpenChange(next);
+    if (closing.current) return;
+    closing.current = true;
+    const field = document.querySelector("[data-search-field]")?.getBoundingClientRect() ?? origin;
+    await Promise.all([
+      play(box, [inPlace, atField(box.getBoundingClientRect(), field)], DUR.base),
+      dim && play(dim, [{ opacity: 1 }, { opacity: 0 }], DUR.base),
+    ]);
+    for (const el of [box, dim]) el?.style.setProperty("opacity", "0"); // its end state until it is gone
+    closing.current = false;
+    refocus.current = true;
+    onOpenChange(false);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -118,8 +186,8 @@ export function Palette({
   );
 
   return (
-    <CommandDialog title={t("palette")} open={open} onOpenChange={onOpenChange}>
-      <CommandInput value={query} onValueChange={setQuery} placeholder={t("paletteSearch")} />
+    <CommandDialog title={t("palette")} open={open} onOpenChange={(next) => void change(next)}>
+      <CommandInput ref={grow} value={query} onValueChange={setQuery} placeholder={t("paletteSearch")} />
       <CommandList>
         <CommandEmpty>{t("noResults")}</CommandEmpty>
         {project && frames.length > 0 && (
@@ -136,7 +204,7 @@ export function Palette({
           {project && command(t("arrangeByStage"), () => canvasApi.arrange("stage"))}
           {project && command(t("tidy"), () => canvasApi.arrange("tidy"))}
           {project && command(t(chatOpen ? "closeChat" : "openChat"), onToggleChat)}
-          {command(t("otherLanguage"), () => setLanguage(language() === "ar" ? "en" : "ar"))}
+          {command(t("otherLanguage"), () => void withTransition(() => setLanguage(language() === "ar" ? "en" : "ar")))}
           {project && command(t("generalChat"), onGeneralChat)}
           {command(t("newProject"), onNewProject)}
         </CommandGroup>

@@ -194,3 +194,64 @@
   padding-inline: 12px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Motion, group A: the start screen (ui/src/app/StartScreen.tsx). «ONE» is set in Instrument Sans Bold, the logo's
+   family (OFL; Latin only, 17 KB). The mark's lines draw in (stroke-dashoffset from each line's length), the face
+   fills copper, then ONE and the slogan's words rise 4 px and fade in. Every animation's resting style is the end
+   state, so with reduced motion, even turned on mid-drawing, everything shows whole at once. */
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url("../../node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-700-normal.woff2") format("woff2");
+}
+@theme {
+  --font-logo: "Instrument Sans", "Kumbh Sans Variable", system-ui, sans-serif;
+}
+@keyframes mark-draw {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+}
+@keyframes mark-fill {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes start-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+[data-draw] .mark-line {
+  stroke-dasharray: var(--len);
+  animation: mark-draw var(--line-ms) var(--ease-calm) backwards;
+}
+[data-draw] .mark-face {
+  animation: mark-fill var(--fill-ms) ease-out var(--fill-at) backwards;
+}
+[data-intro] .start-one {
+  animation: start-in 250ms var(--ease-calm) backwards;
+}
+[data-intro] .start-word {
+  animation: start-in 220ms var(--ease-calm) backwards;
+}
+.start-rise {
+  animation: start-in 200ms var(--ease-calm) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-start-screen] *,
+  [data-mark] * {
+    animation: none !important;
+  }
+}
+
+/* Motion, group A: the language wipe (ui/src/ui/viewTransition.ts). The new page is revealed by a growing circle
+   over the old one, so neither picture fades on its own. */
+html.lang-wipe::view-transition-old(root),
+html.lang-wipe::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
