@@ -311,9 +311,13 @@ def router(projects: Projects, trash: Trash | None = None) -> APIRouter:
     async def list_all(p: str) -> Response:
         return await answer(p, lambda rec: {"deliverables": store.list_deliverables(rec)})
 
+    def screen_view(rec: Records, d: str, version, revision) -> dict:
+        """The view as the screen shows it: its file sources with their quoted lines."""
+        return store.with_quotes(rec, current_view(rec, d, version, revision))
+
     @r.get(base + "/{d}")
     async def get_view(p: str, d: str, version: int | None = None, revision: int | None = None):
-        return await answer(p, current_view, d, version, revision, ids=deliverable(d))
+        return await answer(p, screen_view, d, version, revision, ids=deliverable(d))
 
     @r.get(base + "/{d}/changes")
     async def list_changes(p: str, d: str, status: str | None = None) -> Response:

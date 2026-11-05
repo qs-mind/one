@@ -474,8 +474,25 @@ def _quote(conn, file_id: str | None, locator: dict) -> str | None:
     return text if len(text) <= QUOTE_CHARS else text[: QUOTE_CHARS - 1] + "…"
 
 
+def with_quotes(rec: Records, v: dict) -> dict:
+    """The view `v` with each file source's `quote` (the line it was read from), as the screen's
+    source card shows it. Only the screen's view asks for it: each distinct place in a file is
+    read once for the whole view (a sheet's 650 numbers from one quote read its text once), and
+    the agents' read and the list never pay for it."""
+    read: dict[tuple, str | None] = {}
+    with rec.read() as conn:
+        for source in v.get("sources", {}).values():
+            locator = source.get("locator") or {}
+            place = (source.get("file_id"), json.dumps(locator, sort_keys=True))
+            if place not in read:
+                read[place] = _quote(conn, source.get("file_id"), locator)
+            source["quote"] = read[place]
+    return v
+
+
 def _read_number(conn, row) -> tuple:
-    """A row of `_NUMBER_COLUMNS` as (item id, name, cell, source id, source)."""
+    """A row of `_NUMBER_COLUMNS` as (item id, name, cell, source id, source). The source has no
+    `quote`: `with_quotes` adds it for the screen."""
     number_id, item_id, name, value, unit, currency, source_id, dated = row[:8]
     kind, title, locator, url, source_dated, file_name, file_id = row[8:]
     cell = calc.number_cell(
@@ -495,7 +512,6 @@ def _read_number(conn, row) -> tuple:
         "locator": json.loads(locator),
         "url": url,
         "dated": source_dated,
-        "quote": _quote(conn, file_id, json.loads(locator)),
     }
     return item_id, name, cell, source_id, source
 
