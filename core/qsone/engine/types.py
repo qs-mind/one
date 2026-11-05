@@ -85,6 +85,7 @@ class ModelCard:
     subscription: bool = False
     efforts: tuple[Effort, ...] = ()  # the effort levels it accepts; none: no effort to pick
     effort_default: Effort | None = None  # the provider's own level when none is sent, if known
+    retired: bool = False  # the price book marks it deprecated: never a default
 
 
 @dataclass(frozen=True)
