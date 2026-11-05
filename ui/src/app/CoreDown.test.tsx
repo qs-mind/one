@@ -32,7 +32,7 @@ describe("HealthGate", () => {
     expect(screen.getByText(texts.coreDown.en)).toBeInTheDocument();
     expect(screen.getByText(logPath)).toBeInTheDocument();
     expect(screen.queryByText("chat")).not.toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith("/api/health");
+    expect(fetch).toHaveBeenCalledWith("/api/health", undefined);
   });
 
   it("a failing answer from the proxy counts as down", async () => {

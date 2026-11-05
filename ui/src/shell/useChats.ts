@@ -5,6 +5,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, generateId } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../api";
 import type { SelectionItem } from "../canvas/types";
 import type { Unfinished } from "../chat/parts/ContinueBriefs";
 import { activeBrief, type OneMessage, type OnePart } from "../chat/parts/types";
@@ -12,8 +13,10 @@ import { coreLine, send as sendJson } from "../core";
 import { type Text, texts } from "../i18n";
 
 // Only the new message goes to the core: it keeps the chat's history with its Briefs. The selection rides along.
+// The transport's own URLs ("/chat", "/chat/<id>/stream") are core routes, so they go through api() too.
 const transport = new DefaultChatTransport<OneMessage>({
-  api: "/api/chat",
+  api: "/chat",
+  fetch: (input, init) => api(String(input), init),
   prepareSendMessagesRequest: ({ id, messages, body }) => ({ body: { ...body, id, messages: messages.slice(-1) } }),
 });
 
@@ -59,7 +62,7 @@ export function useChats(chatId: string) {
     // the chat's earlier messages, then the Brief still running in it, replayed from its start (204: none)
     let live = true;
     setLoaded(undefined);
-    fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`)
+    api(`/chat/${encodeURIComponent(chatId)}/messages`)
       .then((response) => (response.ok ? (response.json() as Promise<{ messages?: OneMessage[] }>) : undefined))
       .then((body) => {
         if (!live || !body?.messages) return;
@@ -86,7 +89,7 @@ export function useChats(chatId: string) {
 
   async function steerWith(id: string, text: string): Promise<boolean> {
     setFailed(undefined);
-    const response = await sendJson(`/api/briefs/${encodeURIComponent(id)}/steer`, "POST", { text });
+    const response = await sendJson(`/briefs/${encodeURIComponent(id)}/steer`, "POST", { text });
     if (!response?.ok) setFailed(await coreLine(response, texts.steerFailed));
     return response?.ok === true;
   }
@@ -132,7 +135,7 @@ export function useChats(chatId: string) {
     void stop(); // the stream ends here at once; the Brief itself ends only by the stop call
     if (!id) return;
     setStopped((now) => new Set(now).add(id));
-    const response = await sendJson(`/api/briefs/${encodeURIComponent(id)}/stop`, "POST");
+    const response = await sendJson(`/briefs/${encodeURIComponent(id)}/stop`, "POST");
     if (!response?.ok) {
       setStopped((now) => new Set([...now].filter((other) => other !== id)));
       setFailed(await coreLine(response, texts.stopFailed));

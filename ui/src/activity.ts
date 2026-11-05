@@ -1,6 +1,7 @@
 // The project's live events (Plan 4's GET /projects/{id}/activity): one stream per project, however many parts of
 // the screen listen (the canvas, the agent cards, Plan 6's viewers). Read with fetch, not EventSource, so the Tauri
 // fetch shim carries it in release builds. Nothing is kept: after a reconnect each listener reloads its lists.
+import { api } from "./api";
 import type { ActivityEvent } from "./canvas/types";
 
 type Subscriber = { listener: (event: ActivityEvent) => void; onReconnect?: () => void };
@@ -38,7 +39,7 @@ export function subscribeActivity(
 
 async function run(projectId: string, stream: Stream) {
   const { signal } = stream.controller;
-  const url = `/api/projects/${encodeURIComponent(projectId)}/activity`;
+  const path = `/projects/${encodeURIComponent(projectId)}/activity`;
   let failures = 0;
   let opened = false;
   while (!signal.aborted) {
@@ -47,7 +48,7 @@ async function run(projectId: string, stream: Stream) {
       if (signal.aborted) return;
     }
     try {
-      const response = await fetch(url, { signal, headers: { accept: "text/event-stream" } });
+      const response = await api(path, { signal, headers: { accept: "text/event-stream" } });
       if (response.ok && response.body) {
         if (opened) for (const s of [...stream.subscribers]) s.onReconnect?.();
         opened = true;

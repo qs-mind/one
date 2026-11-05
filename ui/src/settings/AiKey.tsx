@@ -1,5 +1,6 @@
 // Add or replace the engineer's Claude key. The core keeps it in the system key store; the page never shows it again.
 import { useState, type FormEvent } from "react";
+import { api } from "../api";
 import { t, useLanguage } from "../i18n";
 
 export function AiKey({ onSaved, onClose }: { onSaved: () => void; onClose?: () => void }) {
@@ -10,7 +11,7 @@ export function AiKey({ onSaved, onClose }: { onSaved: () => void; onClose?: () 
   async function save(event: FormEvent) {
     event.preventDefault();
     setState("saving");
-    const response = await fetch("/api/settings/ai-key", {
+    const response = await api("/settings/ai-key", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ provider: "anthropic", value: value.trim() }),

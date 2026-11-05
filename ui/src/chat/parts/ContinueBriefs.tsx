@@ -1,6 +1,7 @@
 // Briefs a crash, power cut or closed app left unfinished. One never continues them by itself: each gets a card, and
 // only Continue picks it up from its last Checkpoint.
 import { useEffect, useState } from "react";
+import { api } from "../../api";
 import { coreLine, send } from "../../core";
 import { fill, pick, t, type Text, texts, useLanguage } from "../../i18n";
 import type { BriefState } from "./types";
@@ -15,7 +16,7 @@ export function ContinueBriefs({ onContinued }: { onContinued: (brief: Unfinishe
 
   useEffect(() => {
     let live = true;
-    fetch("/api/briefs/unfinished")
+    api("/briefs/unfinished")
       .then((response) => (response.ok ? (response.json() as Promise<{ briefs?: Unfinished[] }>) : undefined))
       .then((body) => live && body?.briefs && setBriefs(body.briefs))
       .catch(() => undefined); // nothing to offer
@@ -29,7 +30,7 @@ export function ContinueBriefs({ onContinued }: { onContinued: (brief: Unfinishe
   async function resume(brief: Unfinished) {
     setBusy(brief.id);
     setFailed(undefined);
-    const response = await send(`/api/briefs/${encodeURIComponent(brief.id)}/continue`, "POST");
+    const response = await send(`/briefs/${encodeURIComponent(brief.id)}/continue`, "POST");
     setBusy(undefined);
     if (response?.ok) {
       drop(brief.id);

@@ -1,6 +1,7 @@
 // Search by meaning in Project Records: one line for the search model's state and at most one button.
 // The core holds the state; the line polls GET /api/meaning every second while something moves.
 import { useEffect, useState } from "react";
+import { api } from "../api";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 
 type Model = {
@@ -96,7 +97,7 @@ export function MeaningStatus({ projectId }: { projectId: string }) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let last: Status | undefined;
     async function poll() {
-      const response = await fetch("/api/meaning").catch(() => undefined);
+      const response = await api("/meaning").catch(() => undefined);
       const body = response?.ok ? ((await response.json().catch(() => undefined)) as Status | undefined) : undefined;
       if (!live) return;
       if (body) setStatus((last = body));
@@ -115,7 +116,7 @@ export function MeaningStatus({ projectId }: { projectId: string }) {
 
   async function press(post: string) {
     setPressing(true);
-    await fetch(`/api/meaning/${post}`, { method: "POST" }).catch(() => undefined);
+    await api(`/meaning/${post}`, { method: "POST" }).catch(() => undefined);
     setPressing(false);
     setAsked((n) => n + 1);
   }

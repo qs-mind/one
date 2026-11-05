@@ -100,7 +100,7 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
     if (!agent.brief_id) return;
     setStopping(true);
     setProblem(null);
-    const response = await send(`/api/briefs/${encodeURIComponent(agent.brief_id)}/stop`, "POST");
+    const response = await send(`/briefs/${encodeURIComponent(agent.brief_id)}/stop`, "POST");
     setStopping(false);
     if (!response?.ok) setProblem(await coreLine(response, texts.stopFailed));
   }

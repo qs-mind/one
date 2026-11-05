@@ -14,7 +14,7 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import activity, canvas, chat, copy, keys, models, projects, settings
+from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings
 from qsone.calc import routes as calc_routes
 from qsone.connectors import routes as connector_routes
 from qsone.connectors.hub import ConnectorHub
@@ -159,6 +159,14 @@ def create_app(
     @app.get("/health")
     def health() -> dict:
         return {"ok": True}
+
+    @app.get("/about")
+    def about_core() -> dict:
+        return about.about()
+
+    @app.get("/about/native")
+    def about_native() -> dict:
+        return about.native()  # the packaging smoke test: every native library loads
 
     @app.post("/chat")
     async def chat_stream(request: Request) -> Response:

@@ -1,7 +1,7 @@
 {
   "name": "qs-mind-one",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE.md",
   "engines": {

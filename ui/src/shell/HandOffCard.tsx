@@ -2,6 +2,7 @@
 // fits yet. The core sends each as a `data-hand-off` part. Nothing moves and nothing is created until the engineer
 // clicks; then the project opens (or is created) and the request goes to its chat.
 import { useState } from "react";
+import { api } from "../api";
 import type { OnePart } from "../chat/parts/types";
 import { coreLine } from "../core";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
@@ -39,8 +40,8 @@ function HandOffCard({ handOff }: { handOff: HandOff }) {
     setBusy(true);
     setFailed(undefined);
     const response = await (handOff.kind === "project"
-      ? fetch(`/api/projects/${encodeURIComponent(handOff.project_id)}/open`, { method: "POST" })
-      : fetch("/api/projects", {
+      ? api(`/projects/${encodeURIComponent(handOff.project_id)}/open`, { method: "POST" })
+      : api("/projects", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ name }),

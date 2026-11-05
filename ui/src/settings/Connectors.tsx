@@ -3,6 +3,7 @@
 // own (ConnectorCard), and the Connector is saved only after the engineer says yes. A token is sent once, kept in the
 // key store by the core, and never shown again. Self-contained: whoever opens Settings places it.
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { api } from "../api";
 import { ConnectorCard } from "../chat/parts/ConnectorCard";
 import type { CardAnswer } from "../chat/parts/cardKinds";
 import type { CardData } from "../chat/parts/types";
@@ -43,7 +44,7 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
   const [added, setAdded] = useState(false);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/connectors").catch(() => undefined);
+    const response = await api("/connectors").catch(() => undefined);
     const body = response?.ok
       ? ((await response.json().catch(() => undefined)) as { connectors?: ConnectorRow[] } | undefined)
       : undefined;
@@ -56,7 +57,7 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
 
   async function toggle(row: ConnectorRow) {
     setFailed(undefined);
-    const url = `/api/connectors/${encodeURIComponent(row.name)}/enabled`;
+    const url = `/connectors/${encodeURIComponent(row.name)}/enabled`;
     const response = await send(url, "PUT", { enabled: !row.enabled });
     if (!response?.ok) setFailed(await coreLine(response, texts.connectorNotSaved));
     void load();
@@ -64,7 +65,7 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
 
   async function remove(row: ConnectorRow) {
     setFailed(undefined);
-    const response = await send(`/api/connectors/${encodeURIComponent(row.name)}`, "DELETE");
+    const response = await send(`/connectors/${encodeURIComponent(row.name)}`, "DELETE");
     if (!response?.ok) setFailed(await coreLine(response, texts.removeFailed));
     void load();
   }
@@ -165,7 +166,7 @@ function AddConnector({ onAdded, onStarted }: { onAdded: () => void; onStarted: 
       ...(token.trim() ? { token: token.trim() } : {}),
       ...(transport === "stdio" && tokenEnv.trim() ? { token_env: tokenEnv.trim() } : {}),
     };
-    const response = await send("/api/connectors", "POST", body);
+    const response = await send("/connectors", "POST", body);
     setToken(""); // the token is sent once and never kept on the page, whatever the answer
     const answer = response?.ok ? ((await response.json().catch(() => undefined)) as { card?: Pending } | undefined) : undefined;
     setBusy(false);
@@ -178,7 +179,7 @@ function AddConnector({ onAdded, onStarted }: { onAdded: () => void; onStarted: 
     setBusy(true);
     setFailed(undefined);
     const body = { choice, ...(extra.answers ? { answers: extra.answers } : {}) };
-    const response = await send(`/api/connectors/cards/${encodeURIComponent(card.id)}`, "POST", body);
+    const response = await send(`/connectors/cards/${encodeURIComponent(card.id)}`, "POST", body);
     const answer = response?.ok
       ? ((await response.json().catch(() => undefined)) as { connector?: unknown } | undefined)
       : undefined;
