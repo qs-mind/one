@@ -102,7 +102,8 @@ _CARDS = ("hand_to_project", "offer_new_project")
 GENERAL_LINE = (
     "This is the General chat: no project is open. Hand project work to its project with "
     "hand_to_project, offer a new project with offer_new_project when none fits, and never "
-    "name a project that projects did not return."
+    "name a project that projects did not return. Market news, prices and suppliers you search "
+    "yourself: web_search, then web_read for each page you use, and cite it."
 )
 
 
@@ -117,10 +118,15 @@ def project_only() -> set[str]:
 
 def lead_spec() -> AgentSpec:
     """The Lead QS of the General chat: its own instructions plus one line; its tools without
-    the project ones (the team and the engineer's own tools stay), plus the three above."""
+    the project ones (the team and the engineer's own tools stay), plus the three above and the
+    web tools. A project's Lead gives web work to a specialist to keep its context small
+    (decision 7); here there is no project context, and a question about the market is the
+    Lead's own (without them it told the engineer ONE cannot search the web)."""
+    from qsone.tools.web import WEB_TOOLS
+
     lead = agents.lead_spec()
     dropped = project_only()
-    tools = (*(name for name in lead.tools if name not in dropped), *GENERAL_TOOLS)
+    tools = (*(name for name in lead.tools if name not in dropped), *GENERAL_TOOLS, *WEB_TOOLS)
     return replace(lead, instructions=f"{lead.instructions}\n\n{GENERAL_LINE}", tools=tools)
 
 

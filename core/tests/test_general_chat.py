@@ -170,6 +170,7 @@ def test_general_chat_has_no_project_tools():
     assert set(general.GENERAL_TOOLS) <= tools
     assert not tools & {*RECORDS_TOOLS, *OUTPUTS_TOOLS, "note_lesson"}
     assert set(TEAM_TOOLS) <= tools  # Plans 4 and 5: specialists work for the General chat too
+    assert {"web_search", "web_read"} <= tools  # market news and prices: the Lead searches itself
 
 
 def test_a_project_chat_has_no_general_tools():

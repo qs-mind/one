@@ -26,6 +26,7 @@ from qsone.engine.types import ModelChoice
 from qsone.prices.client import DEV_KEY_USER, HttpPrices
 from qsone.records import files
 from qsone.tools.services import Services
+from qsone.tools.web import WEB_TOOLS
 from qsone.web import fetch
 from tests.conftest import AUTH, SECRET
 from tests.engine_fakes import FakeSleep, call, fake_claude_command, read_fake_log, scripted
@@ -96,11 +97,25 @@ def test_the_general_lead_gets_the_hand_off_tools_and_no_project_tool():
     lead, found = agents.lead_spec().tools, general.lead_spec().tools
     project_only = general.project_only()
     assert set(general.GENERAL_TOOLS) <= set(found)
-    assert set(found) == {*(t for t in lead if t not in project_only), *general.GENERAL_TOOLS}
+    assert set(found) == {
+        *(t for t in lead if t not in project_only),
+        *general.GENERAL_TOOLS,
+        *WEB_TOOLS,
+    }
     assert not {"note_lesson", "boq_preview", "boq_import", *RECORDS_TOOLS, *OUTPUTS_TOOLS} & set(
         found
     )
     assert {"files_list", "files_read", "ask_engineer", "prices_lookup"} <= set(found)
+
+
+def test_the_general_lead_searches_the_web_itself():
+    """No project's context to keep small in the General chat: a question about market news or
+    prices is the Lead's own, so it has the web tools and its instructions say so (a project's
+    Lead still gives web work to a specialist, decision 7)."""
+    spec = general.lead_spec()
+    assert set(WEB_TOOLS) <= set(spec.tools)
+    assert "web_search" in spec.instructions and "web_read" in spec.instructions
+    assert not set(WEB_TOOLS) & set(agents.lead_spec().tools)
 
 
 # The app's services ---------------------------------------------------------------------------
