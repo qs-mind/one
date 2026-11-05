@@ -62,7 +62,7 @@ export function useDeliverablePanel(projectId: string | undefined) {
       if (el) {
         const to = shownRect(card.current);
         const keyframes = to
-          ? [{ clipPath: WHOLE, opacity: 1 }, { opacity: 1, offset: 0.6 }, { clipPath: clipTo(el.getBoundingClientRect(), to), opacity: 0 }]
+          ? [{ clipPath: WHOLE, opacity: 1 }, { opacity: 1, offset: 0.4 }, { clipPath: clipTo(el.getBoundingClientRect(), to), opacity: 0 }]
           : [{ opacity: 1 }, { opacity: 0 }];
         await play(el, keyframes, DUR.long);
       }
