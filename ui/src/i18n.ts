@@ -537,7 +537,12 @@ export const texts = {
   clientBoqTitle: { en: "Client BOQ — {name}", ar: "مقايسة العميل — {name}" },
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
-  sourceOpenFile: { en: "Open the file", ar: "افتح الملف" },
+  sourceOpenFile: { en: "Open source", ar: "افتح المصدر" },
+  // A number's source, shown (decision 16.3): the card a number opens into.
+  sourceBackTo: { en: "Back to {value}", ar: "ارجع لـ {value}" },
+  sourceSaidInChat: { en: "Said in the chat", ar: "اتقال في الشات" },
+  sourceSupplier: { en: "Supplier: {name}", ar: "المورّد: {name}" },
+  sourceOfNumber: { en: "Source of {value}", ar: "مصدر {value}" },
   openFull: { en: "Open full screen", ar: "افتح ملء الشاشة" },
   closeFrame: { en: "Close the frame", ar: "اقفل الإطار" },
   collapse: { en: "Fold the frame", ar: "اطوي الإطار" },
