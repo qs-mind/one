@@ -490,6 +490,8 @@ class _Brief:
             "model": a.model,
             # the model's provider on this Brief's sheet, for its company's logo (None: not on it)
             "provider": next((c.provider for c in self.sheet if c.choice.model == a.model), None),
+            # its name as the sheet gives it («Gemini 3.1 Flash Lite»): never the raw id
+            "model_name": next((c.name for c in self.sheet if c.choice.model == a.model), None),
             "state": a.state,
             "line": a.line,
             "lang": self.lang,  # the line's language: the Brief's

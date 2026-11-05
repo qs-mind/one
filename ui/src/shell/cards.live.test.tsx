@@ -263,7 +263,7 @@ describe("a card that comes mid-Brief", () => {
     expect(first.nextElementSibling).toHaveTextContent("وقولي الإجمالي");
   });
 
-  it("an older reply with no language on its progress follows the engineer's message, in the English page", async () => {
+  it("a reply's stored progress, kept in both languages, reads in the page's: English here, though the message was Arabic", async () => {
     setLanguage("en");
     setCurrentProject(P1);
     const old = {
@@ -278,8 +278,8 @@ describe("a card that comes mid-Brief", () => {
     core({ routes: { "GET /api/chat/p1/messages": () => Response.json({ messages }) } });
     render(<App />);
     const line = await screen.findByRole("list", { name: texts.progressLine.en });
-    expect(line).toHaveTextContent("يبص على أعمدة المقايسة");
-    expect(line).not.toHaveTextContent("Look at");
+    expect(line).toHaveTextContent("Look at the BOQ columns"); // tender day: an English page kept Arabic labels
+    expect(line).not.toHaveTextContent("يبص على");
   });
 
   it("“Waiting for you” with no card in the chat reads the chat again from the core", async () => {

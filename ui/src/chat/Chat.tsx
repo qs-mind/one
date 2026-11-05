@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SelectionItem } from "../canvas/types";
 import { type Fix, fixOf } from "../core";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
-import { dir, fill, type Language, language, languageOf, pick, t, type Text, useLanguage } from "../i18n";
+import { dir, fill, pick, t, type Text, useLanguage } from "../i18n";
 import { UnderstoodCard } from "../import/UnderstoodCard";
 import { FixAction } from "../shell/FixAction";
 import { HandOffCards } from "../shell/HandOffCard";
@@ -77,27 +77,53 @@ export function SelectionText({ items }: { items: readonly SelectionItem[] }) {
 }
 
 /** The engineer's own message: each line a block that finds its own direction, the other script's runs isolated. */
+// Lines with tabs, as Excel copies a range, show as one table that scrolls in its own box (the text goes as pasted).
 function OwnText({ text }: { text: string }) {
-  return text.split("\n").map((line, i) => (
-    <p key={i} dir="auto" className="min-h-[1lh] whitespace-pre-wrap">
-      <BidiText text={line} />
-    </p>
-  ));
+  const runs: (string | string[][])[] = [];
+  for (const line of text.split("\n")) {
+    const last = runs.at(-1);
+    if (!line.includes("\t")) runs.push(line);
+    else if (Array.isArray(last)) last.push(line.split("\t"));
+    else runs.push([line.split("\t")]);
+  }
+  return runs.map((run, i) =>
+    typeof run === "string" ? (
+      <p key={i} dir="auto" className="min-h-[1lh] whitespace-pre-wrap">
+        <BidiText text={run} />
+      </p>
+    ) : (
+      <div key={i} className="my-1 max-w-full overflow-x-auto">
+        <table dir="auto" className="border-collapse text-sm">
+          <tbody>
+            {run.map((cells, r) => (
+              <tr key={r} className="border-b border-slate/30 last:border-0">
+                {cells.map((cell, c) => (
+                  <td key={c} dir="auto" className="whitespace-nowrap px-2 py-0.5">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ),
+  );
 }
 
 const failedReply = (parts: OnePart[]) => partsOf(parts, "status").at(-1)?.data.state === "failed";
 
 function BriefReply({
   parts,
-  lang,
   live,
   projectId,
   onOpenDeliverable,
-}: { parts: OnePart[]; lang: Language; live: boolean } & Omit<ChatLogProps, "chat" | "label">) {
+}: { parts: OnePart[]; live: boolean } & Omit<ChatLogProps, "chat" | "label">) {
   const text = textOf(parts);
   const progress = partsOf(parts, "progress");
-  // the Brief's own language: the core's word for it, else the engineer's message's
-  const said = progress.find((item) => item.data.lang)?.data.lang ?? lang;
+  // what is stored in both languages (the work log, the cards, notices) reads in the page's, whatever the Brief's was
+  // (tender day: an English page kept «اشتغل 4 ثواني · 4 خطوات»); the reply's own words stay as written
+  const said = useLanguage();
   // one card open at a time; the top bar's "Waiting for you" goes to it (data-waiting)
   const cardAt = useApprovalQueue(partsOf(parts, "card"), said);
   const firstText = parts.findIndex((part) => part.type === "text");
@@ -291,7 +317,6 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
               <li key={message.id}>
                 <BriefReply
                   parts={message.parts}
-                  lang={briefLanguage(messages, index)}
                   live={busy && index === lastReply}
                   projectId={projectId}
                   onOpenDeliverable={onOpenDeliverable}
@@ -329,9 +354,3 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
   );
 }
 
-/** The language of the Brief whose reply is at `index`: the one of the engineer's message that started it (a
- * steering message does not change it); the page's when there is none. */
-function briefLanguage(messages: ChatState["messages"], index: number): Language {
-  const asked = messages.slice(0, index).findLast((m) => m.role === "user" && !m.metadata?.steering);
-  return asked ? languageOf(textOf(asked.parts)) : language();
-}

@@ -364,6 +364,25 @@ describe("keyboard and layout", () => {
   });
 });
 
+describe("the Project Index", () => {
+  it("opening a Deliverable from it closes the index, so nothing sits over the board; Close goes back to Deliverables", async () => {
+    setCurrentProject(P1);
+    core({ routes: { "GET /api/projects/p1/deliverables": () => Response.json({ deliverables: [entry()] }) } });
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await box();
+    const opener = within(topBar()).getByRole("button", { name: texts.deliverablesButton.ar });
+    await user.click(opener);
+    const index = await screen.findByRole("region", { name: texts.deliverables.ar });
+    await user.click(await within(index).findByRole("button", { name: entry().title }));
+    await waitFor(() => expect(document.querySelector("[data-deliverable-panel]")).not.toBeNull());
+    expect(screen.queryByRole("region", { name: texts.deliverables.ar })).toBeNull();
+    await user.click(within(document.querySelector<HTMLElement>("[data-deliverable-panel]")!).getAllByRole("button", { name: texts.close.ar })[0]!);
+    await waitFor(() => expect(document.querySelector("[data-deliverable-panel]")).toBeNull());
+    expect(opener).toHaveFocus();
+  });
+});
+
 describe("the import reports and the backup question", () => {
   afterEach(() => stopAsking());
 

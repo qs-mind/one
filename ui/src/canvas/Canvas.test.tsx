@@ -161,7 +161,8 @@ describe("the Project Canvas", () => {
     await frameEl("تسعير a - عينة");
     const before = canvasApi.frames();
     act(() => fake.emit({ type: "deliverable", deliverable: deliverable("new", { kind: "document" }) }));
-    expect(await frameEl("تسعير new - عينة")).toBeInTheDocument();
+    // placed (drawn once in view: the view stays when the frames in view cannot all come along with it)
+    await waitFor(() => expect(canvasApi.frames().map((f) => f.key)).toContain("deliverable:new"));
     const after = canvasApi.frames();
     for (const f of before) expect(after.find((x) => x.key === f.key)).toEqual(f);
     const added = after.find((f) => f.key === "deliverable:new")!;

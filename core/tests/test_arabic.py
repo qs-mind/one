@@ -56,8 +56,10 @@ def test_a_file_name_on_screen_is_isolated_with_its_extension_last():
     # «(sample spec).docx», never «.docx(sample spec» (as ui/src/ui/FileName.tsx)
     assert shown == "\u2068مواصفات - عينة اختبار \u2066(sample spec).docx\u2069\u2069"
     assert shown.translate({0x2066: None, 0x2068: None, 0x2069: None}) == name
-    assert copy.file_name("مواصفات.docx") == "\u2068مواصفات\u2066.docx\u2069\u2069"
-    assert copy.file_name("Spec (v2).docx") == "\u2068Spec (v2)\u2066.docx\u2069\u2069"
+    # a lone extension goes in the name's direction: isolated left to right, its dot went to the far
+    # end of an Arabic name, «مواصفاتdocx.» (tender day)
+    assert copy.file_name("مواصفات.docx") == "\u2068مواصفات.docx\u2069"
+    assert copy.file_name("Spec (v2).docx") == "\u2068Spec (v2).docx\u2069"
     assert copy.file_name("README") == "\u2068README\u2069"
     words = copy.fill(copy.DOING_BOQ_IMPORT, name=shown, sheet="BOQ")
     assert shown in words["ar"] and shown in words["en"]

@@ -896,6 +896,7 @@ async def test_team_and_activity_follow_the_agents(make_engine, project):
     assert agent["role"] == copy.ROLE_LEAD and agent["brief_id"] == brief
     assert agent["model"] == OPUS.choice.model and agent["state"] == "thinking"
     assert agent["provider"] == OPUS.provider  # its company's logo on the canvas
+    assert agent["model_name"] == OPUS.name  # its name on the card, never «models/…» (tender day)
     go.set()
     await finish(engine, brief)
     await asyncio.sleep(0.01)

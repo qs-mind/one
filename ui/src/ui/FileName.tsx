@@ -1,5 +1,7 @@
 // A file name or a title, shown so that a name mixing Arabic and Latin reads in order. The whole name is isolated
-// from the text around it and takes its direction from its own first letter; the extension is isolated left to right.
+// from the text around it and takes its direction from its own first letter; the extension goes in that direction
+// too, so in an Arabic name its dot stays by the name, «xlsx.عينة» (isolated left to right, the dot went to the far
+// end: «عينةxlsx.»).
 // A name that starts in Arabic and ends in Latin words keeps those words with the extension as one left-to-right
 // run: «جدول كميات - عينة اختبار (sample BOQ).xlsx» reads «جدول كميات - عينة اختبار» then «(sample BOQ).xlsx», never
 // «.xlsx(sample BOQ)» (the bracket and the extension thrown to the wrong side). The core does the same for names in
@@ -60,11 +62,7 @@ export function FileName({ name, className = "", fit = false }: { name: string; 
               {extension && <span className="shrink-0 whitespace-nowrap">{extension}</span>}
             </bdi>
           ) : (
-            extension && (
-              <bdi dir="ltr" className="shrink-0 whitespace-nowrap">
-                {extension}
-              </bdi>
-            )
+            extension && <span className="shrink-0 whitespace-nowrap">{extension}</span>
           )}
         </bdi>
       </Tip>
@@ -73,11 +71,13 @@ export function FileName({ name, className = "", fit = false }: { name: string; 
   return (
     <bdi dir="auto" className={className || undefined}>
       {head}
-      {(tail || extension) && (
-        <bdi dir="ltr" className={tail ? undefined : "whitespace-nowrap"}>
+      {tail ? (
+        <bdi dir="ltr">
           {tail}
           {extension && <span className="whitespace-nowrap">{extension}</span>}
         </bdi>
+      ) : (
+        extension && <span className="whitespace-nowrap">{extension}</span>
       )}
     </bdi>
   );

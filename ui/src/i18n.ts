@@ -468,6 +468,16 @@ export const texts = {
   reviewVersion: { en: "Version {n}", ar: "نسخة {n}" },
   reviewRevisions: { en: "Revisions", ar: "الإصدارات" },
   reviewRev: { en: "Rev {n}", ar: "إصدار {n}" },
+  // a saved version (نسخة) stays in ONE; an issue (إصدار) is what goes to the client: the two never read alike
+  reviewVersionsHelp: {
+    en: "Each accepted change saves a version. Versions stay in ONE.",
+    ar: "كل مرة بتقبل فيها تعديل بتتحفظ نسخة. النسخ بتفضل جوّه ONE.",
+  },
+  reviewRevisionsHelp: {
+    en: "A Revision is what you send to the client: Rev 1, Rev 2 and so on.",
+    ar: "الإصدار هو اللي بتبعته للعميل: إصدار 1، إصدار 2، وهكذا.",
+  },
+  reviewVersionNoChanges: { en: "No changes", ar: "من غير تعديلات" },
   reviewIssueRevision: { en: "Issue Revision", ar: "طلّع إصدار" },
   reviewCompare: { en: "Compare", ar: "قارن" },
   reviewCloseOut: { en: "Sign-off", ar: "الاعتماد" },
@@ -509,7 +519,7 @@ export const texts = {
   deliverableType: { en: "Type", ar: "النوع" },
   deliverableTitle: { en: "Title", ar: "العنوان" },
   deliverableStatus: { en: "Status", ar: "الحالة" },
-  deliverableNoRevision: { en: "No Revision yet", ar: "لسه مفيش إصدار" },
+  deliverableNoRevision: { en: "Not sent to the client yet", ar: "لسه ما اتبعتش للعميل" },
   deliverableFailed: { en: "This Deliverable could not be loaded. Try again.", ar: "مقدرناش نجيب المُخرَج ده. جرّب تاني." },
   deliverableNoViewer: { en: "This kind of Deliverable cannot be shown here yet.", ar: "النوع ده من المُخرَجات لسه مينفعش يتعرض هنا." },
   deliverableLoading: { en: "Loading…", ar: "بيحمّل…" },
@@ -593,6 +603,16 @@ export const texts = {
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
   sourceOpenFile: { en: "Open source", ar: "افتح المصدر" },
+  sourceNotMarked: {
+    en: "Opened at its page. The exact place on the page isn't stored, so nothing is marked.",
+    ar: "اتفتح على الصفحة. مكان الرقم بالظبط في الصفحة مش متسجّل، فمفيش حاجة متعلّمة.",
+  },
+  // A formula's terms in words (ui/src/sources/formula.ts): «الكمية × الفئة», not «quantity * rate»
+  termQuantity: { en: "Quantity", ar: "الكمية" },
+  termRate: { en: "Rate", ar: "الفئة" },
+  termAmount: { en: "Amount", ar: "الإجمالي" },
+  termTotal: { en: "Total", ar: "الإجمالي العام" },
+  termSum: { en: "sum of {x}", ar: "مجموع {x}" },
   // A number's source, shown (decision 16.3): the card a number opens into.
   sourceBackTo: { en: "Back to {value}", ar: "ارجع لـ {value}" },
   sourceSaidInChat: { en: "Said in the chat", ar: "اتقال في الشات" },
@@ -1034,6 +1054,7 @@ export const texts = {
   undoFailed: { en: "It was not put back. Add it again if you need it.", ar: "مارجعش. ضيفه تاني لو محتاجه." },
   // The BOQ change review (ui/src/review/ChangesPanel.tsx)
   reviewAcceptedShort: { en: "Accepted", ar: "اتقبل" },
+  reviewRejectedShort: { en: "Rejected", ar: "اترفض" },
   changeSource: { en: "Source: {title}", ar: "المصدر: {title}" },
   changeTyped: { en: "Typed in by the engineer", ar: "كتبه المهندس بنفسه" },
   reviewKeys: { en: "J K or ↑ ↓ to move · A accept · R reject", ar: "J K أو ↑ ↓ للتنقل · A اقبل · R ارفض" },

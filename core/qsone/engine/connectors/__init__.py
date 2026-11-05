@@ -124,11 +124,17 @@ def connectors(
     return found
 
 
-async def check(via: str, *, among: Sequence[Connector] | None = None) -> Text | None:
+async def check(
+    via: str,
+    *,
+    among: Sequence[Connector] | None = None,
+    on_usage: Callable[[Any], None] | None = None,
+) -> Text | None:
     """One tiny call through `via` ("<connector>/<model>"; an agent connector's id alone).
 
-    A model connector gets one request for at most 1 output token. None means it answered;
-    otherwise the plain {en, ar} reason. `among` defaults to `connectors()`."""
+    A model connector gets one request for at most 1 output token; `on_usage` is given its
+    usage, so the call is counted in costs like any other. None means it answered; otherwise
+    the plain {en, ar} reason. `among` defaults to `connectors()`."""
     connector_id, _, model_id = via.partition("/")
     found = {c.id: c for c in (connectors() if among is None else among)}
     connector = found.get(connector_id)
@@ -137,7 +143,7 @@ async def check(via: str, *, among: Sequence[Connector] | None = None) -> Text |
     if connector.kind == "agent":
         return await connector.check()
     try:
-        await model_request(
+        answer = await model_request(
             connector.model(model_id),
             [ModelRequest.user_text_prompt("Reply OK")],
             model_settings=ModelSettings(max_tokens=1),
@@ -150,6 +156,8 @@ async def check(via: str, *, among: Sequence[Connector] | None = None) -> Text |
         # a check has no work to save: its own words, not AI_FAILED's
         failed = copy.fill(copy.AI_FAILED, provider=connector.name)
         return copy.fill(copy.AI_CHECK_FAILED, provider=connector.name) if said == failed else said
+    if on_usage is not None:
+        on_usage(answer.usage)
     return None
 
 

@@ -148,7 +148,7 @@ describe("DocumentViewer", () => {
     expect(value.closest("[contenteditable='false']")).not.toBeNull(); // a void: no caret, no typing inside
     await userEvent.setup().click(value);
     const popover = await screen.findByRole("dialog", { name: texts.sheetSource.ar });
-    expect(await within(popover).findByText("sum(amount)", { selector: "bdi.font-mono" })).toBeInTheDocument();
+    expect(await within(popover).findByText("مجموع الإجمالي", { selector: "bdi" })).toBeInTheDocument(); // the formula in words
   });
 
   it("pending segments draw struck and inserted words, never split letters, with ✓ and ✗", async () => {
@@ -206,6 +206,19 @@ describe("DocumentViewer", () => {
     expect(untraced).toHaveTextContent(/^٣٠$/);
     expect(untraced).toHaveAttribute("title", texts.docUntraced.ar);
     expect(screen.getByText(count("docUntracedCount", 1, {}, "ar"))).toBeInTheDocument();
+  });
+
+  it("its notes read in the page's direction: an Arabic letter on an English page starts no note with a full stop (tender day)", () => {
+    setLanguage("en");
+    render(
+      <div dir="rtl">
+        <DocumentViewer projectId={P} view={letter()} />
+      </div>,
+    );
+    for (const note of [screen.getByText(count("docUntracedCount", 1, {}, "en")), screen.getByText(texts.docCommitHint.en)]) {
+      expect(note).toHaveAttribute("dir", "ltr");
+      expect(note).toHaveAttribute("lang", "en");
+    }
   });
 
   it("an edit is sent on Ctrl+Enter as one set_block op with the block's version, then shows as suggested", async () => {

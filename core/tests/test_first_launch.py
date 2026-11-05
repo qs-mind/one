@@ -355,6 +355,17 @@ def test_check_a_standard_link_makes_one_tiny_call_on_its_model(data_dir):
         assert r.status_code == 409 and r.json()["error"] == copy.NO_AI
 
 
+def test_a_standard_link_check_is_counted_in_costs(data_dir):
+    """Tender day: the check call was not counted. Its tokens go in the cost book like any call."""
+    found = links()
+    found[1].models["deepseek-chat"] = scripted(text("OK", usage=(12, 1)))
+    with make_client(found) as client:
+        body = {"via": "standard", "connector": "standard:deepseek"}
+        assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
+        spent = client.get("/costs", headers=AUTH).json()
+    assert spent["tokens"]["today"] == {"input": 12, "output": 1}
+
+
 def test_check_waits_for_consent(no_consent, data_dir):
     link = FakeClaudeCode()
     with make_client([link]) as client:

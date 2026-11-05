@@ -21,6 +21,9 @@ export const stateText: Record<AgentInfo["state"], keyof typeof texts> = {
   failed: "stateFailed",
 };
 
+/** A model not on the sheet: its id, without the API's «models/» prefix. */
+const modelLabel = (id: string) => id.replace(/^models\//, "");
+
 /** A shape per state, so the state reads without colour. */
 function StateIcon({ state }: { state: AgentInfo["state"] }) {
   const common = { viewBox: "0 0 12 12", className: "h-3 w-3 shrink-0", "aria-hidden": true } as const;
@@ -126,7 +129,7 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
         <span className="flex min-w-0 max-w-full items-center gap-1.5 self-start text-slate">
           <ProviderLogo provider={agent.provider ?? ""} />
           <bdi dir="ltr" className="min-w-0 truncate">
-            {agent.model}
+            {agent.model_name ?? modelLabel(agent.model)}
           </bdi>
         </span>
       )}

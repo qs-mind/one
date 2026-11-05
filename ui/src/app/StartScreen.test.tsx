@@ -55,6 +55,26 @@ describe("the start screen", () => {
     expect(startScreen()).toBeNull(); // and it has left
   });
 
+  it("leaves with a clean cut: its words fade on Paper, then ONE takes its place; never the two at once (tender day)", async () => {
+    vi.useFakeTimers();
+    coreReadyAfter(50);
+    let finish = () => {};
+    const animate = vi.fn(() => ({ finished: new Promise<void>((resolve) => (finish = resolve)), finish() {}, cancel() {} }));
+    HTMLElement.prototype.animate = animate as unknown as typeof HTMLElement.prototype.animate;
+    try {
+      render(<HealthGate logPath={logPath}>chat</HealthGate>);
+      await act(() => vi.advanceTimersByTimeAsync(INTRO_MS + 100));
+      const fading = animate.mock.contexts.at(-1) as unknown as HTMLElement;
+      expect(fading.hasAttribute("data-start-screen")).toBe(false); // its words fade; its Paper stays whole
+      expect(screen.queryByText("chat")).toBeNull(); // ONE is not drawn under a fading screen
+      await act(async () => finish());
+      expect(screen.getByText("chat")).toBeInTheDocument();
+      expect(startScreen()).toBeNull();
+    } finally {
+      delete (HTMLElement.prototype as { animate?: unknown }).animate;
+    }
+  });
+
   it("a core slower than the drawing: ONE shows as soon as it is ready", async () => {
     vi.useFakeTimers();
     coreReadyAfter(2000);

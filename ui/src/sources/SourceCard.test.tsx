@@ -115,7 +115,8 @@ describe("a number opens in place into its source card", () => {
 
   it("says who entered the number in words, its date in the app's style and money as the page writes it", async () => {
     const user = userEvent.setup();
-    core();
+    // a number the Lead QS read from a quote (a calculated one says the Calc Engine worked it out)
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ...rate, source: materials.source, calculation: null })));
     render(<Opener cell={cell} sources={{ s1: quote }} />);
     await user.click(screen.getByTestId("number"));
     const card = screen.getByRole("dialog");
@@ -196,6 +197,45 @@ describe("a number opens in place into its source card", () => {
     await user.click(screen.getByTestId("number"));
     expect(screen.getByRole("dialog")).toHaveTextContent("عرض سعر - عينة");
     expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("a calculated amount says the Calc Engine worked it out, with its formula in words (tender day: «quantity * rate»)", async () => {
+    const user = userEvent.setup();
+    const amount: Explained = {
+      number: { ...number("n-amt", "524469.00"), name: "amount", recorded_by: "lead_qs" },
+      source: { id: "s-c", kind: "calculation", title: "quantity * rate", file_id: null, locator: {}, url: null, dated: DAY },
+      calculation: {
+        id: "c2", formula: "quantity * rate", unit: "EGP", stale: false, page: 1, pages: 1,
+        inputs: [
+          { name: "quantity", seq: null, number: "n-q", value: "138.2", unit: "m3", dated: DAY, source: { kind: "file", title: "01 المقايسة - عينة.xlsx" }, calculated: false },
+          { name: "amount", seq: 1, number: "n-a1", value: "102000", unit: "EGP", dated: DAY, source: { kind: "calculation", title: "quantity * rate" }, calculated: true },
+          { name: "rate", seq: null, number: "n-r", value: "3795", unit: "EGP/m3", dated: DAY, source: { kind: "quote", title: "04 عرض أسعار - عينة.pdf" }, calculated: false },
+        ],
+        steps: [{ n: 1, text: "138.2 * 3795", op: "*", value: "524469.00", unit: "EGP" }],
+      },
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(amount)));
+    render(<Opener cell={{ value: "524469.00", currency: "EGP", number_id: "n-amt", source: null, dated: DAY }} />);
+    await user.click(screen.getByTestId("number"));
+    const card = screen.getByRole("dialog");
+    await waitFor(() => expect(card).toHaveTextContent("الكمية × الفئة"));
+    expect(card).toHaveTextContent(texts.enteredByCalc.ar);
+    expect(card).not.toHaveTextContent(texts.enteredByLead.ar); // the Calc Engine worked it out, not the Lead QS
+    expect(card).not.toHaveTextContent("quantity");
+    expect(card).not.toHaveTextContent("*");
+    expect(card).toHaveClass("scroll-fade"); // a long card fades where it scrolls, never just cut
+  });
+
+  it("Open source on a PDF page says the exact place on the page is not stored, as nothing is marked", async () => {
+    const user = userEvent.setup();
+    core();
+    vi.spyOn(canvasApi, "openFile").mockImplementation(() => {});
+    const pdf: Source = { kind: "quote", title: "عرض سعر - عينة", file_name: "عرض سعر - عينة.pdf", file_id: "f2", locator: { page: 1 }, dated: DAY };
+    render(<Opener cell={cell} sources={{ s1: pdf }} />);
+    await user.click(screen.getByTestId("number"));
+    const card = screen.getByRole("dialog");
+    await user.click(within(card).getByRole("button", { name: texts.sourceOpenFile.ar }));
+    expect(await within(card).findByText(texts.sourceNotMarked.ar)).toBeInTheDocument();
   });
 
   it("a number with no source says so, and offers nothing to open", async () => {

@@ -15,9 +15,10 @@ import { VersionsPanel } from "../review/VersionsPanel";
 import { TabUnderline } from "../ui/TabUnderline";
 import { DocumentViewer, type DocumentHandle } from "../viewers/document/DocumentViewer";
 import type { TextAnchor } from "../viewers/document/plate";
-import { UndoNotice } from "../ui/UndoNotice";
+import { UndoNotice, type UndoHandle } from "../ui/UndoNotice";
+import { isMod, isTyping } from "../canvas/keys";
 import { SheetViewer, type SheetHandle, type SheetRange } from "../viewers/sheet/SheetViewer";
-import { deliverablesApi, type Accepted } from "./api";
+import { deliverablesApi, type Accepted, type Rejected } from "./api";
 import type { CommentAnchor, FillPlanInfo, View } from "./types";
 import { useDeliverable, type Subscribe } from "./useDeliverable";
 
@@ -83,8 +84,10 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
   const [fillOpen, setFillOpen] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [plan, setPlan] = useState<FillPlanInfo | null>(null);
-  // The last accept's Undo, «اتقبل · تراجع», while its window lasts; and the change the review is on
-  const [undo, setUndo] = useState<{ token: string; windowMs: number; takeFocus: boolean } | null>(null);
+  // The last accept's or reject's Undo, «اتقبل · تراجع», while its window lasts (Ctrl+Z too); and the change the
+  // review is on
+  const [undo, setUndo] = useState<{ token: string; windowMs: number; takeFocus: boolean; label: string } | null>(null);
+  const undoNotice = useRef<UndoHandle>(null);
   const [current, setCurrent] = useState<string | null>(null);
 
   // The board finds the Sheet's newest Fill Plan, and looks again each time the Deliverable is loaded (a plan the
@@ -135,7 +138,12 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
   }, []);
   const changed = useCallback(() => void reload(), [reload]);
   const accepted = useCallback((answer: Accepted, how: { keys: boolean } = { keys: false }) => {
-    if (answer.undo && answer.window_ms) setUndo({ token: answer.undo, windowMs: answer.window_ms, takeFocus: !how.keys });
+    if (answer.undo && answer.window_ms)
+      setUndo({ token: answer.undo, windowMs: answer.window_ms, takeFocus: !how.keys, label: t("reviewAcceptedShort") });
+  }, []);
+  const rejected = useCallback((answer: Rejected, how: { keys: boolean } = { keys: false }) => {
+    if (answer.undo && answer.window_ms)
+      setUndo({ token: answer.undo, windowMs: answer.window_ms, takeFocus: !how.keys, label: t("reviewRejectedShort") });
   }, []);
   const onCurrent = useCallback((change: { id: string } | null) => setCurrent(change?.id ?? null), []);
 
@@ -168,6 +176,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         fullScreen={props.fullScreen}
         review={mode === "full" ? { active: tab === "changes" && !fillOpen && view.pending > 0, current } : undefined}
         onAccepted={accepted}
+        onRejected={rejected}
       />
     ) : (
       <DocumentViewer
@@ -192,9 +201,35 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
   ];
   const tabId = (key: Tab) => `review-${view.id}-${key}`;
   const onLocate = (anchor: Anchor) => void locate(anchor);
+  const undoLine = undo && (
+    <UndoNotice
+      key={undo.token}
+      ref={undoNotice}
+      label={undo.label}
+      token={undo.token}
+      windowMs={undo.windowMs}
+      takeFocus={undo.takeFocus}
+      onUndone={() => {
+        setUndo(null);
+        announce(t("undoDone"));
+        changed();
+      }}
+      onEnd={() => setUndo(null)}
+    />
+  );
 
   return (
-    <div ref={root} className="relative flex h-full w-full min-h-0 flex-col bg-paper text-ink">
+    <div
+      ref={root}
+      className="relative flex h-full w-full min-h-0 flex-col bg-paper text-ink"
+      onKeyDown={(event) => {
+        // Ctrl+Z (by the key's place, so the Arabic layout works too) takes back the last accept or reject
+        if (!undo || !isMod(event) || event.code !== "KeyZ" || event.shiftKey || isTyping(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation(); // the canvas's own Ctrl+Z (frame moves) is not this
+        undoNotice.current?.undo();
+      }}
+    >
       {/* full: a Sheet is as tall as its rows, up to 60%, and the review panels take the rest; a Document keeps 3/5 */}
       <div
         ref={body}
@@ -227,21 +262,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
               ))}
               <TabUnderline />
             </div>
-            {undo && (
-              <UndoNotice
-                key={undo.token}
-                label={t("reviewAcceptedShort")}
-                token={undo.token}
-                windowMs={undo.windowMs}
-                takeFocus={undo.takeFocus}
-                onUndone={() => {
-                  setUndo(null);
-                  announce(t("undoDone"));
-                  changed();
-                }}
-                onEnd={() => setUndo(null)}
-              />
-            )}
+            {undoLine}
             <div className="ms-auto">
               <ExportMenu
                 projectId={projectId}
@@ -272,6 +293,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
                 onLocate={onLocate}
                 announce={announce}
                 onAccepted={accepted}
+                onRejected={rejected}
                 onCurrent={onCurrent}
               />
             ) : tab === "comments" ? (
@@ -291,6 +313,12 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
               <SignOff projectId={projectId} view={view} onChanged={changed} announce={announce} />
             )}
           </div>
+        </div>
+      )}
+      {mode !== "full" && undoLine && (
+        // in a frame, under the sheet: a decision made in a cell is taken back from there
+        <div data-frame-undo className="absolute inset-x-0 bottom-0 z-10 border-t border-stone bg-paper px-4 pt-2">
+          {undoLine}
         </div>
       )}
       <p role="status" className="sr-only">
