@@ -192,10 +192,9 @@ jobs:
       - name: The updater's private key is in this environment
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
-            echo "::error::The updater's private key or its password is not in the GitHub environment 'release' (secrets TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD, ops step O3). Nothing was signed or published."
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::The updater's private key is not in the GitHub environment 'release' (secret TAURI_SIGNING_PRIVATE_KEY, ops step O3). Nothing was signed or published."
             exit 1
           fi
 
@@ -212,7 +211,7 @@ jobs:
       - name: Sign the update files
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "" # the key has no password; it lives only in this environment
         run: |
           find bundles -type f \( -name '*-setup.exe' -o -name '*.AppImage' -o -name '*.app.tar.gz' \) -print0 |
             while IFS= read -r -d '' file; do
