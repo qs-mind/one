@@ -70,6 +70,15 @@
   }
 }
 
+:root {
+  /* ONE's motion (ui/src/ui/motion.ts): one ease, four lengths. */
+  --ease-calm: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-short: 150ms;
+  --dur-base: 220ms;
+  --dur-long: 300ms;
+  --dur-roll: 400ms;
+}
+
 /* The message box's model card: it rises 4 px into place and fades in, from the chip it belongs to; it leaves
    quicker than it came. No bounce. With reduced motion nothing in the box moves. */
 @keyframes composer-pop-in {
