@@ -210,7 +210,9 @@ def _ledger(
             continue
         source_id, kind, title, file_id, locator = source
         ref = (
-            f"{OWN_REF}{number_id}" if own else _ref_of(source_id, kind, file_id, json.loads(locator))
+            f"{OWN_REF}{number_id}"
+            if own
+            else _ref_of(source_id, kind, file_id, json.loads(locator))
         )
         age = _age(today, dated)
         candidate = {

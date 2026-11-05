@@ -93,7 +93,8 @@ def services_for(app_state: Any) -> Services:
     runner is made here once, so every Brief shares it."""
     http = httpx.AsyncClient(
         transport=fetch.guarded_transport(
-            resolve, verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)  # office networks too
+            resolve,
+            verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),  # office networks too
         ),
         follow_redirects=False,
         timeout=TIMEOUT,

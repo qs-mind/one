@@ -500,6 +500,15 @@ class Run:
         while not done.wait(0.05):
             self.stop_if_interrupted()
         result_text, is_error = answer[0]
+        self.log.write(
+            {
+                "kind": "mcp",
+                "n": self.log.n,
+                "tool": step["tool"],
+                "text": result_text,
+                "is_error": is_error,
+            }
+        )
         out(
             {
                 "type": "user",

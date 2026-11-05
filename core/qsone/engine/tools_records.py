@@ -546,8 +546,8 @@ def _connector_source(conn, args: SourceArgs) -> dict:
 
 def evidence(ctx: ToolContext, target: Records, args: SourceArgs) -> dict:
     """The source row for `args`, from its evidence: in `target` for a file, a Web Log page or
-    a Connector call; in Engineer Records for a QS Mind price or an own price; in the Brief's own file for an
-    answered card. Raises `RecordsError`: NUMBER_NEEDS_CALC for a computed kind;
+    a Connector call; in Engineer Records for a QS Mind price or an own price; in the Brief's
+    own file for an answered card. Raises `RecordsError`: NUMBER_NEEDS_CALC for a computed kind;
     SOURCE_NOT_EVIDENCE, FILE_NOT_IN_PROJECT or FILE_PAGES_OUT_OF_RANGE when it points at
     nothing; NUMBER_NEEDS_DATE for an undated file when `UNDATED_FILES` is "refuse"."""
     kind = args.kind.strip().lower()
