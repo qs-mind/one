@@ -170,7 +170,7 @@ def router(engine: Any) -> APIRouter:
         except BriefBusy as busy:
             return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
         except NoAI as none:
-            return JSONResponse({"error": none.text}, status_code=409)
+            return JSONResponse(copy.error(none.text), status_code=409)
         return JSONResponse({"brief_id": brief_id}, status_code=202)
 
     @r.get("/projects/{project_id}/closing")
@@ -189,7 +189,7 @@ def router(engine: Any) -> APIRouter:
         except BriefBusy as busy:
             return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
         except NoAI as none:
-            return JSONResponse({"error": none.text}, status_code=409)
+            return JSONResponse(copy.error(none.text), status_code=409)
         if brief_id is None:
             return JSONResponse({"error": copy.LESSON_STAYS_CONFIDENTIAL}, status_code=409)
         return JSONResponse({"brief_id": brief_id}, status_code=202)

@@ -52,6 +52,7 @@ describe("Close project", () => {
     expect(fetch.mock.calls.some(([url]) => String(url).endsWith("/lessons/propose"))).toBe(false);
     await user.click(screen.getByRole("button", { name: texts.archiveAnyway.en }));
     expect(await screen.findByText("No backup was made.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.openBackup.en })).toBeInTheDocument(); // where to back it up
     expect(currentProject()?.archived_at).toBe("2026-11-05T10:00:00Z");
   });
 

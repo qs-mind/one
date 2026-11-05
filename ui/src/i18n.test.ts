@@ -70,4 +70,21 @@ describe("i18n", () => {
       expect(text.ar.other, key).toContain("{n}");
     }
   });
+
+  it("a line that says where to change something later names the real buttons: those in the top bar's More", () => {
+    // shell/TopBar.tsx: AI, the other language and Setup are in More, on every screen of the app
+    const names = (key: keyof typeof texts) => ({ en: `“${texts[key].en}”`, ar: `«${texts[key].ar}»` });
+    const where: [keyof typeof texts, (keyof typeof texts)[]][] = [
+      ["languageHelp", ["more"]],
+      ["usageHelp", ["setupAgain", "more"]],
+      ["aiLinkLater", ["ai", "more"]],
+    ];
+    for (const [line, buttons] of where) {
+      for (const button of buttons) {
+        expect(texts[line].en, line).toContain(names(button).en);
+        expect(texts[line].ar, line).toContain(names(button).ar);
+      }
+      expect(texts[line].en + texts[line].ar, line).not.toMatch(/in Settings|من الإعدادات|from the top bar/);
+    }
+  });
 });

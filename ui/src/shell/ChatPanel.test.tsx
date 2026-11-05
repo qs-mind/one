@@ -234,10 +234,41 @@ describe("the chat in the shell", () => {
     expect(calls(fetch, "POST", "/api/briefs/b1/continue")).toHaveLength(1);
   });
 
+  it("a refused key in the chat: the core's words, and Open AI settings, which opens them", async () => {
+    // as the core sends it (core/qsone/copy.py KEY_REFUSED, with its fix)
+    const refused = {
+      en: "Anthropic refused this Claude key. Check that you copied all of it, or make a new key at console.anthropic.com.",
+      ar: "Anthropic رفض مفتاح Claude ده. اتأكد إنك نسخته كله، أو اعمل مفتاح جديد من console.anthropic.com.",
+      fix: "ai",
+    };
+    core({ routes: { "POST /api/chat": (init) => streamed([{ type: "error", errorText: JSON.stringify(refused) }], init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await box(), "hello{enter}");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(refused.ar);
+    expect(alert).not.toHaveTextContent(/فوق|at the top/);
+    expect(screen.queryByRole("heading", { name: texts.aiTitle.ar })).toBeNull();
+
+    await user.click(within(alert).getByRole("button", { name: texts.openAiSettings.ar }));
+    expect(await screen.findByRole("heading", { name: texts.aiTitle.ar })).toBeInTheDocument();
+  });
+
+  it("an error the chat cannot fix from here shows no action", async () => {
+    const failed = { en: "The work stopped because of a problem with Claude.", ar: "الشغل وقف بسبب مشكلة في Claude." };
+    core({ routes: { "POST /api/chat": (init) => streamed([...reply.slice(0, 2), { type: "error", errorText: JSON.stringify(failed) }], init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await box(), "hello{enter}");
+    const alert = await screen.findByRole("alert");
+    await waitFor(() => expect(alert).toHaveTextContent(failed.ar));
+    expect(within(alert).queryByRole("button")).toBeNull();
+  });
+
   it("shows a plain line when the reply fails, and the core's {en, ar} line in the engineer's language", async () => {
     const refused = {
-      en: "The Claude key was refused. Check it, or add a new one.",
-      ar: "مفتاح Claude اترفض. راجعه، أو ضيف مفتاح جديد.",
+      en: "Anthropic refused this Claude key. Check that you copied all of it, or make a new key at console.anthropic.com.",
+      ar: "Anthropic رفض مفتاح Claude ده. اتأكد إنك نسخته كله، أو اعمل مفتاح جديد من console.anthropic.com.",
     };
     let first = true;
     core({

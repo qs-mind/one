@@ -7,7 +7,7 @@
 import { useSyncExternalStore } from "react";
 import { api } from "../api";
 import { askForBackupFolder } from "../backup/ask";
-import { coreLine, send } from "../core";
+import { coreLine, type Fix, fixOf, send } from "../core";
 import { type Text, texts } from "../i18n";
 import { type Project, switchProject } from "../records/project";
 import { byTopFolder, entriesOf, fromEntries, fromInput, oldProjects, type Picked, type Report, upload } from "./walk";
@@ -25,6 +25,8 @@ export type Job = {
   report?: Report;
   /** The "I understood this" Brief: started, or not started with the core's reason. */
   understanding?: "started" | Text;
+  /** What fixes the reason it did not start, as the core says (no AI connected: AI settings). */
+  understandingFix?: Fix;
   /** Old work: archived. */
   archived?: boolean;
   /** The project was not made, or the files not sent: nothing more happens. */
@@ -86,17 +88,17 @@ async function create(name: string): Promise<{ project?: Project; line?: Text }>
   return { line: await coreLine(response, texts.projectNotCreated) };
 }
 
-async function understand(projectId: string): Promise<"started" | Text> {
+async function understand(projectId: string): Promise<Pick<Job, "understanding" | "understandingFix">> {
   const response = await send(`/projects/${encodeURIComponent(projectId)}/understand`, "POST");
   if (response?.status === 202 || response?.status === 409) {
-    const body = (await response.json().catch(() => ({}))) as { brief_id?: string; error?: Text };
+    const body = (await response.json().catch(() => ({}))) as { brief_id?: string; error?: Text; fix?: unknown };
     if (body.brief_id) {
       briefStarted(projectId);
-      return "started";
+      return { understanding: "started" };
     }
-    if (body.error) return body.error;
+    if (body.error) return { understanding: body.error, understandingFix: fixOf(body.fix) };
   }
-  return await coreLine(response, texts.importFailed);
+  return { understanding: await coreLine(response, texts.importFailed) };
 }
 
 async function run(job: Job, picked: Picked[], { understandAfter }: { understandAfter: boolean }) {
@@ -108,7 +110,7 @@ async function run(job: Job, picked: Picked[], { understandAfter }: { understand
     update(job.key, { archived: archived?.ok === true });
     void send(`/projects/${encodeURIComponent(id)}/close`, "POST"); // old work is not left open
   } else if (understandAfter) {
-    update(job.key, { understanding: await understand(id) });
+    update(job.key, await understand(id));
   }
 }
 
@@ -157,7 +159,7 @@ export async function understandIt(key: number) {
   const back = await send(`/projects/${id}/unarchive`, "POST");
   if (!back?.ok) return update(key, { understanding: await coreLine(back, texts.importFailed) });
   switchProject({ ...project, archived_at: null });
-  update(key, { archived: false, old: false, understanding: await understand(job.projectId) });
+  update(key, { archived: false, old: false, ...(await understand(job.projectId)) });
 }
 
 /** For the tests: no import, no listener. */

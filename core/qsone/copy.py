@@ -264,15 +264,15 @@ MODEL_NOT_SAVED = {
 # Money is shown in USD with 2 decimals and Western digits.
 # ---------------------------------------------------------------------------------------------
 
-# The reply when no AI is connected at all.
+# No AI is connected at all (the chat, a Brief started from a screen, the check).
 NO_AI = {
     "en": (
         "No AI is connected yet. Connect a Claude key, another AI provider or your own "
-        "Claude Code, then send your message again."
+        "Claude Code, then try again."
     ),
     "ar": (
         "لسه مفيش ذكاء اصطناعي متوصّل. وصّل مفتاح Claude، أو مزوّد تاني، أو Claude Code بتاعك، "
-        "وبعدين ابعت رسالتك تاني."
+        "وبعدين جرّب تاني."
     ),
 }
 

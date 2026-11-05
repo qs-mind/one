@@ -56,7 +56,7 @@ def check_keys() -> None:
         await asyncio.sleep(1.2)
         if BENCH_KEY in (keys.get_key("anthropic") or ""):
             return None
-        return copy.fill(copy.AI_KEY_REFUSED, provider="Anthropic")
+        return copy.KEY_REFUSED  # what the Native Link says for a refused Claude key
 
     connectors.check = check
 

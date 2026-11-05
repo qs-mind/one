@@ -92,7 +92,11 @@ for (const lang of ["ar", "en"] as const) {
       await paste(page, REFUSED);
       await expect(dialog.locator('[data-feedback="busy"]')).toBeVisible(); // at once: no pause for a paste
       await shot(page, "checking", lang);
-      await expect(dialog.getByRole("alert")).toContainText(lang === "ar" ? "اترفض" : "refused");
+      // what to do, in place: no "go to AI at the top" here, where there is no top bar
+      const alert = dialog.getByRole("alert");
+      await expect(alert).toContainText(lang === "ar" ? "رفض مفتاح Claude" : "refused this Claude key");
+      await expect(alert).toContainText("console.anthropic.com");
+      await expect(alert).not.toContainText(lang === "ar" ? "فوق" : "at the top");
       expected(walk, 409, "POST /api/settings/ai/check");
       await expect(field).toHaveValue(REFUSED); // kept, to be fixed
       await page.mouse.move(0, 0);

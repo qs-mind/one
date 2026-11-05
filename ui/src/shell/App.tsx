@@ -33,6 +33,7 @@ import { SearchKey } from "../settings/SearchKey";
 import { CHAT_WIDTH, ChatPanel } from "./ChatPanel";
 import { CommandBar } from "./CommandBar";
 import { DeliverablePanel, useDeliverablePanel } from "./DeliverablePanel";
+import { onOpenPanel } from "./FixAction";
 import { FloatingPanel } from "./FloatingPanel";
 import { GeneralChat } from "./GeneralChat";
 import { Palette } from "./Palette";
@@ -189,6 +190,16 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
 
   /** The message box has no model to pick: the AI settings open, to connect one. */
   const connectAi = (from: HTMLElement) => togglePanel("ai", from);
+
+  // A text away from its fix (the chat's "Open AI settings", a card's, the archive's "Open Backup") opens the panel,
+  // as the More menu does; it stays open if it already is. Focus goes back to the button pressed when it closes.
+  const showPanel = useRef<(kind: "ai" | "backup") => void>(undefined);
+  showPanel.current = (kind) => {
+    if (kind === "ai" && aiMain) return setChatShown(true); // the settings are already where the chat is
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setPanel(kind);
+  };
+  useEffect(() => onOpenPanel((kind) => showPanel.current?.(kind)), []);
 
   const projectsButton = () => document.querySelector<HTMLElement>('[data-region="topbar"] [data-region-start]');
 

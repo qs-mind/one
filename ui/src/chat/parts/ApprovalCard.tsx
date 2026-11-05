@@ -6,7 +6,8 @@
 // (its title and the answer), which opens again on a click, so the next card that waits is in sight without
 // scrolling.
 import { useRef, useState } from "react";
-import { coreLine, send } from "../../core";
+import { coreLine, fixOf, send } from "../../core";
+import { FixAction } from "../../shell/FixAction";
 import { count, dir, fill, type Language, pick, t, type Text, texts, useLanguage } from "../../i18n";
 import { CapsForm } from "../../settings/AiSettings";
 import { type CardAnswer, cardKinds } from "./cardKinds";
@@ -122,6 +123,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
       )}
       <div hidden={done && !unfolded} className="flex min-w-0 flex-col gap-4">
         <p dir="auto">{pick(card.detail, lang)}</p>
+        {!done && <FixAction fix={fixOf(card.fix)} lang={lang} />}
         {Kind && (
           <Kind
             card={shown}

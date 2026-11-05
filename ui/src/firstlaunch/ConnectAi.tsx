@@ -9,7 +9,7 @@ import { api, inInstalledApp } from "../api";
 import { coreLine, send } from "../core";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
-import { Feedback, type Nav, openSetup, option, primary, quiet, StepScreen } from "./parts";
+import { Feedback, type Nav, openSetup, option, primary, quiet, secondary, StepScreen } from "./parts";
 
 // The consent, as GET /settings/ai-consent says: `at` is null until the engineer said yes to `text_version`.
 type Consent = { at: string | null; text_version: number };
@@ -168,7 +168,15 @@ export function ConnectAi({ nav }: { nav: Nav }) {
               {found?.found && <p className="fl-rise">{fill(t("aiLinkClaudeCodeFound"), { version: found.version ?? "" })}</p>}
               {check === "checking" && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
               {check === "works" && <Feedback state="done">{t("aiLinkWorks")}</Feedback>}
-              {typeof check === "object" && <Feedback state="failed">{pick(check)}</Feedback>}
+              {typeof check === "object" && (
+                <>
+                  <Feedback state="failed">{pick(check)}</Feedback>
+                  {/* every failed line ends "then try again": this is where (coming back to the window does it too) */}
+                  <button type="button" onClick={() => void checkClaudeCode()} className={`${secondary} self-start`}>
+                    {t("tryAgain")}
+                  </button>
+                </>
+              )}
             </div>
           )}
           {via === "api_key" && <AiKey plain onChecking={() => setCheck("idle")} onChecked={(works) => setCheck(works ? "works" : "idle")} />}

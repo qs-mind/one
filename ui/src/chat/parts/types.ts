@@ -49,6 +49,8 @@ export type CardData = {
   title: Text;
   detail: Text;
   options: string[];
+  /** What fixes what the detail says, as the core says (core.ts Fix): a model of unknown price, "ai". */
+  fix?: string;
   payload?: CardPayload;
   status?: "pending" | "settled" | "withdrawn";
   choice?: string | null;

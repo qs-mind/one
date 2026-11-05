@@ -251,6 +251,83 @@ describe("AiSettings", () => {
     expect(calls(fetch, "PUT", "/api/settings/ai/claude-code")).toHaveLength(1);
   });
 
+  // AI settings are where an AI failure is fixed: what they show never sends the engineer elsewhere.
+  const PLACE = /at the top|top bar|\babove\b|in settings|\bpress\b|فوق|الإعدادات|دوس/i;
+  const KEY = "sk-ant-sample-not-a-real-key-0000000000000000";
+
+  it("a key the check refuses says what to do, in place: no Open AI settings, no Try again", async () => {
+    const refused = {
+      en: "Anthropic refused this Claude key. Check that you copied all of it, or make a new key at console.anthropic.com.",
+      ar: "Anthropic رفض مفتاح Claude ده. اتأكد إنك نسخته كله، أو اعمل مفتاح جديد من console.anthropic.com.",
+    };
+    core({
+      "PUT /api/settings/ai-key": () => Response.json({ set: true }),
+      "POST /api/settings/ai/check": () => Response.json({ error: refused, fix: "ai" }, { status: 409 }),
+    });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(await screen.findByLabelText(texts.aiKeyLabel.ar));
+    await user.paste(KEY);
+    const line = (await screen.findByText(refused.ar)).closest("[data-key-line]") as HTMLElement;
+    expect(line.textContent).not.toMatch(PLACE);
+    expect(within(line).queryByRole("button")).toBeNull();
+  });
+
+  it("no internet for the key's check: Try again checks the same key once more", async () => {
+    const offline = { en: "Could not reach Claude. Check the internet connection, then try again.", ar: "مقدرناش نوصل لـ Claude. اتأكد إن النت شغال وجرّب تاني." };
+    const fetch = core({
+      "PUT /api/settings/ai-key": () => Response.json({ set: true }),
+      "POST /api/settings/ai/check": () => Response.json({ error: offline, fix: "retry" }, { status: 409 }),
+    });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(await screen.findByLabelText(texts.aiKeyLabel.ar));
+    await user.paste(KEY);
+    const line = (await screen.findByText(offline.ar)).closest("[data-key-line]") as HTMLElement;
+    expect(line.textContent).not.toMatch(PLACE);
+    await user.click(within(line).getByRole("button", { name: texts.tryAgain.ar }));
+    await waitFor(() => expect(calls(fetch, "POST", "/api/settings/ai/check")).toHaveLength(2));
+    expect(bodies(fetch, "PUT", "/api/settings/ai-key")).toEqual([
+      { provider: "anthropic", value: KEY },
+      { provider: "anthropic", value: KEY },
+    ]);
+  });
+
+  it("before the consent, the key's line offers Connect AI, the one step that gives it", async () => {
+    const consent = { en: "Before ONE uses AI, say yes to the note on where your text goes.", ar: "قبل ما ONE يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين." };
+    core({
+      "PUT /api/settings/ai-key": () => Response.json({ set: true }),
+      "POST /api/settings/ai/check": () => Response.json({ error: consent, fix: "consent" }, { status: 409 }),
+    });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(await screen.findByLabelText(texts.aiKeyLabel.ar));
+    await user.paste(KEY);
+    const line = (await screen.findByText(consent.ar)).closest("[data-key-line]") as HTMLElement;
+    expect(within(line).getByRole("button", { name: texts.connectAi.ar })).toBeInTheDocument();
+  });
+
+  it("Claude Code that fails its check has Try again, which checks it once more", async () => {
+    const on = { id: "claude-code", kind: "agent", name: "Claude Code", provider: "anthropic", on_device: true, key_set: false, error: null };
+    const signedOut = { installed: true, compatible: true, signed_in: false, version: "2.1.318", code: "CLAUDE_CODE_SIGNED_OUT", models: [] };
+    const fetch = core({
+      "GET /api/settings/ai": () => Response.json(settings({ connectors: [on] })),
+      "GET /api/settings/ai/claude-code": () => Response.json(signedOut),
+    });
+    const user = userEvent.setup();
+    render(<Harness />);
+    const line = await screen.findByText(texts.claudeCodeSignedOut.ar);
+    expect(line.textContent).not.toMatch(PLACE);
+    await user.click(screen.getByRole("button", { name: texts.tryAgain.ar }));
+    await waitFor(() => expect(calls(fetch, "GET", "/api/settings/ai/claude-code")).toHaveLength(2));
+  });
+
+  it("the AI settings' own lines name no place they are not in", () => {
+    for (const key of ["noModels", "noAiYet", "claudeCodeTooOld", "claudeCodeSignedOut", "aiKeyHelp"] as const) {
+      expect(texts[key].en + texts[key].ar).not.toMatch(PLACE);
+    }
+  });
+
   it("switching Claude Code on saves it and says it keeps its own copy", async () => {
     const fetch = core({ "PUT /api/settings/ai/claude-code": (init) => Response.json(JSON.parse(String(init.body))) });
     const user = userEvent.setup();

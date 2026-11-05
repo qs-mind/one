@@ -310,7 +310,10 @@ def test_check_says_why_not(data_dir):
     link = FakeClaudeCode(answer=copy.CLAUDE_CODE_NOT_FOUND)
     with make_client([link]) as client:
         r = client.post("/settings/ai/check", json={"via": "claude_code"}, headers=AUTH)
-    assert r.status_code == 409 and r.json() == {"error": copy.CLAUDE_CODE_NOT_FOUND}
+    assert r.status_code == 409 and r.json() == {
+        "error": copy.CLAUDE_CODE_NOT_FOUND,
+        "fix": "retry",
+    }
     assert claude_link.saved()["on"] is False
 
 
@@ -341,7 +344,8 @@ def test_check_waits_for_consent(no_consent, data_dir):
     link = FakeClaudeCode()
     with make_client([link]) as client:
         r = client.post("/settings/ai/check", json={"via": "claude_code"}, headers=AUTH)
-        assert r.status_code == 409 and r.json() == {"error": copy.AI_CONSENT_NEEDED}
+        assert r.status_code == 409
+        assert r.json() == {"error": copy.AI_CONSENT_NEEDED, "fix": "consent"}
         assert link.checks == []
         bad = client.post("/settings/ai/check", json={"via": "openai"}, headers=AUTH)
         assert bad.status_code == 422

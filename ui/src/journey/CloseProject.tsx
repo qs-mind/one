@@ -5,11 +5,12 @@
 // QS, started once per project and session when there are none yet; a Confidential project shares none.
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { api } from "../api";
-import { coreLine, send } from "../core";
+import { coreAnswer, coreLine, type Fix, send } from "../core";
 import { primary, quiet, secondary } from "../firstlaunch/parts";
 import { briefStarted } from "../import/importer";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { type Project, setCurrentProject } from "../records/project";
+import { FixAction } from "../shell/FixAction";
 
 type Lesson = { id: string; text: string; kind: string; carried: boolean };
 type Closing = {
@@ -42,6 +43,11 @@ export function CloseProject({
   const id = encodeURIComponent(project.id);
   const [closing, setClosing] = useState<Closing>();
   const [failed, setFailed] = useState<Text>();
+  const [failedFix, setFailedFix] = useState<Fix>(); // only the lessons' failure has one; any other failure clears it
+  const fail = (line: Text | undefined) => {
+    setFailed(line);
+    setFailedFix(undefined);
+  };
   const [finding, setFinding] = useState(false);
   const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
   const [archiving, setArchiving] = useState(false);
@@ -50,7 +56,7 @@ export function CloseProject({
 
   const load = useCallback(async () => {
     const response = await api(`/projects/${id}/closing`).catch(() => undefined);
-    if (!response?.ok) return void setFailed(await coreLine(response, texts.archiveFailed));
+    if (!response?.ok) return void fail(await coreLine(response, texts.archiveFailed));
     const found = (await response.json()) as Closing;
     setClosing(found);
     return found;
@@ -66,7 +72,9 @@ export function CloseProject({
         briefStarted(project.id); // the Brief shows in the project chat like any other
       } else {
         proposed.delete(project.id); // not started (another Brief runs, or no AI yet): asked again next time
-        setFailed(await coreLine(response, texts.lessonsNotStarted));
+        const answer = await coreAnswer(response, texts.lessonsNotStarted);
+        setFailed(answer.line);
+        setFailedFix(answer.fix); // no AI yet: AI settings
       }
     });
   }, [load]);
@@ -90,20 +98,20 @@ export function CloseProject({
   }, [finding, briefRunning, load]);
 
   async function decide(lesson: Lesson, carry: boolean) {
-    setFailed(undefined);
+    fail(undefined);
     const response = await send(`/projects/${id}/lessons/${encodeURIComponent(lesson.id)}`, "POST", { carry });
-    if (!response?.ok) return setFailed(await coreLine(response, texts.archiveFailed));
+    if (!response?.ok) return fail(await coreLine(response, texts.archiveFailed));
     if (carry) void load();
     else setKept((now) => new Set(now).add(lesson.id)); // keeping it writes nothing
   }
 
   async function archive() {
     setArchiving(true);
-    setFailed(undefined);
+    fail(undefined);
     setNote(undefined);
     const response = await send(`/projects/${id}/archive`, "POST");
     setArchiving(false);
-    if (!response?.ok) return setFailed(await coreLine(response, texts.archiveFailed));
+    if (!response?.ok) return fail(await coreLine(response, texts.archiveFailed));
     const done = (await response.json()) as { archived_at: string; note: Text | null };
     if (done.note) setNote(done.note);
     setCurrentProject({ ...project, archived_at: done.archived_at });
@@ -111,9 +119,9 @@ export function CloseProject({
   }
 
   async function unarchive() {
-    setFailed(undefined);
+    fail(undefined);
     const response = await send(`/projects/${id}/unarchive`, "POST");
-    if (!response?.ok) return setFailed(await coreLine(response, texts.archiveFailed));
+    if (!response?.ok) return fail(await coreLine(response, texts.archiveFailed));
     setCurrentProject({ ...project, archived_at: null });
     void load();
   }
@@ -141,7 +149,13 @@ export function CloseProject({
           </button>
         </div>
       )}
-      {note && <p role="status" className="text-copper">{pick(note)}</p>}
+      {note && (
+        <div className="flex flex-col gap-2">
+          <p role="status" className="text-copper">{pick(note)}</p>
+          {/* the archive's only note: its final backup was not made, so Backup is the way to make it */}
+          <FixAction fix="backup" />
+        </div>
+      )}
 
       {closing && (
         <>
@@ -226,9 +240,12 @@ export function CloseProject({
         </>
       )}
       {failed && (
-        <p role="alert" className="text-copper">
-          {pick(failed)}
-        </p>
+        <div className="flex flex-col gap-2">
+          <p role="alert" className="text-copper">
+            {pick(failed)}
+          </p>
+          <FixAction fix={failedFix} />
+        </div>
       )}
     </section>
   );

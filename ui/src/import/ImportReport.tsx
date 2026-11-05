@@ -4,6 +4,7 @@
 import { FileName } from "../ui/FileName";
 import { fill, pick, t, useLanguage } from "../i18n";
 import { primary, quiet } from "../firstlaunch/parts";
+import { FixAction } from "../shell/FixAction";
 import { dismiss, type Job, understandIt, useImports } from "./importer";
 import type { Report } from "./walk";
 
@@ -92,9 +93,12 @@ export function ImportReport({ job }: { job: Job }) {
       {job.report && <Counts report={job.report} />}
       {job.understanding === "started" && <p role="status">{t("importUnderstanding")}</p>}
       {job.understanding && job.understanding !== "started" && (
-        <p role="alert" className="text-copper">
-          {pick(job.understanding)}
-        </p>
+        <div className="flex flex-col gap-2">
+          <p role="alert" className="text-copper">
+            {pick(job.understanding)}
+          </p>
+          <FixAction fix={job.understandingFix} />
+        </div>
       )}
       {job.old && job.archived && (
         <div className="flex flex-wrap items-center gap-3">
