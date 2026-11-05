@@ -136,11 +136,25 @@ function Step({ line: { step, times, took, named }, lang, live }: { line: Shown;
   );
 }
 
+/** Each line's React key: its time and agent, then how many lines before it had both (two steps can start in the same
+ * millisecond), so a line keeps its key as the log grows. */
+function keys(shown: Shown[]): string[] {
+  const seen = new Map<string, number>();
+  return shown.map(({ step }) => {
+    const base = `${step.at}|${step.agent.en}`;
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return `${base}|${n}`;
+  });
+}
+
 function Steps({ steps, lang, live }: { steps: WorkStep[]; lang: Language; live: boolean }) {
+  const shown = lines(steps);
+  const key = keys(shown);
   return (
     <ul aria-label={t("workSteps", lang)} aria-live={live ? "polite" : undefined} className="flex flex-col gap-1">
-      {lines(steps).map((line) => (
-        <Step key={line.step.at + pick(line.step.agent, "en")} line={line} lang={lang} live={live} />
+      {shown.map((line, i) => (
+        <Step key={key[i]} line={line} lang={lang} live={live} />
       ))}
     </ul>
   );
