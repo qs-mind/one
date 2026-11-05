@@ -352,12 +352,18 @@ export function SheetViewer(props: SheetViewerProps) {
   );
   const total = view.total;
   const totalColumn = columns.find((c) => c.kind === "calc")?.key;
+  // the foot says what the total covers while items wait for their numbers: «الإجمالي لحد دلوقتي · ٨ من ٣٢٥ بند»
+  const progress = view.progress;
+  const totalLabel =
+    progress && progress.done < progress.total
+      ? count("sheetTotalSoFar", progress.total, { done: progress.done }, view.language)
+      : pick(texts.sheetTotal, view.language);
   const summary = useCallback(
     (column: SheetColumn, tabIndex: number) => {
       if (column.key === titleColumn)
         return (
           <span dir="auto" className="font-bold">
-            {pick(texts.sheetTotal, view.language)}
+            {totalLabel}
           </span>
         );
       if (column.key !== totalColumn || !total) return null;
@@ -366,7 +372,7 @@ export function SheetViewer(props: SheetViewerProps) {
           type="button"
           tabIndex={tabIndex}
           className="w-full text-end font-bold hover:text-copper"
-          onClick={(event) => openSource(total, event.currentTarget, event.detail === 0, pick(texts.sheetTotal, view.language))}
+          onClick={(event) => openSource(total, event.currentTarget, event.detail === 0, totalLabel)}
         >
           {/* the core's total, rolling to its new value when an edit changes it; another Deliverable's shows still */}
           <bdi dir="ltr">
@@ -376,7 +382,7 @@ export function SheetViewer(props: SheetViewerProps) {
       );
     },
     // openSource reads the layout when called
-    [titleColumn, totalColumn, total, view.language, view.id],
+    [titleColumn, totalColumn, total, totalLabel, view.id],
   );
 
   // as the open document, the top bar says its title, state, Revision and that its numbers are sample: this row

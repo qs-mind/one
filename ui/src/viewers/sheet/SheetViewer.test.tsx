@@ -156,6 +156,25 @@ describe("SheetViewer", () => {
     expect(screen.getByText(texts.sheetTotal.ar)).toBeInTheDocument();
   });
 
+  it("the foot says the total so far and how many items it covers while some wait; the grand total once all are priced", () => {
+    const { rerender } = render(<SheetViewer projectId={P} view={sheet({ progress: { done: 8, total: 325 } })} />);
+    expect(screen.getByText("الإجمالي لحد دلوقتي · 8 من 325 بند")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "4,859,830.00" })).toBeInTheDocument(); // its figure shows
+    expect(screen.queryByText(texts.sheetTotal.ar)).toBeNull();
+    rerender(<SheetViewer projectId={P} view={sheet({ progress: { done: 3, total: 4 } })} />);
+    expect(screen.getByText("الإجمالي لحد دلوقتي · 3 من 4 بنود")).toBeInTheDocument();
+    rerender(<SheetViewer projectId={P} view={sheet({ progress: { done: 325, total: 325 } })} />);
+    expect(screen.getByText(texts.sheetTotal.ar)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "4,859,830.00" })).toBeInTheDocument();
+  });
+
+  it("an English sheet's foot: Total so far · 8 of 325 items, then Grand total", () => {
+    const { rerender } = render(<SheetViewer projectId={P} view={sheet({ language: "en", progress: { done: 8, total: 325 } })} />);
+    expect(screen.getByText("Total so far · 8 of 325 items")).toBeInTheDocument();
+    rerender(<SheetViewer projectId={P} view={sheet({ language: "en", progress: { done: 325, total: 325 } })} />);
+    expect(screen.getByText("Grand total")).toBeInTheDocument();
+  });
+
   it("the total the core sends rolls to its new value when an edit changes it; still on first render and on another Deliverable", () => {
     const animate = vi.fn(() => ({ finished: new Promise(() => {}), finish() {}, cancel() {} }));
     Object.defineProperty(Element.prototype, "animate", { configurable: true, writable: true, value: animate });

@@ -424,7 +424,7 @@ export const texts = {
   sheetNotNumber: { en: "this is not a number", ar: "ده مش رقم" },
   sheetNotSent: { en: "The change was not sent. Try again.", ar: "التعديل موصلش. جرّب تاني." },
   sheetNoAnswer: { en: "ONE's core did not answer. Try again.", ar: "محرك ONE مردّش. جرّب تاني." },
-  sheetTotal: { en: "Total", ar: "الإجمالي العام" },
+  sheetTotal: { en: "Grand total", ar: "الإجمالي العام" },
   sheetFullScreen: { en: "Full screen", ar: "ملء الشاشة" },
   sheetLeaveFullScreen: { en: "Leave full screen", ar: "اخرج من ملء الشاشة" },
   sheetTheEngineer: { en: "the engineer", ar: "المهندس" },
@@ -1145,6 +1145,16 @@ export const counted = {
   itemsLeft: {
     en: { one: "{n} item left", other: "{n} items left" },
     ar: { one: "فاضل بند واحد", two: "فاضل بندين", few: "فاضل {n} بنود", other: "فاضل {n} بند" },
+  },
+  // a sheet's foot while items wait for their numbers; texts.sheetTotal once all are priced
+  sheetTotalSoFar: {
+    en: { one: "Total so far · {done} of {n} item", other: "Total so far · {done} of {n} items" },
+    ar: {
+      one: "الإجمالي لحد دلوقتي · {done} من بند واحد",
+      two: "الإجمالي لحد دلوقتي · {done} من بندين",
+      few: "الإجمالي لحد دلوقتي · {done} من {n} بنود",
+      other: "الإجمالي لحد دلوقتي · {done} من {n} بند",
+    },
   },
   boqItemsOf: {
     en: { one: "{done} of {n} item", other: "{done} of {n} items" },
