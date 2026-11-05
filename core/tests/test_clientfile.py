@@ -1,12 +1,10 @@
 """The client's own file: read it, map it with a Fill Plan, preview and fill it from a signed-off
 Revision, patching only the mapped cells (synthetic «عينة» files only)."""
 
-import hashlib
 import io
 import json
 import re
 import zipfile
-import zlib
 from decimal import Decimal
 
 import openpyxl
@@ -16,6 +14,7 @@ from qsone import copy
 from qsone.clientfile import patch
 from qsone.clientfile.fill import accept_mismatches, fill, preview, read_sheet, save_plan
 from qsone.clientfile.patch import Write, patch_xlsx
+from qsone.deliverables import review
 from qsone.deliverables.store import view
 from qsone.records import files, ledger
 from qsone.records.project import RecordsError
@@ -70,28 +69,21 @@ def items(v: dict) -> list[dict]:
 
 
 def sign_off(rec, d: str, *, signed_off: bool = True) -> int:
-    """Issues the next Revision of the current view as Task 4 does (a sorted JSON snapshot).
-    Task 4's `review.sign_off` is not merged yet, so the row is written here."""
-    v = view(rec, d)
-    body = json.dumps(v, sort_keys=True, ensure_ascii=False).encode()
-    with rec.write("engineer") as c:
-        no = c.execute(
-            "SELECT coalesce(max(no), 0) + 1 FROM revisions WHERE deliverable_id = ?", (d,)
-        ).fetchone()[0]
-        c.execute(
-            "INSERT INTO revisions(deliverable_id, no, version_n, issued_at, issued_by,"
-            " signed_off, snapshot, sha256) VALUES (?, ?, ?, ?, 'engineer', ?, ?, ?)",
-            (
-                d,
-                no,
-                v["version"],
-                rec.clock(),
-                int(signed_off),
-                zlib.compress(body),
-                hashlib.sha256(body).hexdigest(),
-            ),
-        )
-    return no
+    """The next Revision of the current version: signed off after a Code A check, or only
+    issued."""
+    if not signed_off:
+        return review.issue_revision(rec, d, actor="engineer")
+    review.record_check(
+        rec,
+        d,
+        version_n=view(rec, d)["version"],
+        code="A",
+        checker="model-sample",
+        same_provider=False,
+        summary="",
+        comments=[],
+    )
+    return review.sign_off(rec, d, actor="engineer")
 
 
 def client_file(rec, name: str = "جدول كميات العميل - عينة.xlsx", **kw) -> str:
