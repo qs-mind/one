@@ -355,7 +355,9 @@ def _error_kind(error: BaseException) -> str | None:
     ) or (isinstance(status, int) and (status == 429 or status >= 500)):
         return "busy"
     # an empty or malformed reply, or retries used up, is the model's doing, not ONE's
-    if isinstance(error, ModelAPIError | UnexpectedModelBehavior | anthropic.APIError | openai.APIError):
+    if isinstance(
+        error, ModelAPIError | UnexpectedModelBehavior | anthropic.APIError | openai.APIError
+    ):
         return "other"
     return None
 
