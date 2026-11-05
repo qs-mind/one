@@ -26,8 +26,8 @@ function Names({ label, names }: { label: string; names: string[] }) {
       <p className="text-copper">{label}</p>
       <ul className="flex max-h-32 flex-col gap-0.5 overflow-y-auto ps-4 text-sm">
         {names.map((name, i) => (
-          <li key={`${name}-${i}`} className="truncate">
-            <FileName name={name} />
+          <li key={`${name}-${i}`} className="flex">
+            <FileName name={name} fit />
           </li>
         ))}
       </ul>

@@ -96,7 +96,7 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
     >
       {detail !== "live" ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-          <FileName name={file.name} className="text-lg font-semibold break-all" />
+          <FileName name={file.name} className="text-lg font-semibold break-words" />
           {pageOf && <span className="text-slate">{pageOf}</span>}
         </div>
       ) : (

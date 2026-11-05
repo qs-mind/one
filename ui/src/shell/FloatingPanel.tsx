@@ -4,7 +4,8 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { useScrollEdges } from "../ui/useScrollEdges";
 
-export function FloatingPanel({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+/** `wide`: a panel with a table (the Project Index), so its columns and titles have room. */
+export function FloatingPanel({ onClose, wide = false, children }: { onClose: () => void; wide?: boolean; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   useScrollEdges(scroller);
@@ -23,7 +24,7 @@ export function FloatingPanel({ onClose, children }: { onClose: () => void; chil
         event.preventDefault();
         onClose();
       }}
-      className="absolute start-4 top-2 z-30 flex max-h-[calc(100%-16px)] w-[min(420px,calc(100%-32px))] flex-col overflow-hidden rounded-[14px] border border-ink/10 bg-paper shadow-[0_2px_10px_rgb(14_15_18/0.12)] outline-none"
+      className={`absolute start-4 top-2 z-30 flex max-h-[calc(100%-16px)] ${wide ? "w-[min(760px,calc(100%-32px))]" : "w-[min(420px,calc(100%-32px))]"} flex-col overflow-hidden rounded-[14px] border border-ink/10 bg-paper shadow-[0_2px_10px_rgb(14_15_18/0.12)] outline-none`}
     >
       {/* the scrolling part fades at its edges inside the panel's frame, so the frame and its shadow stay whole */}
       <div ref={scroller} className="scroll-fade min-h-0 overflow-y-auto">

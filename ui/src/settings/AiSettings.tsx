@@ -498,6 +498,7 @@ function Amount({
   onChange,
   hint,
   invalid = false,
+  refused,
 }: {
   label: string;
   value: string;
@@ -505,8 +506,12 @@ function Amount({
   hint?: string;
   /** The core refused it: its border turns Copper until it saves. */
   invalid?: boolean;
+  /** Why the core refused it, said under this field rather than under the whole form. */
+  refused?: string;
 }) {
   const hintId = useId();
+  const refusedId = useId();
+  const described = [hint && hintId, refused && refusedId].filter(Boolean).join(" ");
   return (
     <div className="flex flex-col gap-1">
       <label className="flex flex-col gap-1">
@@ -518,15 +523,21 @@ function Amount({
           spellCheck={false}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          aria-describedby={hint ? hintId : undefined}
+          aria-describedby={described || undefined}
           aria-invalid={invalid || undefined}
-          className={`${field} ${invalid ? "border-copper" : ""}`}
+          // important: the field's own Slate border, and Ink on focus, would otherwise win
+          className={`${field} ${invalid ? "!border-copper" : ""}`}
         />
       </label>
       {hint && (
         <span id={hintId} className="text-slate">
           {hint}
         </span>
+      )}
+      {refused && (
+        <div id={refusedId}>
+          <Feedback state="failed">{refused}</Feedback>
+        </div>
       )}
     </div>
   );
@@ -597,6 +608,9 @@ export function CapsForm({ go }: { go?: { label: string; onGo: () => void } }) {
     if (await flush()) go?.onGo();
   }
 
+  // a refusal that names its amount is said under that field, not under the form
+  const onField = saving.state === "failed" && capFields.some(([name]) => name === bad);
+
   return (
     <form onSubmit={(event) => event.preventDefault()} onBlur={() => void flush()} className="flex flex-col gap-2">
       {capFields.map(([name, label]) => (
@@ -607,9 +621,10 @@ export function CapsForm({ go }: { go?: { label: string; onGo: () => void } }) {
           hint={recommended ? fill(t("recommendedAmount"), { value: recommended[name] }) : undefined}
           onChange={(value) => changed(name, value)}
           invalid={bad === name}
+          refused={onField && bad === name && saving.state === "failed" ? pick(saving.line) : undefined}
         />
       ))}
-      <SaveNote saving={saving} n={n} />
+      <SaveNote saving={onField ? { state: "idle" } : saving} n={n} />
       {go && (
         <div>
           <button type="button" disabled={!caps} onClick={() => void goOn()} className={primary}>

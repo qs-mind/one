@@ -87,7 +87,8 @@ export function SourcePopover({
   const dated = (first ? cell.dated : null) ?? explained?.number.dated ?? source?.dated;
   const by = explained?.number.recorded_by;
   const calc = explained?.calculation;
-  const place = [viewSource?.file_name, where(source?.locator)].filter(Boolean).join(language() === "ar" ? "، " : ", ");
+  const fileName = viewSource?.file_name;
+  const at = where(source?.locator);
 
   function open(id: string) {
     setPage(1);
@@ -132,7 +133,14 @@ export function SourcePopover({
         ) : (
           !failed && <span className="text-slate">{t("noSource")}</span>
         )}
-        {place && <span dir="auto" className="text-slate">{place}</span>}
+        {(fileName || at) && (
+          // the file's name isolated (a name mixing Arabic and Latin keeps its order), then where in it
+          <span className="text-slate">
+            {fileName && <FileName name={fileName} />}
+            {fileName && at && (language() === "ar" ? "، " : ", ")}
+            {at && <bdi>{at}</bdi>}
+          </span>
+        )}
         {viewSource?.file_id && (
           <button
             type="button"

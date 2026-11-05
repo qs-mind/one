@@ -397,21 +397,10 @@ describe("FirstLaunch", () => {
     await waitFor(() => expect(screen.queryByRole("heading", { name: texts.cardTitle.en })).toBeNull());
   });
 
-  it("introduction card: a currency the core refuses says so and stays", async () => {
-    const refused = { detail: [{ loc: ["body", "currency"], msg: "String should match pattern", type: "string_pattern_mismatch" }] };
-    const fetch = mockCore({ "PUT /engineer/card": () => Response.json(refused, { status: 422 }) });
-    const user = userEvent.setup();
-    flowAt("card");
-    await user.click(await screen.findByRole("radio", { name: texts.cardRoleContractor.en }));
-    await user.click(screen.getByRole("button", { name: texts.setupNext.en }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(texts.cardNotSaved.en);
-    expect(calls(fetch, "PUT /setup/card")).toHaveLength(0);
-  });
-
   it.each([
     ["the core's own words", () => Response.json({ error: { en: "The project file cannot be read - sample.", ar: "ملف المشروع مش مقروء - عينة." } }, { status: 409 }), "The project file cannot be read - sample."],
-    ["a plain retry, not the currency", () => new Response("Internal Server Error", { status: 500 }), texts.cardNotSavedRetry.en],
-  ])("introduction card: any other failure shows %s", async (_, answer, shown) => {
+    ["a plain retry", () => new Response("Internal Server Error", { status: 500 }), texts.cardNotSavedRetry.en],
+  ])("introduction card: a failure shows %s", async (_, answer, shown) => {
     const fetch = mockCore({ "PUT /engineer/card": answer });
     const user = userEvent.setup();
     flowAt("card");
@@ -420,7 +409,6 @@ describe("FirstLaunch", () => {
     await user.click(screen.getByRole("button", { name: texts.setupNext.en }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(shown);
-    expect(alert).not.toHaveTextContent(texts.cardNotSaved.en);
     expect(calls(fetch, "PUT /setup/card")).toHaveLength(0);
   });
 

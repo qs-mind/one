@@ -324,6 +324,11 @@ describe("AiSettings", () => {
     expect(alert).toHaveTextContent(notExact.ar);
     expect(day).toHaveValue("20,5");
     expect(day).toHaveAttribute("aria-invalid", "true"); // the amount the core named
+    // said under that field, not under the whole form, and the field itself is marked Copper
+    expect(day.closest("label")!.parentElement).toContainElement(alert);
+    expect(day).toHaveAccessibleDescription(expect.stringContaining(notExact.ar));
+    expect(day).toHaveClass("!border-copper");
+    expect(within(day.closest("form")!).getAllByRole("alert")).toHaveLength(1);
   });
 
   it("a settings load that fails says so and Retry tries again", async () => {

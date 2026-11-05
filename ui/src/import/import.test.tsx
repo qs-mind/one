@@ -75,8 +75,11 @@ describe("the I understood this card", () => {
     const user = userEvent.setup();
     render(<UnderstoodCard projectId="p1" />);
     expect(await screen.findByText("هيئة - عينة")).toBeInTheDocument();
-    expect(screen.getByText("\u2068خطاب الدعوة - عينة\u2066.pdf\u2069\u2069, page 3")).toBeInTheDocument();
-    expect(screen.getByText("\u2068BOQ - عينة\u2066.xlsx\u2069\u2069, BOQ, row 2")).toBeInTheDocument();
+    // each file's name isolated on one line, its extension whole, then the place in it
+    const source = (name: string) => screen.getAllByTitle(name)[0]!.parentElement!;
+    expect(source("خطاب الدعوة - عينة.pdf")).toHaveTextContent(/^خطاب الدعوة - عينة\.pdf, page 3$/);
+    expect(source("BOQ - عينة.xlsx")).toHaveTextContent(/^BOQ - عينة\.xlsx, BOQ, row 2$/);
+    expect(screen.getAllByTitle("BOQ - عينة.xlsx")[0]!.querySelector('bdi[dir="ltr"]')).toHaveTextContent(".xlsx");
     expect(screen.getByText(texts.factSourceCount.en)).toBeInTheDocument();
     expect(screen.getByText(texts.understoodNotFound.en)).toBeInTheDocument(); // the contract type: no file states it
     expect(screen.getByText("تقرير التربة - عينة")).toBeInTheDocument();
