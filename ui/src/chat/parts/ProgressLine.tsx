@@ -13,6 +13,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { count, dir, fill, type Language, pick, t, useLanguage } from "../../i18n";
 import { AutoHeight } from "../../ui/AutoHeight";
 import { DUR, play, useReducedMotion } from "../../ui/motion";
+import { WorkDots } from "../../ui/WorkDots";
 import type { ProgressData, WorklogData, WorkStep } from "./types";
 
 /** The app's numerals: Latin digits in both languages. */
@@ -57,17 +58,6 @@ function useNow(on: boolean): number {
   return now;
 }
 
-/** Three dots fading in turn, CSS only (styles.css .work-dots), beside a step that really runs. */
-function Dots() {
-  return (
-    <span data-dots aria-hidden="true" className="work-dots">
-      <span />
-      <span />
-      <span />
-    </span>
-  );
-}
-
 /** A running step: what it does (its words carry the file's name) and how long it has run. */
 function RunningChip({ step, lang }: { step: WorkStep; lang: Language }) {
   const reduced = useReducedMotion();
@@ -81,7 +71,7 @@ function RunningChip({ step, lang }: { step: WorkStep; lang: Language }) {
         <>
           {" "}
           <span className="tabular-nums text-slate">· {tick(now - Date.parse(step.at), lang)}</span>
-          <Dots />
+          <WorkDots />
         </>
       )}
     </span>

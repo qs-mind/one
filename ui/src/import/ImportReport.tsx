@@ -2,6 +2,8 @@
 // but not read yet, too big, unreadable, zips opened), then the next step: the Lead QS reading the folder, or for old
 // work, archived without the AI step, with "Understand it".
 import { FileName } from "../ui/FileName";
+import { ProgressBar } from "../ui/ProgressBar";
+import { WorkDots } from "../ui/WorkDots";
 import { fill, pick, t, useLanguage } from "../i18n";
 import { primary, quiet } from "../firstlaunch/parts";
 import { FixAction } from "../shell/FixAction";
@@ -80,9 +82,7 @@ export function ImportReport({ job }: { job: Job }) {
       {adding && (
         <div className="flex flex-col gap-2" role="status">
           <p>{fill(t("importUploading"), { done: job.done, total: job.total })}</p>
-          <div className="h-1.5 overflow-hidden rounded-full bg-stone">
-            <div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${job.total ? (100 * job.done) / job.total : 0}%` }} />
-          </div>
+          <ProgressBar done={job.done} total={job.total} />
         </div>
       )}
       {job.failed && (
@@ -91,7 +91,12 @@ export function ImportReport({ job }: { job: Job }) {
         </p>
       )}
       {job.report && <Counts report={job.report} />}
-      {job.understanding === "started" && <p role="status">{t("importUnderstanding")}</p>}
+      {job.understanding === "started" && (
+        <p role="status" className="flex items-baseline gap-2">
+          {t("importUnderstanding")}
+          <WorkDots />
+        </p>
+      )}
       {job.understanding && job.understanding !== "started" && (
         <div className="flex flex-col gap-2">
           <p role="alert" className="text-copper">

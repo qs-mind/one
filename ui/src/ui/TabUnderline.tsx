@@ -13,9 +13,10 @@ export function TabUnderline() {
     if (!el || !box) return;
     const tab = box.querySelector<HTMLElement>(':scope > [role="tab"][aria-selected="true"]');
     if (!tab) return el.setAttribute("data-hidden", "");
-    const { x, w } = placeIn(tab, box);
+    const { x, y, w, h } = placeIn(tab, box);
     el.removeAttribute("data-hidden");
     el.style.setProperty("--x", `${x}px`);
+    el.style.setProperty("--y", `${y + h - 2}px`); // under the tab's own line, when the tabs wrap
     el.style.setProperty("--w", String(w));
   };
 

@@ -182,9 +182,10 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     };
   }, [sources]);
 
-  const closePanel = useCallback(() => {
+  // closed by a click outside it: focus stays where the engineer clicked
+  const closePanel = useCallback((how?: unknown) => {
     setPanel(null);
-    opener.current?.focus();
+    if (how !== "outside") opener.current?.focus();
   }, []);
 
   function togglePanel(kind: PanelKind, from: HTMLElement | null) {

@@ -8,6 +8,7 @@ import { lod, type Detail } from "../lod";
 import { MIN_H, MIN_W, STRIP_H } from "../place";
 import type { Anchor, ClientBoqInfo, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
 import { FileName } from "../../ui/FileName";
+import { Tip } from "../../ui/Tip";
 
 /** `h` is the frame's open height, kept while it is folded to its strip. */
 type Base = { collapsed: boolean; live: boolean; h: number };
@@ -98,7 +99,7 @@ type FrameProps = {
 };
 
 const iconButton =
-  "nodrag shrink-0 rounded-lg px-2 py-1.5 leading-none text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
+  "nodrag tap shrink-0 rounded-lg px-2 py-1.5 leading-none text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
 
 export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenFull, closable, scrolls = true, children }: FrameProps) {
   useLanguage();
@@ -126,24 +127,29 @@ export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenF
         </h3>
         {meta}
         {onOpenFull && (
-          <button type="button" onClick={onOpenFull} aria-label={t("openFull")} title={t("openFull")} className={iconButton}>
-            ⤢
-          </button>
+          <Tip label={t("openFull")}>
+            <button type="button" onClick={onOpenFull} aria-label={t("openFull")} className={iconButton}>
+              ⤢
+            </button>
+          </Tip>
         )}
-        <button
-          type="button"
-          onClick={() => actions.toggle(id)}
-          aria-label={collapsed ? t("expand") : t("collapse")}
-          aria-expanded={!collapsed}
-          title={collapsed ? t("expand") : t("collapse")}
-          className={iconButton}
-        >
-          {collapsed ? "▾" : "▴"}
-        </button>
-        {closable && (
-          <button type="button" onClick={() => actions.close(id)} aria-label={t("closeFrame")} title={t("closeFrame")} className={iconButton}>
-            ✕
+        <Tip label={collapsed ? t("expand") : t("collapse")}>
+          <button
+            type="button"
+            onClick={() => actions.toggle(id)}
+            aria-label={collapsed ? t("expand") : t("collapse")}
+            aria-expanded={!collapsed}
+            className={iconButton}
+          >
+            {collapsed ? "▾" : "▴"}
           </button>
+        </Tip>
+        {closable && (
+          <Tip label={t("closeFrame")}>
+            <button type="button" onClick={() => actions.close(id)} aria-label={t("closeFrame")} className={iconButton}>
+              ✕
+            </button>
+          </Tip>
         )}
       </header>
       {!collapsed && detail !== "title" && (

@@ -12,6 +12,7 @@ import { FillPreview } from "../review/FillPreview";
 import { rangePlace } from "../review/place";
 import { SignOff } from "../review/SignOff";
 import { VersionsPanel } from "../review/VersionsPanel";
+import { TabUnderline } from "../ui/TabUnderline";
 import { DocumentViewer, type DocumentHandle } from "../viewers/document/DocumentViewer";
 import type { TextAnchor } from "../viewers/document/plate";
 import { SheetViewer, type SheetHandle, type SheetRange } from "../viewers/sheet/SheetViewer";
@@ -178,7 +179,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
       {mode === "full" && (
         <div className="flex min-h-0 flex-[2_1_0%] flex-col bg-stone/50">
           <div className="flex flex-wrap items-center gap-3 px-5 pb-1 pt-3">
-            <div role="tablist" aria-label={t("reviewPanels")} className="flex flex-wrap gap-1">
+            <div role="tablist" aria-label={t("reviewPanels")} className="relative flex flex-wrap gap-1">
               {tabs.map(([key, label]) => (
                 <button
                   key={key}
@@ -187,7 +188,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
                   role="tab"
                   aria-selected={tab === key}
                   aria-controls={tabId(key)}
-                  className={`rounded-lg px-3 py-1.5 ${tab === key ? "bg-ink text-paper" : "hover:bg-stone"}`}
+                  className={`rounded-t-lg px-3 py-1.5 transition-colors duration-150 ${tab === key ? "text-ink" : "text-slate hover:text-ink"}`}
                   onClick={() => {
                     setTab(key);
                     setFillOpen(null);
@@ -198,6 +199,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
                   {key === "comments" && view.open_comments > 0 && <bdi> ({view.open_comments})</bdi>}
                 </button>
               ))}
+              <TabUnderline />
             </div>
             <div className="ms-auto">
               <ExportMenu

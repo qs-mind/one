@@ -419,13 +419,11 @@ html.lang-wipe::view-transition-new(root) {
 }
 /* a 1 px Ink line, 2 px tall, stretched to the tab's width */
 .tab-underline {
-  top: auto;
-  bottom: 0;
   width: 1px;
   height: 2px;
   background: var(--color-ink);
   transform-origin: 0 0;
-  transform: translateX(var(--x, 0)) scaleX(var(--w, 0));
+  transform: translate(var(--x, 0), var(--y, 0)) scaleX(var(--w, 0));
 }
 .tab-underline[data-hidden] {
   opacity: 0;

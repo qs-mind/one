@@ -948,6 +948,10 @@ export const texts = {
   undoDone: { en: "Back as it was.", ar: "رجع زي ما كان." },
   removedName: { en: "Removed «{name}»", ar: "اتشال «{name}»" },
   undoFailed: { en: "It was not put back. Add it again if you need it.", ar: "مارجعش. ضيفه تاني لو محتاجه." },
+  // Calm interaction details: a file frame's page shown as its picture or as its text.
+  pageView: { en: "Show the page as", ar: "اعرض الصفحة" },
+  pageViewImage: { en: "Picture", ar: "صورة" },
+  pageViewText: { en: "Text", ar: "نص" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";

@@ -2,6 +2,7 @@
 import { Command as Cmdk } from "cmdk";
 import { type ComponentProps, type ReactNode, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "./dialog";
+import { Glide } from "./Glide";
 import { useScrollEdges } from "./useScrollEdges";
 
 export function Command({ className = "", ...props }: ComponentProps<typeof Cmdk>) {
@@ -39,10 +40,16 @@ export function CommandInput({ className = "", ...props }: ComponentProps<typeof
   );
 }
 
-export function CommandList({ className = "", ...props }: ComponentProps<typeof Cmdk.List>) {
+/** The results, with one Stone highlight gliding to the row the pointer or the arrow keys reach. */
+export function CommandList({ className = "", children, ...props }: ComponentProps<typeof Cmdk.List>) {
   const list = useRef<HTMLDivElement>(null);
   useScrollEdges(list);
-  return <Cmdk.List ref={list} className={`scroll-fade max-h-[50vh] overflow-y-auto p-2 ${className}`} {...props} />;
+  return (
+    <Cmdk.List ref={list} className={`scroll-fade max-h-[50vh] overflow-y-auto p-2 ${className}`} {...props}>
+      {children}
+      <Glide />
+    </Cmdk.List>
+  );
 }
 
 export function CommandEmpty({ className = "", ...props }: ComponentProps<typeof Cmdk.Empty>) {
@@ -61,7 +68,7 @@ export function CommandGroup({ className = "", ...props }: ComponentProps<typeof
 export function CommandItem({ className = "", ...props }: ComponentProps<typeof Cmdk.Item>) {
   return (
     <Cmdk.Item
-      className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 data-[selected=true]:bg-stone ${className}`}
+      className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 ${className}`}
       {...props}
     />
   );

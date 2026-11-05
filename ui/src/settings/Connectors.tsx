@@ -11,6 +11,7 @@ import type { CardData } from "../chat/parts/types";
 import { coreLine, send } from "../core";
 import { count, fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { UndoNotice } from "../ui/UndoNotice";
+import { WorkDots } from "../ui/WorkDots";
 
 /** The core's answer to a removal: its Undo token and window (core/qsone/undo.py). */
 export type Removed = { undo: string; window_ms: number };
@@ -307,7 +308,12 @@ function AddConnector({ onAdded, onStarted }: { onAdded: () => void; onStarted: 
           {t("connectorAdd")}
         </button>
       </div>
-      {busy && <p className="text-slate">{t("connectorChecking")}</p>}
+      {busy && (
+        <p role="status" className="flex items-baseline gap-2 text-slate">
+          {t("connectorChecking")}
+          <WorkDots />
+        </p>
+      )}
       <Alert line={failed} />
     </form>
   );
