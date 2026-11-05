@@ -1,14 +1,13 @@
 // The top bar's motion (docs/specs/2026-11-05-motion-design.md 2.7 and 2.8): the language wipe from its button,
 // and the search field that opens the palette from itself.
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { language, setLanguage, texts } from "../i18n";
+import { fakeSources } from "../project/fake";
 import { setCurrentProject } from "../records/project";
 import { App } from "./App";
 import { core, P1 } from "./testing";
-
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
 const topBar = () => screen.getByRole("banner", { name: texts.topBar.ar });
@@ -140,9 +139,38 @@ describe("at 1000 px", () => {
     const search = await screen.findByRole("button", { name: `${texts.searchField.ar} Ctrl K` });
     expect(search.querySelector("span")).toHaveTextContent(new RegExp(`^${texts.searchField.ar}$`));
     expect(search.querySelector("kbd")).toHaveTextContent(/^Ctrl K$/);
-    // Search and the project's panels, then a line, then the rest of More
+    // Search, then a line, then the rest of More (the Deliverables and Project Records are in the document switcher)
     const order = [...search.parentElement!.children].map((el) => (el.tagName === "HR" ? "—" : (el.textContent ?? "")));
-    expect(order.slice(0, 4)).toEqual([`${texts.searchField.ar}Ctrl K`, texts.deliverablesButton.ar, texts.records.ar, "—"]);
+    expect(order.slice(0, 2)).toEqual([`${texts.searchField.ar}Ctrl K`, "—"]);
+    expect(order).not.toContain(texts.deliverablesButton.ar);
+    expect(order).not.toContain(texts.records.ar);
     vi.unstubAllGlobals();
+  });
+});
+
+describe("what is waiting", () => {
+  it("one quiet line: a copper dot and «مستنيك قرار واحد», «مستنيك قرارين», or Slate «مافيش حاجة مستنياك»", async () => {
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({ status: { waiting: 1 } });
+    render(<App sourcesFor={() => sources} />);
+    const one = await within(topBar()).findByRole("button", { name: "مستنيك قرار واحد" });
+    expect(one).toHaveClass("text-copper");
+    expect(one.querySelector("[data-waiting-dot]")).toHaveClass("bg-copper");
+    act(() => sources.emit({ type: "waiting", count: 2 }));
+    expect(await within(topBar()).findByRole("button", { name: "مستنيك قرارين" })).toBeInTheDocument();
+    act(() => sources.emit({ type: "waiting", count: 0 }));
+    const none = await within(topBar()).findByText("مافيش حاجة مستنياك");
+    expect(none).toHaveClass("text-slate");
+    expect(none.closest("button")).toBeNull(); // nothing to go to
+  });
+
+  it("no Deliverables or Project Records button: both are in the document switcher", async () => {
+    setCurrentProject(P1);
+    core();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await box();
+    expect(within(topBar()).queryByRole("button", { name: texts.deliverablesButton.ar })).toBeNull();
+    expect(within(topBar()).queryByRole("button", { name: texts.records.ar })).toBeNull();
   });
 });

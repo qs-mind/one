@@ -1,4 +1,4 @@
-// The one composer: tells the Lead QS what to do with what is selected on the canvas. The selection shows as a
+// The one composer: tells the Lead QS what to do with what is selected in the document. The selection shows as a
 // chip and goes with the message; each quick action only fills a message and sends it. Nothing here calls an agent
 // or sends anything outside directly (decision 9).
 // At rest it is one quiet pill: the words and one round action. Focused, or with words, a selection, an open model
@@ -52,7 +52,6 @@ export function CommandBar({
   ai,
   onSent,
   onConnectAi,
-  floating,
   inPanel = false,
 }: {
   chat: ChatState;
@@ -62,10 +61,7 @@ export function CommandBar({
   onSent?: () => void;
   /** No model to pick: the AI settings open, to connect one. */
   onConnectAi?: (from: HTMLElement) => void;
-  /** Over the canvas, between the zoom controls (start) and the chat (end), in px from each side; without it the
-   * bar sits under the General chat's conversation. */
-  floating?: { start: number; end: number; bottom: number };
-  /** At the foot of the open project chat. */
+  /** At the foot of the open project chat; without it the bar sits under the General chat's conversation. */
   inPanel?: boolean;
 }) {
   useLanguage();
@@ -80,6 +76,9 @@ export function CommandBar({
   const quick = kinds.size === 1 ? actions[selection[0]!.kind] : [];
   const placeholder = t(selection.length ? "commandBox" : "commandBoxEmpty");
   const open = (focused && !dismissed) || draft !== "" || chat.running || picking || selection.length > 0;
+  // in the chat beside the document it is one line at rest (dense, 5 Nov); under the General chat, roomier
+  const lines = inPanel ? "min-h-9 py-1.5 ps-3 leading-6" : "min-h-12 py-2.5 ps-5 leading-7";
+  const ends = inPanel ? { open: "pe-3", rest: "pe-10" } : { open: "pe-5", rest: "pe-14" };
 
   // the Lead QS's model and effort for the next Brief
   const settings = ai?.loaded.state === "ready" ? ai.loaded.settings : undefined;
@@ -164,10 +163,8 @@ export function CommandBar({
         text.current?.focus();
       }}
       className={`relative w-full cursor-text border bg-paper transition-[border-radius,border-color] duration-200 ease-out ${
-        open ? "rounded-[18px]" : "rounded-[25px]"
-      } ${focused ? "border-ink/15" : "border-ink/[0.08]"} ${
-        floating ? "shadow-[0_2px_12px_rgb(14_15_18/0.08)]" : "shadow-[0_1px_2px_rgb(14_15_18/0.04),0_2px_10px_rgb(14_15_18/0.05)]"
-      }`}
+        inPanel ? "rounded-[10px]" : open ? "rounded-[18px]" : "rounded-[25px]"
+      } ${focused ? "border-ink/15" : "border-ink/[0.08]"} shadow-[0_1px_2px_rgb(14_15_18/0.04),0_2px_10px_rgb(14_15_18/0.05)]`}
     >
       {selection.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-3 pt-3">
@@ -203,7 +200,7 @@ export function CommandBar({
           aria-hidden="true"
           dir={draft ? "auto" : dir()}
           data-command-mirror
-          className={`invisible col-start-1 row-start-1 max-h-40 min-h-12 overflow-hidden py-2.5 ps-5 leading-7 ${draft ? "whitespace-pre-wrap break-words" : "truncate"} ${open ? "pe-5" : "pe-14"}`}
+          className={`invisible col-start-1 row-start-1 max-h-40 overflow-hidden ${lines} ${draft ? "whitespace-pre-wrap break-words" : "truncate"} ${open ? ends.open : ends.rest}`}
         >
           {(draft || placeholder) + " "}
         </div>
@@ -234,7 +231,7 @@ export function CommandBar({
               setDismissed(true);
             }
           }}
-          className={`col-start-1 row-start-1 max-h-40 min-h-12 w-full resize-none bg-transparent py-2.5 ps-5 leading-7 outline-none placeholder:text-slate ${draft ? "overflow-y-auto" : "truncate"} ${open ? "pe-5" : "pe-14"}`}
+          className={`col-start-1 row-start-1 max-h-40 w-full resize-none bg-transparent ${lines} outline-none placeholder:text-slate ${draft ? "overflow-y-auto" : "truncate"} ${open ? ends.open : ends.rest}`}
         />
       </div>
       {/* The quiet row: its height opens from nothing, and it fades in; folded, it takes no focus. */}
@@ -262,7 +259,7 @@ export function CommandBar({
           </div>
         </div>
       </div>
-      <div className="absolute bottom-1.5 end-1.5 flex items-center gap-1.5">
+      <div className={`absolute flex items-center gap-1.5 ${inPanel ? "bottom-[5px] end-[5px] [&>button]:size-7" : "bottom-1.5 end-1.5"}`}>
         {chat.running && hasWords && (
           <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
             <Square />
@@ -292,14 +289,7 @@ export function CommandBar({
       aria-label={t("commandBar")}
       data-region="command"
       tabIndex={-1}
-      data-canvas-cover={floating ? true : undefined}
-      className={
-        floating
-          ? "pointer-events-auto w-full max-w-[560px]"
-          : inPanel
-            ? "shrink-0 px-3 pb-3 pt-2"
-            : "mx-auto w-full max-w-[46rem] px-6 pb-6"
-      }
+      className={inPanel ? "shrink-0 pt-2" : "mx-auto w-full max-w-[46rem] px-6 pb-6"}
     >
       <form
         onSubmit={(event) => {
@@ -324,14 +314,5 @@ export function CommandBar({
     </section>
   );
 
-  return floating ? (
-    <div
-      className="pointer-events-none absolute z-30 flex justify-center"
-      style={{ insetInlineStart: floating.start, insetInlineEnd: floating.end, bottom: floating.bottom }}
-    >
-      {bar}
-    </div>
-  ) : (
-    bar
-  );
+  return bar;
 }

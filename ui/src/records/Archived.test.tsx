@@ -8,7 +8,7 @@ import { App } from "../shell/App";
 import { calls, core, P1, P2 } from "../shell/testing";
 import { currentProject, setCurrentProject } from "./project";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const archived = { ...P1, archived_at: "2026-11-05T09:00:00+00:00" };
 

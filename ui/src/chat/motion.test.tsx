@@ -9,7 +9,7 @@ import { App } from "../shell/App";
 import { core, reply, running, streamed } from "../shell/testing";
 import { ProgressLine } from "./parts/ProgressLine";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 /** The system's reduced-motion setting, and an `animate` that records what played on which element. */
 function motion(reduced = false) {

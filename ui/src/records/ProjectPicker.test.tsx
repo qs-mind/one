@@ -5,7 +5,7 @@ import { setLanguage, texts } from "../i18n";
 import { App } from "../shell/App";
 import { currentProject, setCurrentProject } from "./project";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 // Sample projects, as the core lists them.
 const school = { id: "a".repeat(32), name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00.000000+00:00" };

@@ -3,13 +3,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fill, setLanguage, texts } from "../i18n";
+import { count, fill, setLanguage, texts } from "../i18n";
 import { currentProject, setCurrentProject } from "../records/project";
 import { App } from "./App";
 import { ACTIVITY_POLL, type ChatActivity } from "./chatActivity";
 import { calls, core, P1, P2, type Route } from "./testing";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("./testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const topBar = () => screen.getByRole("banner", { name: texts.topBar.ar });
 const picker = () => screen.getByRole("region", { name: texts.projects.ar });
@@ -200,7 +200,7 @@ describe("the notice from another chat", () => {
     });
     const user = userEvent.setup();
     render(<App />);
-    const waiting = await within(topBar()).findByRole("button", { name: fill(texts.waitingForYou.ar, { n: 1 }) });
+    const waiting = await within(topBar()).findByRole("button", { name: count("decisionsWaiting", 1) });
     await user.click(waiting);
     await waitFor(() => expect(currentProject()?.id).toBe("p2"));
   });

@@ -1,23 +1,26 @@
-// The top bar, 56 px: the mark, the project (or the General chat) with its switcher, the project's status (its two
-// most important items; the rest in More status), the agent the view follows, who is working now, "Waiting for you",
-// then the search field (it opens the palette from itself), the Deliverables and Project Records. AI settings and the other language are always in More: they are
-// set once, not used every hour, and so is Setup, the first launch's steps again. Below 900 px the status folds into one Status button and the rest into More; below
-// 1280 px search and the panels fold into More too: the project's name is never cut. The chrome mirrors in Arabic.
+// The top bar, 44 px, on the Stone ground with 16 px sides and 12 px gaps (dense: the room is the documents'): the mark, the project (or the General chat) with its
+// switcher, the project's status (its two most important items; the rest in More status), then what is waiting (a
+// copper dot and «مستنيك قرار واحد», or Slate «مافيش حاجة مستنياك»; pressing it opens the chat at the card), the
+// search field (it opens the palette from itself) and More. The Deliverables and Project Records are in the document
+// switcher. AI settings and the other language are always in More: they are set once, not used every hour, and so is
+// Setup, the first launch's steps again. Below 1000 px the status folds into one Status button and the chat opens from
+// its own button here (the waiting dot rides on it); below 1280 px search folds into More too: the project's name is
+// never cut. The chrome mirrors in Arabic.
 // The project button carries one small mark when another chat needs a look (chatActivity.ts): working, waiting for
 // you, failed, or done since you last looked; this chat is the one on the screen, so it is seen.
-import { useRef } from "react";
+import { type ReactNode, useRef } from "react";
 import { Mark } from "../brand/Mark";
 import type { ProjectSources, ProjectStatus } from "../project/types";
 import { isMac } from "../project/keys";
-import { Following, TeamNow } from "../project/live/TeamNow";
 import { send } from "../core";
 import { openSetup } from "../firstlaunch/parts";
 import { chooseFolder } from "../import/FolderDrop";
-import { fill, language, setLanguage, t, useLanguage } from "../i18n";
+import { count, fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { centreOf, withTransition } from "../ui/viewTransition";
 import { ActivityMark, activityWord } from "./ActivityMark";
+import { WaitingDot } from "./ChatPanel";
 import { elsewhere, GENERAL, useActivity, useOpenChat } from "./chatActivity";
 import { useCompact } from "./regions";
 import { StatusStrip } from "./StatusStrip";
@@ -46,6 +49,8 @@ export type TopBarProps = {
   /** Narrow layout: the chat sheet. */
   chatOpen: boolean;
   onChat(): void;
+  /** The open document's title (its switcher) and state, after the project's name. */
+  document?: ReactNode;
 };
 
 export function TopBar(props: TopBarProps) {
@@ -73,7 +78,7 @@ export function TopBar(props: TopBarProps) {
       type="button"
       data-search-field=""
       aria-label={fill(t("searchKeys"), { keys })}
-      className="flex w-48 items-center justify-between gap-4 rounded-lg border border-ink/10 bg-stone/60 px-3 py-1.5 text-start whitespace-nowrap hover:border-ink/20 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+      className="flex w-48 items-center justify-between gap-4 rounded-lg border border-ink/10 bg-stone/60 px-3 py-1 text-start whitespace-nowrap hover:border-ink/20 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
       onClick={(event) => {
         event.currentTarget.focus(); // WebKit does not focus a clicked button; the palette gives focus back to this
         props.onPalette(event.currentTarget.getBoundingClientRect());
@@ -110,36 +115,16 @@ export function TopBar(props: TopBarProps) {
       {t("otherLanguage")}
     </button>
   );
-  const projectPanels = (opener?: HTMLElement | null) =>
-    project && (
-      <>
-        <button
-          type="button"
-          aria-expanded={panel === "deliverables"}
-          className={button}
-          onClick={(event) => onPanel("deliverables", opener ?? event.currentTarget)}
-        >
-          {t("deliverablesButton")}
-        </button>
-        <button
-          type="button"
-          aria-expanded={panel === "records"}
-          className={button}
-          onClick={(event) => onPanel("records", opener ?? event.currentTarget)}
-        >
-          {t("records")}
-        </button>
-      </>
-    );
-
   return (
     <header
       aria-label={t("topBar")}
       data-region="topbar"
       tabIndex={-1}
-      className="relative z-40 flex h-14 shrink-0 items-center gap-3 border-b border-ink/[0.06] bg-paper px-5 text-slate"
+      className={`relative z-40 flex h-11 shrink-0 items-center gap-3 px-4 text-slate ${
+        project ? "" : "border-b border-ink/[0.06] bg-paper"
+      }`}
     >
-      <Mark />
+      <Mark size={18} />
       <button
         type="button"
         data-region-start
@@ -168,8 +153,15 @@ export function TopBar(props: TopBarProps) {
         </button>
       )}
 
-      {project && !narrow && <StatusStrip status={props.status} sources={props.sources} />}
-      {project && narrow && Object.keys(props.status).length > 0 && (
+      {project && props.document && (
+        <>
+          <span aria-hidden="true" className="shrink-0 text-slate/60">/</span>
+          {props.document}
+        </>
+      )}
+      {/* the status folds before the document's title would cut */}
+      {project && !(narrow || compact) && <StatusStrip status={props.status} sources={props.sources} />}
+      {project && (narrow || compact) && Object.keys(props.status).length > 0 && (
         <Popover>
           <PopoverTrigger className={button}>{t("deliverableStatus")}</PopoverTrigger>
           <PopoverContent>
@@ -182,22 +174,20 @@ export function TopBar(props: TopBarProps) {
       )}
 
       <div className="ms-auto flex shrink-0 items-center gap-2">
-        {project && <Following />}
-        {project && !narrow && <TeamNow />}
-        {project && props.waiting > 0 && (
-          <button type="button" className={`${button} text-copper`} onClick={props.onWaiting}>
-            {fill(t("waitingForYou"), { n: props.waiting })}
-          </button>
-        )}
-        {!(narrow || compact) && (
-          <>
-            {searchField}
-            {projectPanels()}
-          </>
-        )}
+        {project &&
+          (props.waiting > 0 ? (
+            <button type="button" className={`${button} flex items-center gap-2 text-copper hover:text-copper`} onClick={props.onWaiting}>
+              <WaitingDot />
+              {count("decisionsWaiting", props.waiting)}
+            </button>
+          ) : (
+            !narrow && <span className="whitespace-nowrap px-3 text-slate">{t("nothingWaiting")}</span>
+          ))}
+        {!(narrow || compact) && searchField}
         {project && narrow && (
-          <button type="button" aria-expanded={props.chatOpen} className={button} onClick={props.onChat}>
+          <button type="button" data-chat-button aria-expanded={props.chatOpen} className={`${button} flex items-center gap-2`} onClick={props.onChat}>
             {t("projectChat")}
+            {props.waiting > 0 && <WaitingDot />}
           </button>
         )}
         <Popover>
@@ -208,7 +198,6 @@ export function TopBar(props: TopBarProps) {
             {(narrow || compact) && (
               <>
                 {search}
-                {projectPanels(more.current)}
                 <hr className="mx-3 my-1 border-ink/[0.06]" />
               </>
             )}

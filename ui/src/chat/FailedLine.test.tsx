@@ -8,7 +8,7 @@ import { setCurrentProject } from "../records/project";
 import { App } from "../shell/App";
 import { core, reply, streamed } from "../shell/testing";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 // What the core sends for Google's 404 on a retired model (core: connectors.provider_reason).
 const gone = {

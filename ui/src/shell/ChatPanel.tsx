@@ -1,19 +1,20 @@
-// The project chat, floating at the inline end of the canvas (left in Arabic, right in English): 420 px, so its cards
-// and tables have room, resizable from 320 to 640 for this session, from under the top bar to 20 px from the bottom. It shows the conversation, and
-// the command bar, its composer, sits at its foot: one message box (it floats over the canvas only while the chat is
-// folded). It folds to a "Project chat" button. Below 900 px it is a full-height sheet the top bar opens. With no AI
-// connected, AI settings take the chat's place (Plan 4). The open chat marks itself as covering the canvas
-// (data-canvas-cover), so the canvas shows its frames beside it, never under it.
-import { type ReactNode, useRef } from "react";
+// The project chat: a column at the inline end of the screen (left in Arabic, right in English), beside the document
+// on the Stone ground, 320 px to start, resizable from 280 to 480 for this session, 12 px inside (dense, 5 Nov). Its
+// head names the role it talks to and who is working now (that opens the team list); then the conversation, and the
+// command bar at its foot, the only message box. It folds to a 12 px edge that keeps the waiting dot. Below 1000 px it is a panel over the
+// document, opened from the top bar's chat button and closed with Esc; below 640 px the panel covers the window's
+// width. With no AI connected, AI settings take the chat's place (Plan 4).
+import { type ReactNode, useEffect, useRef } from "react";
 import { ChatLog } from "../chat/Chat";
 import { ConsentNeeded } from "../firstlaunch/ConnectAi";
 import { dir, t, useLanguage } from "../i18n";
+import { TeamNow } from "../project/live/TeamNow";
 import { type Ai, AiSettings } from "../settings/AiSettings";
 import { useScrollEdges } from "../ui/useScrollEdges";
 import { Notices } from "./Notices";
 import type { ChatState } from "./useChats";
 
-export const CHAT_WIDTH = { min: 320, max: 640, start: 420, step: 16 };
+export const CHAT_WIDTH = { min: 280, max: 480, start: 320, step: 16 };
 
 const clamp = (width: number) => Math.min(CHAT_WIDTH.max, Math.max(CHAT_WIDTH.min, Math.round(width)));
 
@@ -26,12 +27,14 @@ export type ChatBodyProps = {
   label: string;
   projectId?: string;
   onOpenDeliverable?: (id: string) => void;
+  /** The project chat beside the document: 12 px round and between messages. */
+  dense?: boolean;
 };
 
 /** AI settings while nothing is connected, else the conversation; above both, the way to the AI consent while the
  * engineer has not given it (until then the core refuses every AI call); under them, the import reports and the
  * backup question (Notices). */
-export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpenDeliverable }: ChatBodyProps) {
+export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpenDeliverable, dense }: ChatBodyProps) {
   const settings = useRef<HTMLDivElement>(null);
   useScrollEdges(settings);
   return (
@@ -43,11 +46,16 @@ export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpen
         </div>
       )}
       {ai.connected !== false && (
-        <ChatLog chat={chat} label={label} projectId={projectId} onOpenDeliverable={onOpenDeliverable} className="flex-1" />
+        <ChatLog chat={chat} label={label} projectId={projectId} onOpenDeliverable={onOpenDeliverable} className="flex-1" dense={dense} />
       )}
       <Notices />
     </>
   );
+}
+
+/** The copper dot of "waiting": on the folded edge and on the narrow window's chat button. */
+export function WaitingDot() {
+  return <span data-waiting-dot aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-copper" />;
 }
 
 export function ChatPanel({
@@ -55,8 +63,10 @@ export function ChatPanel({
   onOpen,
   onClose,
   narrow,
+  small,
   width,
   onWidth,
+  waiting,
   composer,
   ...body
 }: Omit<ChatBodyProps, "label"> & {
@@ -64,47 +74,70 @@ export function ChatPanel({
   onOpen(): void;
   onClose(): void;
   narrow: boolean;
+  /** Below 640 px: the panel covers the window's width. */
+  small: boolean;
   width: number;
   onWidth(width: number): void;
+  /** Something waits for the engineer: the folded edge keeps the dot. */
+  waiting: boolean;
   /** The command bar, at the chat's foot. */
   composer?: ReactNode;
 }) {
   useLanguage();
   const drag = useRef<{ x: number; width: number } | null>(null);
+  const panel = useRef<HTMLElement>(null);
   const rtl = dir() === "rtl";
+
+  // the narrow panel takes the focus as it opens, so Esc closes it from the start
+  useEffect(() => {
+    if (open && narrow) panel.current?.focus();
+  }, [open, narrow]);
 
   if (!open) {
     return narrow ? null : (
-      <div data-region="chat" data-canvas-cover className="absolute end-4 top-3 z-20">
+      <div data-region="chat" className="flex shrink-0 -ms-4">
         <button
           type="button"
           data-region-start
+          data-chat-edge
+          aria-label={t("openChat")}
+          title={t("openChat")}
           onClick={onOpen}
-          className="rounded-[14px] border border-ink/[0.08] bg-paper px-4 py-2.5 shadow-[0_2px_12px_rgb(14_15_18/0.08)] hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+          className="flex w-3 flex-col items-center rounded-full pt-5 hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-ink"
         >
-          {t("projectChat")}
+          {waiting && <WaitingDot />}
         </button>
       </div>
     );
   }
 
-  // the edge toward the canvas: dragging or pressing the arrow toward the canvas widens the chat
+  // the edge toward the document: dragging or pressing the arrow toward it widens the chat
   const widen = rtl ? "ArrowRight" : "ArrowLeft";
   const narrowKey = rtl ? "ArrowLeft" : "ArrowRight";
 
+  function close() {
+    if (narrow) document.querySelector<HTMLElement>("[data-chat-button]")?.focus(); // back to what opened it
+    onClose();
+  }
+
   return (
     <aside
+      ref={panel}
       aria-label={t("projectChat")}
       data-region="chat"
-      data-canvas-cover
       tabIndex={-1}
-      style={narrow ? undefined : { width }}
-      className={
+      style={narrow ? (small ? undefined : { width: CHAT_WIDTH.start }) : { width }}
+      onKeyDown={(event) => {
+        // Esc closes the narrow panel; not one a popover from it (in a portal) or the message box used first
+        if (!narrow || event.key !== "Escape" || event.defaultPrevented || !event.currentTarget.contains(event.target as Node)) return;
+        event.preventDefault();
+        close();
+      }}
+      className={`flex min-h-0 flex-col gap-1 outline-none [&_[data-own]]:bg-paper [&_[data-own]_p.bg-paper]:bg-stone ${
         narrow
-          ? "fixed inset-x-0 bottom-0 top-14 z-30 flex flex-col bg-paper"
-          : // never more than a third of the window (at 1000 px the canvas keeps two thirds), never under 320 px
-            "absolute bottom-4 end-4 top-3 z-20 flex max-w-[max(320px,33.333vw)] flex-col rounded-[16px] border border-ink/[0.08] bg-paper shadow-[0_2px_12px_rgb(14_15_18/0.08)]"
-      }
+          ? `fixed bottom-0 end-0 top-11 z-30 bg-stone shadow-[0_0_0_1px_rgb(110_106_100/0.18),0_10px_28px_rgb(14_15_18/0.07)] ${small ? "start-0" : "max-w-full"}`
+          : "relative shrink-0"
+      }`}
     >
       {!narrow && (
         <div
@@ -132,23 +165,27 @@ export function ChatPanel({
             onWidth(clamp(from.width + moved));
           }}
           onPointerUp={() => (drag.current = null)}
-          className="absolute inset-y-4 start-0 w-1.5 -translate-x-1/2 cursor-col-resize rounded-full hover:bg-ink/10 focus-visible:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink rtl:translate-x-1/2"
+          // in the 12 px gap beside the document
+          className="absolute inset-y-4 -start-[9px] z-10 w-1.5 cursor-col-resize rounded-full hover:bg-ink/10 focus-visible:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         />
       )}
-      <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-3">
-        <h2 className="font-semibold">{t("projectChat")}</h2>
+      <div className={`flex items-start justify-between gap-3 px-3 ${narrow ? "pt-3" : "pt-1"}`}>
+        <div className="flex min-w-0 flex-col">
+          <h2 className="text-sm font-semibold">{t("roleLead")}</h2>
+          <TeamNow />
+        </div>
         <button
           type="button"
-          onClick={onClose}
-          className="-me-2 rounded-lg px-3 py-1.5 text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+          onClick={close}
+          className="-me-2 shrink-0 rounded-lg px-2 py-1 text-xs text-slate hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
         >
           {t("closeChat")}
         </button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        <ChatBody {...body} label={t("projectChat")} />
+        <ChatBody {...body} label={t("projectChat")} dense />
       </div>
-      {composer}
+      <div className={narrow ? "px-3 pb-3" : "px-3"}>{composer}</div>
     </aside>
   );
 }

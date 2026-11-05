@@ -8,7 +8,7 @@ import { setCurrentProject } from "../records/project";
 import { App } from "../shell/App";
 import { core, reply, running, streamed } from "../shell/testing";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
+vi.mock("../workspace/Workspace", async () => ({ Workspace: (await import("../shell/testing")).WorkspaceStandIn, DocumentHead: () => null }));
 
 const lead = { en: "Lead QS", ar: "كبير مهندسي الكميات" };
 const read = { en: "reading A-101.dwg", ar: "بيقرا A-101.dwg" };

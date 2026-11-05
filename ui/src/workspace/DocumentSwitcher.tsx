@@ -1,6 +1,6 @@
-// The head of the open document: its title (the button that opens the list of every document of the project), then in
-// Slate its state, Revision and, for sample data, «الأرقام عينة». The list: Deliverables newest first, the client BOQs,
-// then Project files. Picking opens that document; a document ONE is working on has a Slate dot.
+// The head of the open document, in the top bar on one line (no head row over the sheet): its title (the button that
+// opens the list of every document of the project; it never cuts), then in Slate its state, Revision and, for sample
+// data, «الأرقام عينة» (these cut first). The list: Deliverables newest first, the client BOQs, then Project files. Picking opens that document; a document ONE is working on has a Slate dot.
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { rowParts } from "../deliverables/ProjectIndex";
 import type { DeliverableInfo } from "../deliverables/types";
@@ -75,13 +75,13 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
   };
 
   const item =
-    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-start hover:bg-stone focus-visible:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
+    "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-start hover:bg-stone focus-visible:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
   const facts_ = "flex flex-wrap items-center gap-x-3 text-sm text-slate";
 
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <div className="flex min-w-0 items-baseline gap-x-3">
       <Popover open={open} onOpenChange={setOpen}>
-        <h1 className="text-xl font-semibold">
+        <h1 className="shrink-0 whitespace-nowrap text-base font-semibold text-ink">
           <PopoverTrigger asChild>
             <button type="button" aria-haspopup="menu" className="inline-flex items-center gap-2 rounded-lg px-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink">
               <Dot on={working.has(opened.key)} />
@@ -90,7 +90,7 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
             </button>
           </PopoverTrigger>
         </h1>
-        <PopoverContent role="menu" aria-label={t("docSwitch")} className="flex max-h-[70vh] min-w-72 flex-col gap-1 overflow-y-auto p-2" onKeyDown={move}>
+        <PopoverContent role="menu" aria-label={t("docSwitch")} className="flex max-h-[70vh] min-w-72 flex-col gap-2 overflow-y-auto p-3" onKeyDown={move}>
           {sorted.map((d) => {
             const key: DocKey = `deliverable:${d.id}`;
             const parts = rowParts(d);
@@ -127,7 +127,7 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
         </PopoverContent>
       </Popover>
       {facts.length > 0 && (
-        <p className="text-sm text-slate">
+        <p className="min-w-0 truncate text-sm text-slate max-[999px]:hidden">
           {facts.map((f, i) => (
             <span key={f}>
               {i > 0 && <span> · </span>}

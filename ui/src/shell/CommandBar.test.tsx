@@ -2,14 +2,16 @@
 // message to the Lead QS.
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { fakeSources } from "../project/fake";
 import { select } from "../project/selection";
 import { fill, setLanguage, texts } from "../i18n";
 import { setCurrentProject } from "../records/project";
-import { App } from "./App";
+import { App as Shell } from "./App";
 import { bodyOf, calls, core, P1, reply, running, streamed } from "./testing";
 
-vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
+/** The shell with an empty project's own sources (the workspace's lists). */
+const App = () => <Shell sourcesFor={() => fakeSources({})} />;
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
 /** Matches the element whose whole text is `text` (the name inside it is its own <bdi>). */
@@ -77,7 +79,7 @@ describe("CommandBar", () => {
     expect(clear()).toBeNull();
   });
 
-  it("several frames selected say how many, and ✕ clears the selection", async () => {
+  it("several things selected say how many, and ✕ clears the selection", async () => {
     core();
     const user = userEvent.setup();
     render(<App />);
@@ -129,14 +131,16 @@ describe("CommandBar", () => {
     expect(screen.getByRole("button", { name: texts.actionWhatDoing.ar })).toBeInTheDocument();
   });
 
-  it("sending opens the chat panel", async () => {
-    core({ routes: { "POST /api/chat": (init) => streamed(reply, init) } });
+  it("it is only in the chat: folded, there is none, and / opens the chat to write there", async () => {
+    core();
     const user = userEvent.setup();
-    render(<App />);
+    const { container } = render(<App />);
     await user.click(await screen.findByRole("button", { name: texts.closeChat.ar }));
     expect(screen.queryByRole("log")).toBeNull();
-    await user.type(await box(), "سعّر{enter}");
+    expect(container.querySelector("[data-command-box]")).toBeNull();
+    fireEvent.keyDown(document.body, { code: "Slash", key: "/" });
     expect(await screen.findByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument();
+    await waitFor(async () => expect(await box()).toHaveFocus());
   });
 
   it("Stop ends the reply and the box is ready again", async () => {
@@ -178,13 +182,13 @@ describe("CommandBar", () => {
     expect(await box()).toHaveValue("كمان");
   });
 
-  it("/ on the canvas goes to the command bar, also with the Arabic layout", async () => {
+  it("/ in the document goes to the command bar, also with the Arabic layout", async () => {
     core();
     render(<App />);
     await box();
-    const frame = screen.getByRole("button", { name: "frame" });
-    frame.focus();
-    fireEvent.keyDown(frame, { code: "Slash", key: "ظ" });
+    const inDocument = await screen.findByRole("button", { name: new RegExp(texts.projectFiles.ar) }); // its title
+    inDocument.focus();
+    fireEvent.keyDown(inDocument, { code: "Slash", key: "ظ" });
     expect(await box()).toHaveFocus();
   });
 
