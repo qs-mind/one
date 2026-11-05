@@ -7,6 +7,7 @@ import threading
 import httpx
 import pytest
 
+from qsone import copy
 from qsone.app import create_app
 from qsone.engine import roles
 from tests.bench import fake, samples
@@ -123,3 +124,46 @@ def test_the_extra_priced_row_is_flagged_for_the_engineer(bench):
     flags = [t for t in threads["comments"] if t["anchor"]["type"] == "row"]
     assert [t["body"].split(":")[0] for t in flags] == ["Not in the client's BOQ"]
     assert fake.EXTRA_CODE in flags[0]["body"] and flags[0]["status"] == "open"
+
+
+def test_the_tender_folder_is_understood(bench, tmp_path):
+    """The Brief a tender folder's import starts: the BOQ comes in, then the card, every fact with
+    its place in a file and the count from the import."""
+    client, _ = bench
+    project = client.post("/projects", json={"name": samples.TENDER_NAME}).json()["id"]
+    folder = samples.write_tender(tmp_path / "tender")
+    for path in sorted(p for p in folder.rglob("*") if p.is_file()):
+        inside = path.parent.relative_to(folder.parent).as_posix()  # files_list names the folder
+        params = {"name": path.name, "folder": inside}
+        client.post(f"/projects/{project}/files", params=params, content=path.read_bytes())
+    kinds, reply, events = run(client, project, copy.UNDERSTAND_BRIEF["ar"])
+    assert kinds == ["rows"] and "رفضت" not in reply
+    assert any(e["type"] == "data-understood" for e in events)
+    facts = client.get(f"/projects/{project}/facts").json()
+    assert facts["facts"]["client"]["source"]["file_name"] == samples.BOQ_NAME
+    assert facts["facts"]["items_count"]["value"] == "4"
+    assert facts["facts"]["items_count"]["source"]["kind"] == "count"
+    assert len(facts["files"]) == 4 and facts["approved"] is False  # the zip's file, the RAR too
+    assert f"{samples.TENDER_NAME}/02 جداول" in {f["folder"] for f in facts["files"]}
+
+
+def test_closing_proposes_a_lesson(bench):
+    client, project = bench
+    _, reply, _ = run(client, project, copy.LESSONS_BRIEF["en"])
+    assert "Refused" not in reply
+    [lesson] = client.get(f"/projects/{project}/closing").json()["lessons"]
+    assert lesson["kind"] == "method" and lesson["carried"] is False
+
+
+def test_the_sample_tender_folder(tmp_path):
+    folder = samples.write_tender(tmp_path)
+    names = sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file())
+    assert names == sorted(
+        [
+            f"02 جداول/{samples.BOQ_NAME}",
+            samples.SPEC_NAME,
+            f"نسخة/{samples.SPEC_NAME}",
+            "رسومات - عينة.zip",
+            "رسومات - عينة.rar",
+        ]
+    )

@@ -18,7 +18,7 @@ export function Restore() {
   const [found, setFound] = useState<Found[]>();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Text>();
-  const [back, setBack] = useState<string[]>([]);
+  const [back, setBack] = useState<{ id: string; name: string }[]>([]); // restored here: said once, not listed again
   const signingIn = useSetupRequest() !== null;
   const wasSigningIn = useRef(false);
 
@@ -41,6 +41,8 @@ export function Restore() {
     }
   }
 
+  const left = found?.filter((project) => !back.some((done) => done.id === project.id));
+
   return (
     <section aria-label={t("restoreTitle")} className="flex flex-col gap-4">
       <h3 className="font-semibold">{t("restoreTitle")}</h3>
@@ -50,23 +52,23 @@ export function Restore() {
           {path}
         </p>
       )}
-      {back.map((name) => (
-        <p key={name} role="status">
+      {back.map(({ id, name }) => (
+        <p key={id} role="status">
           {fill(t("restoreDone"), { name })}
         </p>
       ))}
-      {found && found.length === 0 && <p className="text-slate">{t("restoreNone")}</p>}
-      {found && found.length > 0 && (
+      {left && left.length === 0 && !back.length && <p className="text-slate">{t("restoreNone")}</p>}
+      {left && left.length > 0 && (
         <div className="flex flex-col gap-2">
           <h4 className="text-sm text-slate">{t("restoreFound")}</h4>
           <ul className="flex flex-col gap-2">
-            {found.map((project) => (
+            {left.map((project) => (
               <FoundProject
                 key={project.id}
                 path={path!}
                 project={project}
                 onRestored={(name) => {
-                  setBack((now) => [...now, name]);
+                  setBack((now) => [...now, { id: project.id, name }]);
                   void look(path!);
                 }}
               />

@@ -1,8 +1,10 @@
 // Pick the project to work in, or create one, or go to the General chat outside every project. The core lists
 // every project on this computer, newest first; one it cannot read is listed with the reason, never hidden.
+// Archived projects come after the others, in their own group, each marked.
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api } from "../api";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
+import { askForBackupFolder } from "../backup/ask";
 import { coreLine } from "../core";
 import { currentProject, type Project, setCurrentProject, switchProject, useProject } from "./project";
 
@@ -81,7 +83,39 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
       body: JSON.stringify({ name: trimmed }),
     }).catch(() => undefined);
     await done(response, texts.projectNotCreated);
+    if (response?.ok) void askForBackupFolder();
   }
+
+  const row = (item: Listed) =>
+    "error" in item ? (
+      <li key={item.id} className="flex flex-col px-3 py-2">
+        <span dir="ltr" className="text-slate">
+          {item.id}
+        </span>
+        <span className="text-copper">{pick(item.error)}</span>
+      </li>
+    ) : (
+      <li key={item.id}>
+        <button
+          type="button"
+          ref={item.id === focused ? toFocus : undefined}
+          aria-current={item.id === current?.id || undefined}
+          disabled={busy}
+          onClick={() => void open(item.id)}
+          className={`flex w-full items-center justify-between gap-4 rounded-md px-3 py-2 text-start hover:bg-stone disabled:opacity-40 ${item.id === current?.id ? "bg-stone font-semibold" : ""}`}
+        >
+          <span dir="auto">{item.name}</span>
+          {item.id === current?.id ? (
+            <span>{t("open")}</span>
+          ) : (
+            item.archived_at && <span className="shrink-0 text-sm font-normal text-slate">{t("archivedReadOnly")}</span>
+          )}
+        </button>
+      </li>
+    );
+  const listed = list.state === "ready" ? list.projects : [];
+  const archived = listed.filter((p) => "name" in p && p.archived_at);
+  const working = listed.filter((p) => !("name" in p && p.archived_at));
 
   return (
     <section aria-labelledby={title} className="border-b border-stone px-4 py-4">
@@ -117,33 +151,12 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
           </div>
         )}
         {list.state === "ready" && list.projects.length === 0 && <p className="text-slate">{t("noProjects")}</p>}
-        {list.state === "ready" && list.projects.length > 0 && (
-          <ul className="flex max-h-[40dvh] flex-col gap-1 overflow-y-auto">
-            {list.projects.map((item) =>
-              "error" in item ? (
-                <li key={item.id} className="flex flex-col px-3 py-2">
-                  <span dir="ltr" className="text-slate">
-                    {item.id}
-                  </span>
-                  <span className="text-copper">{pick(item.error)}</span>
-                </li>
-              ) : (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    ref={item.id === focused ? toFocus : undefined}
-                    aria-current={item.id === current?.id || undefined}
-                    disabled={busy}
-                    onClick={() => void open(item.id)}
-                    className={`flex w-full items-center justify-between gap-4 rounded-md px-3 py-2 text-start hover:bg-stone disabled:opacity-40 ${item.id === current?.id ? "bg-stone font-semibold" : ""}`}
-                  >
-                    <span dir="auto">{item.name}</span>
-                    {item.id === current?.id && <span>{t("open")}</span>}
-                  </button>
-                </li>
-              ),
-            )}
-          </ul>
+        {working.length > 0 && <ul className="flex max-h-[40dvh] flex-col gap-1 overflow-y-auto">{working.map(row)}</ul>}
+        {archived.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <h3 className="px-3 text-sm text-slate">{t("archivedGroup")}</h3>
+            <ul className="flex max-h-[30dvh] flex-col gap-1 overflow-y-auto">{archived.map(row)}</ul>
+          </div>
         )}
         <form onSubmit={create} className="flex flex-col gap-2 border-t border-stone pt-3">
           <h3 className="font-semibold">{t("newProject")}</h3>

@@ -118,7 +118,7 @@ export function CloseProject({
     void load();
   }
 
-  const archived = closing?.archived_at ?? project.archived_at ?? null;
+  const archived = closing ? closing.archived_at : (project.archived_at ?? null); // the core's answer, once read, wins
   const open = closing ? closing.open_comments > 0 || closing.unsigned.length > 0 : false;
   const lessons = closing?.lessons.filter((lesson) => !kept.has(lesson.id)) ?? [];
 

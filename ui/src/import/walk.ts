@@ -46,21 +46,25 @@ async function walkEntry(entry: Entry, parent: string, out: Picked[]): Promise<v
 }
 
 /** The entries of a drop. They must be taken during the drop event itself: the browser empties the list after it. */
-export function entriesOf(items: DataTransferItemList): Entry[] {
-  return Array.from(items)
+export function entriesOf(items: DataTransferItemList | undefined): Entry[] {
+  return Array.from(items ?? []) // a drop made by a script may carry files only
     .filter((item) => item.kind === "file")
     .map((item) => item.webkitGetAsEntry())
     .filter((entry): entry is Entry => entry !== null);
 }
 
 /** Whether a drop holds a folder (and not only loose files). */
-export function holdsFolder(items: DataTransferItemList): boolean {
+export function holdsFolder(items: DataTransferItemList | undefined): boolean {
   return entriesOf(items).some((entry) => entry.isDirectory);
 }
 
 /** Every file of a drop, nested folders included, in the order the folder lists them. */
-export async function fromDrop(items: DataTransferItemList | Entry[]): Promise<Picked[]> {
-  const entries = Array.isArray(items) ? items : entriesOf(items);
+export function fromDrop(items: DataTransferItemList): Promise<Picked[]> {
+  return fromEntries(entriesOf(items));
+}
+
+/** The same, from entries already taken out of a drop (see entriesOf). */
+export async function fromEntries(entries: Entry[]): Promise<Picked[]> {
   const out: Picked[] = [];
   for (const entry of entries) await walkEntry(entry, "", out);
   return out;
@@ -82,6 +86,19 @@ export function byTopFolder(picked: Picked[]): { name: string; picked: Picked[] 
   for (const one of picked) {
     const top = one.folder ? one.folder.split("/")[0]! : one.file.name.replace(/\.[^.]+$/, "");
     groups.set(top, [...(groups.get(top) ?? []), one]);
+  }
+  return [...groups].map(([name, files]) => ({ name, picked: files }));
+}
+
+/** Old work from "Choose folder", which gives one folder: the old projects are the folders inside it, each with its
+ * files; files loose in it make one more, named after it. */
+export function oldProjects(picked: Picked[]): { name: string; picked: Picked[] }[] {
+  const groups = new Map<string, Picked[]>();
+  for (const one of picked) {
+    const [root = "", project, ...rest] = one.folder.split("/");
+    const name = project ?? (root || one.file.name.replace(/\.[^.]+$/, ""));
+    const inside = project ? { file: one.file, folder: [project, ...rest].join("/") } : one;
+    groups.set(name, [...(groups.get(name) ?? []), inside]);
   }
   return [...groups].map(([name, files]) => ({ name, picked: files }));
 }

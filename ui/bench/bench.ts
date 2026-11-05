@@ -135,7 +135,7 @@ export class Walk {
   async addFiles() {
     const names = readdirSync(samplesDir);
     await this.page.getByRole("button", { name: this.w.records, exact: true }).click();
-    await this.page.locator('input[type="file"]').setInputFiles(names.map((f) => path.join(samplesDir, f)));
+    await this.page.locator('input[type="file"]:not([data-folder-chooser])').setInputFiles(names.map((f) => path.join(samplesDir, f)));
     for (const name of names) await expect(this.page.getByText(name.replace(/\.[^.]+$/, "").slice(0, 12)).first()).toBeVisible();
     await this.page.waitForTimeout(1500); // the canvas has had time to hear of them
     const files = this.page.locator('[data-frame="files:all"]');
@@ -168,6 +168,12 @@ export class Walk {
     await this.page.getByRole("button", { name: this.w.send, exact: true }).click();
     await expect(this.chat.getByText(text.slice(0, 20)).first()).toBeVisible();
     await this.shot("brief-sent");
+    return this.follow(text, { timeout, marks });
+  }
+
+  /** Answers every card of the Brief running in the chat as it comes, until the Brief ends (its bench reply shows).
+   * For a Brief One starts itself (a tender folder's, a project's lessons), `marks` is 0 in a new project. */
+  async follow(what: string, { timeout = 180_000, marks = 0 } = {}): Promise<string[]> {
     const answered: string[] = [];
     const end = Date.now() + timeout;
     let unseenSince: number | undefined;
@@ -193,7 +199,7 @@ export class Walk {
       }
       await this.page.waitForTimeout(500);
     }
-    await this.problem(`the Brief «${text}» did not end in time`, "brief-timeout");
+    await this.problem(`the Brief «${what}» did not end in time`, "brief-timeout");
     return answered;
   }
 

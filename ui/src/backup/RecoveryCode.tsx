@@ -32,7 +32,8 @@ export function RecoveryCode({ code, confirmPath, onDone }: { code: string; conf
       <output
         dir="ltr"
         aria-label={t("recoveryTitle")}
-        className="select-all rounded-md bg-paper px-3 py-3 text-center font-mono text-lg tracking-wider break-all"
+        // no break-all: a long line breaks after a dash, between groups, never inside one
+        className="rounded-md bg-paper px-3 py-3 text-center font-mono text-base tracking-wide select-all"
       >
         {code}
       </output>

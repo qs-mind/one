@@ -39,11 +39,19 @@ function day(date: string): string {
 }
 
 /** Where a fact comes from, in words: "BOQ.xlsx, BOQ, row 12", "Tender letter.pdf, page 3", "You, 5 Nov 2026". */
+/** A file name in a line of either language: isolated, with its extension kept left to right at its end, as the
+ * core writes names (an Arabic name with a Latin part around ".xlsx" would otherwise come out of order). */
+function isolated(name: string): string {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return `\u2068${name}\u2069`;
+  return `\u2068${name.slice(0, dot)}\u2066${name.slice(dot)}\u2069\u2069`;
+}
+
 export function sourceText(source: Source): string {
   if (source.kind === "engineer" && "date" in source) return fill(t("factSourceEngineer"), { date: day(source.date) });
   if (source.kind === "count") return t("factSourceCount");
   if (source.kind === "file" && "locator" in source) {
-    const file = source.file_name ? `\u2068${source.file_name}\u2069` : ""; // isolated: an Arabic name in an English line
+    const file = source.file_name ? isolated(source.file_name) : "";
     const at = source.locator ?? {};
     if (at.page !== undefined) return fill(t("factSourcePage"), { file, page: at.page });
     if (at.sheet !== undefined && at.row !== undefined) return fill(t("factSourceRow"), { file, sheet: at.sheet, row: at.row });

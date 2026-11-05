@@ -1,10 +1,15 @@
 """Start the real core with the bench's fake AI: `python -m tests.bench --port N --data-dir D`.
 
 Run from `core/` (or with `core/` on PYTHONPATH). `QSONE_SECRET` must be set, as for the real
-core. With `--samples DIR`, the sample input files are written there first."""
+core. With `--samples DIR`, the sample input files are written there first.
+
+The bench core has one route of its own, `POST /bench/new-computer`: the data folder as on a
+computer One was just installed on (no projects, no snapshots, no backup settings, no project
+key and no Backup key in the key store), so a walk can restore from the backup folder."""
 
 import argparse
 import os
+import shutil
 from pathlib import Path
 
 from tests.bench import fake, guard, samples
@@ -25,6 +30,33 @@ def seed() -> None:
     setup_state.give_consent(setup_state.CONSENT_VERSION)  # the AI note, as the screen says yes
     for step in setup_state.STEPS:  # the walks start in the app, past the first launch
         setup_state.mark(step, "skipped")
+    setup_state.set_language("ar")  # the screen's first language: the Briefs One starts match it
+
+
+def new_computer(app, data_dir: Path) -> None:
+    """Adds `POST /bench/new-computer` to the bench's app (see the module's text)."""
+    import keyring
+
+    from qsone import settings
+    from qsone.backup import keys
+
+    @app.post("/bench/new-computer")
+    def forget() -> dict:
+        registry = app.state.projects
+        for project_id, _ in registry.opened():
+            registry.close(project_id, back_up=False)
+        for folder in ("projects", "snapshots"):
+            shutil.rmtree(data_dir / folder, ignore_errors=True)
+        (data_dir / keys.BACKUP_KEY_FILE).unlink(missing_ok=True)
+        settings.save("backup", {})
+        settings.save("backups", {})
+        store = keyring.get_keyring().store  # the bench's MemoryKeyring: the AI keys stay
+        for service, user in list(store):
+            if user.startswith(("project:", keys.KEY_USER)):
+                del store[(service, user)]
+        registry._known.clear()
+        app.state.backups._local.clear()
+        return {"new": True}
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -44,8 +76,20 @@ def main(argv: list[str] | None = None) -> None:
     seed()
     if args.samples is not None:
         samples.write(args.samples)
+        samples.write_tender(args.samples.parent / "tender")  # beside the loose files
+        samples.write_old(args.samples.parent / "old")
 
+    import qsone.__main__ as core
     from qsone.__main__ import main as core_main
+
+    real_app = core.create_app
+
+    def create_app(*a, **k):
+        app = real_app(*a, **k)
+        new_computer(app, args.data_dir)
+        return app
+
+    core.create_app = create_app
 
     core_args = ["--port", str(args.port), "--data-dir", str(args.data_dir)]
     core_main(core_args + (["--exit-with-stdin"] if args.exit_with_stdin else []))

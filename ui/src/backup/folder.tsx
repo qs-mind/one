@@ -33,7 +33,9 @@ export function FolderPicker({ label, onPicked, busy = false }: { label: string;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (path.trim()) onPicked(path.trim());
+    if (!path.trim()) return;
+    onPicked(path.trim());
+    setPath(""); // the folder now shows where it is used
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">

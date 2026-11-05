@@ -10,7 +10,7 @@ import { askForBackupFolder } from "../backup/ask";
 import { coreLine, send } from "../core";
 import { type Text, texts } from "../i18n";
 import { type Project, switchProject } from "../records/project";
-import { byTopFolder, entriesOf, fromDrop, fromInput, type Picked, type Report, upload } from "./walk";
+import { byTopFolder, entriesOf, fromEntries, fromInput, oldProjects, type Picked, type Report, upload } from "./walk";
 
 export type Job = {
   key: number;
@@ -71,12 +71,13 @@ export function briefStarted(projectId: string) {
   for (const listener of briefListeners) listener(projectId);
 }
 
-/** The picked files of a drop or a folder chooser. A drop's entries are taken now, while its event lasts. */
-function picking(source: DataTransfer | FileList | File[] | Picked[]): Promise<Picked[]> {
-  if (Array.isArray(source) && (source.length === 0 || "folder" in source[0]!)) return Promise.resolve(source as Picked[]);
-  if (source instanceof FileList || Array.isArray(source)) return Promise.resolve(fromInput(source as FileList | File[]));
+/** The picked files of a drop or a folder chooser, and whether they came from the chooser (one folder). A drop's
+ * entries are taken now, while its event lasts. */
+async function picking(source: DataTransfer | FileList | File[] | Picked[]): Promise<{ picked: Picked[]; chosen: boolean }> {
+  if (Array.isArray(source) && (source.length === 0 || "folder" in source[0]!)) return { picked: source as Picked[], chosen: false };
+  if (source instanceof FileList || Array.isArray(source)) return { picked: fromInput(source as FileList | File[]), chosen: true };
   const entries = entriesOf(source.items);
-  return entries.length ? fromDrop(entries) : Promise.resolve(fromInput(source.files));
+  return entries.length ? { picked: await fromEntries(entries), chosen: false } : { picked: fromInput(source.files), chosen: true };
 }
 
 async function create(name: string): Promise<{ project?: Project; line?: Text }> {
@@ -113,10 +114,11 @@ async function run(job: Job, picked: Picked[], { understandAfter }: { understand
 
 /** A dropped or chosen tender folder (old: false), or old work (old: true), each folder its own project. */
 export async function importFolders(source: DataTransfer | FileList | File[] | Picked[], { old }: { old: boolean }) {
-  const picked = await picking(source);
+  const { picked, chosen } = await picking(source);
   if (!picked.length) return;
-  // a tender is one project, named after the (first) folder; old work is one project per folder
-  const groups = old ? byTopFolder(picked) : [{ name: byTopFolder(picked)[0]!.name, picked }];
+  // a tender is one project, named after the (first) folder; old work is one project per folder dropped, or per
+  // folder inside the one chosen
+  const groups = !old ? [{ name: byTopFolder(picked)[0]!.name, picked }] : chosen ? oldProjects(picked) : byTopFolder(picked);
   for (const group of groups) {
     const job: Job = { key: next++, name: group.name, old, done: 0, total: group.picked.length };
     changed([...jobs, job]);
@@ -134,11 +136,11 @@ export async function importFolders(source: DataTransfer | FileList | File[] | P
 }
 
 /** A folder dropped on the open project's canvas: its files, with their folders, into that project. */
-export async function importInto(project: Project, source: DataTransfer | Picked[]) {
-  const picked = await picking(source);
+export async function importInto(projectId: string, source: DataTransfer | Picked[]) {
+  const { picked } = await picking(source);
   if (!picked.length) return;
   const name = byTopFolder(picked)[0]!.name;
-  const job: Job = { key: next++, name, projectId: project.id, old: false, into: true, done: 0, total: picked.length };
+  const job: Job = { key: next++, name, projectId, old: false, into: true, done: 0, total: picked.length };
   changed([...jobs, job]);
   await run(job, picked, { understandAfter: false });
 }

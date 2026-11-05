@@ -42,6 +42,8 @@ import { pickLive } from "./lod";
 import { createSaver } from "./persist";
 import { freeArea, MARGIN, PREFERRED, READABLE, readable, TOGETHER, worldOf } from "./cover";
 import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
+import { importInto } from "../import/importer";
+import { holdsFolder } from "../import/walk";
 import { select } from "./selection";
 import { SourceError } from "./sources";
 import type {
@@ -738,6 +740,12 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   }
 
   function onDrop(event: DragEvent<HTMLElement>) {
+    if (holdsFolder(event.dataTransfer.items)) {
+      // a folder (a tender's, say): its files go into this project with their folders, and the import says how it went
+      event.preventDefault();
+      void importInto(projectId, event.dataTransfer);
+      return;
+    }
     const files = Array.from(event.dataTransfer.files);
     if (!files.length) return;
     event.preventDefault(); // the window must not open the file itself

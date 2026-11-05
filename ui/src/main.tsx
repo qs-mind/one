@@ -8,6 +8,7 @@ import { HealthGate } from "./app/CoreDown";
 import { installCrashReports } from "./app/crash";
 import { ScreenError } from "./app/ScreenError";
 import { SetupGate } from "./firstlaunch/FirstLaunch";
+import { importFolders } from "./import/importer";
 import { language, setLanguage } from "./i18n";
 import { App } from "./shell/App";
 
@@ -18,7 +19,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ScreenError>
       <HealthGate>
-        <SetupGate>
+        <SetupGate onImport={(from, old) => void importFolders(from, { old })}>
           <App />
         </SetupGate>
       </HealthGate>

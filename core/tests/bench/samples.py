@@ -60,3 +60,36 @@ def write_spec(path: Path) -> Path:
 def write(folder: Path) -> list[Path]:
     folder.mkdir(parents=True, exist_ok=True)
     return [write_boq(folder / BOQ_NAME), write_spec(folder / SPEC_NAME)]
+
+
+TENDER_NAME = "مناقصة عينة - منصة الاختبار"
+
+
+def write_tender(root: Path) -> Path:
+    """A sample tender folder, as an engineer gets one: Arabic names, a nested folder, a zip with a
+    folder inside, a RAR One keeps but does not read, and the same file twice."""
+    import zipfile
+
+    folder = root / TENDER_NAME
+    (folder / "02 جداول").mkdir(parents=True, exist_ok=True)
+    (folder / "نسخة").mkdir(exist_ok=True)
+    write_boq(folder / "02 جداول" / BOQ_NAME)
+    write_spec(folder / SPEC_NAME)
+    (folder / "نسخة" / SPEC_NAME).write_bytes((folder / SPEC_NAME).read_bytes())  # a duplicate
+    with zipfile.ZipFile(folder / "رسومات - عينة.zip", "w") as z:
+        z.writestr("مخططات/ملاحظات اللوحات - عينة.txt", "لوحات عينة لمنصة الاختبار، مش حقيقية.\n")
+    (folder / "رسومات - عينة.rar").write_bytes(b"Rar!\x1a\x07\x00 bench sample, not a real archive")
+    return folder
+
+
+OLD_NAME = "شغل قديم - عينة"
+OLD_PROJECTS = ("برج إداري - عينة قديمة", "مدرسة - عينة قديمة")
+
+
+def write_old(root: Path) -> Path:
+    """A folder of old work: one folder per finished project, each with its specification."""
+    folder = root / OLD_NAME
+    for name in OLD_PROJECTS:
+        (folder / name).mkdir(parents=True, exist_ok=True)
+        write_spec(folder / name / SPEC_NAME)
+    return folder

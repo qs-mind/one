@@ -50,7 +50,7 @@ const words = {
     ready: "One جاهز",
     next: "التالي",
     skip: "تخطّى",
-    start: "ابدأ",
+    start: "ابدأ من غير فولدر", // the Ready screen offers a tender folder first
     message: "رسالة إلى كبير مهندسي الكميات",
   },
   en: {
@@ -72,7 +72,7 @@ const words = {
     ready: "One is ready",
     next: "Next",
     skip: "Skip",
-    start: "Start",
+    start: "Start without a folder",
     message: "Message to the Lead QS",
   },
 } as const;
