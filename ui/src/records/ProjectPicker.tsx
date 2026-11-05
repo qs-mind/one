@@ -1,12 +1,19 @@
-// Pick the project to work in, or create one. The core lists every project on this computer, newest first;
-// one it cannot read is listed with the reason, never hidden.
+// Pick the project to work in, or create one, or go to the General chat outside every project. The core lists
+// every project on this computer, newest first; one it cannot read is listed with the reason, never hidden.
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 import { coreLine } from "../core";
-import { type Project, switchProject, useProject } from "./project";
+import { currentProject, type Project, setCurrentProject, switchProject, useProject } from "./project";
 
 type Listed = (Project & { open: boolean }) | { id: string; error: Text };
 type List = { state: "loading" } | { state: "ready"; projects: Listed[] } | { state: "failed"; line: Text };
+
+/** Goes to the General chat: no project is current, and the one that was is closed in the core. */
+export function leaveProject() {
+  const before = currentProject();
+  setCurrentProject(undefined);
+  if (before) void fetch(`/api/projects/${before.id}/close`, { method: "POST" }).catch(() => undefined);
+}
 
 export function ProjectPicker({ onClose }: { onClose: () => void }) {
   useLanguage();
@@ -86,6 +93,17 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
             {t("close")}
           </button>
         </div>
+        <button
+          type="button"
+          aria-current={current === undefined || undefined}
+          onClick={() => {
+            leaveProject();
+            onClose();
+          }}
+          className={`flex w-full rounded-md px-3 py-2 text-start hover:bg-stone ${current === undefined ? "bg-stone font-semibold" : ""}`}
+        >
+          {t("generalChat")}
+        </button>
         {list.state === "loading" && <p className="text-slate">{t("projectsLoading")}</p>}
         {list.state === "failed" && (
           <div className="flex items-center gap-3">

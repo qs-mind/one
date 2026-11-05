@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Chat } from "../chat/Chat";
 import { setLanguage, texts } from "../i18n";
+import { App } from "../shell/App";
 import { setCurrentProject } from "./project";
 import { RecordsPanel } from "./RecordsPanel";
+
+vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("../shell/testing")).CanvasStandIn }));
 
 const school = { id: "p1", name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00.000000+00:00" };
 const files = `/api/projects/${school.id}/files`;
@@ -359,37 +361,26 @@ describe("RecordsPanel", () => {
 
   it("asks to pick or create a project first when none is open", async () => {
     setCurrentProject(undefined);
-    core({ "GET /api/projects": () => Response.json({ projects: [] }) });
+    core();
+    const pick = vi.fn();
     const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: texts.records.ar }));
-
+    render(<RecordsPanel onClose={() => {}} onPickProject={pick} />);
     const records = screen.getByRole("region", { name: texts.records.ar });
     expect(within(records).getByText(texts.pickProjectFirst.ar)).toBeInTheDocument();
     expect(within(records).queryByRole("searchbox")).not.toBeInTheDocument();
     await user.click(within(records).getByRole("button", { name: texts.projects.ar }));
-    expect(screen.getByRole("region", { name: texts.projects.ar })).toBeInTheDocument();
+    expect(pick).toHaveBeenCalled();
   });
 
-  it("opens from the header and closes again", async () => {
+  it("opens from the top bar beside the canvas, the message box stays, and Close closes it", async () => {
     core();
     const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: texts.records.ar }));
+    render(<App />);
+    await user.click(within(screen.getByRole("banner")).getByRole("button", { name: texts.records.ar }));
     const records = screen.getByRole("region", { name: texts.records.ar });
+    expect(screen.getByRole("textbox", { name: texts.message.ar })).toBeInTheDocument();
     await user.click(within(records).getByRole("button", { name: texts.close.ar }));
     await waitFor(() => expect(screen.queryByRole("region", { name: texts.records.ar })).not.toBeInTheDocument());
-  });
-
-  it("opens in its own column beside the chat; the message box stays, and Tab reaches the panel first", async () => {
-    core();
-    const user = userEvent.setup();
-    render(<Chat />);
-    await user.click(screen.getByRole("button", { name: texts.records.ar }));
-    const records = screen.getByRole("region", { name: texts.records.ar });
-    const box = screen.getByRole("textbox", { name: texts.message.ar });
-    expect(within(records.parentElement!).queryByRole("textbox", { name: texts.message.ar })).toBeNull();
-    expect(records.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("every new label exists in both languages", async () => {
