@@ -84,6 +84,45 @@ describe("DocumentSwitcher", () => {
     expect(document.activeElement).toBe(items[0]);
   });
 
+  it("ArrowUp before any item is focused goes to the last item; Home and End jump", async () => {
+    show();
+    await userEvent.click(screen.getByRole("button", { name: /المقايسة المسعّرة/ }));
+    const items = screen.getAllByRole("menuitem");
+    expect(items[3]!.textContent).toContain(texts.projectFiles.ar);
+    act(() => screen.getByRole("menu").focus());
+    await userEvent.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(items[3]);
+    await userEvent.keyboard("{Home}");
+    expect(document.activeElement).toBe(items[0]);
+    await userEvent.keyboard("{End}");
+    expect(document.activeElement).toBe(items[3]);
+  });
+
+  it("the trigger says it opens a menu", () => {
+    show();
+    expect(screen.getByRole("button", { name: /المقايسة المسعّرة/ }).getAttribute("aria-haspopup")).toBe("menu");
+  });
+
+  it("Esc closes the list and focus returns to the title; Project files opens files:all", async () => {
+    show();
+    const title = screen.getByRole("button", { name: /المقايسة المسعّرة/ });
+    await userEvent.click(title);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(title);
+    await userEvent.click(title);
+    await userEvent.click(screen.getByRole("menuitem", { name: new RegExp(texts.projectFiles.ar) }));
+    expect(workspaceApi.current()?.key).toBe("files:all");
+  });
+
+  it("the rows say Revision as the head does", async () => {
+    show();
+    await userEvent.click(screen.getByRole("button", { name: /المقايسة المسعّرة/ }));
+    const row = screen.getAllByRole("menuitem")[0]!;
+    expect(row.textContent).toContain(fill(texts.docRevision.ar, { n: 2 }));
+    expect(row.textContent).not.toContain(fill(texts.reviewRev.ar, { n: 2 }));
+  });
+
   it("the head of file:x shows the file's name whole", () => {
     show({ opened: { key: "file:x", anchor: null } });
     const h1 = screen.getByRole("heading", { level: 1 });

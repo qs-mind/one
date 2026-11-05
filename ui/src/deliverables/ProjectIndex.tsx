@@ -99,26 +99,26 @@ export function ProjectIndex({ projectId, onOpen, onClose, subscribe = subscribe
               {list.map((d) => {
                 const parts = rowParts(d);
                 return (
-                <tr key={d.id}>
-                  <td className={`${cell} min-w-56`}>
-                    <button
-                      type="button"
-                      dir="auto"
-                      lang={d.language}
-                      className="text-start font-semibold underline decoration-ink/20 hover:text-copper"
-                      onClick={() => onOpen(d.id)}
-                    >
-                      {d.title}
-                    </button>
-                  </td>
-                  <td className={small}>{parts.kind}</td>
-                  <td className={small}>{parts.revision}</td>
-                  <td className={cell}>
-                    <span className="flex flex-wrap gap-1">{parts.status}</span>
-                  </td>
-                  <td className={small}>{parts.pending}</td>
-                  <td className={`${small} ${d.open_comments > 0 ? "text-copper" : ""}`}>{parts.comments}</td>
-                </tr>
+                  <tr key={d.id}>
+                    <td className={`${cell} min-w-56`}>
+                      <button
+                        type="button"
+                        dir="auto"
+                        lang={d.language}
+                        className="text-start font-semibold underline decoration-ink/20 hover:text-copper"
+                        onClick={() => onOpen(d.id)}
+                      >
+                        {d.title}
+                      </button>
+                    </td>
+                    <td className={small}>{parts.kind}</td>
+                    <td className={small}>{parts.revision}</td>
+                    <td className={cell}>
+                      <span className="flex flex-wrap gap-1">{parts.status}</span>
+                    </td>
+                    <td className={small}>{parts.pending}</td>
+                    <td className={`${small} ${d.open_comments > 0 ? "text-copper" : ""}`}>{parts.comments}</td>
+                  </tr>
                 );
               })}
             </tbody>

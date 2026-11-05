@@ -64,12 +64,14 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
     setOpen(false);
   };
   const move = (event: KeyboardEvent<HTMLElement>) => {
-    const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
-    if (!step) return;
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')];
     const at = items.indexOf(document.activeElement as HTMLElement);
-    items[(at + step + items.length) % items.length]?.focus();
+    const last = items.length - 1;
+    const next =
+      event.key === "Home" ? 0 : event.key === "End" ? last : at < 0 ? (event.key === "ArrowUp" ? last : 0) : (at + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
   };
 
   const item =
@@ -81,7 +83,7 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
       <Popover open={open} onOpenChange={setOpen}>
         <h1 className="text-xl font-semibold">
           <PopoverTrigger asChild>
-            <button type="button" className="inline-flex items-center gap-2 rounded-lg px-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink">
+            <button type="button" aria-haspopup="menu" className="inline-flex items-center gap-2 rounded-lg px-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink">
               <Dot on={working.has(opened.key)} />
               {title}
               <span aria-hidden>▾</span>
@@ -100,7 +102,7 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
                 </span>
                 <span className={`${facts_} ms-auto`}>
                   <span>{parts.kind}</span>
-                  <span>{parts.revision}</span>
+                  <span>{d.revision !== null ? fill(t("docRevision"), { n: d.revision }) : "—"}</span>
                   {parts.status}
                   {(d.pending ?? 0) > 0 && <span>{count("sheetPending", d.pending ?? 0)}</span>}
                   {d.open_comments > 0 && <span className="text-copper">{count("openComments", d.open_comments)}</span>}
