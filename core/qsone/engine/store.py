@@ -104,7 +104,7 @@ class Store:
 
     _BRIEF = (
         "id, chat_id, text, status, step, read_untrusted, allowed, created_at, updated_at,"
-        " selection, effort"
+        " selection, effort, worklog"
     )
 
     @staticmethod
@@ -133,6 +133,12 @@ class Store:
                 " WHERE id = ?",
                 (status, None if step is None else _dump(step), self.rec.clock(), brief_id),
             )
+
+    def set_worklog(self, brief_id: str, worklog: str) -> None:
+        """The Brief's work log (`worklog.WorkLog.saved`): screen text, not a project fact, so
+        not audited."""
+        with self.rec.write(ENGINE) as c:
+            c.execute("UPDATE briefs SET worklog = ? WHERE id = ?", (worklog, brief_id))
 
     def mark_untrusted(self, brief_id: str) -> None:
         with self.rec.write(ENGINE) as c:

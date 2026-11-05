@@ -18,7 +18,16 @@ from qsone.deliverables import store as deliverables
 from qsone.engine import costs, roles
 from qsone.engine.runner import GENERAL, WORK, Engine
 from qsone.engine.store import Store
-from qsone.engine.types import Asked, Progress, Reviewed, Settled, Status, TextDelta, Unsourced
+from qsone.engine.types import (
+    Asked,
+    Data,
+    Progress,
+    Reviewed,
+    Settled,
+    Status,
+    TextDelta,
+    Unsourced,
+)
 from qsone.projects import Projects
 from tests.engine_fakes import DEEPSEEK, HAIKU, OPUS, SAMPLE_SHEET, SONNET, call, calls, scripted
 from tests.engine_fakes import text as said
@@ -923,3 +932,59 @@ async def test_stop_ends_a_claude_code_specialist(make_engine, project, tmp_path
     assert [run["ended"] for run in read_fake_log(log)] == ["interrupted", "interrupted"]
     assert store_of(engine, project).brief(brief)["status"] == "stopped"
     assert not (data_dir / WORK).exists() or not any((data_dir / WORK).iterdir())
+
+
+# The work log: the real times the chat settles to ---------------------------------------------
+
+
+async def test_the_work_log_has_real_times_and_stays_after_a_reload(
+    make_engine, project, registry, fake_clock
+):
+    def answer(messages, info):
+        fake_clock.advance(125)  # the Lead thinks for 2m 5s after its tool returned
+        return "تم تسجيل المصدر - عينة"
+
+    lead = scripted(call("add_source", quote_source(registry.get(project))), answer)
+    start = fake_clock().isoformat(timespec="milliseconds")
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, BRIEF)
+    events = await finish(engine, brief)
+    logs = [e.data for e in events if isinstance(e, Data) and e.name == "worklog"]
+    assert logs[0]["ended"] is None and logs[0]["steps"][0]["until"] is None  # open while it runs
+    last = logs[-1]
+    assert last["started"] == start
+    assert last["ended"] == fake_clock().isoformat(timespec="milliseconds")
+    [step] = last["steps"]
+    assert step["agent"] == copy.ROLE_LEAD and step["at"] == start
+    assert step["until"] == start  # it ended when the tool returned, before the Lead thought on
+    assert isinstance(events[-1], Status) and events[-1].state == "done"  # after the log closed
+    engine._briefs.pop(brief, None)  # read from the store, as after a restart
+    reply = engine.chat_messages(project)[-1]
+    [part] = [p for p in reply["parts"] if p["type"] == "data-worklog"]
+    assert part == {"type": "data-worklog", "id": brief, "data": last}
+
+
+async def test_a_settled_card_says_when_and_a_paid_one_asks_for_a_hold(make_engine, project):
+    from qsone.engine.stream import message_parts
+
+    costs.save_caps({"budget_above": "0"})  # plan_brief asks for the budget: paid
+    lead = scripted(call("plan_brief", PLAN), said("الخطة جاهزة - عينة"))
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, BRIEF)
+    store = store_of(engine, project)
+    await until(lambda: store.pending(brief))
+    [card] = store.pending(brief)
+    await until(lambda: any(isinstance(e, Asked) for e in engine._briefs[brief].log))
+    parts = message_parts(engine._briefs[brief].log)
+    [asked] = [p["data"] for p in parts if p["type"] == "data-card"]
+    assert asked["hold"] == {"why": "paid", "options": ["yes"]}
+    await engine.answer(card.id, "yes")
+    events = await finish(engine, brief)
+    [settled] = [e for e in events if isinstance(e, Settled)]
+    assert settled.at is not None
+    [data] = [p["data"] for p in message_parts(events) if p["type"] == "data-card"]
+    assert data["status"] == "settled" and data["settled_at"] == settled.at
+    engine._briefs.pop(brief, None)  # read from the store: the time it was settled there
+    reply = engine.chat_messages(project)[-1]
+    [stored] = [p["data"] for p in reply["parts"] if p["type"] == "data-card"]
+    assert stored["settled_at"] and stored["hold"] == asked["hold"]

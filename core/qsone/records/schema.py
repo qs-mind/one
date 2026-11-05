@@ -346,6 +346,12 @@ ALTER TABLE briefs ADD COLUMN effort TEXT CHECK (effort IN ('low', 'medium', 'hi
 ALTER TABLE ai_costs ADD COLUMN effort TEXT
 """
 
+# A Brief's work log: each step its team reported with its real start and end, and the Brief's
+# own (JSON, `engine.worklog`), so the chat shows "Worked for 2m · 6 steps" after a reload too.
+WORKLOG_SQL = (
+    "ALTER TABLE briefs ADD COLUMN worklog TEXT CHECK (worklog IS NULL OR json_valid(worklog))"
+)
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -355,4 +361,5 @@ MIGRATIONS: list[str] = [
     CANVAS_SQL,
     FOLDERS_SQL,
     EFFORT_SQL,
+    WORKLOG_SQL,
 ]
