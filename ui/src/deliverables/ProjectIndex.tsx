@@ -11,6 +11,18 @@ import type { Subscribe } from "./useDeliverable";
 
 const newestFirst = (a: DeliverableInfo, b: DeliverableInfo) => b.updated_at.localeCompare(a.updated_at);
 
+/** The parts of a Deliverable's row, shared with the document switcher: the index cells and the switcher's items show
+ * the same kind, Revision, status chips, pending changes and open comments. */
+export function rowParts(d: DeliverableInfo) {
+  return {
+    kind: kindName(d.kind),
+    revision: d.revision !== null ? fill(t("reviewRev"), { n: d.revision }) : "—",
+    status: <StatusChips view={d} />,
+    pending: <bdi>{d.pending ?? 0}</bdi>,
+    comments: <bdi>{d.open_comments}</bdi>,
+  };
+}
+
 export type ProjectIndexProps = {
   projectId: string;
   onOpen: (id: string) => void;
@@ -84,34 +96,31 @@ export function ProjectIndex({ projectId, onOpen, onClose, subscribe = subscribe
               </tr>
             </thead>
             <tbody>
-              {list.map((d) => (
-                <tr key={d.id}>
-                  <td className={`${cell} min-w-56`}>
-                    <button
-                      type="button"
-                      dir="auto"
-                      lang={d.language}
-                      className="text-start font-semibold underline decoration-ink/20 hover:text-copper"
-                      onClick={() => onOpen(d.id)}
-                    >
-                      {d.title}
-                    </button>
-                  </td>
-                  <td className={small}>{kindName(d.kind)}</td>
-                  <td className={small}>{d.revision !== null ? fill(t("reviewRev"), { n: d.revision }) : "—"}</td>
-                  <td className={cell}>
-                    <span className="flex flex-wrap gap-1">
-                      <StatusChips view={d} />
-                    </span>
-                  </td>
-                  <td className={small}>
-                    <bdi>{d.pending ?? 0}</bdi>
-                  </td>
-                  <td className={`${small} ${d.open_comments > 0 ? "text-copper" : ""}`}>
-                    <bdi>{d.open_comments}</bdi>
-                  </td>
-                </tr>
-              ))}
+              {list.map((d) => {
+                const parts = rowParts(d);
+                return (
+                  <tr key={d.id}>
+                    <td className={`${cell} min-w-56`}>
+                      <button
+                        type="button"
+                        dir="auto"
+                        lang={d.language}
+                        className="text-start font-semibold underline decoration-ink/20 hover:text-copper"
+                        onClick={() => onOpen(d.id)}
+                      >
+                        {d.title}
+                      </button>
+                    </td>
+                    <td className={small}>{parts.kind}</td>
+                    <td className={small}>{parts.revision}</td>
+                    <td className={cell}>
+                      <span className="flex flex-wrap gap-1">{parts.status}</span>
+                    </td>
+                    <td className={small}>{parts.pending}</td>
+                    <td className={`${small} ${d.open_comments > 0 ? "text-copper" : ""}`}>{parts.comments}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
