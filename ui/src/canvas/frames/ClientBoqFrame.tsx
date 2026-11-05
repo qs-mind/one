@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import type { SheetView } from "../../deliverables/types";
 import { count, pick, t, texts, useLanguage, type Text } from "../../i18n";
 import { SheetViewer } from "../../viewers/sheet/SheetViewer";
-import { SourceError } from "../sources";
-import type { FrameKey } from "../types";
+import { SourceError } from "../../project/sources";
+import type { FrameKey } from "../../project/types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type ClientBoqData } from "./Frame";
 
 type Loaded = { view: SheetView } | { failed: Text } | null;

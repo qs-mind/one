@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { place, sizeFor, STRIP_H } from "./place";
-import type { Placed } from "./types";
+import type { Placed } from "../project/types";
 
 const opts = { gap: 80, rowGap: 120 } as const;
 

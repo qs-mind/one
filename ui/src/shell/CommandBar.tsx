@@ -7,8 +7,8 @@
 // Its motion is short and eases out, on transforms, opacity and the row's height only; none with reduced motion.
 // While a Brief runs, Enter queues the message (./MessageQueue.tsx) and Ctrl/⌘+Enter steers the Brief now.
 import { type FocusEvent, useEffect, useRef, useState } from "react";
-import { select, useSelection } from "../canvas/selection";
-import type { SelectionItem } from "../canvas/types";
+import { select, useSelection } from "../project/selection";
+import type { SelectionItem } from "../project/types";
 import { SelectionText } from "../chat/Chat";
 import { sentFrom, takeSentFrom } from "../chat/sent";
 import { dir, t, type texts, useLanguage } from "../i18n";

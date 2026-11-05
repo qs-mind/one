@@ -6,9 +6,9 @@ import { CommandDialog, CommandInput, CommandItem, CommandList } from "../ui/com
 import { canvasApi, registerCanvas, type CanvasApi } from "./api";
 import { Canvas } from "./Canvas";
 import { DESKS_START_COLLAPSED, FILE_FRAMES } from "./choices";
-import { fakeSources, sampleSources } from "./fake";
-import { currentSelection, select, subscribeSelection } from "./selection";
-import type { ActivityEvent, AgentInfo, SelectionItem } from "./types";
+import { fakeSources, sampleSources } from "../project/fake";
+import { currentSelection, select, subscribeSelection } from "../project/selection";
+import type { ActivityEvent, AgentInfo, SelectionItem } from "../project/types";
 
 const lead: AgentInfo = {
   id: "run1",

@@ -5,12 +5,12 @@ import { useState } from "react";
 import { ProviderLogo } from "../../brand/providers/ProviderLogo";
 import { coreLine, send } from "../../core";
 import { fill, pick, t, texts, useLanguage, type Text } from "../../i18n";
-import { canvasApi } from "../api";
-import { idOf } from "../frames/Frame";
+import { canvasApi } from "../../canvas/api";
+import { idOf } from "../../canvas/frames/Frame";
 import type { AgentInfo, Anchor, FrameKey } from "../types";
 import { FileName } from "../../ui/FileName";
 import { cursorShown, type LiveAgent } from "./activity";
-import { follow, stopFollowing, useFollowing } from "./follow";
+import { follow, stopFollowing, useFollowing } from "../../canvas/live/follow";
 
 export const stateText: Record<AgentInfo["state"], keyof typeof texts> = {
   idle: "stateIdle",

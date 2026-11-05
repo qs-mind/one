@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fill, setLanguage, texts } from "../../i18n";
 import { Cursors } from "./Cursors";
 import { following, stopFollowing } from "./follow";
-import { Following } from "./TeamNow";
+import { Following } from "../../project/live/TeamNow";
 import { agent, paneSize, restorePane, showCanvas, viewport } from "./testing";
 
 const role = "مهندس التسعير est - عينة";

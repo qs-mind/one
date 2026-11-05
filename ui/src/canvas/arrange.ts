@@ -1,7 +1,7 @@
 // Arranging the whole canvas at once. "stage": columns in reading order (files, Draft, Checked, Signed off, the
 // team and Desks). "tidy": rows in reading order, keeping the order the frames had. Both return a new layout.
 import { STRIP_H } from "./place";
-import type { DeliverableInfo, FrameKey, Placed } from "./types";
+import type { DeliverableInfo, FrameKey, Placed } from "../project/types";
 
 type Status = DeliverableInfo["status"];
 export type ArrangeOptions = { dir: "rtl" | "ltr"; gap?: number; rowGap?: number };

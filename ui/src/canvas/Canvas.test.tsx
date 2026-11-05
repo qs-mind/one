@@ -4,13 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { count, fill, setLanguage, texts } from "../i18n";
 import { canvasApi } from "./api";
 import { Canvas } from "./Canvas";
-import { fakeSources, type FakeOptions } from "./fake";
-import { currentSelection, select } from "./selection";
-import type { AgentInfo, DeliverableInfo, Placed, ViewerHandle, ViewerProps } from "./types";
+import { fakeSources, type FakeOptions } from "../project/fake";
+import { currentSelection, select } from "../project/selection";
+import type { AgentInfo, DeliverableInfo, Placed, ViewerHandle, ViewerProps } from "../project/types";
 
 // A stand-in for Plan 6's sheet viewer: one text box, and a locate that finds row "3/02".
-vi.mock("./sources", async (original) => ({
-  ...(await original<typeof import("./sources")>()),
+vi.mock("../project/sources", async (original) => ({
+  ...(await original<typeof import("../project/sources")>()),
   viewerFor: (kind: string) => (kind === "sheet" ? FakeViewer : null),
 }));
 

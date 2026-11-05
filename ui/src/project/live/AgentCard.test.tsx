@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fill, setLanguage, texts } from "../../i18n";
 import { currentSelection, select } from "../selection";
-import { agent, paneSize, restorePane, showCanvas } from "./testing";
+import { agent, paneSize, restorePane, showCanvas } from "../../canvas/live/testing";
 
 const team = () => screen.findByRole("group", { name: texts.projectTeam.ar });
 const card = async (id: string) => {

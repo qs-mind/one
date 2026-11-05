@@ -1,6 +1,6 @@
 // Level of detail by zoom (decision 6): from 0.6 up a frame shows its live viewer, from 0.3 a poster, below 0.3 its
 // name strip only. At most six live viewers at once: the focused frame, then the selected, then the nearest.
-import type { FrameKey } from "./types";
+import type { FrameKey } from "../project/types";
 
 export type Detail = "live" | "poster" | "title";
 export const LIVE_CAP = 6;

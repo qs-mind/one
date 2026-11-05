@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { subscribeActivity } from "./activity";
-import type { ActivityEvent } from "./canvas/types";
+import type { ActivityEvent } from "./project/types";
 
 // A fetch whose each call answers a stream the test writes to and closes.
 function streamingFetch() {

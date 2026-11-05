@@ -2,7 +2,7 @@
 // engineer's and the Checking QS's, which may be Code C: must fix before Sign-off), each with a text label, its
 // replies and its status. "Fix it" sends the core's own message to the Lead QS through the chat.
 import { useState } from "react";
-import type { Anchor } from "../canvas/types";
+import type { Anchor } from "../project/types";
 import { deliverablesApi } from "../deliverables/api";
 import type { CommentAnchor, Thread, View } from "../deliverables/types";
 import { fill, language, pick, t, type Text } from "../i18n";

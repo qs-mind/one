@@ -8,10 +8,10 @@ import { dir, pick, t, useLanguage } from "../../i18n";
 import { viewerHandles } from "../frames/DeliverableFrame";
 import { lod } from "../lod";
 import { STRIP_H } from "../place";
-import type { FrameKey } from "../types";
-import { useAgent, useAgentsOn, useCursorIds } from "./activity";
+import type { FrameKey } from "../../project/types";
+import { useAgent, useAgentsOn, useCursorIds } from "../../project/live/activity";
 import { useFollowCamera } from "./follow";
-import { useReducedMotion } from "./motion";
+import { useReducedMotion } from "../../project/live/motion";
 
 /** Cursors on one frame stack this far apart. */
 export const STACK_PX = 24;

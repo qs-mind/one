@@ -2,7 +2,7 @@
 // own frame; files dropped on it go to Project Records.
 import type { Node, NodeProps } from "@xyflow/react";
 import { dir, pick, t, texts, useLanguage, type Text } from "../../i18n";
-import type { FileInfo } from "../types";
+import type { FileInfo } from "../../project/types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, type FilesData } from "./Frame";
 import { FileName } from "../../ui/FileName";
 import { Glide } from "../../ui/Glide";

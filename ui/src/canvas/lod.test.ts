@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lod, pickLive } from "./lod";
-import type { FrameKey } from "./types";
+import type { FrameKey } from "../project/types";
 
 describe("level of detail", () => {
   it("detail by zoom", () => {

@@ -2,8 +2,8 @@
 // running agent shows as idle; nothing else is made up.
 import type { Node, NodeProps } from "@xyflow/react";
 import { dir, texts, useLanguage } from "../../i18n";
-import { useTeamAgents, type LiveAgent } from "../live/activity";
-import { AgentCard } from "../live/AgentCard";
+import { useTeamAgents, type LiveAgent } from "../../project/live/activity";
+import { AgentCard } from "../../project/live/AgentCard";
 import { Frame, frameTitle, memoFrame, type TeamData } from "./Frame";
 
 const idle = (kind: "lead" | "checker"): LiveAgent => ({

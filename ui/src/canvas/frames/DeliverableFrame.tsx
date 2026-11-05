@@ -4,8 +4,8 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import { useCallback } from "react";
 import { count, fill, pick, t, useLanguage } from "../../i18n";
-import { viewerFor } from "../sources";
-import type { DeliverableInfo, FrameKey, ViewerHandle } from "../types";
+import { viewerFor } from "../../project/sources";
+import type { DeliverableInfo, FrameKey, ViewerHandle } from "../../project/types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, useDetail, type DeliverableData } from "./Frame";
 
 /** The live viewers' handles by frame, for the cursors (Task 5): `locate(anchor)` gives a box in the viewer's own

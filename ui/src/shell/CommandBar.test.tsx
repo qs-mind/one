@@ -3,7 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { select } from "../canvas/selection";
+import { select } from "../project/selection";
 import { fill, setLanguage, texts } from "../i18n";
 import { setCurrentProject } from "../records/project";
 import { App } from "./App";

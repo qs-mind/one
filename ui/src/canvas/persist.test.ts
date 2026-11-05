@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeSources } from "./fake";
+import { fakeSources } from "../project/fake";
 import { createSaver } from "./persist";
-import type { Placed } from "./types";
+import type { Placed } from "../project/types";
 
 const at = (x: number): Placed => ({ key: "deliverable:a", x, y: 0, w: 960, h: 640, z: 0, collapsed: false });
 

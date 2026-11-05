@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { arrange } from "./arrange";
-import type { DeliverableInfo, FrameKey, Placed } from "./types";
+import type { DeliverableInfo, FrameKey, Placed } from "../project/types";
 
 const frame = (key: FrameKey, x: number, y: number, w = 400, h = 300): Placed => ({ key, x, y, w, h, z: 0, collapsed: false });
 const status = new Map<FrameKey, DeliverableInfo["status"]>([
