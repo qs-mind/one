@@ -107,14 +107,14 @@ describe("ApprovalCard", () => {
     expect(screen.getByText(online.detail.ar)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: texts.allowBrief.ar }));
-    expect(await screen.findByText("ردّك: اسمح للتكليف ده كله")).toBeInTheDocument();
+    expect(await screen.findByText("ردّك: سمحت للتكليف ده كله")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: texts.dontAllow.ar })).not.toBeInTheDocument();
     expect(bodyOf(fetch, "POST", "/api/cards/c1")).toEqual([{ choice: "brief" }]);
   });
 
   it("a card settled in the stream shows its choice, with no buttons", () => {
     render(<ApprovalCard id="c1" card={{ ...online, status: "settled", choice: "no" }} />);
-    expect(screen.getByText(`ردّك: ${texts.dontAllow.ar}`)).toBeInTheDocument();
+    expect(screen.getByText(`ردّك: ${texts.didNotAllow.ar}`)).toBeInTheDocument();
     expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
   });
 
@@ -239,7 +239,7 @@ describe("ApprovalCard", () => {
     // pressed before the pause is over: the change is saved first, then the card answered
     await user.click(screen.getByRole("button", { name: texts.capRaiseGo.ar }));
 
-    expect(await screen.findByText("ردّك: ارفع السقف")).toBeInTheDocument();
+    expect(await screen.findByText("ردّك: رفعت السقف")).toBeInTheDocument();
     expect(bodyOf(fetch, "PUT", "/api/settings/ai/caps")).toEqual([{ ...amounts, brief: "5.00" }]);
     expect(bodyOf(fetch, "POST", "/api/cards/cap1")).toEqual([{ choice: "raise" }]);
   });
@@ -316,32 +316,37 @@ describe("ContinueBriefs", () => {
     { id: "b2", chat_id: "general", project_name: null, step: { en: "planning", ar: "بيخطط" }, state: "paused_cap" },
   ];
 
-  it("offers each unfinished Brief, and continues only on press", async () => {
+  it("offers the chat's own unfinished Brief as one line, and continues only on press", async () => {
     const fetch = core({
       "GET /api/briefs/unfinished": () => Response.json({ briefs }),
       "POST /api/briefs/b1/continue": () => Response.json({ state: "running" }),
     });
     const onContinued = vi.fn();
     const user = userEvent.setup();
-    render(<ContinueBriefs onContinued={onContinued} />);
+    render(<ContinueBriefs chatId="p1" onContinued={onContinued} />);
 
     const card = (await screen.findByText(/مهندس التسعير بيسعّر بند 03\/02/)).closest("section")!;
-    expect(within(card).getByText("مدرسة - عينة")).toBeInTheDocument();
-    expect(screen.getByText(texts.generalChat.ar)).toBeInTheDocument();
+    expect(screen.queryByText(/بيخطط/)).not.toBeInTheDocument(); // the General chat's Brief shows only there
     expect(fetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false); // nothing by itself
 
     await user.click(within(card).getByRole("button", { name: texts.continue.ar }));
     await waitFor(() => expect(onContinued).toHaveBeenCalledWith(expect.objectContaining({ id: "b1", chat_id: "p1" })));
-    expect(screen.queryByText("مدرسة - عينة")).not.toBeInTheDocument();
+    expect(screen.queryByText(/مهندس التسعير بيسعّر/)).not.toBeInTheDocument();
     expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 
-  it("leave hides it without asking the core", async () => {
-    const fetch = core({ "GET /api/briefs/unfinished": () => Response.json({ briefs: briefs.slice(0, 1) }) });
+  it("leave tells the core, which ends the Brief, so it is not offered again", async () => {
+    const fetch = core({
+      "GET /api/briefs/unfinished": () => Response.json({ briefs: briefs.slice(0, 1) }),
+      "POST /api/briefs/b1/leave": () => new Response(null, { status: 204 }),
+    });
+    const onLeft = vi.fn();
     const user = userEvent.setup();
-    render(<ContinueBriefs onContinued={() => undefined} />);
+    render(<ContinueBriefs chatId="p1" onContinued={() => undefined} onLeft={onLeft} />);
     await user.click(await screen.findByRole("button", { name: texts.leave.ar }));
-    expect(screen.queryByText("مدرسة - عينة")).not.toBeInTheDocument();
-    expect(fetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    await waitFor(() => expect(onLeft).toHaveBeenCalledWith(expect.objectContaining({ id: "b1" })));
+    expect(screen.queryByText(/مهندس التسعير بيسعّر/)).not.toBeInTheDocument();
+    const left = fetch.mock.calls.filter(([u, init]) => init?.method === "POST" && String(u) === "/api/briefs/b1/leave");
+    expect(left).toHaveLength(1);
   });
 });

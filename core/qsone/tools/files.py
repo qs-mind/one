@@ -95,6 +95,20 @@ def _when(at: str) -> str:
     return at.replace("T", " ")[:16] + " UTC"
 
 
+def _doing(
+    name: str | dict, *, pages: list[int] = (), sheet: str | None = None, rows: str | None = None
+) -> dict[str, str]:
+    """«يقرا X، صفحة 2», «يقرا X، صفحات 1-3», «يقرا X، شيت BOQ، الصفوف 1-200», or the name
+    alone for a file with no pages: never «صفحات 1»."""
+    if sheet is not None:
+        return copy.fill(copy.DOING_FILES_READ_ROWS, name=name, sheet=sheet, rows=rows)
+    if len(pages) == 1:
+        return copy.fill(copy.DOING_FILES_READ_PAGE, name=name, page=str(pages[0]))
+    if pages:
+        return copy.fill(copy.DOING_FILES_READ, name=name, pages=_ranges(list(pages)))
+    return copy.fill(copy.DOING_FILE_READ, name=name)
+
+
 def _ranges(numbers: list[int]) -> str:
     """[1, 2, 3, 7] -> "1-3, 7"."""
     out, start = [], None
@@ -259,10 +273,11 @@ class _Selection:
     rows: tuple[int, int] = (1, ROWS_WINDOW)
     defaults: dict = field(default_factory=dict)
 
-    def words(self) -> str:
+    def doing(self, name: str | dict) -> dict[str, str]:
+        """What the engineer sees while it is read (_doing)."""
         if self.sheet is not None:
-            return f"{self.sheet} {self.rows[0]}-{self.rows[1]}"
-        return _ranges(self.pages) if self.pages else "1"
+            return _doing(name, sheet=self.sheet, rows=f"{self.rows[0]}-{self.rows[1]}")
+        return _doing(name, pages=self.pages)
 
     def args(self, file_id: str) -> dict:
         """The call that reads this selection again."""
@@ -562,9 +577,7 @@ async def _ask_cost(ctx: ToolContext, info: FileInfo, reader, pages: list[int]) 
     card = Card(
         id=uuid4().hex,
         kind="cost",
-        title=copy.fill(
-            copy.DOING_FILES_READ, name=copy.file_name(info.name), pages=_ranges(pages)
-        ),
+        title=_doing(copy.file_name(info.name), pages=pages),
         detail=detail,
         options=("yes", "no"),
     )
@@ -634,7 +647,7 @@ async def _files_read(ctx: ToolContext, args: ReadArgs) -> str:
     if info is None:
         raise RecordsError(copy.FILE_NOT_IN_PROJECT, status=422, field="file_id")
     sel = await asyncio.to_thread(_select, rec, info, args)
-    words = copy.fill(copy.DOING_FILES_READ, name=copy.file_name(info.name), pages=sel.words())
+    words = sel.doing(copy.file_name(info.name))
     ctx.host.emit(Progress(ctx.brief_id, ctx.run_id, ctx.agent.name, words))
     notes: list[str] = []
     if args.ocr:
@@ -646,9 +659,13 @@ async def _files_read(ctx: ToolContext, args: ReadArgs) -> str:
 
 
 def _activity(args: ReadArgs):
-    pages = args.pages if args.pages is not None else args.rows
-    said = _json(pages) if isinstance(pages, list) else str(pages or args.part)
-    return copy.fill(copy.DOING_FILES_READ, name=copy.A_FILE, pages=said)
+    if args.rows is not None and args.sheet:
+        return _doing(copy.A_FILE, sheet=args.sheet, rows=_plain(str(args.rows)))
+    try:
+        pages = _page_list(args.pages) if args.pages is not None else []
+    except ModelRetry:
+        pages = []  # not pages it can read: the call itself says so
+    return _doing(copy.A_FILE, pages=pages)
 
 
 for _tool in (

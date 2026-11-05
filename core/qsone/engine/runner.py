@@ -1550,6 +1550,25 @@ class Engine:
             return
         raise LookupError(brief_id)
 
+    def leave_brief(self, brief_id: str) -> None:
+        """The engineer chose not to continue an unfinished Brief: it ends as stopped, its
+        waiting cards withdrawn, so it is never offered again. Raises `BriefBusy` while it
+        runs, `LookupError` when no unfinished Brief has the id."""
+        if brief_id in self._briefs:
+            raise BriefBusy(brief_id)
+        for place in self._places():
+            try:
+                brief = place.store.brief(brief_id)
+            except LookupError:
+                continue
+            if brief["status"] not in UNFINISHED:
+                break
+            place.store.withdraw_pending(brief_id)
+            place.store.set_status(brief_id, "stopped", copy.STOPPED)
+            log.info("brief %s left", brief_id)
+            return
+        raise LookupError(brief_id)
+
     # The chat as stored ----------------------------------------------------------------------
 
     def chat_messages(self, chat_id: str) -> list[dict]:
@@ -1581,9 +1600,8 @@ class Engine:
                 parts = message_parts(running.log)
             else:
                 waiting = brief["status"] in UNFINISHED
-                parts = message_parts(
-                    _stored_events(place.store, brief, self), with_status=not waiting
-                )
+                events = _stored_events(place.store, brief, self, unfinished=waiting)
+                parts = message_parts(events, with_status=not waiting)
             messages.append({"id": reply_id(brief_id), "role": "assistant", "parts": parts})
         return messages
 
@@ -1672,15 +1690,49 @@ def _tool_results(runs: list[dict]) -> list[str]:
     ]
 
 
-def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
+def _first_said(history: bytes | None) -> datetime | None:
+    """When the Lead first said something: its first response with words."""
+    for m in _load(history):
+        if isinstance(m, ModelResponse) and any(
+            isinstance(p, TextPart) and p.content for p in m.parts
+        ):
+            return m.timestamp
+    return None
+
+
+def _stored_events(
+    store: Store, brief: dict, engine: Engine, *, unfinished: bool = False
+) -> list[Event]:
     """A Brief as events again, from what is stored: the Lead's words, the Coordination Room,
     the cards and their answers, the Deliverable cards, the Reviews, the unsourced marks and the
-    state."""
+    state. A card asked before the Lead first spoke comes before its words, as it did live.
+    `unfinished`: the Brief waits for Continue, so a card still pending shows as withdrawn (no
+    one waits on it; Continue asks it again)."""
     brief_id = brief["id"]
     events: list[Event] = []
     runs = store.runs(brief_id)
     lead = next((r for r in runs if r["parent_id"] is None and r["spec"].role == "lead"), None)
     reply = lead_text(_load(lead["history"])) if lead is not None else ""
+    said_at = _first_said(lead["history"]) if reply and lead is not None else None
+    with store.rec.read() as c:
+        approvals = c.execute(
+            "SELECT card, status, choice, asked_at, settled_at FROM approvals"
+            " WHERE brief_id = ? ORDER BY asked_at, rowid",
+            (brief_id,),
+        ).fetchall()
+    before: list[Event] = []  # the cards asked before the Lead spoke (a prefix: oldest first)
+    after: list[Event] = []
+    for card_text, status, choice, asked_at, settled_at in approvals:
+        d = json.loads(card_text)
+        card = Card(**{**d, "options": tuple(d["options"])})
+        early = said_at is not None and not after and datetime.fromisoformat(asked_at) < said_at
+        found = before if early else after
+        found.append(Asked(brief_id, card))
+        if status == "settled":
+            found.append(Settled(brief_id, card.id, choice, settled_at))
+        elif status == "withdrawn" or (unfinished and status == "pending"):
+            found.append(Data(brief_id, "card", card.id, {"status": "withdrawn"}))
+    events += before
     if reply:
         events.append(TextDelta(brief_id, reply))
     if lead is not None and lead["history"]:
@@ -1694,25 +1746,13 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
     for m in store.team(brief_id):
         events.append(TeamMessage(brief_id, m["id"], m["sender"], m["recipient"], m["text"]))
     with store.rec.read() as c:
-        approvals = c.execute(
-            "SELECT card, status, choice, settled_at FROM approvals WHERE brief_id = ?"
-            " ORDER BY asked_at, rowid",
-            (brief_id,),
-        ).fetchall()
         reviews = c.execute(
             "SELECT r.deliverable_id, r.code, r.comments, r.checker, r.same_provider, r.round"
             " FROM reviews r JOIN deliverable_drafts d ON d.id = r.deliverable_id"
             " WHERE d.brief_id = ? ORDER BY r.at, r.rowid",
             (brief_id,),
         ).fetchall()
-    for card_text, status, choice, settled_at in approvals:
-        d = json.loads(card_text)
-        card = Card(**{**d, "options": tuple(d["options"])})
-        events.append(Asked(brief_id, card))
-        if status == "settled":
-            events.append(Settled(brief_id, card.id, choice, settled_at))
-        elif status == "withdrawn":
-            events.append(Data(brief_id, "card", card.id, {"status": "withdrawn"}))
+    events += after
     for deliverable_id, code, comments, choice, same, round_ in reviews:
         review = Review(
             code=code,

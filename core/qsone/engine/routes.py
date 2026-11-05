@@ -317,6 +317,17 @@ def briefs_router(engine: Any) -> APIRouter:
             return refused(copy.BRIEF_NOT_FOUND, 404)
         return JSONResponse({"state": "running"})
 
+    @router.post("/briefs/{brief_id}/leave")
+    def leave_brief(brief_id: str) -> Response:
+        """The engineer's «Leave it» on an unfinished Brief: it ends, and is not offered again."""
+        try:
+            engine.leave_brief(brief_id)
+        except BriefBusy as busy:
+            return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
+        except LookupError:
+            return refused(copy.BRIEF_NOT_FOUND, 404)
+        return Response(status_code=204)
+
     @router.post("/cards/{card_id}")
     async def answer(card_id: str, body: CardChoiceIn) -> Response:
         card = engine.card(card_id)

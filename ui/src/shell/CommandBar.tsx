@@ -12,6 +12,8 @@ import type { SelectionItem } from "../canvas/types";
 import { SelectionText } from "../chat/Chat";
 import { sentFrom, takeSentFrom } from "../chat/sent";
 import { dir, t, type texts, useLanguage } from "../i18n";
+import { ArchivedLine } from "../records/Archived";
+import { useProject } from "../records/project";
 import { type Ai, keyOf } from "../settings/AiSettings";
 import { chip, EffortChip, ModelChip } from "./ComposerChips";
 import { MessageQueue, QueueHint, useMessageQueue } from "./MessageQueue";
@@ -89,6 +91,8 @@ export function CommandBar({
   const picked = ai?.picked.lead;
 
   const queue = useMessageQueue(chat.chatId);
+  const project = useProject();
+  const archived = Boolean(project?.archived_at) && project?.id === chat.chatId; // read-only: nothing to send
 
   /** The words in the box go on the queue, with the selection they were written for. */
   function enqueue() {
@@ -299,12 +303,18 @@ export function CommandBar({
           else void submit(draft, true);
         }}
       >
-        <MessageQueue queue={queue} canResume={!chat.running} onResume={() => {
-          queue.resume();
-          void sendNext();
-        }} />
-        {box}
-        <QueueHint queue={queue} />
+        {archived ? (
+          <ArchivedLine projectId={chat.chatId} />
+        ) : (
+          <>
+            <MessageQueue queue={queue} canResume={!chat.running} onResume={() => {
+              queue.resume();
+              void sendNext();
+            }} />
+            {box}
+            <QueueHint queue={queue} />
+          </>
+        )}
       </form>
     </section>
   );

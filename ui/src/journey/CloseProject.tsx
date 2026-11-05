@@ -2,13 +2,14 @@
 // the Lessons Learned one by one (Carry to Engineer Records, or Keep in project), then Archive. Nothing here blocks:
 // with something open, Archive reads "Archive anyway", and the core keeps that choice in the audit trail. An
 // archived project says "Archived, read-only" and offers Unarchive. The lessons come from a short Brief of the Lead
-// QS, started once per project and session when there are none yet; a Confidential project shares none.
+// QS, which the engineer starts with a press (it costs AI); a Confidential project shares none. A card still waiting
+// in the chat counts as open.
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { api } from "../api";
 import { coreAnswer, coreLine, type Fix, send } from "../core";
 import { primary, quiet, secondary } from "../firstlaunch/parts";
 import { briefStarted } from "../import/importer";
-import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { count, fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { type Project, setCurrentProject } from "../records/project";
 import { FixAction } from "../shell/FixAction";
 
@@ -20,6 +21,8 @@ type Closing = {
   confidential: boolean;
   archived_at: string | null;
   lessons: Lesson[];
+  /** Cards waiting for the engineer in the project chat (the core's count). */
+  waiting?: number;
 };
 
 const proposed = new Set<string>(); // projects whose lessons Brief ran this session
@@ -62,22 +65,24 @@ export function CloseProject({
     return found;
   }, [id]);
 
-  useEffect(() => {
-    void load().then(async (found) => {
-      if (!found || found.confidential || found.archived_at || found.lessons.length || proposed.has(project.id)) return;
-      proposed.add(project.id);
-      const response = await send(`/projects/${id}/lessons/propose`, "POST");
-      if (response?.status === 202) {
-        setFinding(true);
-        briefStarted(project.id); // the Brief shows in the project chat like any other
-      } else {
-        proposed.delete(project.id); // not started (another Brief runs, or no AI yet): asked again next time
-        const answer = await coreAnswer(response, texts.lessonsNotStarted);
-        setFailed(answer.line);
-        setFailedFix(answer.fix); // no AI yet: AI settings
-      }
-    });
-  }, [load]);
+  useEffect(() => void load(), [load, briefRunning]); // read again as a Brief starts or ends: what waits changes
+
+  // The lessons are a step the engineer chooses: the Lead QS's Brief costs AI, so it starts only on a press.
+  async function findLessons() {
+    if (proposed.has(project.id)) return;
+    proposed.add(project.id);
+    fail(undefined);
+    const response = await send(`/projects/${id}/lessons/propose`, "POST");
+    if (response?.status === 202) {
+      setFinding(true);
+      briefStarted(project.id); // the Brief shows in the project chat like any other
+    } else {
+      proposed.delete(project.id); // not started (another Brief runs, or no AI yet): it can be asked again
+      const answer = await coreAnswer(response, texts.lessonsNotStarted);
+      setFailed(answer.line);
+      setFailedFix(answer.fix); // no AI yet: AI settings
+    }
+  }
 
   useEffect(() => {
     // while the Lead QS picks lessons, they are read again every few seconds, and once more when its Brief ends
@@ -127,7 +132,8 @@ export function CloseProject({
   }
 
   const archived = closing ? closing.archived_at : (project.archived_at ?? null); // the core's answer, once read, wins
-  const open = closing ? closing.open_comments > 0 || closing.unsigned.length > 0 : false;
+  const waiting = closing?.waiting ?? 0;
+  const open = closing ? closing.open_comments > 0 || closing.unsigned.length > 0 || waiting > 0 : false;
   const lessons = closing?.lessons.filter((lesson) => !kept.has(lesson.id)) ?? [];
 
   return (
@@ -162,6 +168,7 @@ export function CloseProject({
           <div className="flex flex-col gap-3">
             {!archived && <p className="text-slate">{t("closeProjectHelp")}</p>}
             {!open && <p>{t("closeProjectAllClear")}</p>}
+            {waiting > 0 && <p className="text-copper">{count("closeProjectWaiting", waiting)}</p>}
             {closing.open_comments > 0 && <p className="text-copper">{fill(t("closeProjectOpenComments"), { n: closing.open_comments })}</p>}
             {closing.unsigned.length > 0 && (
               <div className="flex flex-col gap-1">
@@ -206,7 +213,15 @@ export function CloseProject({
               <>
                 {lessons.length > 0 && <p className="text-slate">{t("lessonsHelp")}</p>}
                 {finding && <p role="status">{t("lessonsFinding")}</p>}
-                {!finding && lessons.length === 0 && <p className="text-slate">{t("lessonsNone")}</p>}
+                {!finding && lessons.length === 0 && !archived && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-slate">{t("lessonsAsk")}</p>
+                    <button type="button" onClick={() => void findLessons()} className={`${secondary} self-start`}>
+                      {t("lessonsFind")}
+                    </button>
+                  </div>
+                )}
+                {!finding && lessons.length === 0 && archived && <p className="text-slate">{t("lessonsNone")}</p>}
                 <ul className="flex flex-col gap-2">
                   {lessons.map((lesson) => (
                     <li key={lesson.id} className="flex flex-col gap-3 rounded-lg bg-stone px-4 py-3">

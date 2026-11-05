@@ -244,25 +244,30 @@ def _card(ctx: ToolContext, p: boq.Plan) -> Card:
             "field": copy.BOQ_FIELDS[f][lang],
             "column": letter,
             "header": p.headers.get(f, "")[:CELL_CHARS],
-            "example": ", ".join(p.examples.get(f, ()))[:80],
+            "example": copy.listed(list(p.examples.get(f, ())))[lang][:80],
         }
         for f, letter in p.columns.items()
     ]
     counts = {
         "first": str(p.first_row),
         "last": str(p.last_row),
-        "items": str(p.items),
-        "headings": str(p.headings),
-        "skipped": str(len(p.skipped)),
+        "items": copy.counted(p.items, copy.ITEMS),
+        "headings": copy.counted(p.headings, copy.HEADINGS),
     }
     parts = [copy.fill(copy.BOQ_CONFIRM_DETAIL, **counts)]
+    if p.skipped:
+        parts.append(
+            copy.fill(copy.BOQ_CONFIRM_SKIPPED, count=copy.counted(len(p.skipped), copy.ROWS))
+        )
+    parts.append(copy.BOQ_CONFIRM_TICK)
     if p.hidden_rows:
         words = (
             copy.BOQ_CONFIRM_HIDDEN_IN if p.hidden_policy == "include" else copy.BOQ_CONFIRM_HIDDEN
         )
-        parts.append(copy.fill(words, count=str(len(p.hidden_rows))))
+        parts.append(copy.fill(words, count=copy.counted(len(p.hidden_rows), copy.ROWS)))
     if p.flagged_rows:
-        parts.append(copy.fill(copy.BOQ_CONFIRM_FLAGGED, count=str(len(p.flagged_rows))))
+        flagged = copy.counted(len(p.flagged_rows), copy.ROWS)
+        parts.append(copy.fill(copy.BOQ_CONFIRM_FLAGGED, count=flagged))
     return Card(
         id=uuid4().hex,
         kind="rows",

@@ -8,6 +8,8 @@ import { api } from "../api";
 import { coreLine, send } from "../core";
 import { field, primary, quiet } from "../firstlaunch/parts";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { FoldMark } from "../chat/parts/Fold";
+import { useProject } from "../records/project";
 import { FileName } from "../ui/FileName";
 import { SaveNote, useSaving } from "../ui/live";
 
@@ -72,6 +74,7 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
   const [failed, setFailed] = useState<Text>();
   const [unfolded, setUnfolded] = useState(false);
   const { saving, n, now, flush } = useSaving(); // a changed fact
+  const readOnly = Boolean(useProject()?.archived_at); // archived: the card shows, nothing on it changes
 
   const load = useCallback(async () => {
     const response = await api(`/projects/${id}/facts`).catch(() => undefined);
@@ -115,9 +118,7 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
             onClick={() => setUnfolded(!unfolded)}
             className="flex w-full min-w-0 items-baseline gap-2 text-start focus-visible:outline-2 focus-visible:outline-ink"
           >
-            <span aria-hidden="true" className="shrink-0 text-slate">
-              {unfolded ? "▾" : language() === "ar" ? "◂" : "▸"}
-            </span>
+            <FoldMark open={unfolded} />
             <span className="min-w-0 truncate font-semibold">{t("understoodTitle")}</span>
             <span className="shrink-0 text-slate">{t("understoodApproved")}</span>
           </button>
@@ -138,7 +139,7 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
               label={t(label)}
               fact={facts.facts[name]}
               editing={editing === name}
-              locked={approved || busy}
+              locked={approved || busy || readOnly}
               onEdit={() => setEditing(name)}
               onCancel={() => setEditing(undefined)}
               onSave={(value) =>
@@ -199,7 +200,7 @@ export function UnderstoodCard({ projectId }: { projectId: string }) {
           </p>
         )}
         {!approved && (
-          <button type="button" disabled={busy} onClick={() => void approve()} className={`${primary} self-start`}>
+          <button type="button" disabled={busy || readOnly} onClick={() => void approve()} className={`${primary} self-start`}>
             {t("understoodApprove")}
           </button>
         )}

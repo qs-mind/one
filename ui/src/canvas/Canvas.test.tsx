@@ -412,3 +412,34 @@ describe("the Project Canvas", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+// B9: the layout and its frame ids are the project's own. Switching to another project never asks the new
+// project's sources for the frames of the one before.
+describe("switching projects", () => {
+  beforeEach(() => {
+    paneSize();
+    setLanguage("ar");
+  });
+
+  it("never asks the new project for the old project's frames", async () => {
+    const pdf = (id: string) => ({ id, name: `${id} - عينة.pdf`, status: "read" as const, note: null, replaces: null });
+    const first = fakeSources({ files: [pdf("f1")], layout: { frames: [at("file:f1", 0, 0, 480, 640)], view: zoomOne } });
+    const second = fakeSources({ files: [pdf("f2")], layout: { frames: [at("file:f2", 0, 0, 480, 640)], view: zoomOne } });
+    const asked = vi.spyOn(second, "pages");
+    const view = render(
+      <div style={{ width: 1200, height: 800 }}>
+        <Canvas projectId="p1" sources={first} onOpenFull={() => undefined} />
+      </div>,
+    );
+    expect(await screen.findByRole("group", { name: /f1 - عينة/ })).toBeInTheDocument();
+    view.rerender(
+      <div style={{ width: 1200, height: 800 }}>
+        <Canvas projectId="p2" sources={second} onOpenFull={() => undefined} />
+      </div>,
+    );
+    expect(await screen.findByRole("group", { name: /f2 - عينة/ })).toBeInTheDocument();
+    expect(asked).toHaveBeenCalledWith("f2");
+    expect(asked).not.toHaveBeenCalledWith("f1");
+    expect(second.saved.frames.flatMap((s) => s.removed)).not.toContain("file:f1");
+  });
+});

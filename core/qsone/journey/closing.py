@@ -60,6 +60,14 @@ def _open_comments(rec: Records) -> int:
     return n
 
 
+def waiting(rec: Records, cards: int) -> int:
+    """What waits for the engineer in the project chat: `cards`, the running Briefs' cards, and
+    the "I understood this" card while it is there and not approved."""
+    found = understand.facts(rec)
+    there = bool(found["facts"] or found["files"] or found["missing"])
+    return cards + int(there and not found["approved"])
+
+
 def checklist(rec: Records, engineer: Records) -> dict:
     """The GET /closing answer: open comments, the Deliverables not signed off, each
     Deliverable's newest Review report, Confidential, the archive time, and the lessons with

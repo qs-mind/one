@@ -102,6 +102,8 @@ for (const lang of ["ar", "en"] as const) {
     expect.soft(kinds, "the BOQ's columns are confirmed on the way").toEqual(["rows"]);
     const card = chat.locator("[data-understood-card]");
     await expect(card).toBeVisible();
+    // the summary stops reading once the Lead QS has, and folds small: the card stays in sight
+    await expect(report.getByText(say(walk, "importUnderstanding"))).toBeHidden({ timeout: 10_000 });
     await card.scrollIntoViewIfNeeded();
     await shot(walk, "understood-card");
 
@@ -134,7 +136,8 @@ for (const lang of ["ar", "en"] as const) {
     for (let i = 0; i < 2; i++) await olds.first().getByRole("button", { name: say(walk, "close"), exact: true }).click();
 
     await top.getByRole("button", { name: TENDER }).click();
-    await expect(page.getByRole("heading", { name: say(walk, "archivedGroup"), exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: say(walk, "projects") }).getByText(say(walk, "archivedGroup"), { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: new RegExp(`^${say(walk, "unarchiveProject")}: `) }).first()).toBeVisible();
     await shot(walk, "projects-archived");
     await page.keyboard.press("Escape");
 
@@ -158,8 +161,12 @@ for (const lang of ["ar", "en"] as const) {
     const marks = await chat.getByText(/bench reply|رد تجريبي/).count(); // before the lessons Brief starts
     await more(walk, "closeProject");
     const closing = page.getByRole("region", { name: fill(say(walk, "closeProjectTitle"), { name: `\u2068${TENDER}\u2069` }) });
-    await expect(closing.getByText(say(walk, "lessonsFinding")).or(closing.getByText(say(walk, "lessonCarry")))).toBeVisible();
+    // the lessons cost AI: nothing starts until the engineer asks for them
+    const find = closing.getByRole("button", { name: say(walk, "lessonsFind"), exact: true });
+    await expect(find).toBeVisible();
     await shot(walk, "close-checklist");
+    await find.click();
+    await expect(closing.getByText(say(walk, "lessonsFinding")).or(closing.getByText(say(walk, "lessonCarry")))).toBeVisible();
     await walk.follow("lessons", { marks });
     await expect(closing.getByRole("button", { name: say(walk, "lessonCarry"), exact: true }).first()).toBeVisible({ timeout: 30_000 });
     await shot(walk, "close-lessons");

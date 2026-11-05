@@ -2,9 +2,10 @@ import type { Channel } from "@tauri-apps/api/core";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../i18n";
-import { HealthGate, STARTING_MS } from "./CoreDown";
+import { HealthGate, PING_MS, STARTING_MS } from "./CoreDown";
 
 const logPath = "/tmp/qs-mind-one/core.log";
 
@@ -51,6 +52,46 @@ describe("HealthGate", () => {
     await user.click(await screen.findByRole("button", { name: texts.retry.en }));
     expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+// B10: the core dies while ONE is open. Within about 5 s ONE says so, and it carries on by itself once it is back.
+describe("HealthGate while ONE is open", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("shows the core-down screen within 5 s of the core stopping, and opens ONE afresh when it is back", async () => {
+    let up = true;
+    let mounts = 0;
+    function Chat() {
+      useEffect(() => void (mounts += 1), []);
+      return <p>chat</p>;
+    }
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        if (!up) throw new TypeError("Failed to fetch");
+        return Response.json({ ok: true });
+      }),
+    );
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(
+      <HealthGate logPath={logPath}>
+        <Chat />
+      </HealthGate>,
+    );
+    expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
+    const before = mounts;
+
+    up = false;
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(texts.coreDown.en);
+    expect(screen.getByText(logPath)).toBeInTheDocument();
+
+    up = true;
+    await act(() => vi.advanceTimersByTimeAsync(PING_MS + 100));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByText("chat")).toBeInTheDocument();
+    expect(mounts).toBe(before + 1); // its chats and streams start again from the core
   });
 });
 

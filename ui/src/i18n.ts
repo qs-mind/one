@@ -35,6 +35,7 @@ export const texts = {
     ar: "محرك ون لا يعمل، لذلك لا تعمل المحادثة. سجله موجود هنا:",
   },
   retry: { en: "Retry", ar: "إعادة المحاولة" },
+  coreDownTitle: { en: "ONE's core stopped", ar: "محرك ONE وقف" },
   screenFailed: {
     en: "Something went wrong on this screen. Your work is saved in the project; reload to carry on.",
     ar: "حصلت مشكلة في الشاشة دي. شغلك محفوظ في المشروع؛ اعمل إعادة تحميل وكمّل.",
@@ -151,10 +152,11 @@ export const texts = {
   steering: { en: "Steering the Brief", ar: "توجيه للتكليف" },
   steerFailed: { en: "The message did not reach the Brief. Try again.", ar: "الرسالة موصلتش للتكليف. جرّب تاني." },
   stopFailed: { en: "The Brief did not stop. Try again.", ar: "التكليف موقفش. جرّب تاني." },
-  continueBrief: { en: "This Brief stopped at: {step}. Continue it?", ar: "التكليف ده وقف عند: {step}. نكمّله؟" },
+  continueBriefLine: { en: "This Brief stopped at: {step}", ar: "التكليف ده وقف عند: {step}" },
   continue: { en: "Continue", ar: "كمّل" },
   leave: { en: "Leave it", ar: "سيبه" },
   continueFailed: { en: "The Brief did not continue. Try again.", ar: "التكليف مكمّلش. جرّب تاني." },
+  leaveFailed: { en: "The Brief was not left. Try again.", ar: "التكليف ماتقفلش. جرّب تاني." },
   generalChat: { en: "General chat", ar: "الشات العام" },
   yes: { en: "Yes", ar: "أيوه" },
   no: { en: "No", ar: "لأ" },
@@ -271,6 +273,30 @@ export const texts = {
   tickRow: { en: "Keep row {n}", ar: "احفظ الصف {n}" },
   answered: { en: "Your answer: {choice}", ar: "ردّك: {choice}" },
   withdrawn: { en: "No longer needed.", ar: "مبقاش له لازمة." },
+  // A folded card's answer: what the engineer did, not the button's words.
+  didAllowOnce: { en: "allowed once", ar: "سمحت المرة دي" },
+  didAllowBrief: { en: "allowed for this Brief", ar: "سمحت للتكليف ده كله" },
+  didNotAllow: { en: "not allowed", ar: "ماسمحتش" },
+  didCapContinue: { en: "went on to the cap", ar: "كمّلت لحد السقف" },
+  didCapRaise: { en: "raised the cap", ar: "رفعت السقف" },
+  didCapReport: { en: "stopped with a report", ar: "وقفت بتقرير" },
+  didUseIt: { en: "used it", ar: "استخدمته" },
+  didNotUseIt: { en: "did not use it", ar: "ماستخدمتوش" },
+  didStart: { en: "started it", ar: "بدأته" },
+  didNotStart: { en: "did not start it", ar: "مابدأتوش" },
+  didKeepDesk: { en: "kept the Desk", ar: "احتفظت بالقسم" },
+  didNotKeep: { en: "did not keep it", ar: "ماحتفظتش بيه" },
+  didKeepAsIs: { en: "kept it as it is", ar: "سبته زي ما هو" },
+  didSendBack: { en: "sent it back to be fixed", ar: "رجّعته يتصلّح" },
+  didKeepForAll: { en: "kept it for all projects", ar: "حفظته لكل المشاريع" },
+  didKeepNone: { en: "kept none", ar: "ماحفظتش حاجة" },
+  didGoAhead: { en: "went ahead", ar: "كمّلت" },
+  didNotNow: { en: "not now", ar: "قلت مش دلوقتي" },
+  didAdd: { en: "added it", ar: "ضفته" },
+  didNotAdd: { en: "did not add it", ar: "ماضفتوش" },
+  didYes: { en: "yes", ar: "أيوه" },
+  didNo: { en: "no", ar: "لأ" },
+  noAnswers: { en: "sent with no answers", ar: "بعته من غير ردود" },
   answerNotSent: { en: "Your answer was not sent. Try again.", ar: "ردّك موصلش. جرّب تاني." },
   codeA: { en: "Code A: approved", ar: "كود A: معتمد" },
   codeB: { en: "Code B: approved with comments", ar: "كود B: معتمد بملاحظات" },
@@ -803,6 +829,12 @@ export const texts = {
   importZips: { en: "Zips opened: {n}", ar: "ملفات مضغوطة اتفتحت: {n}" },
   importFailed: { en: "Some files were not added. Try again.", ar: "في ملفات ماتضافتش. جرّب تاني." },
   importUnderstanding: { en: "The Lead QS is reading the folder…", ar: "كبير مهندسي الكميات بيقرا الفولدر…" },
+  importUnderstoodWaits: {
+    en: "Read. The «I understood this» card waits for you in the chat.",
+    ar: "اتقرا. كارت «فهمت كده» مستنيك في المحادثة.",
+  },
+  importUnderstoodDone: { en: "Read.", ar: "اتقرا." },
+  importMissed: { en: "What did not come in", ar: "اللي ماتضافش" },
   importOldArchived: {
     en: "Added and archived, without the AI step.",
     ar: "اتضاف واتأرشف، من غير خطوة الذكاء الاصطناعي.",
@@ -847,6 +879,11 @@ export const texts = {
   },
   lessonsFinding: { en: "The Lead QS is picking lessons…", ar: "كبير مهندسي الكميات بيختار الدروس…" },
   lessonsNone: { en: "No lessons to carry.", ar: "مفيش دروس تتنقل." },
+  lessonsAsk: {
+    en: "The Lead QS can look back over the project for lessons worth keeping. It uses AI.",
+    ar: "كبير مهندسي الكميات يقدر يراجع المشروع ويطلّع الدروس اللي تستاهل تتحفظ. ده بيستخدم الذكاء الاصطناعي.",
+  },
+  lessonsFind: { en: "Find lessons", ar: "طلّع الدروس" },
   lessonsConfidential: {
     en: "This project is Confidential, so its lessons stay in it.",
     ar: "المشروع ده سري، فدروسه بتفضل فيه.",
@@ -860,6 +897,8 @@ export const texts = {
   archivedReadOnly: { en: "Archived, read-only", ar: "مؤرشف، للقراءة بس" },
   archivedGroup: { en: "Archived", ar: "المؤرشفة" },
   unarchiveProject: { en: "Unarchive", ar: "لغي الأرشفة" },
+  archivedChatLine: { en: "This project is archived, so it is read-only.", ar: "المشروع ده متأرشف، فهو للقراءة بس." },
+  unarchiveFailed: { en: "The project was not unarchived. Try again.", ar: "الأرشفة ماتلغتش. جرّب تاني." },
   archiveFailed: { en: "The project was not archived. Try again.", ar: "المشروع ماتأرشفش. جرّب تاني." },
   confidential: { en: "Confidential", ar: "سري" },
   confidentialHelp: {
@@ -1037,9 +1076,13 @@ export function languageOf(text: string): Language {
   return latin > arabic ? "en" : "ar";
 }
 
-/** Puts values into a text's blanks: fill("Page {page}", { page: 3 }) is "Page 3". */
+/** Puts values into a text's blanks: fill("Page {page}", { page: 3 }) is "Page 3". A value that ends a sentence
+ * itself («…شيت BOQ؟») takes the place of the template's own full stop after it, never «؟.». */
 export function fill(template: string, values: Record<string, string | number | undefined>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key]));
+  return template.replace(/\{(\w+)\}(\.?)/g, (_, key: string, stop: string) => {
+    const value = String(values[key]);
+    return stop && /[.?!؟…]$/.test(value) ? value : value + stop;
+  });
 }
 
 type Forms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
@@ -1090,13 +1133,18 @@ export const counted = {
       other: "{n} رقم من غير مصدر (تحتهم خط منقّط): مش مربوطين بسجلات المشروع.",
     },
   },
-  rowsKept: {
-    en: { one: "{kept} of {n} row kept.", other: "{kept} of {n} rows kept." },
+  // a folded rows card's answer, after «ردّك:»: all of them, or {kept} of {n}
+  rowsApproved: {
+    en: { one: "approved {n} row", other: "approved {n} rows" },
+    ar: { one: "وافقت على صف واحد", two: "وافقت على صفين", few: "وافقت على {n} صفوف", other: "وافقت على {n} صف" },
+  },
+  rowsApprovedOf: {
+    en: { one: "approved {kept} of {n} row", other: "approved {kept} of {n} rows" },
     ar: {
-      one: "اتحفظ {kept} من صف واحد.",
-      two: "اتحفظ {kept} من صفين.",
-      few: "اتحفظ {kept} من {n} صفوف.",
-      other: "اتحفظ {kept} من {n} صف.",
+      one: "وافقت على {kept} من صف واحد",
+      two: "وافقت على {kept} من صفين",
+      few: "وافقت على {kept} من {n} صفوف",
+      other: "وافقت على {kept} من {n} صف",
     },
   },
   coordinationRoom: {
@@ -1136,6 +1184,16 @@ export const counted = {
   moreWaiting: {
     en: { one: "{n} more waiting", other: "{n} more waiting" },
     ar: { one: "واحدة كمان مستنية", two: "اتنين كمان مستنيين", few: "{n} كمان مستنيين", other: "{n} كمان مستنيين" },
+  },
+  // Close project: cards still waiting for the engineer in the project chat
+  closeProjectWaiting: {
+    en: { one: "A card waits for you in the chat.", other: "{n} cards wait for you in the chat." },
+    ar: {
+      one: "فيه كارت مستنيك في المحادثة.",
+      two: "فيه كارتين مستنيينك في المحادثة.",
+      few: "فيه {n} كروت مستنيينك في المحادثة.",
+      other: "فيه {n} كارت مستنيينك في المحادثة.",
+    },
   },
 } satisfies Record<string, { en: Forms; ar: Forms }>;
 

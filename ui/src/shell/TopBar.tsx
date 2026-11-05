@@ -155,10 +155,12 @@ export function TopBar(props: TopBarProps) {
         <button
           type="button"
           aria-expanded={panel === "close"}
-          className="shrink-0 whitespace-nowrap rounded-lg bg-stone px-3 py-1 text-ink hover:bg-ink/[0.08] focus-visible:outline-2 focus-visible:outline-ink"
+          data-archived-chip
+          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-ink/20 bg-paper px-3 py-1 text-ink shadow-[0_1px_2px_rgb(14_15_18/0.06)] hover:border-ink/40 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
           onClick={(event) => onPanel("close", event.currentTarget)}
         >
           {t("archivedReadOnly")}
+          <span aria-hidden="true" className="text-xs text-slate">▾</span>
         </button>
       )}
 

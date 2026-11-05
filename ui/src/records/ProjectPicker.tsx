@@ -13,6 +13,7 @@ import { ActivityMark, activityWord } from "../shell/ActivityMark";
 import { GENERAL, stateOf, useActivity } from "../shell/chatActivity";
 import { Glide } from "../ui/Glide";
 import { useScrollEdges } from "../ui/useScrollEdges";
+import { unarchive } from "./Archived";
 import { currentProject, type Project, setCurrentProject, switchProject, useProject } from "./project";
 
 type Listed = (Project & { open: boolean }) | { id: string; error: Text };
@@ -193,8 +194,29 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
         </span>
         <span className="text-copper">{pick(p.error)}</span>
       </li>
+    ) : p.archived_at ? (
+      // an archived project: open it to read, or Unarchive it right here
+      <li key={p.id} className="flex items-center gap-1">
+        <div className="min-w-0 flex-1">{chatRow(p.id, p.name, () => void open(p.id), true)}</div>
+        <button
+          type="button"
+          disabled={busy}
+          aria-label={`${t("unarchiveProject")}: ${p.name}`}
+          onClick={async () => {
+            setBusy(true);
+            setFailed(undefined);
+            const line = await unarchive(p.id);
+            setBusy(false);
+            if (line) setFailed(line);
+            else void load();
+          }}
+          className="shrink-0 rounded-lg border border-ink/15 px-2.5 py-1 text-sm hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-40"
+        >
+          {t("unarchiveProject")}
+        </button>
+      </li>
     ) : (
-      <li key={p.id}>{chatRow(p.id, p.name, () => void open(p.id), Boolean(p.archived_at))}</li>
+      <li key={p.id}>{chatRow(p.id, p.name, () => void open(p.id))}</li>
     );
 
   return (

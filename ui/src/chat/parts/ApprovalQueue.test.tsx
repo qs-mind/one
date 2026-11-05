@@ -99,12 +99,28 @@ describe("press-and-hold", () => {
 });
 
 describe("a decided card", () => {
-  it("folds to a one-line trace: the answer, what it was, and when", () => {
+  it("folds to a short trace: what it asked, then the answer given in words, and when", () => {
     const at = "2026-11-05T08:42:00.000Z";
     render(<ApprovalCard id="c1" card={{ ...outside, status: "settled", choice: "yes", settled_at: at }} />);
     const time = new Intl.DateTimeFormat("ar-EG-u-nu-latn", { hour: "numeric", minute: "2-digit" }).format(new Date(at));
     const line = screen.getByRole("button", { expanded: false });
-    expect(line).toHaveTextContent(`ردّك: ${texts.allowOnce.ar} · إرسال الطلب للمورد · ${time}`);
+    expect(line).toHaveTextContent(`◂إرسال الطلب للموردردّك: ${texts.didAllowOnce.ar} · ${time}`);
     expect(line.querySelector("time")).toHaveAttribute("datetime", at);
+    // the question has its own line, cut with an ellipsis (CSS), so more than a word of it shows
+    expect(line.querySelector("[data-card-question]")).toHaveClass("truncate", "flex-1");
+    expect(line.querySelectorAll("[data-fold-mark]")).toHaveLength(1);
+  });
+
+  it("a question card's folded line says the answers given, not the button's words", () => {
+    const asked: CardData = {
+      ...card("سؤالين - عينة", { kind: "question", options: ["sent"] }),
+      payload: { questions: [{ id: "q1", text: "جاهزة؟" }, { id: "q2", text: "السعر؟", free_text: true }] },
+      status: "settled",
+      choice: "sent",
+      answers: { q1: "جاهزة", q2: "3950 جنيه" },
+    };
+    render(<ApprovalCard id="c1" card={asked} />);
+    expect(screen.getByText("ردّك: جاهزة، 3950 جنيه")).toBeInTheDocument();
+    expect(screen.queryByText(`ردّك: ${texts.send.ar}`)).toBeNull();
   });
 });

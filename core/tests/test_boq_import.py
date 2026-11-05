@@ -300,7 +300,7 @@ async def test_import_makes_items_headings_and_sourced_numbers(ctx):
     assert [r["column"] for r in card.payload["rows"]] == ["A", "B", "C", "D"]
     assert card.payload["rows"][3]["header"] == "الكمية"
     assert card.payload["rows"][3]["example"].startswith("120.5")
-    assert "2 items and 1 headings" in card.detail["en"]
+    assert "2 items and 1 heading" in card.detail["en"]
 
 
 async def test_the_document_date_is_used_when_given(ctx):
@@ -415,7 +415,7 @@ async def test_hidden_rows_are_left_out_and_said(rec):
     d = data_of(await run_import(ctx, f))
     assert d["items"] == 2 and d["hidden_rows"] == {"skipped": [7]}
     assert d["skipped"] == [{"row": 7, "why": "the row is hidden in Excel"}]
-    assert "1 rows hidden in Excel are left out" in ctx.host.cards[0].detail["en"]
+    assert "Hidden in Excel and left out: 1 row." in ctx.host.cards[0].detail["en"]
 
     again = tool_ctx(rec, answers={"rows": keep_all()})
     d = data_of(await run_import(again, f, hidden_rows="include"))
@@ -428,7 +428,7 @@ async def test_hidden_text_rows_are_imported_as_data_and_said(ctx):
     f = add_boq(ctx.rec, book(rows, white=("B6",)))
     d = data_of(await run_import(ctx, f))
     assert d["items"] == 3 and d["flagged_rows"] == [6, 7]
-    assert "2 rows have hidden text" in ctx.host.cards[0].detail["en"]
+    assert "orders to an AI: 2 rows." in ctx.host.cards[0].detail["en"]
 
 
 async def test_merged_headings_and_totals_are_not_items(ctx):

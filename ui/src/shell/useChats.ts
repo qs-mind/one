@@ -177,15 +177,28 @@ export function useChats(chatId: string) {
     void sendRef.current(text);
   }, [loaded, chatId, queueTick]);
 
+  /** The chat's messages as the core has them now, with no stream joined (the Brief has ended). */
+  const reread = useCallback(async () => {
+    const body = await api(`/chat/${encodeURIComponent(chatId)}/messages`)
+      .then((response) => (response.ok ? (response.json() as Promise<{ messages?: OneMessage[] }>) : undefined))
+      .catch(() => undefined);
+    if (body?.messages?.length) setMessages(body.messages);
+  }, [chatId, setMessages]);
+
   async function halt() {
     const id = brief;
     void stop(); // the stream ends here at once; the Brief itself ends only by the stop call
     if (!id) return;
     setStopped((now) => new Set(now).add(id));
+    // its waiting cards fold at once, withdrawn: no button is left that the core would refuse
+    setMessages((now) => withdrawCards(now, id));
     const response = await sendJson(`/briefs/${encodeURIComponent(id)}/stop`, "POST");
     if (!response?.ok) {
       setStopped((now) => new Set([...now].filter((other) => other !== id)));
       setFailed(await coreLine(response, texts.stopFailed));
+      void resync(); // it still runs: its cards as they are
+    } else {
+      void reread(); // the stream that would have said it was cut above: the Brief's end, from the core
     }
   }
 
@@ -210,7 +223,22 @@ export function useChats(chatId: string) {
     halt,
     continued,
     resync,
+    reread,
   };
+}
+
+/** The messages with the cards still waiting in the Brief `briefId`'s reply marked withdrawn. */
+export function withdrawCards(messages: OneMessage[], briefId: string): OneMessage[] {
+  return messages.map((message) => {
+    if (message.role !== "assistant" || !partsOf(message.parts, "status").some((part) => part.id === briefId)) return message;
+    const parts = message.parts.map((part) => {
+      if (part.type !== "data-card") return part;
+      const card = part as Extract<OnePart, { type: "data-card" }>;
+      const waiting = card.data.status === "pending" || card.data.status === undefined;
+      return waiting ? { ...card, data: { ...card.data, status: "withdrawn" as const } } : part;
+    });
+    return { ...message, parts };
+  });
 }
 
 export type ChatState = ReturnType<typeof useChats>;
