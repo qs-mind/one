@@ -13,6 +13,8 @@ from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelRequest, ToolReturnPart, UserPromptPart
 
 from qsone import activity, copy
+from qsone.deliverables import review as deliverable_review
+from qsone.deliverables import store as deliverables
 from qsone.engine import costs, roles
 from qsone.engine.runner import GENERAL, WORK, Engine
 from qsone.engine.store import Store
@@ -20,6 +22,7 @@ from qsone.engine.types import Asked, Progress, Reviewed, Settled, Status, TextD
 from qsone.projects import Projects
 from tests.engine_fakes import DEEPSEEK, HAIKU, OPUS, SAMPLE_SHEET, SONNET, call, calls, scripted
 from tests.engine_fakes import text as said
+from tests.samples import sample_boq_rows, sample_sheet
 from tests.team_samples import BRIEF, TeamFakeHost, lead_ctx, quote_source, sample_ledger
 
 PLAN = {
@@ -255,6 +258,52 @@ async def test_unchecked_deliverable_with_numbers_is_checked_before_done(make_en
     assert review.review.code == "A" and review.review.checker == DEEPSEEK.choice
     assert states(events)[-1] == "done" and checker.calls == 1
     assert store_of(engine, project).unchecked(brief) == []
+
+
+async def test_a_deliverable_the_brief_made_is_checked_on_its_saved_version(make_engine, registry,
+                                                                           project):  # fmt: skip
+    """Plan 6: a Deliverable the team made in this Brief, with numbers and no check yet, gets the
+    Checking QS's check on its Saved version before the Brief is done."""
+    rec = registry.get(project)
+    rows = sample_boq_rows(rec, 2)
+    sheet = {"kind": "sheet", "variant": "boq", "title": "جدول - عينة", "language": "ar"}
+    lead = scripted(call("deliverable_create", sheet | {"rows": rows}), said("الجدول جاهز - عينة"))
+    checker = scripted(call("final_result", {"code": "B", "comments": []}))
+    engine = await started(make_engine(links(lead=lead, checker=checker)))
+    brief = await engine.start_brief(project, BRIEF)
+    events = await finish(engine, brief)
+    [review] = [e for e in events if isinstance(e, Reviewed)]
+    assert review.review.code == "B" and checker.calls == 1 and states(events)[-1] == "done"
+    [d] = [e["id"] for e in deliverables.list_deliverables(rec)]
+    closeout = deliverable_review.closeout(rec, d)
+    assert closeout["check"]["version_n"] == 1 and closeout["check"]["code"] == "B"
+
+
+async def test_a_deliverable_the_brief_proposed_to_is_checked_once(make_engine, registry, project):
+    """A Sheet the team only proposed changes to has its Saved version checked when it has no
+    check; one this Brief did not touch, or one checked already, is left as it is."""
+    rec = registry.get(project)
+    touched, untouched, done = sample_sheet(rec), sample_sheet(rec), sample_sheet(rec)
+    check = {"version_n": 1, "code": "A", "checker": "model-sample", "same_provider": False}
+    deliverable_review.record_check(rec, done, summary="", comments=[], **check)
+    row = next(r for r in deliverables.view(rec, touched)["rows"] if r["kind"] == "item")["id"]
+    op = {"op": "set_field", "row": row, "key": "description", "value": "خرسانة - عينة"}
+    row_done = next(r for r in deliverables.view(rec, done)["rows"] if r["kind"] == "item")["id"]
+    lead = scripted(
+        calls(
+            call("deliverable_propose", {"id": touched, "ops": [op]}),
+            call("deliverable_propose", {"id": done, "ops": [op | {"row": row_done}]}),
+        ),
+        said("اقترحت تعديل - عينة"),
+    )
+    checker = scripted(call("final_result", {"code": "A", "comments": []}))
+    engine = await started(make_engine(links(lead=lead, checker=checker)))
+    brief = await engine.start_brief(project, BRIEF)
+    events = await finish(engine, brief)
+    assert [e.deliverable_id for e in events if isinstance(e, Reviewed)] == [touched]
+    assert checker.calls == 1
+    assert deliverable_review.closeout(rec, touched)["check"]["version_n"] == 1
+    assert deliverable_review.closeout(rec, untouched)["check"] is None
 
 
 def table_brief(ids: dict) -> dict:

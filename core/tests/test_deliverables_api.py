@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from qsone import activity, copy
 from qsone.app import create_app
-from qsone.deliverables import review, store
+from qsone.deliverables import events, review, store
 from qsone.records import files, ledger
 from tests.conftest import AUTH, SECRET
 from tests.samples import (
@@ -351,6 +351,47 @@ def test_fill_preview_mismatches_and_file(client, project, sheet):
     assert r.status_code == 404 and r.json()["error"] == copy.FILL_PLAN_NOT_FOUND
 
 
+def test_a_sheet_lists_its_fill_plans_newest_first(client, project, sheet):
+    """The screen finds a Sheet's Fill Plans here: the client's file name, when it was made and
+    whether it can fill yet. The ids are for the routes, never shown."""
+    path, d = sheet
+    rec = records(client, project)
+    from qsone.clientfile import fill
+
+    assert get(client, f"{path}/fill-plans").json() == {"plans": []}
+    v = store.view(rec, d)
+    file_id = files.add_file(
+        rec, "مقايسة العميل - عينة.xlsx", sample_client_xlsx(), actor="engineer"
+    ).id
+    first_row = next(r for r in v["rows"] if r["kind"] == "item")
+    plan = {
+        "sheet": "BOQ", "header_row": 11, "write": ["rate"], "columns": {"rate": "E"},
+        "rows": [{"row": CLIENT_FIRST_ROW, "part": first_row["id"]}],
+    }  # fmt: skip
+    heard = []
+    stop = events.listen(lambda p, event: heard.append((p, event["deliverable"]["id"])))
+    try:
+        older = fill.save_plan(rec, d, file_id, plan, actor="lead_qs")
+    finally:
+        stop()
+    assert heard == [(project, d)]  # an open review board loads the plan
+    [found] = get(client, f"{path}/fill-plans").json()["plans"]
+    assert set(found) == {"id", "file_name", "created_at", "status"}
+    assert found["id"] == older and found["file_name"] == "مقايسة العميل - عينة.xlsx"
+    assert found["status"] == "needs_signoff" and found["created_at"]
+    check_a(rec, d)
+    post(client, f"{path}/signoff")
+    newer = fill.save_plan(rec, d, file_id, plan, actor="lead_qs")
+    plans = get(client, f"{path}/fill-plans").json()["plans"]
+    assert [p["id"] for p in plans] == [newer, older]
+    assert {p["status"] for p in plans} == {"ready"}
+    other = sample_sheet(rec)  # another Sheet's list is its own
+    r = get(client, f"/projects/{project}/deliverables/{other}/fill-plans")
+    assert r.json() == {"plans": []}
+    r = get(client, f"/projects/{project}/deliverables/{NOWHERE}/fill-plans")
+    assert r.status_code == 404 and r.json()["error"] == copy.DELIVERABLE_NOT_FOUND
+
+
 # Live events -------------------------------------------------------------------------------
 
 
@@ -408,6 +449,7 @@ ROUTES = [
     ("POST", "/deliverables/{d}/signoff"),
     ("GET", "/deliverables/{d}/export"),
     ("GET", "/deliverables/{d}/review-report"),
+    ("GET", "/deliverables/{d}/fill-plans"),
     ("GET", "/fill-plans/{d}/preview"),
     ("POST", "/fill-plans/{d}/accept-mismatches"),
     ("GET", "/fill-plans/{d}/file"),

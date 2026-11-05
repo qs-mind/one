@@ -11,7 +11,6 @@ from qsone import copy
 from qsone.deliverables.store import ref_key
 from qsone.export import (
     DASH,
-    LABELS,
     check_draft,
     format_decimal,
     isolate,
@@ -48,7 +47,7 @@ def _page(language: str, title: str, page_marks: list[str], page_state: str) -> 
         "title": title,
         "marks": page_marks,
         "state": page_state,
-        "page_of": LABELS["page_of"][language],  # Typst fills {x} and {y}
+        "page_of": copy.EXPORT_LABELS["page_of"][language],  # Typst fills {x} and {y}
     }
 
 

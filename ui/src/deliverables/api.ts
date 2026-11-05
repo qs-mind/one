@@ -8,6 +8,7 @@ import type {
   CommentAnchor,
   DeliverableInfo,
   Explained,
+  FillPlanInfo,
   FillPreview,
   Op,
   Thread,
@@ -107,6 +108,7 @@ export const deliverablesApi = {
     bytes(`${base(p)}/deliverables/${id(d)}/export${query({ format, revision })}`, `deliverable.${format}`),
   reviewReport: (p: string, d: string, revision: number) =>
     bytes(`${base(p)}/deliverables/${id(d)}/review-report${query({ revision, format: "pdf" })}`, "review.pdf"),
+  fillPlans: (p: string, d: string) => call<{ plans: FillPlanInfo[] }>(`${base(p)}/deliverables/${id(d)}/fill-plans`),
   fillPreview: (p: string, f: string) => call<FillPreview>(`${base(p)}/fill-plans/${id(f)}/preview`),
   acceptMismatches: (p: string, f: string, rows: number[]) =>
     call<FillPreview>(`${base(p)}/fill-plans/${id(f)}/accept-mismatches`, "POST", { rows }),

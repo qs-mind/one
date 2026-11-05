@@ -1,5 +1,6 @@
 """Operations, Suggested changes and Saved versions (synthetic «عينة» data only)."""
 
+import json
 from datetime import date
 
 import pytest
@@ -617,6 +618,27 @@ def test_removing_every_priced_row_under_a_section_ends_its_total(rec):
     assert v3["total"]["value"] == "5078485.00"
 
 
+def test_removing_every_priced_row_leaves_no_bill_total(rec):
+    """With nothing priced left, the section and the bill show no total: never the old number,
+    never an invented 0. The exports print a dash."""
+    from qsone.export import DASH, layout
+
+    d = sample_sheet(rec, 2)
+    v1 = view(rec, d)
+    ops_ = [
+        {"op": "remove_row", "row": row_by_code_in(v1, code)["id"], "expect": 1}
+        for code in ("1-1", "1-2")
+    ]
+    made = propose(rec, d, ops_, actor="engineer")
+    accept(rec, d, [c.id for c in made], actor="engineer")
+    v2 = view(rec, d)
+    assert [r["kind"] for r in v2["rows"]] == ["section"]
+    assert "amount" not in v2["rows"][0]["cells"] and v2["total"] is None
+    shown = [c.get("text") for row in layout(v2) for c in row["cells"] if "number" not in c]
+    assert DASH in shown and not any("number" in c for row in layout(v2) for c in row["cells"])
+    assert view(rec, d, version=1)["total"] == v1["total"]  # the past keeps its total
+
+
 def test_add_section_and_rename_it(rec):
     d = sample_sheet(rec)
     v = view(rec, d)
@@ -711,6 +733,16 @@ def test_columns_change_by_a_new_template_version(rec):
     )
     assert [c["key"] for c in ch.after["columns"]] == ["code", "rate"]
     accept(rec, d, [ch.id], actor="engineer")
+    with rec.read() as c:  # the audit row holds the whole new template, its version bumped
+        before, after = c.execute(
+            "select before, after from audit where table_name = 'deliverables' and row_id = ?"
+            " and action = 'update' order by id desc limit 1",
+            (d,),
+        ).fetchone()
+        (now,) = c.execute("select template from deliverables where id = ?", (d,)).fetchone()
+    assert json.loads(after)["template"] == json.loads(now)
+    assert json.loads(now)["version"] == 2 and json.loads(before)["template"]["version"] == 1
+    assert [c["key"] for c in json.loads(now)["columns"]] == ["code", "rate"]
     v2 = view(rec, d)
     assert [c["key"] for c in v2["columns"]] == ["code", "rate"]
     assert [c["key"] for c in view(rec, d, version=1)["columns"]] == [

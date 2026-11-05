@@ -9,8 +9,9 @@ import { fill, setLanguage, texts } from "../i18n";
 import { viewerFor } from "../viewers/registry";
 import { DeliverableCard } from "./DeliverableCard";
 import { DeliverableViewer } from "./DeliverableViewer";
-import { base, change, columns, core, D, entry, fakeLive, json, sheet, thread, viewRoutes } from "./fixtures";
+import { base, change, columns, core, D, DOC, entry, fakeLive, json, letter, sheet, thread, viewRoutes } from "./fixtures";
 import { ProjectIndex } from "./ProjectIndex";
+import type { FillPlanInfo } from "./types";
 
 // jsdom has no scrolling; the grid scrolls its active cell into view.
 Element.prototype.scrollIntoView ??= () => {};
@@ -103,6 +104,46 @@ describe("viewerFor", () => {
     await user.click(screen.getByRole("tab", { name: texts.reviewCloseOut.ar }));
     expect(await screen.findByText("واحد مستني.")).toBeInTheDocument();
     expect(screen.getByRole("tabpanel")).toHaveAttribute("dir", "rtl");
+  });
+
+  it("full screen finds the Sheet's newest Fill Plan, live, and opens its preview; the plan's id is never shown", async () => {
+    const F = "e".repeat(32);
+    const plans: FillPlanInfo[] = [];
+    const fetch = core({
+      ...viewRoutes(sheet()),
+      [`GET ${base}/deliverables/${D}/fill-plans`]: () => json({ plans }),
+      [`GET ${base}/fill-plans/${F}/preview`]: () => json({ error: { en: "Sign off first.", ar: "اعتمد الأول." }, field: null }, 409),
+    });
+    const live = fakeLive();
+    const user = userEvent.setup();
+    render(<DeliverableViewer projectId="p1" deliverableId={D} mode="full" subscribe={live.subscribe} />);
+    await screen.findByRole("tablist", { name: texts.reviewPanels.ar });
+    await waitFor(() => expect(fetch.mock.calls.some(([u]) => String(u).endsWith("/fill-plans"))).toBe(true));
+    expect(screen.queryByRole("button", { name: texts.exportClientFile.ar })).toBeNull();
+
+    // the Lead QS saves a plan: the core announces the Deliverable, and the board finds it
+    plans.push(
+      { id: F, file_name: "مقايسة العميل - عينة.xlsx", created_at: "2026-11-05T10:00:00.000000+00:00", status: "needs_signoff" },
+      { id: "a".repeat(32), file_name: "قديم - عينة.xlsx", created_at: "2026-11-05T09:00:00.000000+00:00", status: "needs_signoff" },
+    );
+    act(() => live.emit({ type: "deliverable", deliverable: entry() }));
+    const button = await screen.findByRole("button", { name: texts.exportClientFile.ar });
+    expect(screen.getByText("مقايسة العميل - عينة.xlsx")).toBeInTheDocument();
+    expect(screen.queryByText("قديم - عينة.xlsx")).toBeNull();
+    expect(document.body.textContent).not.toContain(F);
+    await user.click(button);
+    expect(await screen.findByRole("region", { name: texts.fillPreview.ar })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("اعتمد الأول.");
+  });
+
+  it("a frame and a Document never ask for Fill Plans", async () => {
+    const fetch = core({ ...viewRoutes(sheet()), ...viewRoutes(letter()) });
+    const { unmount } = render(<DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={fakeLive().subscribe} />);
+    await screen.findByText("03/02");
+    unmount();
+    render(<DeliverableViewer projectId="p1" deliverableId={DOC} mode="full" subscribe={fakeLive().subscribe} />);
+    await screen.findByRole("tablist", { name: texts.reviewPanels.ar });
+    expect(fetch.mock.calls.some(([u]) => String(u).includes("fill-plans"))).toBe(false);
   });
 });
 
