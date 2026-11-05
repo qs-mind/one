@@ -187,6 +187,22 @@ def file_info(rec: Records, file_id: str) -> FileInfo | None:
     return None if row is None else FileInfo(*row)
 
 
+def list_flags(rec: Records, file_id: str) -> list[dict] | None:
+    """A file's hidden-text flags in the order they were found: kind, locator, excerpt (at most
+    160 characters) and count. None for an unknown id."""
+    with rec.read() as conn:
+        if conn.execute("SELECT 1 FROM files WHERE id = ?", (file_id,)).fetchone() is None:
+            return None
+        rows = conn.execute(
+            "SELECT kind, locator, excerpt, count FROM file_flags WHERE file_id = ? ORDER BY id",
+            (file_id,),
+        ).fetchall()
+    return [
+        {"kind": kind, "locator": json.loads(locator), "excerpt": excerpt, "count": count}
+        for kind, locator, excerpt, count in rows
+    ]
+
+
 def read_pages(conn, file_id: str) -> set[int]:
     """The pages of a file that have text: a text layer, or read from the page image."""
     rows = conn.execute(
