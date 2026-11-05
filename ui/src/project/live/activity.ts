@@ -3,7 +3,7 @@
 // however many arrive, and each part of the screen reads only its own slice. Nothing here is kept on disk.
 import { useCallback, useRef, useSyncExternalStore } from "react";
 import { texts } from "../../i18n";
-import type { ActivityEvent, AgentInfo, FrameKey, ProjectSources, Team } from "../types";
+import type { ActivityEvent, AgentInfo, ProjectSources, Team } from "../types";
 
 /** An agent as the screen shows it: `noNews` once it has been silent for a minute while working. */
 export type LiveAgent = AgentInfo & { noNews: boolean };
@@ -14,9 +14,6 @@ export const NO_NEWS_MS = 60_000;
 const TICK_MS = 1000;
 
 const busy = (a: AgentInfo) => a.state === "working" || a.state === "thinking";
-/** A cursor shows while the agent is on something; it goes when the agent finishes. */
-export const cursorShown = (a: LiveAgent) =>
-  a.focus !== null && (a.state === "working" || a.state === "thinking" || a.state === "waiting");
 
 // Before Plan 4 sends a Lead QS, the Lead QS is the chat itself: thinking while a reply streams (leadFromChat).
 const chatLead = (state: "idle" | "thinking"): LiveAgent => ({
@@ -224,15 +221,9 @@ export function deskCounts(): ReadonlyMap<string, { members: number; working: nu
   return counts;
 }
 
-/** The frames agents are working on now (their cursors are there). */
-export function workedOn(): readonly string[] {
-  return list.filter(cursorShown).map((a) => a.focus!.frame);
-}
-
 // Hooks -----------------------------------------------------------------------------------------------------------
 
 const getList = () => list;
-const getCounts = () => counts;
 const getWaiting = () => waiting;
 
 /** Everyone on the team now, the Lead QS first when it comes from the chat. */
@@ -260,30 +251,6 @@ function useDerived<T>(compute: () => readonly T[], deps: unknown[]): readonly T
   return useSyncExternalStore(subscribe, get);
 }
 
-/** The ids of the agents whose cursor is on this frame, in a steady order (the cursors stack by it). */
-export function useAgentsOn(key: FrameKey): readonly string[] {
-  return useDerived(
-    () =>
-      list
-        .filter((a) => cursorShown(a) && a.focus!.frame === key)
-        .map((a) => a.id)
-        .sort(),
-    [key],
-  );
-}
-
-/** The ids of every agent with a cursor. */
-export function useCursorIds(): readonly string[] {
-  return useDerived(
-    () =>
-      list
-        .filter(cursorShown)
-        .map((a) => a.id)
-        .sort(),
-    [],
-  );
-}
-
 /** The team frame's members: the Lead QS, the Checking QS, and any agent outside every known Desk. */
 export function useTeamAgents(): readonly LiveAgent[] {
   return useDerived(() => list.filter((a) => a.desk_id === null || !desks.has(a.desk_id)), []);
@@ -291,10 +258,6 @@ export function useTeamAgents(): readonly LiveAgent[] {
 
 export function useDeskAgents(deskId: string): readonly LiveAgent[] {
   return useDerived(() => list.filter((a) => a.desk_id === deskId && desks.has(deskId)), [deskId]);
-}
-
-export function useDeskCounts(): ReadonlyMap<string, { members: number; working: number }> {
-  return useSyncExternalStore(subscribe, getCounts);
 }
 
 /** Cards waiting for the engineer, from the live stream; null until it says. */

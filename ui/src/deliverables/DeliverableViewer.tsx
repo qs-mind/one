@@ -234,7 +234,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         // Ctrl+Z (by the key's place, so the Arabic layout works too) takes back the last accept or reject
         if (!undo || !isMod(event) || event.code !== "KeyZ" || event.shiftKey || isTyping(event.target)) return;
         event.preventDefault();
-                undoNotice.current?.undo();
+        undoNotice.current?.undo();
       }}
     >
       {/* full: a Sheet is as tall as its rows, up to 60% (75% as the open document: the room is the data's), and the
