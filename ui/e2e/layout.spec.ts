@@ -32,13 +32,12 @@ for (const language of ["ar", "en"] as const) {
     // readable: never below 60%; what it shows is beside the chat, and the rest is a pan away
     const zoom = Number(await page.evaluate(() => /scale\(([\d.]+)\)/.exec(document.querySelector<HTMLElement>(".react-flow__viewport")!.style.transform)?.[1]));
     expect(zoom).toBeGreaterThanOrEqual(0.6);
-    expect(overlaps(await box(frame(page, "files:all")), chat)).toBe(false);
+    // the Project files, always in a first view, whole and clear of the chat and every other overlay
+    const files = await box(frame(page, "files:all"));
     const pane = await box(page.locator(".react-flow"));
-    for (const node of await page.locator(".react-flow__node").all()) {
-      const b = await box(node);
-      const whollyShown = b.x >= pane.x && b.x + b.width <= pane.x + pane.width && b.y >= pane.y && b.y + b.height <= pane.y + pane.height;
-      if (whollyShown) expect(overlaps(b, chat)).toBe(false);
-    }
+    expect(files.x >= pane.x && files.x + files.width <= pane.x + pane.width && files.y >= pane.y && files.y + files.height <= pane.y + pane.height).toBe(true);
+    expect(overlaps(files, chat)).toBe(false);
+    for (const cover of await covers(page)) expect(overlaps(files, cover)).toBe(false);
   });
 
   test(`one message box, at the open chat's foot, ${language}`, async ({ page }) => {

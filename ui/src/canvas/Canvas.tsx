@@ -253,9 +253,10 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   /** Shows these frames in the middle of the free area. Computed from the layout itself, not from React Flow's
    * measured nodes: with onlyRenderVisibleElements a frame off screen is never measured, so fitView would leave it
    * out. With `keepZoom`, only pans, unless the frames do not fit at the zoom there is. With `minZoom`, never zooms out
-   * below it: what does not fit then shows from its top and its start (a tall Document opens readable, at its top). */
+   * below it: what does not fit then shows from its top and its start (a tall Document opens readable, at its top).
+   * With `atStart`, they sit at the top and the inline start of the free area, where the layout grows from. */
   const fitTo = useCallback(
-    (frames: readonly Placed[], { padding = 0.1, maxZoom = 1, minZoom = 0.1, animate = true, keepZoom = false } = {}) => {
+    (frames: readonly Placed[], { padding = 0.1, maxZoom = 1, minZoom = 0.1, animate = true, keepZoom = false, atStart = false } = {}) => {
       if (!frames.length) return;
       const area = free();
       const minX = Math.min(...frames.map((f) => f.x));
@@ -268,12 +269,15 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       const across = w * zoom > area.w * (1 - 2 * padding);
       const down = h * zoom > area.h * (1 - 2 * padding);
       const edge = Math.min(padding, 0.04); // a frame that does not fit starts close to the edge
-      const x = !across
-        ? area.x + area.w / 2 - (minX + w / 2) * zoom
-        : dir() === "rtl"
-          ? area.x + area.w * (1 - edge) - (minX + w) * zoom
-          : area.x + area.w * edge - minX * zoom;
-      const y = down ? area.y + area.h * edge - minY * zoom : area.y + area.h / 2 - (minY + h / 2) * zoom;
+      const ex = across ? edge : padding / 2;
+      const ey = down ? edge : padding / 2;
+      const x =
+        !across && !atStart
+          ? area.x + area.w / 2 - (minX + w / 2) * zoom
+          : dir() === "rtl"
+            ? area.x + area.w * (1 - ex) - (minX + w) * zoom
+            : area.x + area.w * ex - minX * zoom;
+      const y = !down && !atStart ? area.y + area.h / 2 - (minY + h / 2) * zoom : area.y + area.h * ey - minY * zoom;
       void flow.setViewport({ x, y, zoom }, { duration: animate ? duration() : 0 });
     },
     [flow, store, free],
@@ -295,7 +299,9 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
         return at === -1 ? 1000 : 2 + at;
       };
       const shown = new Set(readable(boxes, rank, free()).map((f) => f.key));
-      fitTo(frames.filter((f) => shown.has(f.key)), opts);
+      // when not all of them fit, at the readable zoom itself: the most of the rest is in sight around them
+      const some = shown.size < frames.length;
+      fitTo(frames.filter((f) => shown.has(f.key)), { ...opts, ...(some ? { maxZoom: READABLE, minZoom: READABLE, atStart: true } : {}) });
     },
     [fitTo, free],
   );
