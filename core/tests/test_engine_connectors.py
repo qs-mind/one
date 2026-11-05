@@ -409,7 +409,9 @@ def test_settings_routes(data_dir):
     r = client.put("/settings/ai/prices", json=price | {"model": "not-listed"}, headers=AUTH)
     assert r.status_code == 404
 
-    assert client.delete(f"/settings/ai/standard/{added['id']}", headers=AUTH).status_code == 204
+    removed = client.delete(f"/settings/ai/standard/{added['id']}", headers=AUTH)
+    assert removed.status_code == 200  # with its Undo; the key goes when the window ends
+    client.app.state.trash.purge_all()
     assert keys.get_key(added["id"]) is None
     body = client.get("/settings/ai", headers=AUTH).json()
     assert [c["id"] for c in body["connectors"]] == ["anthropic"]

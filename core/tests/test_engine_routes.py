@@ -199,7 +199,9 @@ def test_cards_route_checks_the_choice(serve_app):
             assert ok.status_code == 204
             rest = read_until(lines, "finish")
         settled = [c for c in rest if c["type"] == "data-card" and c["id"] == card["id"]]
-        assert settled[-1]["data"] | {} == card["data"] | {"status": "settled", "choice": "yes"}
+        answered = settled[-1]["data"]
+        assert answered.pop("settled_at")  # when, for the card's one-line trace
+        assert answered == card["data"] | {"status": "settled", "choice": "yes"}
         assert states(rest)[-1] == "done"
         gone = client.post(f"{url}/cards/{card['id']}", json={"choice": "yes"})
         assert gone.status_code == 404

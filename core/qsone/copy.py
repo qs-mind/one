@@ -21,6 +21,12 @@ KEY_STORE_DOWN = {
     "ar": "مخزن المفاتيح في الجهاز مش متاح، فالمفتاح ماتحفظش. افتحه أو شغّله وجرّب تاني.",
 }
 
+# Undo instead of "are you sure?" (qsone.undo): pressed after its window ended.
+UNDO_GONE = {
+    "en": "Too late to undo: it was removed for good. Add it again if you need it.",
+    "ar": "وقت التراجع خلص: اتشال خلاص. ضيفه تاني لو محتاجه.",
+}
+
 # Model errors: the engineer sees one of these; the details go to core.log only.
 # The Claude key's (the Native Link's): also what AI_KEY_REFUSED says for it.
 KEY_REFUSED = {

@@ -112,6 +112,7 @@ from qsone.engine.types import (
     brief_language,
     choice_of,
 )
+from qsone.engine.worklog import WorkLog
 from qsone.journey import engineer, understand
 from qsone.projects import Projects
 from qsone.records.project import Records, RecordsError
@@ -379,6 +380,12 @@ class _Brief:
         self.lead_run_id: str | None = None
         self.lead_ctx: ToolContext | None = None
         self._news = asyncio.Event()
+        saved = brief.get("worklog")
+        self.worklog = (
+            WorkLog.load(saved, stopped_at=brief["updated_at"])
+            if saved
+            else WorkLog(started=self._now())
+        )
 
     # Events --------------------------------------------------------------------------------
 
@@ -386,16 +393,35 @@ class _Brief:
         self._news.set()
         self._news = asyncio.Event()
 
+    def _now(self) -> str:
+        return self.engine.clock().isoformat(timespec="milliseconds")
+
     def emit(self, event: Event) -> None:
         if isinstance(event, Progress) and event.lang is None:
             event = replace(event, lang=self.lang)
+        if isinstance(event, Progress | Settled) and event.at is None:
+            event = replace(event, at=self._now())
         self.log.append(event)
         if isinstance(event, Progress):
             self._agent(event.run_id, state="working", line=event.text, focus=event.focus)
             self.step = event.text
             if self.state == "running" and self.cancel_mode != "crash":
                 self.store.set_status(self.brief_id, "running", event.text)
+            self.worklog.add(event, event.at)
+            self._worklog_changed()
         self._notify()
+
+    def _worklog_changed(self) -> None:
+        """Saves the work log and sends it whole (`data-worklog`, id: the Brief)."""
+        if self.cancel_mode != "crash":
+            self.store.set_worklog(self.brief_id, self.worklog.saved())
+        self.log.append(Data(self.brief_id, "worklog", self.brief_id, self.worklog.as_json()))
+        self._notify()
+
+    def _tools_done(self, run_id: str) -> None:
+        """The run's tools have returned: its tool steps end now."""
+        if self.worklog.tools_done(run_id, self._now()):
+            self._worklog_changed()
 
     async def events(self) -> AsyncIterator[Event]:
         i = 0
@@ -415,6 +441,9 @@ class _Brief:
         if self.cancel_mode != "crash":
             self.store.set_status(self.brief_id, state, self.step)
         log.info("brief %s %s", self.brief_id, state)
+        if state in ("done", "failed", "stopped"):
+            self.worklog.end(self._now())
+            self._worklog_changed()
         self.emit(Status(self.brief_id, state, self.step))
 
     # Plan 7's view of the team ---------------------------------------------------------------
@@ -666,7 +695,7 @@ class _Brief:
                 except Exception:  # noqa: BLE001 - its own words are only for the Progress Line
                     pass
             on = self._focus(c.tool_name, c.args_as_dict())
-            self.emit(Progress(self.brief_id, run_id, spec.name, words, on))
+            self.emit(Progress(self.brief_id, run_id, spec.name, words, on, tool=True))
 
     def _focus(self, tool: str, args: dict) -> dict | None:
         try:
@@ -862,6 +891,8 @@ class _Brief:
                 while self.steering:
                     run.enqueue(self.steering.pop(0))
                 async for node in run:
+                    if not Agent.is_call_tools_node(node):
+                        self._tools_done(run_id)
                     if Agent.is_model_request_node(node):
                         self._agent(run_id, state="thinking")
                         async with node.stream(run.ctx) as events:
@@ -885,6 +916,7 @@ class _Brief:
                     self._save(run_id, run.all_messages()[len(earlier) :])
             finally:
                 self.lead_run = None
+                self._tools_done(run_id)
             self._save(run_id, run.all_messages()[len(earlier) :])
             output = run.result.output
         if isinstance(output, DeferredToolRequests):
@@ -994,7 +1026,10 @@ class _Brief:
             async for node in run:
                 if Agent.is_call_tools_node(node):
                     self._say_tools(run_id, spec, node.model_response)
+                else:
+                    self._tools_done(run_id)
                 self._save(run_id, run.all_messages())
+            self._tools_done(run_id)
             self._save(run_id, run.all_messages())
             return run.result.output
 
@@ -1600,7 +1635,7 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
         events.append(TeamMessage(brief_id, m["id"], m["sender"], m["recipient"], m["text"]))
     with store.rec.read() as c:
         approvals = c.execute(
-            "SELECT card, status, choice FROM approvals WHERE brief_id = ?"
+            "SELECT card, status, choice, settled_at FROM approvals WHERE brief_id = ?"
             " ORDER BY asked_at, rowid",
             (brief_id,),
         ).fetchall()
@@ -1610,12 +1645,12 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
             " WHERE d.brief_id = ? ORDER BY r.at, r.rowid",
             (brief_id,),
         ).fetchall()
-    for card_text, status, choice in approvals:
+    for card_text, status, choice, settled_at in approvals:
         d = json.loads(card_text)
         card = Card(**{**d, "options": tuple(d["options"])})
         events.append(Asked(brief_id, card))
         if status == "settled":
-            events.append(Settled(brief_id, card.id, choice))
+            events.append(Settled(brief_id, card.id, choice, settled_at))
         elif status == "withdrawn":
             events.append(Data(brief_id, "card", card.id, {"status": "withdrawn"}))
     for deliverable_id, code, comments, choice, same, round_ in reviews:
@@ -1635,5 +1670,9 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
         named = numbers_guard.sourced(reply, results)
         if named:
             events.append(Data(brief_id, "sourced", brief_id, {"numbers": named}))
+    if brief["worklog"]:
+        worklog = WorkLog.load(brief["worklog"], stopped_at=brief["updated_at"])
+        worklog.ended = json.loads(brief["worklog"]).get("ended")
+        events.append(Data(brief_id, "worklog", brief_id, worklog.as_json()))
     events.append(Status(brief_id, brief["status"], brief["step"]))
     return events

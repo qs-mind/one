@@ -22,6 +22,7 @@ from qsone import copy, keys, keystore, settings
 from qsone.engine import cards, connectors, costs, roles
 from qsone.engine.connectors import claude_code, standard
 from qsone.engine.types import EFFORTS, BadAnswer, ModelCard, ModelChoice, Role, Text, answer_value
+from qsone.undo import Trash
 
 
 class ChoiceIn(BaseModel):
@@ -117,11 +118,17 @@ def _roles_json(chosen: dict[Role, ModelChoice]) -> dict:
 
 
 def settings_router(
-    http_client: httpx2.AsyncClient | None = None, *, claude_command: Sequence[str] = ()
+    http_client: httpx2.AsyncClient | None = None,
+    *,
+    claude_command: Sequence[str] = (),
+    trash: Trash | None = None,
 ) -> APIRouter:
     """`http_client` reaches the AI providers; tests inject a fake one. `claude_command`
-    replaces the Claude Code executable; tests run the fake `claude`."""
+    replaces the Claude Code executable; tests run the fake `claude`. A removed Standard Link
+    waits in `trash` for its Undo window; its key goes when the window ends."""
     router = APIRouter()
+    trash = trash if trash is not None else Trash()
+    trash.kind("standard", restore=standard.put_back, purge=standard.forget_key)
 
     def found() -> list[connectors.Connector]:
         return connectors.connectors(http_client=http_client, claude_command=claude_command)
@@ -170,12 +177,12 @@ def settings_router(
         return JSONResponse(_connector_json(link, None), status_code=201)
 
     @router.delete("/settings/ai/standard/{connector_id}")
-    def remove_standard(connector_id: str) -> Response:
-        try:
-            removed = standard.remove(connector_id)
-        except KeyringError:
-            return JSONResponse({"error": copy.KEY_STORE_DOWN}, status_code=503)
-        return Response(status_code=204 if removed else 404)
+    async def remove_standard(connector_id: str) -> Response:
+        """Out of use at once; `{undo, window_ms}` takes it back (`POST /undo/{token}`)."""
+        taken = standard.take_out(connector_id)
+        if taken is None:
+            return Response(status_code=404)
+        return JSONResponse(trash.put("standard", taken))
 
     @router.put("/settings/ai/prices")
     async def enter_price(body: PriceIn) -> JSONResponse:

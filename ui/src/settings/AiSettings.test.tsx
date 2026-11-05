@@ -201,13 +201,21 @@ describe("AiSettings", () => {
 
   it("shows why a connector's models could not be listed, and removes a Standard Link", async () => {
     const url = "/api/settings/ai/standard/standard%3As1"; // the connector's whole id
-    const fetch = core({ [`DELETE ${url}`]: () => new Response(null, { status: 204 }) });
+    const fetch = core({
+      [`DELETE ${url}`]: () => Response.json({ undo: "tok", window_ms: 6000 }),
+      "POST /api/undo/tok": () => new Response(null, { status: 204 }),
+    });
     const user = userEvent.setup();
     render(<Harness />);
     const row = (await screen.findByText("Sample provider")).closest("li")!;
     expect(within(row).getByText("مقدرناش نوصل لـ Sample provider.")).toBeInTheDocument();
     await user.click(within(row).getByRole("button", { name: texts.remove.ar }));
     await waitFor(() => expect(calls(fetch, "DELETE", url)).toHaveLength(1));
+    // gone at once, with Undo in its place instead of "are you sure?"
+    expect(await screen.findByRole("status", { name: "" })).toHaveTextContent("اتشال «Sample provider» · تراجع");
+    await user.click(screen.getByRole("button", { name: texts.undo.ar }));
+    await waitFor(() => expect(calls(fetch, "POST", "/api/undo/tok")).toHaveLength(1));
+    expect(await screen.findByRole("button", { name: texts.remove.ar })).toBeInTheDocument();
   });
 
   it("a refused address says what One needs, in its own words", async () => {

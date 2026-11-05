@@ -1,11 +1,164 @@
-// The Progress Line: one line per agent at work, its name and what it is doing now. Each line is updated in place.
-// It is in the Brief's language (the engineer's, for that Brief), not the page's: an Arabic Brief in the English
-// page shows Arabic progress, as its reply is. While the Brief is live, each new step the core reports rises in as a
-// new line (150 ms); nothing here runs on a timer, and the steps of a Brief read again stay still.
-import { useLayoutEffect, useRef } from "react";
-import { dir, type Language, pick, t, useLanguage } from "../../i18n";
-import { DUR, play } from "../../ui/motion";
-import type { ProgressData } from "./types";
+// The Progress Line and the work log. It is in the Brief's language (the engineer's, for that Brief), not the page's:
+// an Arabic Brief in the English page shows Arabic progress, as its reply is.
+//
+// With the core's work log (data-worklog: each step with its real start and end), it is an honest log. While the
+// Brief runs, Thinking shimmers over every step so far; a step still running is a chip with its own timer, counting
+// the real time since the core said it began, and three dots fading beside it; no fill bar, no guess. When the Brief
+// ends, Thinking settles to its real time and step count ("Worked for 2m 5s · 6 steps") and the steps fold into that
+// line, which opens them again. Nothing here runs on a timer but the chip's clock, and only while that step runs.
+// With reduced motion there is no shimmer, no fade and no ticking clock: just the words.
+//
+// A Brief stored before the work log came shows the older line: one per agent, its latest words, updated in place.
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { count, dir, fill, type Language, pick, t, useLanguage } from "../../i18n";
+import { AutoHeight } from "../../ui/AutoHeight";
+import { DUR, play, useReducedMotion } from "../../ui/motion";
+import type { ProgressData, WorklogData, WorkStep } from "./types";
+
+/** The app's numerals: Latin digits in both languages. */
+const locale = (lang: Language) => (lang === "ar" ? "ar-EG-u-nu-latn" : "en-GB");
+
+/** A Brief's whole time in words: "42s", "2m 5s" (whole minutes past ten), "1h 5m"; «دقيقتين و5 ثواني». */
+export function duration(ms: number, lang: Language): string {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  const both = (a: string, b: string) => fill(t("durationAnd", lang), { a, b });
+  if (s < 60) return count("seconds", s, {}, lang);
+  const m = Math.floor(s / 60);
+  if (m < 60) {
+    const minutes = count("minutes", m, {}, lang);
+    return s % 60 && m < 10 ? both(minutes, count("seconds", s % 60, {}, lang)) : minutes;
+  }
+  const hours = count("hours", Math.floor(m / 60), {}, lang);
+  return m % 60 ? both(hours, count("minutes", m % 60, {}, lang)) : hours;
+}
+
+/** A step's time, short: "1.2 s" under a minute, then "1m 05s"; «1.2 ث», «1 د 05 ث». */
+export function tick(ms: number, lang: Language): string {
+  const s = Math.max(0, ms) / 1000;
+  if (s < 60) {
+    const tenths = new Intl.NumberFormat(locale(lang), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return fill(t("tickSeconds", lang), { s: tenths.format(Math.floor(s * 10) / 10) });
+  }
+  const whole = Math.floor(s);
+  return fill(t("tickMinutes", lang), { m: Math.floor(whole / 60), s: String(whole % 60).padStart(2, "0") });
+}
+
+const span = (from: string, to: string) => Date.parse(to) - Date.parse(from);
+
+/** Now, again every 100 ms while `on`: the running chip's clock. */
+function useNow(on: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!on) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(timer);
+  }, [on]);
+  return now;
+}
+
+/** Three dots fading in turn, CSS only (styles.css .work-dots), beside a step that really runs. */
+function Dots() {
+  return (
+    <span data-dots aria-hidden="true" className="work-dots">
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}
+
+/** A running step: what it does (its words carry the file's name) and how long it has run. */
+function RunningChip({ step, lang }: { step: WorkStep; lang: Language }) {
+  const reduced = useReducedMotion();
+  const now = useNow(!reduced);
+  return (
+    <span data-running className="inline-flex max-w-full items-baseline gap-1.5 rounded-full bg-stone px-2.5 py-0.5 text-ink">
+      <span dir="auto" className="min-w-0 truncate">
+        {pick(step.text, lang)}
+      </span>
+      {!reduced && (
+        <>
+          {" "}
+          <span className="tabular-nums text-slate">· {tick(now - Date.parse(step.at), lang)}</span>
+          <Dots />
+        </>
+      )}
+    </span>
+  );
+}
+
+/** One step of the log; rises in (150 ms) when it arrives while the Brief is live. */
+function Step({ step, lang, live }: { step: WorkStep; lang: Language; live: boolean }) {
+  const ref = useRef<HTMLLIElement>(null);
+  useLayoutEffect(() => {
+    if (live && ref.current) void play(ref.current, [{ opacity: 0, transform: "translateY(0.5em)" }, { opacity: 1, transform: "none" }], DUR.short);
+  }, []); // on arrival only
+  const took = step.until ? span(step.at, step.until) : 0;
+  return (
+    <li ref={ref} className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+      <span className="font-semibold text-ink">{pick(step.agent, lang)}</span>{" "}
+      {live && step.until === null ? (
+        <RunningChip step={step} lang={lang} />
+      ) : (
+        <span dir="auto">{pick(step.text, lang)}</span>
+      )}
+      {took >= 100 && ( // under a tenth of a second there is nothing honest to show
+        <>
+          {" "}
+          <span className="tabular-nums">· {tick(took, lang)}</span>
+        </>
+      )}
+    </li>
+  );
+}
+
+function Steps({ steps, lang, live }: { steps: WorkStep[]; lang: Language; live: boolean }) {
+  return (
+    <ul aria-label={t("workSteps", lang)} aria-live={live ? "polite" : undefined} className="flex flex-col gap-1">
+      {steps.map((step) => (
+        <Step key={step.at + pick(step.agent, "en")} step={step} lang={lang} live={live} />
+      ))}
+    </ul>
+  );
+}
+
+/** The work log of one Brief. */
+function WorkLog({ log, lang, live }: { log: WorklogData; lang: Language; live: boolean }) {
+  const reduced = useReducedMotion();
+  const [open, setOpen] = useState(false);
+  const header = useRef<HTMLDivElement>(null);
+  const ended = log.ended !== null;
+  const settled = ended
+    ? fill(t("workedFor", lang), { time: duration(span(log.started, log.ended!), lang), steps: count("steps", log.steps.length, {}, lang) })
+    : undefined;
+  const was = useRef(ended);
+  useLayoutEffect(() => {
+    // Thinking settles to the real time: the new words fade in where the shimmer was (opacity only)
+    if (ended && !was.current && header.current) void play(header.current, [{ opacity: 0 }, { opacity: 1 }], DUR.base);
+    was.current = ended;
+  }, [ended]);
+  return (
+    <div lang={lang} dir={dir(lang)} className="flex flex-col gap-1 text-slate">
+      <div ref={header}>
+        {settled ? (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="flex items-baseline gap-2 text-start hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+          >
+            <span aria-hidden="true">{open ? "▾" : lang === "ar" ? "◂" : "▸"}</span>
+            <span className="tabular-nums">{settled}</span>
+          </button>
+        ) : (
+          live && <span className={reduced ? "text-slate" : "shimmer"}>{t("thinking", lang)}</span>
+        )}
+      </div>
+      <AutoHeight>{(!ended || open) && log.steps.length > 0 && <Steps steps={log.steps} lang={lang} live={live && !ended} />}</AutoHeight>
+    </div>
+  );
+}
 
 /** One agent's line; keyed by its step too, so a new step is a new line that rises in. */
 function Line({ data, lang, live }: { data: ProgressData; lang?: Language; live: boolean }) {
@@ -21,8 +174,20 @@ function Line({ data, lang, live }: { data: ProgressData; lang?: Language; live:
   );
 }
 
-export function ProgressLine({ items, lang, live = false }: { items: { id: string; data: ProgressData }[]; lang?: Language; live?: boolean }) {
-  useLanguage();
+export function ProgressLine({
+  items,
+  worklog,
+  lang,
+  live = false,
+}: {
+  items: { id: string; data: ProgressData }[];
+  /** The core's work log for this Brief; without it, the older per-agent line. */
+  worklog?: WorklogData;
+  lang?: Language;
+  live?: boolean;
+}) {
+  const page = useLanguage();
+  if (worklog) return <WorkLog log={worklog} lang={lang ?? page} live={live} />;
   if (items.length === 0) return null;
   return (
     <ul aria-label={t("progressLine")} aria-live="polite" className="flex flex-col gap-1 text-slate">

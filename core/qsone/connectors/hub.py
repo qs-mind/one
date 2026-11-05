@@ -385,9 +385,37 @@ class ConnectorHub:
         store is down (then nothing is removed)."""
         self._need(name)
         keys.delete_key(KEY_PREFIX + name)
-        self._save([c for c in self.configs() if c.name != name])
+        await self.take_out(name)
+
+    async def take_out(self, name: str) -> dict:
+        """Takes the Connector out of use (its server stops); its token stays in the key store.
+        What was taken, for `put_back` (Undo). Raises `ConnectorError` (404) for an unknown
+        name."""
+        found = self._need(name)
+        configs = self.configs()
+        at = configs.index(found)
+        self._save(configs[:at] + configs[at + 1 :])
         self._listed.pop(name, None)
         await self._drop(name)
+        return {"at": at, "config": found.as_json()}
+
+    def put_back(self, taken: dict) -> bool:
+        """Undo of `take_out`; False when a Connector of that name was added since."""
+        config = ConnectorConfig.from_json(taken["config"])
+        configs = self.configs()
+        if config is None or any(c.name == config.name for c in configs):
+            return False
+        configs.insert(taken["at"], config)
+        self._save(configs)
+        return True
+
+    def forget_key(self, taken: dict) -> None:
+        """The purge after `take_out`'s Undo window: its token leaves the key store, unless a
+        Connector of that name was added since (the token is then that one's). Raises
+        `KeyringError` (tried again later)."""
+        name = taken["config"]["name"]
+        if self.config(name) is None:
+            keys.delete_key(KEY_PREFIX + name)
 
     async def set_enabled(self, name: str, on: bool) -> ConnectorConfig:
         found = replace(self._need(name), enabled=on)

@@ -63,6 +63,10 @@ export type CardData = {
   /** A settled card with a payload: the answers by question id, and the rows ticked, by index. */
   answers?: Record<string, string>;
   rows_ok?: number[];
+  /** The answers that spend money or can't be taken back: press-and-hold, never one click (core: stream.HOLD). */
+  hold?: { why: "paid" | "irreversible"; options: string[] };
+  /** When the engineer answered (ISO), for the folded card's one-line trace. */
+  settled_at?: string;
 };
 /** data-cost, id = the scope. */
 export type CostData = {
@@ -89,6 +93,12 @@ export type DeliverableData = { id: string };
  * "I understood this" card, which reads the facts itself. */
 export type UnderstoodData = { project_id: string };
 
+/** One step of a Brief's work log: who, what, and its real start and end (ISO, the core's clock); `until` is null
+ * while it runs. */
+export type WorkStep = { agent: Text; text: Text; at: string; until: string | null };
+/** data-worklog, id = the Brief (core: engine/worklog.py): when it began and ended (null while it runs), each step. */
+export type WorklogData = { started: string; ended: string | null; steps: WorkStep[] };
+
 export type OneData = {
   progress: ProgressData;
   team: TeamData;
@@ -102,6 +112,7 @@ export type OneData = {
   understood: UnderstoodData;
   /** data-view, id = the view (decision 16.1): what the Lead QS chose to show, from ONE's blocks. */
   view: ViewData;
+  worklog: WorklogData;
 };
 
 /** A message the engineer sent while a Brief ran is marked as steering it; one sent with a canvas selection keeps

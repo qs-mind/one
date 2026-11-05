@@ -242,6 +242,8 @@ class Progress:
     text: Text
     focus: dict | None = None  # the canvas frame the agent now works on (Plan 7), when known
     lang: str | None = None  # the Brief's language; the Brief sets it as it sends the event
+    tool: bool = False  # a tool call: a step of its own, open until the agent's tools return
+    at: str | None = None  # when it began (ISO 8601 UTC); the Brief sets it as it sends the event
 
 
 @dataclass(frozen=True)
@@ -264,6 +266,7 @@ class Settled:
     brief_id: str
     card_id: str
     choice: str
+    at: str | None = None  # when the engineer answered (ISO 8601), for the card's one-line trace
 
 
 @dataclass(frozen=True)

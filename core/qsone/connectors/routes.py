@@ -7,7 +7,8 @@
   screen shows (ConnectorCard). The token stays in memory until the engineer says yes.
 - `POST /connectors/cards/{card_id}` `{choice, answers?}` answers that card: `{"connector": …}`
   once saved, `{"connector": null}` after a no.
-- `DELETE /connectors/{name}` → 204; the token leaves the key store too.
+- `DELETE /connectors/{name}` → `{undo, window_ms}`: out of use at once, back with
+  `POST /undo/{token}` inside the window; the token leaves the key store when it ends.
 - `PUT /connectors/{name}/enabled` `{enabled}` → `{"connector": …}`.
 
 Refusals are `{"error": {en, ar}}`: CONNECTOR_BAD (422), CONNECTOR_NAME_TAKEN (409),
@@ -28,6 +29,7 @@ from starlette.responses import Response
 from qsone import copy
 from qsone.connectors.hub import ConnectorConfig, ConnectorDown, ConnectorError, ConnectorHub
 from qsone.engine.types import BadAnswer, Card, answer_value
+from qsone.undo import Trash
 
 
 class ConnectorIn(BaseModel):
@@ -70,8 +72,11 @@ def _card_json(card: Card) -> dict:
     return found
 
 
-def router(hub: ConnectorHub) -> APIRouter:
+def router(hub: ConnectorHub, trash: Trash | None = None) -> APIRouter:
+    """A removed Connector waits in `trash` for its Undo window."""
     router = APIRouter()
+    trash = trash if trash is not None else Trash()
+    trash.kind("connector", restore=hub.put_back, purge=hub.forget_key)
     waiting: dict[str, tuple[Card, asyncio.Future, asyncio.Task, str]] = {}
 
     def refused(text: dict, status: int) -> JSONResponse:
@@ -144,10 +149,10 @@ def router(hub: ConnectorHub) -> APIRouter:
     @router.delete("/connectors/{name}")
     async def remove(name: str) -> Response:
         try:
-            await hub.remove(name)
-        except (ConnectorError, KeyringError) as error:
+            taken = await hub.take_out(name)
+        except ConnectorError as error:
             return failure(error)
-        return Response(status_code=204)
+        return JSONResponse(trash.put("connector", taken))
 
     @router.put("/connectors/{name}/enabled")
     async def enable(name: str, body: EnabledIn) -> JSONResponse:

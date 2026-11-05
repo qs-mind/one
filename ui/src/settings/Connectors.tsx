@@ -1,14 +1,19 @@
 // Connectors (Plan 5, Task 12): the MCP servers the engineer adds, on this computer (a command) or over the internet
 // (an address). Adding one starts it to see what it can do; the core answers with a connector card, shown here on its
 // own (ConnectorCard), and the Connector is saved only after the engineer says yes. A token is sent once, kept in the
-// key store by the core, and never shown again. Self-contained: whoever opens Settings places it.
+// key store by the core, and never shown again. Self-contained: whoever opens Settings places it. Remove takes it out
+// at once, with Undo in its place for the core's window (UndoNotice), instead of asking "are you sure?".
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { api } from "../api";
 import { ConnectorCard } from "../chat/parts/ConnectorCard";
 import type { CardAnswer } from "../chat/parts/cardKinds";
 import type { CardData } from "../chat/parts/types";
 import { coreLine, send } from "../core";
-import { count, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { count, fill, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { UndoNotice } from "../ui/UndoNotice";
+
+/** The core's answer to a removal: its Undo token and window (core/qsone/undo.py). */
+export type Removed = { undo: string; window_ms: number };
 
 /** One Connector, as GET /connectors sends it (core/qsone/connectors/routes.py). */
 export type ConnectorRow = {
@@ -42,6 +47,8 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
   const [failed, setFailed] = useState<Text>();
   const [added, setAdded] = useState(false);
+  // by name, each with its Undo in place; kept with its row, so a reload in the window keeps the Undo too
+  const [removed, setRemoved] = useState<Record<string, Removed & { row: ConnectorRow }>>({});
 
   const load = useCallback(async () => {
     const response = await api("/connectors").catch(() => undefined);
@@ -66,7 +73,25 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
   async function remove(row: ConnectorRow) {
     setFailed(undefined);
     const response = await send(`/connectors/${encodeURIComponent(row.name)}`, "DELETE");
-    if (!response?.ok) setFailed(await coreLine(response, texts.removeFailed));
+    if (!response?.ok) {
+      setFailed(await coreLine(response, texts.removeFailed));
+      return void load();
+    }
+    const undo = (await response.json().catch(() => undefined)) as Removed | undefined;
+    if (undo?.undo) setRemoved((was) => ({ ...was, [row.name]: { ...undo, row } }));
+    else void load();
+  }
+
+  /** The list, with each one removed in this window still in its place (the core has it out of use already). */
+  const shown = (listed: ConnectorRow[]) =>
+    Object.values(removed).reduce(
+      (rows, { row }) => (rows.some((r) => r.name === row.name) ? rows : [...rows, row]),
+      listed,
+    );
+
+  /** Its Undo was pressed, or its window ended: the list as the core has it now. */
+  function settled(name: string) {
+    setRemoved(({ [name]: _, ...rest }) => rest);
     void load();
   }
 
@@ -96,11 +121,22 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
           </div>
         )}
         {loaded.state === "ready" &&
-          (loaded.connectors.length === 0 ? (
+          (shown(loaded.connectors).length === 0 ? (
             <p>{t("noConnectors")}</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {loaded.connectors.map((row) => (
+              {shown(loaded.connectors).map((row) =>
+                removed[row.name] ? (
+                  <li key={row.name} className="rounded-md px-3 py-2">
+                    <UndoNotice
+                      label={fill(t("removedName"), { name: row.name })}
+                      token={removed[row.name]!.undo}
+                      windowMs={removed[row.name]!.window_ms}
+                      onUndone={() => settled(row.name)}
+                      onEnd={() => settled(row.name)}
+                    />
+                  </li>
+                ) : (
                 <li key={row.name} className="flex items-center justify-between gap-4 rounded-md bg-stone px-3 py-2">
                   <span className="flex flex-col">
                     <span dir="auto" className="font-semibold">
@@ -125,7 +161,8 @@ export function Connectors({ onClose }: { onClose?: () => void }) {
                     </button>
                   </span>
                 </li>
-              ))}
+                ),
+              )}
             </ul>
           ))}
         <Alert line={failed} />

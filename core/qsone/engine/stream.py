@@ -3,11 +3,12 @@ of a stored UI message.
 
 The Lead's words are one text part. One's own events are `data-*` parts with a stable id, so the
 screen updates each in place: `data-progress` (id: the agent run), `data-team` (the message),
-`data-card` (the card; status pending, settled with the choice, or withdrawn), `data-cost` (the
-scope), `data-review` (the Deliverable), `data-unsourced` (the Brief), `data-status` (the Brief),
-and any `Data` event as `data-<name>`. A failed Brief also ends with an `error` chunk whose text
-is its plain {en, ar} words as JSON, as the screen reads it, with the `fix` the screen can offer
-(`copy.fix_of`); a card carries its detail's `fix` too.
+`data-card` (the card; status pending, settled with the choice and when, or withdrawn; `hold`
+names the answers that need press-and-hold), `data-cost` (the scope), `data-review` (the
+Deliverable), `data-unsourced` (the Brief), `data-status` (the Brief), and any `Data` event as
+`data-<name>`, such as `data-worklog` (the Brief: `engine.worklog`). A failed Brief also ends
+with an `error` chunk whose text is its plain {en, ar} words as JSON, as the screen reads it,
+with the `fix` the screen can offer (`copy.fix_of`); a card carries its detail's `fix` too.
 
 No PydanticAI here: the chunks are written as the protocol defines them."""
 
@@ -40,6 +41,19 @@ HEARTBEAT = ": keep-alive\n\n"
 _END = object()
 
 
+# The answers that spend money or cannot be taken back, by card kind: the screen asks for them by
+# press-and-hold, never a single click. "paid": a tool's own cost, a Brief Budget, going on at a
+# Spending Cap or with a model of unknown price, a costlier model. "irreversible": an outside tool
+# sends or deletes something outside ONE. Every other answer is one click.
+HOLD: dict[str, tuple[str, tuple[str, ...]]] = {
+    "outside": ("irreversible", ("yes",)),
+    "cost": ("paid", ("yes",)),
+    "budget": ("paid", ("yes",)),
+    "cap": ("paid", ("continue", "yes")),
+    "fallback": ("paid", ("yes",)),
+}
+
+
 def _card(card) -> dict:
     found = {
         "kind": card.kind,
@@ -47,6 +61,11 @@ def _card(card) -> dict:
         "detail": card.detail,
         "options": list(card.options),
     }
+    if card.kind in HOLD:
+        why, options = HOLD[card.kind]
+        held = [o for o in options if o in card.options]
+        if held:
+            found["hold"] = {"why": why, "options": held}
     fix = copy.fix_of(card.detail)
     if fix is not None:
         found["fix"] = fix
@@ -88,6 +107,8 @@ class _Parts:
             card = self.cards.get(event.card_id, {})
             answer = _settled(self.asked.get(event.card_id), event.choice)
             data = card | {"status": "settled"} | answer
+            if event.at is not None:
+                data["settled_at"] = event.at
             return "data-card", event.card_id, data
         if isinstance(event, CostNotice):
             data = {

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApprovalCard } from "../chat/parts/ApprovalCard";
@@ -169,6 +169,10 @@ describe("Connectors", () => {
       },
       "DELETE /api/connectors/mail-sample": () => {
         list = [];
+        return Response.json({ undo: "tok", window_ms: 6000 });
+      },
+      "POST /api/undo/tok": () => {
+        list = [mail];
         return new Response(null, { status: 204 });
       },
     });
@@ -180,8 +184,29 @@ describe("Connectors", () => {
     await waitFor(() => expect(bodies(fetch, "PUT", "/api/connectors/mail-sample/enabled")).toEqual([{ enabled: false }]));
     await waitFor(() => expect(screen.getByRole("checkbox", { name: texts.connectorSwitchedOn.ar })).not.toBeChecked());
     await user.click(screen.getByRole("button", { name: texts.remove.ar }));
-    expect(await screen.findByText(texts.noConnectors.ar)).toBeInTheDocument();
+    // gone at once, with Undo in its place instead of "are you sure?"
+    expect(await screen.findByRole("status")).toHaveTextContent("اتشال «mail-sample» · تراجع");
     expect(bodies(fetch, "DELETE", "/api/connectors/mail-sample")).toEqual([undefined]);
+    await user.click(screen.getByRole("button", { name: texts.undo.ar }));
+    expect(await screen.findByRole("button", { name: texts.remove.ar })).toBeInTheDocument();
+  });
+
+  it("a removed one is gone for good once its window ends", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let list = [mail];
+    core({
+      "GET /api/connectors": () => Response.json({ connectors: list }),
+      "DELETE /api/connectors/mail-sample": () => {
+        list = [];
+        return Response.json({ undo: "tok", window_ms: 6000 });
+      },
+    });
+    render(<Connectors />);
+    fireEvent.click(await screen.findByRole("button", { name: texts.remove.ar }));
+    expect(await screen.findByRole("status")).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTime(6000));
+    expect(await screen.findByText(texts.noConnectors.ar)).toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("speaks English left to right when the engineer picks English", async () => {

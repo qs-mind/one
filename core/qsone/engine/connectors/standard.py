@@ -151,19 +151,63 @@ def remove(connector_id: str) -> bool:
 
     False when there is no such entry. Raises `KeyringError` (then nothing is removed) and
     `OSError`."""
-    entries = _entries()
-    kept = [e for e in entries if PREFIX + e["id"] != connector_id]
-    if len(kept) == len(entries):
+    if take_out(connector_id) is None:
         return False
-    keys.delete_key(connector_id)
-    ai = settings.ai()
-    roles = ai.get("roles") if isinstance(ai.get("roles"), dict) else {}
-    roles = {
-        r: c
-        for r, c in roles.items()
-        if not (isinstance(c, dict) and c.get("connector") == connector_id)
-    }
-    prices = ai.get("prices") if isinstance(ai.get("prices"), dict) else {}
-    prices = {k: p for k, p in prices.items() if not k.startswith(connector_id + "/")}
-    settings.save("ai", ai | {"standard": kept, "roles": roles, "prices": prices})
+    forget_key({"id": connector_id})
     return True
+
+
+def _part(ai: dict, name: str) -> dict:
+    found = ai.get(name)
+    return dict(found) if isinstance(found, dict) else {}
+
+
+def take_out(connector_id: str) -> dict | None:
+    """Takes the entry out of use, with the role choices and prices that named it; its key
+    stays. What was taken, for `put_back` (Undo); None when there is no such entry."""
+    entries = _entries()
+    at = next((i for i, e in enumerate(entries) if PREFIX + e["id"] == connector_id), None)
+    if at is None:
+        return None
+    ai = settings.ai()
+
+    def named(choice) -> bool:
+        return isinstance(choice, dict) and choice.get("connector") == connector_id
+
+    roles, prices = _part(ai, "roles"), _part(ai, "prices")
+    mine = {k: p for k, p in prices.items() if k.startswith(connector_id + "/")}
+    settings.save(
+        "ai",
+        ai
+        | {
+            "standard": entries[:at] + entries[at + 1 :],
+            "roles": {r: c for r, c in roles.items() if not named(c)},
+            "prices": {k: p for k, p in prices.items() if k not in mine},
+        },
+    )
+    return {
+        "id": connector_id,
+        "at": at,
+        "entry": entries[at],
+        "roles": {r: c for r, c in roles.items() if named(c)},
+        "prices": mine,
+    }
+
+
+def put_back(taken: dict) -> bool:
+    """Undo of `take_out`: the entry in its place again, its prices, and its role choices for
+    the roles not chosen anew since."""
+    entries = _entries()
+    if any(e["id"] == taken["entry"]["id"] for e in entries):
+        return False
+    entries.insert(taken["at"], taken["entry"])
+    ai = settings.ai()
+    roles = taken["roles"] | _part(ai, "roles")
+    prices = _part(ai, "prices") | taken["prices"]
+    settings.save("ai", ai | {"standard": entries, "roles": roles, "prices": prices})
+    return True
+
+
+def forget_key(taken: dict) -> None:
+    """The purge after `take_out`'s Undo window. Raises `KeyringError` (tried again later)."""
+    keys.delete_key(taken["id"])
