@@ -5,7 +5,7 @@ import { type FormEvent, useEffect, useId, useState } from "react";
 import { api } from "../api";
 import { coreLine, send } from "../core";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
-import { Feedback, field, type Nav, option, primary, StepScreen } from "./parts";
+import { field, type Nav, option, primary, StepScreen } from "./parts";
 
 type Role = "contractor" | "consultant" | "owner" | "procurement";
 type Country = "EG" | "SA" | "AE" | "other";
@@ -74,7 +74,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!role) return;
+    if (!role || saving) return;
     setSaving(true);
     setFailed(undefined);
     const response = await send("/engineer/card", "PUT", { role, country, city: city.trim(), currency: CURRENCY[country] });
@@ -83,7 +83,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
     await nav.pass("done");
   }
 
-  const ready = role !== undefined && !saving;
+  const ready = role !== undefined; // not dimmed while it saves: the spinner shows in it
   return (
     <form onSubmit={save} noValidate>
       <StepScreen
@@ -92,8 +92,15 @@ export function IntroCard({ nav }: { nav: Nav }) {
         nav={nav}
         failed={failed && pick(failed)}
         next={
-          <button type="submit" disabled={!ready} className={primary}>
-            {t("setupNext")}
+          // while it saves, the button itself shows it: nothing above it appears, so the row never moves
+          <button type="submit" disabled={!ready} aria-busy={saving} className={`${primary} relative`}>
+            <span className={saving ? "invisible" : undefined}>{t("setupNext")}</span>
+            {saving && (
+              <span className="absolute inset-0 flex items-center justify-center">
+                <span aria-hidden="true" className="fl-spin block size-4 rounded-full border-2 border-paper/30 border-t-paper" />
+                <span className="sr-only">{t("cardSaving")}</span>
+              </span>
+            )}
           </button>
         }
       >
@@ -131,7 +138,6 @@ export function IntroCard({ nav }: { nav: Nav }) {
               <input dir="auto" maxLength={80} value={city} onChange={(event) => setCity(event.target.value)} className={field} />
             </label>
           </div>
-          {saving && <Feedback state="busy">{t("cardSaving")}</Feedback>}
         </div>
       </StepScreen>
     </form>

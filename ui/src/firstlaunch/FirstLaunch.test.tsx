@@ -336,6 +336,21 @@ describe("FirstLaunch", () => {
     await waitFor(() => expect(calls(fetch, "PUT /setup/card")[0]).toEqual({ state: "done" }));
   });
 
+  it("introduction card: while it saves, Next shows it and nothing appears above the buttons", async () => {
+    let answer!: (response: Response) => void;
+    mockCore({ "PUT /engineer/card": () => new Promise<Response>((resolve) => (answer = resolve)) });
+    const user = userEvent.setup();
+    flowAt("card");
+    await user.click(await screen.findByRole("radio", { name: texts.cardRoleContractor.en }));
+    await user.click(screen.getByRole("button", { name: texts.setupNext.en }));
+    const next = await screen.findByRole("button", { name: new RegExp(texts.cardSaving.en.replace("…", "")) });
+    expect(next).toHaveAttribute("aria-busy", "true");
+    expect(next).toBeEnabled(); // not dimmed
+    expect(screen.queryByRole("status")).toBeNull(); // no new line that would push the row down
+    answer(Response.json({}));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: texts.cardTitle.en })).toBeNull());
+  });
+
   it("introduction card: a currency the core refuses says so and stays", async () => {
     const refused = { detail: [{ loc: ["body", "currency"], msg: "String should match pattern", type: "string_pattern_mismatch" }] };
     const fetch = mockCore({ "PUT /engineer/card": () => Response.json(refused, { status: 422 }) });
