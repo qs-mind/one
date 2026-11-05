@@ -15,7 +15,7 @@ from pydantic_ai import Agent
 
 from qsone import copy, settings
 from qsone.app import create_app
-from qsone.engine import cards, costs
+from qsone.engine import cards, costs, general
 from qsone.engine.costs import (
     RECOMMENDED,
     Budget,
@@ -598,20 +598,30 @@ def test_caps_routes_take_exact_numbers_only(data_dir):
     assert client.get("/settings/ai/caps").status_code == 401
 
 
-def test_costs_route_gives_spent_and_equivalent_as_text(data_dir, general, monkeypatch):
-    client = TestClient(create_app(SECRET, data_dir=data_dir))
-    r = client.get("/costs", headers=AUTH)
-    assert r.status_code == 200
-    assert r.json()["brief"] is None and r.json()["today"] == "0" and r.json()["month"] == "0"
+def test_costs_route_gives_spent_and_equivalent_as_text(data_dir, monkeypatch):
+    with TestClient(create_app(SECRET, data_dir=data_dir)) as client:
+        engine = client.app.state.engine
 
+        def second_connection(data_dir):
+            raise AssertionError("GET /costs opened the Engineer Records file again")
+
+        # the engine holds the file open: the route reads its cost book, never a second one
+        monkeypatch.setattr(general, "open_engineer_records", second_connection)
+        r = client.get("/costs", headers=AUTH)
+        assert r.status_code == 200
+        assert r.json()["brief"] is None and r.json()["today"] == "0" and r.json()["month"] == "0"
+        costs_of_b1 = add_sample_costs(engine.book)  # the computer's own day, as the route's
+        r = client.get("/costs", params={"brief_id": "b1"}, headers=AUTH)
+    assert r.json() == costs_of_b1
+
+
+def add_sample_costs(book: CostBook) -> dict:
     now = datetime.now(UTC)
-    book = CostBook(general)  # the computer's own day, as the route's
     book_add(book, brief="b1", usd="1.25", at=now)
     book_add(book, brief="b2", usd="0.50", at=now, project="p2")
     book_add(book, brief="b1", usd="0.75", at=now, equivalent=True)
     book_add(book, brief="b1", usd=None, at=now)
-    r = client.get("/costs", params={"brief_id": "b1"}, headers=AUTH)
-    assert r.json() == {
+    return {  # what GET /costs?brief_id=b1 answers for them
         "brief": "1.25",
         "today": "1.75",
         "month": "1.75",
@@ -627,6 +637,7 @@ def test_costs_route_gives_spent_and_equivalent_as_text(data_dir, general, monke
 
 
 def test_costs_route_creates_no_engineer_records(data_dir):
-    client = TestClient(create_app(SECRET, data_dir=data_dir))
+    """Before the engine has opened the file (or when it could not), nothing is spent yet."""
+    client = TestClient(create_app(SECRET, data_dir=data_dir))  # no lifespan: no engine start
     assert client.get("/costs", headers=AUTH).json()["today"] == "0"
     assert not (data_dir / "engineer").exists()

@@ -18,12 +18,10 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from starlette.responses import Response, StreamingResponse
 
-from qsone import copy, keys, settings
-from qsone.engine import cards, connectors, costs, general, roles
+from qsone import copy, keys
+from qsone.engine import cards, connectors, costs, roles
 from qsone.engine.connectors import claude_code, standard
-from qsone.engine.store import CostBook
 from qsone.engine.types import ModelCard, ModelChoice, Role, Text
-from qsone.records.project import FILE_NAME
 
 
 class ChoiceIn(BaseModel):
@@ -217,19 +215,6 @@ def settings_router(
             return JSONResponse({"error": copy.CAPS_NOT_SAVED}, status_code=503)
         return JSONResponse(caps_answer(saved))
 
-    @router.get("/costs")
-    def spent(brief_id: str | None = None) -> dict:
-        # Opened for this answer only, and never created by it; the Brief Runner (Task 8) may
-        # hand its own open cost book here instead.
-        data = settings.data_dir()
-        if not (data / general.FOLDER / FILE_NAME).is_file():
-            return costs.summary(None, brief_id=brief_id, now=datetime.now(UTC))
-        rec = general.open_engineer_records(data)
-        try:
-            return costs.summary(CostBook(rec), brief_id=brief_id, now=datetime.now(UTC))
-        finally:
-            rec.close()
-
     return router
 
 
@@ -311,6 +296,11 @@ def briefs_router(engine: Any) -> APIRouter:
         except LookupError:
             return refused(copy.CARD_GONE, 404)
         return Response(status_code=204)
+
+    @router.get("/costs")
+    def spent(brief_id: str | None = None) -> dict:
+        """From the engine's own open cost book; nothing is spent before it is open."""
+        return costs.summary(engine.cost_book(), brief_id=brief_id, now=datetime.now(UTC))
 
     @router.get("/projects/{project_id}/team")
     def team(project_id: str) -> dict:

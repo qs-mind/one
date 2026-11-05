@@ -14,7 +14,9 @@ Settings come from the environment or, because One clears the environment it pas
 those are never logged as argv:
 
 - FAKE_CLAUDE_SCRIPT / --fake-script: JSON text or a path to a JSON file. A list of steps for one
-  run, or `{"runs": [[...], [...]]}`: run N (counted in the log) plays runs[N], the last repeating.
+  run, or `{"runs": [[...], [...]]}`: run N plays runs[N], the last repeating. Runs that log are
+  numbered 0, 1, … in the order they start, by a counter beside the log (`<log>.run<N>` files);
+  a run with no log is run 0.
 - FAKE_CLAUDE_LOG / --fake-log: a JSON-lines file; `engine_fakes.read_fake_log` reads it.
   It logs the argv, the environment's names (never values), the files named by --mcp-config and
   --system-prompt-file, each stdin line, and how the run ended.
@@ -33,6 +35,7 @@ Steps (a string, or an object with one key):
   with the `mcp` client to the URL and headers in --mcp-config; its result comes back as a
   `user` tool_result line. A URL that is not loopback stops the fake.
 - {"sleep": seconds}: waits; an interrupt or SIGTERM ends it early.
+- {"await_user": seconds}: waits for one more user line on stdin (a steer), at most that long.
 - "drop": exits with code 3 mid-stream, with no result line.
 - {"error": "rate_limit" | "authentication_failed" | …, "status"?}: a `system/api_retry` line.
 - "result" or {"result": {"subtype"?, "is_error"?, "cost"?: "0.01"}}: the result line.
@@ -199,13 +202,22 @@ def out(obj: dict) -> None:
         sys.stdout.flush()
 
 
+def claim_run_number(log: Path) -> int:
+    """The lowest run number no other run has: each is claimed by creating `<log>.run<n>`
+    exclusively, which is atomic on every system, so runs started at once never share one."""
+    n = 0
+    while True:
+        try:
+            os.close(os.open(f"{log}.run{n}", os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            return n
+        except FileExistsError:
+            n += 1
+
+
 class Log:
     def __init__(self, path: str | None) -> None:
         self.path = Path(path) if path else None
-        self.n = 0
-        if self.path and self.path.exists():
-            text = self.path.read_text(encoding="utf-8")
-            self.n = sum(json.loads(line)["kind"] == "start" for line in text.splitlines())
+        self.n = claim_run_number(self.path) if self.path else 0
 
     def write(self, record: dict) -> None:
         if self.path:
@@ -309,6 +321,16 @@ class Run:
             elif message.get("type") == "user":
                 self.users.put(message)
         self.users.put(None)  # end of input
+
+    def await_user(self, seconds: float) -> None:
+        """Waits for one more user line (a steer), the end of stdin, an interrupt or the time."""
+        deadline = time.monotonic() + seconds
+        while not self.interrupted.is_set() and time.monotonic() < deadline:
+            try:
+                self.users.get(timeout=0.05)
+                return
+            except queue.Empty:
+                continue
 
     def stop_if_interrupted(self) -> None:
         if self.interrupted.is_set():
@@ -556,6 +578,8 @@ class Run:
                 self.call_mcp(step)
             elif name == "sleep":
                 self.interrupted.wait(float(step))
+            elif name == "await_user":
+                self.await_user(float(step))
             elif name == "drop":
                 self.log.end("dropped")
                 os._exit(3)

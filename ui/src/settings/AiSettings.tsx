@@ -439,25 +439,47 @@ function PriceForm({ sheet, onSaved }: { sheet: ModelCard[]; onSaved: () => void
   );
 }
 
-/** An amount typed as exact text, never turned into a float on the way. */
-function Amount({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+/** An amount typed as exact text, never turned into a float on the way; `hint` is a line under it. */
+function Amount({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  hint?: string;
+}) {
+  const hintId = useId();
   return (
-    <label className="flex flex-col gap-1">
-      <span>{label}</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        dir="ltr"
-        spellCheck={false}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={field}
-      />
-    </label>
+    <div className="flex flex-col gap-1">
+      <label className="flex flex-col gap-1">
+        <span>{label}</span>
+        <input
+          type="text"
+          inputMode="decimal"
+          dir="ltr"
+          spellCheck={false}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-describedby={hint ? hintId : undefined}
+          className={field}
+        />
+      </label>
+      {hint && (
+        <span id={hintId} className="text-slate">
+          {hint}
+        </span>
+      )}
+    </div>
   );
 }
 
-type Caps = { brief: string; day: string; month: string; budget_above: string; subscription_stops?: boolean };
+type Amounts = { brief: string; day: string; month: string; budget_above: string };
+type Caps = Amounts & { subscription_stops: boolean };
+/** GET and PUT /settings/ai/caps: the caps in force and the Recommended Setting, in USD as exact text. */
+type CapsAnswer = { caps: Caps; recommended: Caps };
 const capFields = [
   ["brief", "capBrief"],
   ["day", "capDay"],
@@ -468,28 +490,43 @@ const capFields = [
 /** The three Spending Caps and the Brief Budget line, in USD. Also used by a cap card's "Raise the cap". */
 export function CapsForm({ onSaved }: { onSaved?: () => void }) {
   useLanguage();
-  const [caps, setCaps] = useState<Caps>();
+  const [caps, setCaps] = useState<Amounts>();
+  const [recommended, setRecommended] = useState<Amounts>();
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const [failed, setFailed] = useState<Text>();
+
+  const shown = useCallback((body: CapsAnswer) => {
+    const amounts = (from: Caps): Amounts => ({
+      brief: from.brief,
+      day: from.day,
+      month: from.month,
+      budget_above: from.budget_above,
+    });
+    setCaps(amounts(body.caps));
+    setRecommended(amounts(body.recommended));
+  }, []);
 
   useEffect(() => {
     let live = true;
     fetch("/api/settings/ai/caps")
-      .then((response) => (response.ok ? (response.json() as Promise<Caps>) : undefined))
-      .then((body) => live && body && setCaps(body))
+      .then((response) => (response.ok ? (response.json() as Promise<CapsAnswer>) : undefined))
+      .then((body) => live && body?.caps && shown(body))
       .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, []);
+  }, [shown]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
     if (!caps) return;
     setState("saving");
     setFailed(undefined);
+    // only the amounts on this form: whether the subscription stops is not changed here
     const response = await send("/api/settings/ai/caps", "PUT", caps);
     if (response?.ok) {
+      const body = (await response.json().catch(() => undefined)) as CapsAnswer | undefined;
+      if (body?.caps) shown(body);
       setState("saved");
       onSaved?.();
     } else {
@@ -505,6 +542,7 @@ export function CapsForm({ onSaved }: { onSaved?: () => void }) {
           key={name}
           label={t(label)}
           value={caps?.[name] ?? ""}
+          hint={recommended ? fill(t("recommendedAmount"), { value: recommended[name] }) : undefined}
           onChange={(value) => {
             setState("idle");
             setCaps((now) => (now ? { ...now, [name]: value } : now));

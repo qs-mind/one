@@ -6,18 +6,24 @@ import { fill, pick, t, type Text, texts, useLanguage } from "../../i18n";
 import { CapsForm } from "../../settings/AiSettings";
 import type { CardData } from "./types";
 
-const optionTexts: Record<string, keyof typeof texts> = {
-  yes: "yes",
-  no: "no",
-  brief: "allowBrief",
-  continue: "capContinue",
-  raise: "capRaise",
-  report: "capReport",
+type Labels = Record<string, keyof typeof texts>;
+const allow: Labels = { yes: "allowOnce", brief: "allowBrief", no: "dontAllow" };
+
+/** The words for each option of each card the core sends: what the answer does, never a bare id. */
+const optionTexts: Record<CardData["kind"], Labels> = {
+  outside: allow,
+  online: allow,
+  // a pause at 80% of a cap; yes and no answer a model of unknown price
+  cap: { continue: "capContinue", raise: "capRaise", report: "capReport", yes: "useIt", no: "dontUseIt" },
+  budget: { yes: "startBrief", no: "dontStart" },
+  fallback: { yes: "useIt", no: "dontUseIt" },
+  desk: { yes: "keepDesk", no: "dontKeep" },
+  disagreement: { yes: "keepAsIs", no: "sendBackToFix" }, // the card's own words say "No" sends it back
 };
+const plain: Labels = { yes: "yes", no: "no" };
 
 function optionLabel(kind: CardData["kind"], option: string): string {
-  if (option === "yes" && (kind === "outside" || kind === "online")) return t("allowOnce");
-  const key = optionTexts[option];
+  const key = optionTexts[kind]?.[option] ?? plain[option];
   return key ? t(key) : option;
 }
 

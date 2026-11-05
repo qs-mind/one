@@ -78,7 +78,10 @@ function core({ keySet = true, routes = {} }: { keySet?: boolean; routes?: Recor
       saved = true;
       return Response.json({ set: true });
     }
-    if (key === "GET /api/settings/ai/caps") return Response.json({ brief: "3.00", day: "15.00", month: "150.00", budget_above: "0.50" });
+    if (key === "GET /api/settings/ai/caps") {
+      const caps = { brief: "3.00", day: "15.00", month: "150.00", budget_above: "0.50", subscription_stops: false };
+      return Response.json({ caps, recommended: caps });
+    }
     if (key === "GET /api/briefs/unfinished") return Response.json({ briefs: [] });
     if (/^GET \/api\/chat\/[^/]+\/messages$/.test(key)) return Response.json({ messages: [] });
     if (/^GET \/api\/chat\/[^/]+\/stream$/.test(key)) return new Response(null, { status: 204 });

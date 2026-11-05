@@ -705,10 +705,73 @@ async def test_nothing_readable_on_disk_after_a_brief(make_engine, project, data
     assert not (data_dir / WORK).exists() or not any((data_dir / WORK).iterdir())
 
 
+def claude_code_link(script, log):
+    from qsone.engine.connectors.claude_code import ClaudeCodeConnector
+    from tests.engine_fakes import fake_claude_command
+
+    return ClaudeCodeConnector(None, command_prefix=fake_claude_command(script=script, log=log))
+
+
+async def test_the_checking_qs_on_claude_code_answers_in_json_text(make_engine, rec_ids, tmp_path):
+    from qsone.engine.connectors.claude_code import ID
+    from qsone.engine.runner import REVIEW_AS_JSON
+    from qsone.engine.types import ModelChoice
+    from tests.engine_fakes import read_fake_log
+
+    project, ids = rec_ids
+    rows = [{"code": "03/02", "quantity": {"number_id": ids["quantity"]}}]
+    deliverable = {
+        "kind": "table",
+        "title": "جدول - عينة",
+        "rows": rows,
+        "sources": [ids["source"]],
+    }
+    lead = scripted(call("make_deliverable", deliverable), said("الجدول جاهز - عينة"))
+    review = {"code": "B", "comments": [{"about": "03/02", "text": "راجع الوحدة - عينة"}]}
+    answer = f"المراجعة - عينة:\n{json.dumps(review, ensure_ascii=False)}\nخلصت."
+    log = tmp_path / "claude.log"
+    claude = claude_code_link(["init", {"text": answer}, "result"], log)
+    roles.choose("checker", ModelChoice(ID, "sonnet"))
+    engine = await started(make_engine([*links(lead=lead), claude]))
+    engine.base_url = "http://127.0.0.1:9/"  # never reached: the fake calls no tool
+    brief = await engine.start_brief(project, BRIEF)
+    events = await finish(engine, brief)
+    assert states(events)[-1] == "done"
+    [reviewed] = [e.review for e in events if isinstance(e, Reviewed)]
+    assert reviewed.code == "B" and reviewed.checker == ModelChoice(ID, "sonnet")
+    assert reviewed.comments == tuple(review["comments"])
+    assert reviewed.same_provider  # the Lead's Claude and Claude Code are both Anthropic
+    [run] = read_fake_log(log)
+    [task] = [line for line in run["stdin"] if line["type"] == "user"]
+    assert REVIEW_AS_JSON in task["message"]["content"][0]["text"]
+    assert store_of(engine, project).unchecked(brief) == []
+
+
+async def test_steer_reaches_a_lead_on_claude_code(make_engine, project, tmp_path):
+    from qsone.engine.connectors.claude_code import ID
+    from qsone.engine.types import ModelChoice
+    from tests.engine_fakes import read_fake_log
+
+    log = tmp_path / "claude.log"
+    script = ["init", {"await_user": 20}, {"text": "تمام، الخرسانة - عينة"}, "result"]
+    roles.choose("lead", ModelChoice(ID, "sonnet"))
+    engine = await started(make_engine([*links(), claude_code_link(script, log)]))
+    engine.base_url = "http://127.0.0.1:9/"  # never reached: the fake calls no tool
+    brief = await engine.start_brief(project, BRIEF)
+    await until(lambda: log.exists() and bool(read_fake_log(log)[0]["stdin"]), steps=4000)
+    await engine.steer(brief, "ركّز على الخرسانة - عينة")
+    events = await finish(engine, brief)
+    assert states(events)[-1] == "done"
+    assert "".join(e.text for e in events if isinstance(e, TextDelta)) == "تمام، الخرسانة - عينة"
+    [run] = read_fake_log(log)
+    users = [line["message"]["content"] for line in run["stdin"] if line["type"] == "user"]
+    assert users[1] == [{"type": "text", "text": "ركّز على الخرسانة - عينة"}]
+
+
 async def test_stop_ends_a_claude_code_specialist(make_engine, project, tmp_path, data_dir):
     from qsone.engine.connectors.claude_code import ID, ClaudeCodeConnector
     from qsone.engine.types import ModelChoice
-    from tests.engine_fakes import fake_claude_command
+    from tests.engine_fakes import fake_claude_command, read_fake_log
 
     log = tmp_path / "claude.log"
     command = fake_claude_command(script=["init", {"sleep": 30}], log=log)
@@ -719,13 +782,12 @@ async def test_stop_ends_a_claude_code_specialist(make_engine, project, tmp_path
     engine.base_url = "http://127.0.0.1:9/"  # never reached: the fake only sleeps
     brief = await engine.start_brief(project, BRIEF)
 
-    def records(kind: str) -> list[dict]:
-        # The raw log: two fakes started at once may both count themselves run 0.
-        lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
-        return [r for r in map(json.loads, lines) if r["kind"] == kind]
+    def both_read_their_task() -> bool:
+        runs = read_fake_log(log) if log.exists() else []
+        return len(runs) == 2 and all(run["stdin"] for run in runs)
 
-    await until(lambda: len(records("stdin")) == 2, steps=4000)  # both read their task
+    await until(both_read_their_task, steps=4000)
     await engine.stop(brief)
-    assert [r["how"] for r in records("end")] == ["interrupted", "interrupted"]
+    assert [run["ended"] for run in read_fake_log(log)] == ["interrupted", "interrupted"]
     assert store_of(engine, project).brief(brief)["status"] == "stopped"
     assert not (data_dir / WORK).exists() or not any((data_dir / WORK).iterdir())

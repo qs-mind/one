@@ -306,13 +306,13 @@ def read_fake_log(path: Path) -> list[dict]:
     """One dict per `-p` run, oldest first: argv, env_names, cwd, files (the text of the
     files named by --mcp-config and --system-prompt-file), stdin (each line as JSON) and ended
     ("done", "interrupted", "terminated", "dropped", or None while it runs)."""
-    runs: list[dict] = []
+    runs: dict[int, dict] = {}  # by run number: runs started at once may log out of order
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         record = json.loads(line)
         if record["kind"] == "start":
-            runs.append({**record["run"], "stdin": [], "ended": None})
+            runs[record["run"]["n"]] = {**record["run"], "stdin": [], "ended": None}
         elif record["kind"] == "stdin":
             runs[record["n"]]["stdin"].append(record["line"])
         elif record["kind"] == "end":
             runs[record["n"]]["ended"] = record["how"]
-    return runs
+    return [runs[n] for n in sorted(runs)]
