@@ -7,6 +7,7 @@ import type { FrameKey, ProjectSources } from "../canvas/types";
 import { fill, language, pick, setLanguage, t, useLanguage } from "../i18n";
 import { type Project, switchProject } from "../records/project";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
+import { FileName } from "../ui/FileName";
 
 type Hit = { file_id: string; file_name: string; locator: Record<string, string | number>; text: string };
 
@@ -160,7 +161,7 @@ export function Palette({
                   className="flex-col items-start"
                 >
                   <span className="text-slate">
-                    <bdi dir="auto">{hit.file_name}</bdi>
+                    <FileName name={hit.file_name} />
                     {page !== undefined && <> · {fill(t("page"), { page })}</>}
                   </span>
                   <span dir="auto" className="line-clamp-2">

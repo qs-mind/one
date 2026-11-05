@@ -266,6 +266,13 @@ describe("the Project Canvas", () => {
     expect(await frameEl(texts.projectFiles.ar)).toHaveTextContent("عرض سعر - عينة.pdf");
   });
 
+  it("a file added elsewhere (Project Records) comes to the Project files frame from its event", async () => {
+    const { fake } = show({});
+    const files = await frameEl(texts.projectFiles.ar);
+    act(() => fake.emit({ type: "file", file: { id: "f9", name: "جدول كميات - عينة.xlsx", status: "read", note: null, replaces: null } }));
+    await waitFor(() => expect(files).toHaveTextContent("جدول كميات - عينة.xlsx"));
+  });
+
   it("a file that is not added says why, by name", async () => {
     const { fake, container } = show({});
     await frameEl(texts.projectFiles.ar);

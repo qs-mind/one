@@ -58,6 +58,16 @@ def test_list_is_newest_first(client):
     assert [p["name"] for p in listed] == names[::-1]
 
 
+def test_an_added_file_is_told_on_the_activity_stream(client, project, monkeypatch):
+    """The canvas's Project files frame hears of a file added from Project Records, live."""
+    from qsone import activity
+
+    told = []
+    monkeypatch.setattr(activity, "publish", lambda pid, event: told.append((pid, event)))
+    info = upload(client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "خرسانة", "م3", 120]]})).json()
+    assert told == [(project, {"type": "file", "file": info})]
+
+
 @pytest.mark.parametrize("name", ["", "   ", "x" * 201])
 def test_a_name_is_needed_and_short(client, name):
     assert client.post("/projects", json={"name": name}, headers=AUTH).status_code == 422

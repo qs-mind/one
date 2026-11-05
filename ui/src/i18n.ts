@@ -30,6 +30,11 @@ export const texts = {
     ar: "محرك ون لا يعمل، لذلك لا تعمل المحادثة. سجله موجود هنا:",
   },
   retry: { en: "Retry", ar: "إعادة المحاولة" },
+  screenFailed: {
+    en: "Something went wrong on this screen. Your work is saved in the project; reload to carry on.",
+    ar: "حصلت مشكلة في الشاشة دي. شغلك محفوظ في المشروع؛ اعمل إعادة تحميل وكمّل.",
+  },
+  reload: { en: "Reload", ar: "إعادة التحميل" },
   // Plan 4 (agent engine). Arabic in plain Egyptian colloquial, as in core/qsone/copy.py, until the founder picks.
   ai: { en: "AI", ar: "الذكاء الاصطناعي" },
   aiTitle: { en: "AI settings", ar: "إعدادات الذكاء الاصطناعي" },
@@ -284,7 +289,7 @@ export const texts = {
     ar: "افتح مشروعًا أو أنشئ مشروعًا جديدًا أولًا.",
   },
   addFiles: { en: "Add files", ar: "إضافة ملفات" },
-  dropHere: { en: "Drop PDF and Excel files here.", ar: "أفلت ملفات PDF وExcel هنا." },
+  dropHere: { en: "Drop PDF and Excel files here.", ar: "أفلت ملفات PDF و Excel هنا." },
   adding: { en: "Adding the files…", ar: "جارٍ إضافة الملفات…" },
   noFiles: { en: "No files yet.", ar: "لا توجد ملفات بعد." },
   filesFailed: { en: "The files could not be loaded. Try again.", ar: "تعذّر تحميل الملفات. حاول مرة أخرى." },

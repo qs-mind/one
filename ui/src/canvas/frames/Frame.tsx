@@ -7,6 +7,7 @@ import { fill, pick, t, useLanguage } from "../../i18n";
 import { lod, type Detail } from "../lod";
 import { MIN_H, MIN_W, STRIP_H } from "../place";
 import type { Anchor, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
+import { FileName } from "../../ui/FileName";
 
 /** `h` is the frame's open height, kept while it is folded to its strip. */
 type Base = { collapsed: boolean; live: boolean; h: number };
@@ -116,7 +117,7 @@ export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenF
       />
       <header style={{ height: STRIP_H }} className="flex shrink-0 cursor-grab items-center gap-2 px-3">
         <h3 dir="auto" title={title} className="min-w-0 flex-1 truncate font-semibold">
-          {title}
+          <FileName name={title} />
         </h3>
         {meta}
         {onOpenFull && (

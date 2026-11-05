@@ -477,18 +477,21 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     const controller = new AbortController();
     const onEvent = (event: ActivityEvent) => {
       const now = things.current;
+      let files = now.files;
       if (event.type === "deliverable") now.deliverables.set(event.deliverable.id, event.deliverable);
       else if (event.type === "desk") now.desks.set(event.desk.id, event.desk);
+      else if (event.type === "file") files = [event.file, ...files.filter((f) => f.id !== event.file.id && f.id !== event.file.replaces)];
       else return;
-      things.current = { ...now };
+      things.current = { ...now, files };
       rebuild();
     };
     const reload = () => {
-      void Promise.all([sources.deliverables(), sources.team()]).then(
-        ([deliverables, team]) => {
+      void Promise.all([sources.deliverables(), sources.team(), sources.files()]).then(
+        ([deliverables, team, files]) => {
           if (controller.signal.aborted) return;
           things.current = {
             ...things.current,
+            files,
             deliverables: new Map(deliverables.map((d) => [d.id, d])),
             desks: new Map(team.desks.map((d) => [d.id, d])),
           };

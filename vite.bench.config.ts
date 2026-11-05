@@ -20,5 +20,6 @@ export default defineConfig({
       logFile: path.join(dir, "core.log"),
     }),
   ],
-  server: { host: "127.0.0.1", port: 1442, strictPort: true }, // 1440 is the dev app's
+  // No hot reload: a file saved mid-walk must not swap code under a running page (it takes effect on the next load).
+  server: { host: "127.0.0.1", port: 1442, strictPort: true, hmr: false }, // 1440 is the dev app's
 });

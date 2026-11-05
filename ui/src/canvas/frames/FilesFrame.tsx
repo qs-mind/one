@@ -4,6 +4,7 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { dir, pick, t, texts, useLanguage, type Text } from "../../i18n";
 import type { FileInfo } from "../types";
 import { Frame, frameTitle, memoFrame, useCanvasActions, type FilesData } from "./Frame";
+import { FileName } from "../../ui/FileName";
 
 const statusText: Record<FileInfo["status"], Text> = {
   read: texts.fileRead,
@@ -50,9 +51,7 @@ function FilesFrameView(props: NodeProps<Node<FilesData, "files">>) {
                   className="flex w-full flex-col items-start px-3 py-2 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
                 >
                   <span className="flex w-full items-center justify-between gap-3">
-                    <bdi dir="auto" className="min-w-0 truncate">
-                      {file.name}
-                    </bdi>
+                    <FileName name={file.name} className="min-w-0 truncate" />
                     <span className={`shrink-0 ${file.status === "read" ? "text-slate" : "text-copper"}`}>
                       {pick(statusText[file.status])}
                     </span>

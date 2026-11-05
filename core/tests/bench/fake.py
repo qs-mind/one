@@ -189,12 +189,13 @@ def _ask(seen: Seen) -> Step:
 
 
 def _plan(seen: Seen) -> Step:
-    # Many requests on purpose: at the sample prices the plan is over the Brief Budget's
-    # threshold, so One asks the engineer first (the approval card of the walks).
+    # Just enough requests that, at the sample prices and the assumed tokens of a new project,
+    # the plan is over the Brief Budget's threshold (0.50 USD): One asks the engineer first (the
+    # approval card of the walks), about 0.6 USD and 15 minutes.
     name = _words(seen, "Estimator (bench)", "مهندس التسعير (تجريبي)")
     task = _words(seen, "Sample prices for the BOQ", "أسعار عينة لجدول الكميات")
-    steps = [{"specialist": name, "task": task, "requests": 250},
-             {"specialist": name, "task": task, "requests": 250}]  # fmt: skip
+    steps = [{"specialist": name, "task": task, "requests": 20},
+             {"specialist": name, "task": task, "requests": 20}]  # fmt: skip
     deliverable = _words(seen, "Priced BOQ (bench sample)", "جدول كميات مسعر (عينة تجريبية)")
     return _call("plan", "plan_brief", {"steps": steps, "deliverables": [deliverable]})
 
