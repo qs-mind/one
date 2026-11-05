@@ -91,15 +91,21 @@ describe("Close project", () => {
     expect(sent).toEqual([{ carry: true }, { carry: false }]);
   });
 
-  it("asks the Lead QS for lessons once, and reads them when its Brief ends", async () => {
+  it("asks the Lead QS for lessons only when the engineer chooses to (it costs AI), and reads them when its Brief ends", async () => {
     const p = project();
     let lessons: unknown[] = [];
     const fetch = mockCore({
       [`GET /projects/${p.id}/closing`]: () => Response.json(closing({ open_comments: 0, unsigned: [], lessons })),
       [`POST /projects/${p.id}/lessons/propose`]: () => Response.json({ brief_id: "b1" }, { status: 202 }),
     });
+    const user = userEvent.setup();
     const props = { project: p, onOpenDeliverable: () => undefined, onClose: () => undefined };
-    const { rerender, unmount } = render(<CloseProject {...props} briefRunning={false} />);
+    const { rerender } = render(<CloseProject {...props} briefRunning={false} />);
+    const find = await screen.findByRole("button", { name: texts.lessonsFind.en });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith("/lessons/propose"))).toBe(false); // never by itself
+
+    await user.click(find);
     expect(await screen.findByText(texts.lessonsFinding.en)).toBeInTheDocument();
     rerender(<CloseProject {...props} briefRunning />);
     lessons = [{ id: "l1", text: "درس (عينة)", kind: "method", carried: false }];
@@ -107,11 +113,16 @@ describe("Close project", () => {
     expect(await screen.findByText("درس (عينة)")).toBeInTheDocument();
     expect(screen.getByText(texts.closeProjectAllClear.en)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: texts.archiveProject.en })).toBeInTheDocument();
-    unmount();
-    lessons = [];
-    render(<CloseProject {...props} briefRunning={false} />);
-    await screen.findByText(texts.lessonsNone.en);
     expect(fetch.mock.calls.filter(([url]) => String(url).endsWith("/lessons/propose"))).toHaveLength(1);
+  });
+
+  it("never says nothing is open while a card waits for the engineer in the chat", async () => {
+    const p = project();
+    mockCore({ [`GET /projects/${p.id}/closing`]: () => Response.json(closing({ open_comments: 0, unsigned: [], waiting: 2 })) });
+    render(<CloseProject project={p} briefRunning={false} onOpenDeliverable={() => undefined} onClose={() => undefined} />);
+    expect(await screen.findByText("2 cards wait for you in the chat.")).toBeInTheDocument();
+    expect(screen.queryByText(texts.closeProjectAllClear.en)).toBeNull();
+    expect(screen.getByRole("button", { name: texts.archiveAnyway.en })).toBeInTheDocument();
   });
 
   it("a Confidential project proposes no lessons", async () => {

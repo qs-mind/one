@@ -873,6 +873,11 @@ export const texts = {
   },
   lessonsFinding: { en: "The Lead QS is picking lessons…", ar: "كبير مهندسي الكميات بيختار الدروس…" },
   lessonsNone: { en: "No lessons to carry.", ar: "مفيش دروس تتنقل." },
+  lessonsAsk: {
+    en: "The Lead QS can look back over the project for lessons worth keeping. It uses AI.",
+    ar: "كبير مهندسي الكميات يقدر يراجع المشروع ويطلّع الدروس اللي تستاهل تتحفظ. ده بيستخدم الذكاء الاصطناعي.",
+  },
+  lessonsFind: { en: "Find lessons", ar: "طلّع الدروس" },
   lessonsConfidential: {
     en: "This project is Confidential, so its lessons stay in it.",
     ar: "المشروع ده سري، فدروسه بتفضل فيه.",
@@ -1173,6 +1178,16 @@ export const counted = {
   moreWaiting: {
     en: { one: "{n} more waiting", other: "{n} more waiting" },
     ar: { one: "واحدة كمان مستنية", two: "اتنين كمان مستنيين", few: "{n} كمان مستنيين", other: "{n} كمان مستنيين" },
+  },
+  // Close project: cards still waiting for the engineer in the project chat
+  closeProjectWaiting: {
+    en: { one: "A card waits for you in the chat.", other: "{n} cards wait for you in the chat." },
+    ar: {
+      one: "فيه كارت مستنيك في المحادثة.",
+      two: "فيه كارتين مستنيينك في المحادثة.",
+      few: "فيه {n} كروت مستنيينك في المحادثة.",
+      other: "فيه {n} كارت مستنيينك في المحادثة.",
+    },
   },
 } satisfies Record<string, { en: Forms; ar: Forms }>;
 

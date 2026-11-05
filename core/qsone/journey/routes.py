@@ -176,7 +176,10 @@ def router(engine: Any) -> APIRouter:
     @r.get("/projects/{project_id}/closing")
     async def get_closing(project_id: str) -> dict:
         rec = engine.projects.get(project_id)
-        return await asyncio.to_thread(closing.checklist, rec, engine.engineer_records())
+        got = await asyncio.to_thread(closing.checklist, rec, engine.engineer_records())
+        # what waits for the engineer in the chat: the panel never says nothing is open then
+        got["waiting"] = await asyncio.to_thread(closing.waiting, rec, engine.waiting(project_id))
+        return got
 
     @r.post("/projects/{project_id}/lessons/propose", status_code=202)
     async def propose_lessons(project_id: str) -> JSONResponse:
