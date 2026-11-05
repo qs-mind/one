@@ -6,6 +6,7 @@ have no key. A base URL on this computer makes it `on_device`. Entries live in s
 """
 
 import ipaddress
+import re
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -17,10 +18,18 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from qsone import keys, settings
-from qsone.engine.connectors import efforts_of
+from qsone.engine.connectors import efforts_of, refused
 from qsone.engine.types import ModelCard, ModelChoice
 
 PREFIX = "standard:"
+# Models a server lists that are not for a chat that uses tools (audit C4: Google lists 60,
+# speech, images, embeddings, music and robotics among them).
+_NOT_CHAT = re.compile(
+    r"(?:^|[-_/.])(?:tts|image|imagen|embed|embedding|veo|sora|lyria|music|robotics|aqa|audio|"
+    r"native-audio|live|realtime|transcribe|translate|computer-use|deep-research|whisper|dall-e|"
+    r"moderation|babbage|davinci|banana)(?=$|[-_/.\d])",
+    re.IGNORECASE,
+)
 
 
 class KeyInTheClear(ValueError):
@@ -72,7 +81,8 @@ class StandardLink:
         return keys.get_key(self.id) or "none"  # the SDK needs one; a local server ignores it
 
     async def cards(self) -> list[ModelCard]:
-        """`GET <base_url>/models`, in the server's order.
+        """`GET <base_url>/models`, in the server's order: its chat models only, by name, less
+        any the provider refused.
 
         That list says nothing of images, tools or context: images stay off (none are sent),
         tools on (the Standard Link speaks OpenAI's tool calls), the context unknown. Its
@@ -81,17 +91,25 @@ class StandardLink:
             base_url=self.base_url, api_key=self._key(), http_client=self._http, timeout=20
         )
         try:
-            found = [m.id async for m in client.models.list()]
+            found = [m async for m in client.models.list()]
         finally:
             if self._http is None:
                 await client.close()
         cards = []
-        for model_id in found:
+        for listed in found:
+            model_id = listed.id
+            if _NOT_CHAT.search(model_id) or refused(ModelChoice(self.id, model_id)):
+                continue
+            # its name as the server gives it, else its id without Google's models/
+            name = getattr(listed, "display_name", None)
+            name = (
+                name if isinstance(name, str) and name.strip() else model_id.removeprefix("models/")
+            )
             efforts, effort_default = efforts_of(OpenAIProvider.model_profile(model_id))
             cards.append(
                 ModelCard(
                     choice=ModelChoice(self.id, model_id),
-                    name=model_id,
+                    name=name,
                     provider=self.provider,
                     images=False,
                     tools=True,

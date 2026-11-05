@@ -309,7 +309,9 @@ AI_FAILED = {
 # The provider's own reason, in plain words (audit B7): a model it retired, and the one it names.
 MODEL_GONE_TRY = {
     "en": "{provider} says {model} is no longer available; try {other}. Pick it in AI settings.",
-    "ar": "{provider} بيقول إن {model} مبقاش متاح؛ جرّب {other}. اختاره من إعدادات الذكاء الاصطناعي.",
+    "ar": (
+        "{provider} بيقول إن {model} مبقاش متاح؛ جرّب {other}. اختاره من إعدادات الذكاء الاصطناعي."
+    ),
 }
 MODEL_GONE = {
     "en": "{provider} says {model} is not available. Pick another model in AI settings.",

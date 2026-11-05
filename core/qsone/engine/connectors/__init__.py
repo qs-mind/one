@@ -31,7 +31,7 @@ from pydantic_ai.messages import ModelRequest
 from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
 
-from qsone import copy
+from qsone import copy, settings
 from qsone.engine.types import EFFORTS, Effort, Event, ModelCard, Text
 
 log = logging.getLogger("qsone.engine.connectors")
@@ -160,6 +160,25 @@ def key_refused(provider: str) -> Text:
     if provider == NativeLink.name:
         return copy.KEY_REFUSED
     return copy.fill(copy.AI_KEY_REFUSED, provider=provider)
+
+
+def _model_key(choice) -> str:
+    return f"{choice.connector}/{choice.model}"
+
+
+def note_refused(choice) -> None:
+    """A model the provider said it does not serve: no longer listed (audit C4)."""
+    found = settings.ai().get("refused_models")
+    kept = [k for k in found if isinstance(k, str)] if isinstance(found, list) else []
+    try:
+        settings.save_ai("refused_models", sorted({*kept, _model_key(choice)}))
+    except OSError:
+        log.warning("the refused model was not saved")
+
+
+def refused(choice) -> bool:
+    found = settings.ai().get("refused_models")
+    return isinstance(found, list) and _model_key(choice) in found
 
 
 _SUGGESTED = re.compile(r"\buse (?:models/)?([A-Za-z0-9][\w.-]*[\w])", re.IGNORECASE)

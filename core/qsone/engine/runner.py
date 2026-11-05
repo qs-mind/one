@@ -736,6 +736,8 @@ class _Brief:
                     raise _Fail(connectors_mod.key_refused(provider)) from None
                 if kind == "other":  # the provider's reason when ONE knows it (audit B7)
                     said = connectors_mod.provider_reason(error, provider, choice.model)
+                    if getattr(error, "status_code", None) == 404:
+                        connectors_mod.note_refused(choice)  # no longer listed (audit C4)
                     raise _Fail(said or copy.fill(copy.AI_FAILED, provider=provider)) from None
                 if kind == "offline":
                     before = self.step
