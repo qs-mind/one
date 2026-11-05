@@ -235,6 +235,6 @@ describe("ConnectorCard in the chat", () => {
     expect(bodies(fetch, "POST", "/api/cards/c1")).toEqual([
       { choice: "yes", answers: { read_without_asking: "no", search: "none" } },
     ]);
-    expect(await screen.findByText(fill(texts.answered.ar, { choice: texts.addConnector.ar }))).toBeInTheDocument();
+    expect(await screen.findByText(fill(texts.answered.ar, { choice: texts.didAdd.ar }))).toBeInTheDocument();
   });
 });
