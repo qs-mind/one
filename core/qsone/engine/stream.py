@@ -224,15 +224,19 @@ async def ui_stream(events: AsyncIterator[Event], *, message_id: str) -> AsyncIt
 
 
 def message_parts(events: Iterable[Event], *, with_status: bool = True) -> list[dict]:
-    """The parts of the UI message that `events` stream: one text part, then each data part
-    once, at its first place, with its latest data. `with_status=False` leaves out the Brief's
-    status, for a Brief that waits for Continue (the screen must not steer it)."""
+    """The parts of the UI message that `events` stream, each once, at its first place: one text
+    part where the words began, and each data part with its latest data. `with_status=False`
+    leaves out the Brief's status, for a Brief that waits for Continue (the screen must not
+    steer it)."""
     parts = _Parts()
     found: list[dict] = []
     index: dict[tuple[str, str], int] = {}
     text: list[str] = []
+    text_at = 0  # where the text part goes: before the data parts that came after the first words
     for event in events:
         if isinstance(event, TextDelta):
+            if not text:
+                text_at = len(found)
             text.append(event.text)
             continue
         data = parts.data(event)
@@ -247,5 +251,6 @@ def message_parts(events: Iterable[Event], *, with_status: bool = True) -> list[
         else:
             index[key] = len(found)
             found.append({"type": kind, "id": part_id, "data": value})
-    head = [{"type": "text", "text": "".join(text), "state": "done"}] if text else []
-    return head + found
+    if text:
+        found.insert(text_at, {"type": "text", "text": "".join(text), "state": "done"})
+    return found
