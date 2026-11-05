@@ -6,12 +6,14 @@ import hashlib
 import json
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from qsone import copy
 from qsone.records import audit, search
 from qsone.records.arabic import NORMALISER_VERSION
 from qsone.records.extract import chunk, extract
+from qsone.records.hidden import Flag
 from qsone.records.project import Records, RecordsError
 
 MAX_FILE_BYTES = 256 * 1024 * 1024
@@ -52,11 +54,19 @@ def _same_bytes(conn, sha256: str) -> FileInfo | None:
 
 
 def add_file(
-    rec: Records, name: str, data: bytes, *, actor: str, embedder: search.Embedder | None = None
+    rec: Records,
+    name: str,
+    data: bytes,
+    *,
+    actor: str,
+    embedder: search.Embedder | None = None,
+    flags: Sequence[Flag] = (),
 ) -> FileInfo:
     """Raises `RecordsError`: FILE_EMPTY (422) or FILE_TOO_BIG (413), and then nothing is stored.
 
-    `name` is display text only and never touches the disk."""
+    `name` is display text only and never touches the disk. `flags` are hidden-text flags the
+    caller found and the stored bytes no longer show (a web page's hidden elements), kept with
+    the file's own; they are not added again when the same bytes are already stored."""
     name = re.split(r"[/\\]", name)[-1][:255]
     if not data:
         raise RecordsError(copy.FILE_EMPTY, status=422)
@@ -70,6 +80,7 @@ def add_file(
 
     extracted = extract(name, data)  # outside the lock: reading a big file takes time
     chunks = chunk(extracted.pieces)
+    all_flags = [*extracted.flags, *flags]
     file_id = uuid.uuid4().hex
     with rec.write(actor) as conn:
         found = _same_bytes(conn, sha256)  # the same bytes may have come in meanwhile
@@ -140,7 +151,7 @@ def add_file(
             "INSERT INTO file_flags(file_id, kind, locator, excerpt, count) VALUES (?, ?, ?, ?, ?)",
             (
                 (file_id, f.kind, json.dumps(f.locator, ensure_ascii=False), f.excerpt, f.count)
-                for f in extracted.flags
+                for f in all_flags
             ),
         )
         # Set only when missing: an older version stays, so `ensure_index` still rebuilds it.
@@ -164,7 +175,7 @@ def add_file(
         at,
         replaces,
         None,
-        len(extracted.flags),
+        len(all_flags),
     )
 
 

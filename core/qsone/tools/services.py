@@ -12,7 +12,7 @@ import asyncio
 import socket
 import ssl
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -56,6 +56,8 @@ class Services:
     transcriber: Transcriber | None = None  # in a Brief, the engineer's image model
     sandbox: Any = None  # Task 11's `SandboxRunner`
     connectors: Any = None  # Task 12's `ConnectorHub`
+    robots: dict = field(default_factory=dict, repr=False)  # robots.txt by site, for a day
+    # (Task 6); shared by every run's copy of these services
 
     def on_device(self, rec: Records | None) -> bool:
         """True for an On-device Project (its meta "on_device" is "1"): nothing may leave this
