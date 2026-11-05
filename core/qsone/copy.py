@@ -144,10 +144,10 @@ FILE_NOT_FOUND = {
     "ar": "الملف ده مش موجود في سجلات المشروع.",
 }
 
-# The Project Canvas (Plan 7).
-CANVAS_BAD_LAYOUT = {
-    "en": "The canvas layout was not saved: a frame's place or size is out of range.",
-    "ar": "ترتيب الكانفاس ماتحفظش: مكان أو مقاس إطار برّه الحدود.",
+# The workspace.
+WORKSPACE_BAD = {
+    "en": "The open document was not saved: ONE does not know its name.",
+    "ar": "المستند المفتوح ما اتحفظش: ONE مش عارف اسمه.",
 }
 CLIENT_BOQ_NOT_FOUND = {
     "en": "No BOQ was imported from this file.",
@@ -175,8 +175,8 @@ PROJECT_IS_CONFIDENTIAL = {
 }
 
 CHAT_BAD_SELECTION = {
-    "en": "What was selected on the canvas could not be read, so the message was not sent.",
-    "ar": "اللي اتحدد على الكانفاس ماتقراش، فالرسالة ماتبعتتش.",
+    "en": "What was selected in the open document could not be read, so the message was not sent.",
+    "ar": "اللي اتحدد في المستند المفتوح ماتقراش، فالرسالة ماتبعتتش.",
 }
 
 SEARCH_WORDS_ONLY = {

@@ -98,7 +98,7 @@ def remember(lead: ModelChoice | None, effort: Effort | None) -> None:
 async def respond(request: Request, engine: Engine) -> Response:
     """The AI SDK body `{id: chat id, messages, selection?, model?, effort?}`: only the last user
     message is used. The chat id is a project id or "general"; `selection` is what the engineer
-    selected on the canvas (Plan 7, up to 20 items); `model` `{connector, model}` and `effort`
+    selected in the open document (up to 20 items); `model` `{connector, model}` and `effort`
     ("low", "medium", "high") are the Lead QS's for this Brief, picked in the message box, and
     remembered for the next. 409 with `{"brief_id"}` while the chat has a Brief."""
     try:

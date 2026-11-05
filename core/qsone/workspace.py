@@ -1,11 +1,11 @@
-"""The Project Canvas in the core API (Plan 7): where each frame sits, the project's status line,
-and a file's pages as images and text for its file frame. All paths start `/projects/{p}`.
+"""The workspace in the core API (Workspace plan): the project's open document, its status line,
+the client BOQs it holds, and a file's pages as images and text. All paths start `/projects/{p}`.
 
-The canvas keeps only *where* things sit, in `canvas_frames` and `canvas_view` inside the
-project's encrypted file. These rows are screen layout, not project facts: they are written
-without an audit row, and floats are allowed. Every route needs the bearer secret (the app checks
-it) and an open project. A refusal is `{"error": {en, ar}, "field": str | None}`. Page images are
-rendered in memory (`records.render`), never to a file. Only ids are ever logged."""
+The project keeps only *which document is open* (and where in it), in `workspace` inside the
+project's encrypted file. That row is screen state, not a project fact: it is written without an
+audit row. Every route needs the bearer secret (the app checks it) and an open project. A refusal
+is `{"error": {en, ar}, "field": str | None}`. Page images are rendered in memory
+(`records.render`), never to a file. Only ids are ever logged."""
 
 import json
 import re
@@ -14,7 +14,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from qsone import copy
@@ -24,12 +23,9 @@ from qsone.projects import Projects
 from qsone.records import files, render
 from qsone.records.project import Records, RecordsError
 
-MAX_FRAMES = 2000  # in one save, and as removed keys
 MAX_PIECES = 1000  # text pieces in one answer
-KEY = re.compile(r"^(files|file|deliverable|desk|team|clientboq):[0-9a-z_-]{1,64}$")
-_PLACE = 1_000_000  # world coordinates within ±1,000,000
-
-Coordinate = Annotated[float, Field(ge=-_PLACE, le=_PLACE, allow_inf_nan=False)]
+MAX_ANCHOR = 2048  # bytes of an anchor's JSON
+KEY = re.compile(r"^(files:all|(file|deliverable|clientboq):[0-9a-z_-]{1,64})$")
 
 
 def today() -> date:
@@ -37,101 +33,54 @@ def today() -> date:
     return date.today()
 
 
-class FrameIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    key: str = Field(pattern=KEY.pattern, max_length=80)
-    x: Coordinate
-    y: Coordinate
-    w: float = Field(ge=120, le=8000, allow_inf_nan=False)
-    h: float = Field(ge=80, le=8000, allow_inf_nan=False)
-    z: int = Field(ge=-1_000_000, le=1_000_000)
-    collapsed: StrictBool
-
-
-class FramesIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    frames: list[FrameIn] = Field(max_length=MAX_FRAMES)
-    removed: list[Annotated[str, Field(pattern=KEY.pattern, max_length=80)]] = Field(
-        max_length=MAX_FRAMES
-    )
-
-
-class ViewIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    x: Coordinate
-    y: Coordinate
-    zoom: float = Field(ge=0.1, le=2, allow_inf_nan=False)
-
-
 def _refusal(e: RecordsError) -> JSONResponse:
     return JSONResponse({"error": e.text, "field": e.field}, status_code=e.status)
 
 
-async def _layout_body(request: Request, model: type[BaseModel]) -> BaseModel:
-    """The body as `model`, or CANVAS_BAD_LAYOUT naming the first field that is wrong."""
+def _bad(field: str) -> RecordsError:
+    return RecordsError(copy.WORKSPACE_BAD, status=422, field=field)
+
+
+async def _open_body(request: Request) -> tuple[str, dict | None]:
+    """The body's `open` and `anchor`, or WORKSPACE_BAD naming the field that is wrong."""
     try:
-        return model.model_validate_json(await request.body())
-    except ValidationError as e:
-        where = ".".join(str(p) for p in e.errors()[0]["loc"]) or None
-        raise RecordsError(copy.CANVAS_BAD_LAYOUT, status=422, field=where) from None
+        body = json.loads(await request.body())
+    except ValueError:
+        raise _bad("open") from None
+    if not isinstance(body, dict):
+        raise _bad("open")
+    key, anchor = body.get("open"), body.get("anchor")
+    if not isinstance(key, str) or not KEY.match(key):
+        raise _bad("open")
+    if anchor is not None:
+        try:
+            size = len(json.dumps(anchor, ensure_ascii=False, allow_nan=False).encode())
+        except ValueError:
+            raise _bad("anchor") from None
+        if not isinstance(anchor, dict) or size > MAX_ANCHOR:
+            raise _bad("anchor")
+    return key, anchor
 
 
-# The layout ------------------------------------------------------------------------------------
+# The open document -----------------------------------------------------------------------------
 
 
-def read_layout(rec: Records) -> dict:
-    """Where each frame sits, the view, and the Client BOQs the canvas shows (one frame each)."""
+def read_open(rec: Records) -> dict:
+    """The open document's key and anchor (None, None when nothing was ever opened), and the
+    Client BOQs the project holds."""
     with rec.read() as conn:
-        frames = conn.execute(
-            "SELECT key, x, y, w, h, z, collapsed FROM canvas_frames ORDER BY z, key"
-        ).fetchall()
-        view = conn.execute("SELECT x, y, zoom FROM canvas_view WHERE id = 1").fetchone()
-    return {
-        "frames": [
-            {"key": k, "x": x, "y": y, "w": w, "h": h, "z": z, "collapsed": bool(c)}
-            for k, x, y, w, h, z, c in frames
-        ],
-        "view": None if view is None else {"x": view[0], "y": view[1], "zoom": view[2]},
-        "client_boqs": imported.list_imported(rec),
-    }
+        found = conn.execute("SELECT doc, anchor FROM workspace WHERE id = 1").fetchone()
+    key, anchor = (None, None) if found is None else (found[0], json.loads(found[1] or "null"))
+    return {"open": key, "anchor": anchor, "client_boqs": imported.list_imported(rec)}
 
 
-def save_frames(rec: Records, frames: list[FrameIn], removed: list[str]) -> None:
-    """One transaction: the frames given are put (one row per key), the removed ones go."""
-    at = rec.clock()
-    with rec.write("engineer", upkeep=True) as conn:  # screen layout: no audit row (decision 3)
-        conn.executemany("DELETE FROM canvas_frames WHERE key = ?", ((k,) for k in removed))
-        conn.executemany(
-            "INSERT INTO canvas_frames(key, x, y, w, h, z, collapsed, updated_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET x = excluded.x,"
-            " y = excluded.y, w = excluded.w, h = excluded.h, z = excluded.z,"
-            " collapsed = excluded.collapsed, updated_at = excluded.updated_at",
-            (
-                (
-                    f.key,
-                    round(f.x, 1),
-                    round(f.y, 1),
-                    round(f.w, 1),
-                    round(f.h, 1),
-                    f.z,
-                    int(f.collapsed),
-                    at,
-                )  # fmt: skip
-                for f in frames
-            ),
-        )
-
-
-def save_view(rec: Records, view: ViewIn) -> None:
-    with rec.write("engineer", upkeep=True) as conn:
+def save_open(rec: Records, key: str, anchor: dict | None) -> None:
+    with rec.write("engineer", upkeep=True) as conn:  # screen state: no audit row (decision 3)
         conn.execute(
-            "INSERT INTO canvas_view(id, x, y, zoom, updated_at) VALUES (1, ?, ?, ?, ?)"
-            " ON CONFLICT(id) DO UPDATE SET x = excluded.x, y = excluded.y,"
-            " zoom = excluded.zoom, updated_at = excluded.updated_at",
-            (round(view.x, 1), round(view.y, 1), round(view.zoom, 3), rec.clock()),
+            "INSERT INTO workspace(id, doc, anchor, updated_at) VALUES (1, ?, ?, ?)"
+            " ON CONFLICT(id) DO UPDATE SET doc = excluded.doc, anchor = excluded.anchor,"
+            " updated_at = excluded.updated_at",
+            (key, None if anchor is None else json.dumps(anchor, ensure_ascii=False), rec.clock()),
         )
 
 
@@ -285,33 +234,21 @@ def router(projects: Projects, waiting=lambda project_id: 0) -> APIRouter:
     def project(project_id: str) -> Records:
         return projects.get(project_id)
 
-    @r.get("/projects/{project_id}/canvas")
-    async def get_layout(project_id: str):
-        return await run(lambda: read_layout(project(project_id)))
+    @r.get("/projects/{project_id}/workspace")
+    async def get_workspace(project_id: str):
+        return await run(lambda: read_open(project(project_id)))
 
-    @r.put("/projects/{project_id}/canvas/frames")
-    async def put_frames(project_id: str, request: Request):
-        def save(body: FramesIn) -> dict:
-            save_frames(project(project_id), body.frames, body.removed)
+    @r.put("/projects/{project_id}/workspace")
+    async def put_workspace(project_id: str, request: Request):
+        def save(key: str, anchor: dict | None) -> dict:
+            save_open(project(project_id), key, anchor)
             return {"ok": True}
 
         try:
-            body = await _layout_body(request, FramesIn)
+            key, anchor = await _open_body(request)
         except RecordsError as e:
             return _refusal(e)
-        return await run(save, body)
-
-    @r.put("/projects/{project_id}/canvas/view")
-    async def put_view(project_id: str, request: Request):
-        def save(body: ViewIn) -> dict:
-            save_view(project(project_id), body)
-            return {"ok": True}
-
-        try:
-            body = await _layout_body(request, ViewIn)
-        except RecordsError as e:
-            return _refusal(e)
-        return await run(save, body)
+        return await run(save, key, anchor)
 
     @r.get("/projects/{project_id}/client-boq/{file_id}")
     async def get_client_boq(project_id: str, file_id: str):

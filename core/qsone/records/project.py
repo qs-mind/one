@@ -211,7 +211,7 @@ class Records:
 
         While the project is archived, an outer `write` is refused with PROJECT_ARCHIVED (423),
         except the archive change itself (`archive_change`) and `upkeep` that changes no project
-        data: the search index and the canvas layout, so reading and searching still work."""
+        data: the search index and the open-document state, so reading and searching still work."""
         if not actor.strip():
             raise ValueError("every change needs an actor")
         with self._lock:

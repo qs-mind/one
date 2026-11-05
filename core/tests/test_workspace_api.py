@@ -1,5 +1,5 @@
-"""The Project Canvas in the core (Plan 7, Task 2): the layout, the project's status, and a PDF's
-pages as images and text for its file frame. Synthetic «عينة» data only."""
+"""The workspace in the core (Workspace plan, Task 2): the project's open document, its status,
+and a PDF's pages as images and text. Synthetic «عينة» data only."""
 
 import json
 from datetime import date, timedelta
@@ -7,18 +7,12 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from qsone import canvas, copy
+from qsone import copy, workspace
 from qsone.app import create_app
 from qsone.records import schema
 from qsone.records.project import Records
 from tests.conftest import AUTH, SECRET
 from tests.samples import sample_pdf, sample_sheet, sample_xlsx
-
-D1 = "deliverable:d1"
-FRAMES = [
-    {"key": D1, "x": 120.5, "y": -40, "w": 960, "h": 640, "z": 2, "collapsed": False},
-    {"key": "files:all", "x": -420, "y": 0, "w": 360, "h": 520, "z": 0, "collapsed": True},
-]
 
 
 @pytest.fixture
@@ -32,13 +26,12 @@ def project(client):
     return client.post("/projects", json={"name": "برج - عينة"}, headers=AUTH).json()["id"]
 
 
-def put_frames(client, project, frames, removed=()):
-    body = {"frames": frames, "removed": list(removed)}
-    return client.put(f"/projects/{project}/canvas/frames", json=body, headers=AUTH)
+def put_open(client, project, body):
+    return client.put(f"/projects/{project}/workspace", json=body, headers=AUTH)
 
 
-def layout(client, project) -> dict:
-    return client.get(f"/projects/{project}/canvas", headers=AUTH).json()
+def workspace_of(client, project) -> dict:
+    return client.get(f"/projects/{project}/workspace", headers=AUTH).json()
 
 
 def upload(client, project, name, data):
@@ -54,103 +47,93 @@ def set_meta(client, project, **values):
             rec.set_meta(conn, key, value)
 
 
-# The layout --------------------------------------------------------------------------------------
+# The open document -------------------------------------------------------------------------------
 
 
-def test_layout_round_trips_and_survives_a_restart(data_dir):
+def test_open_document_round_trips(client, project):
+    body = {"open": "deliverable:abc", "anchor": {"row": "3/02"}}
+    r = put_open(client, project, body)
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    got = workspace_of(client, project)
+    assert got["open"] == "deliverable:abc" and got["anchor"] == {"row": "3/02"}
+    assert got["client_boqs"] == []
+
+
+def test_open_document_survives_a_restart(data_dir):
     with TestClient(create_app(SECRET, data_dir=data_dir)) as c:
         pid = c.post("/projects", json={"name": "برج - عينة"}, headers=AUTH).json()["id"]
-        assert layout(c, pid) == {"frames": [], "view": None, "client_boqs": []}
-        r = put_frames(c, pid, FRAMES)
-        assert r.status_code == 200 and r.json() == {"ok": True}
-        view = {"x": -300, "y": 80, "zoom": 0.85}
-        r = c.put(f"/projects/{pid}/canvas/view", json=view, headers=AUTH)
-        assert r.status_code == 200 and r.json() == {"ok": True}
+        put_open(c, pid, {"open": "file:f1", "anchor": None})
     with TestClient(create_app(SECRET, data_dir=data_dir)) as c:
         c.post(f"/projects/{pid}/open", headers=AUTH)
-        got = layout(c, pid)
-        assert sorted(f["key"] for f in got["frames"]) == ["deliverable:d1", "files:all"]
-        assert {f["key"]: f for f in got["frames"]} == {f["key"]: f for f in FRAMES}
-        assert got["view"] == {"x": -300, "y": 80, "zoom": 0.85}
+        got = workspace_of(c, pid)
+        assert got["open"] == "file:f1" and got["anchor"] is None
 
 
-def test_removed_frames_go(client, project):
-    put_frames(client, project, FRAMES)
-    assert put_frames(client, project, [], removed=["files:all"]).status_code == 200
-    assert [f["key"] for f in layout(client, project)["frames"]] == [D1]
+def test_nothing_open_is_null(client, project):
+    got = workspace_of(client, project)
+    assert got["open"] is None and got["anchor"] is None
 
 
-def test_upsert_keeps_one_row_per_key(client, project):
-    put_frames(client, project, FRAMES[:1])
-    moved = FRAMES[0] | {"x": 7.25, "y": 8, "collapsed": True}
-    put_frames(client, project, [moved])
-    frames = layout(client, project)["frames"]
-    assert frames == [moved | {"x": 7.2}]  # one decimal
+def test_a_later_save_replaces_the_earlier(client, project):
+    put_open(client, project, {"open": "files:all", "anchor": {"page": 2}})
+    put_open(client, project, {"open": "clientboq:f2", "anchor": None})
+    got = workspace_of(client, project)
+    assert got["open"] == "clientboq:f2" and got["anchor"] is None
+
+
+def test_unknown_key_is_refused(client, project):
+    r = put_open(client, project, {"open": "desk:x"})
+    assert r.status_code == 422
+    assert r.json() == {"error": copy.WORKSPACE_BAD, "field": "open"}
+    assert workspace_of(client, project)["open"] is None
 
 
 @pytest.mark.parametrize(
-    "bad",
-    [
-        {"w": 0},
-        {"h": 8001},
-        {"x": float("inf")},
-        {"y": float("nan")},
-        {"x": 1_000_001},
-        {"key": "../x"},
-        {"key": "FILE:a"},
-        {"key": "plan:a"},
-        {"key": "file:" + "a" * 65},
-        {"z": 1.5},
-        {"collapsed": "yes"},
-    ],
+    "bad", ["", "FILE:a", "files:other", "file:", "file:" + "a" * 65, "../x", "file:a/b", None]
 )
-def test_bad_layout_is_refused_in_plain_words(client, project, bad):
-    body = json.dumps({"frames": [FRAMES[1], FRAMES[0] | bad], "removed": []})  # Infinity, NaN
-    r = client.put(f"/projects/{project}/canvas/frames", content=body, headers=AUTH)
+def test_bad_keys_are_refused(client, project, bad):
+    r = put_open(client, project, {"open": bad, "anchor": None})
+    assert r.status_code == 422 and r.json()["field"] == "open"
+
+
+@pytest.mark.parametrize("bad", [[1], "row", 3, {"note": "x" * 2100}])
+def test_bad_anchor_is_refused(client, project, bad):
+    r = put_open(client, project, {"open": "files:all", "anchor": bad})
     assert r.status_code == 422
-    assert r.json()["error"] == copy.CANVAS_BAD_LAYOUT and r.json()["field"].startswith("frames.1")
-    assert layout(client, project)["frames"] == []  # nothing stored
+    assert r.json() == {"error": copy.WORKSPACE_BAD, "field": "anchor"}
 
 
-@pytest.mark.parametrize("view", [{"x": 0, "y": 0, "zoom": 0.05}, {"x": 0, "y": 0, "zoom": 3}])
-def test_bad_view_is_refused(client, project, view):
-    r = client.put(f"/projects/{project}/canvas/view", json=view, headers=AUTH)
-    assert r.status_code == 422 and r.json() == {"error": copy.CANVAS_BAD_LAYOUT, "field": "zoom"}
+def test_missing_open_is_refused(client, project):
+    r = put_open(client, project, {"anchor": None})
+    assert r.status_code == 422 and r.json()["field"] == "open"
 
 
-def test_a_bad_removed_key_is_refused(client, project):
-    r = put_frames(client, project, [], removed=["../etc"])
-    assert r.status_code == 422 and r.json()["field"] == "removed.0"
+def test_canvas_routes_are_gone(client, project):
+    assert client.get(f"/projects/{project}/canvas", headers=AUTH).status_code == 404
+    assert client.put(f"/projects/{project}/canvas/view", json={}, headers=AUTH).status_code == 404
 
 
-def test_too_many_frames(client, project):
-    many = [FRAMES[0] | {"key": f"file:f{i}"} for i in range(canvas.MAX_FRAMES + 1)]
-    r = put_frames(client, project, many)
-    assert r.status_code == 422 and r.json()["error"] == copy.CANVAS_BAD_LAYOUT
-    assert r.json()["field"] == "frames"
-
-
-def test_layout_needs_an_open_project(client, project):
+def test_workspace_needs_an_open_project(client, project):
     client.post(f"/projects/{project}/close", headers=AUTH)
     for r in (
-        client.get(f"/projects/{project}/canvas", headers=AUTH),
-        put_frames(client, project, FRAMES),
+        client.get(f"/projects/{project}/workspace", headers=AUTH),
+        put_open(client, project, {"open": "files:all", "anchor": None}),
         client.get(f"/projects/{project}/status", headers=AUTH),
     ):
         assert r.status_code == 409 and r.json()["error"] == copy.PROJECT_NOT_OPEN
 
 
-def test_layout_not_readable_on_disk(client, project, data_dir):
-    put_frames(client, project, FRAMES)
+def test_open_document_not_readable_on_disk(client, project, data_dir):
+    put_open(client, project, {"open": "deliverable:secretname", "anchor": None})
     client.post(f"/projects/{project}/close", headers=AUTH)
     for path in data_dir.rglob("*"):
         if path.is_file():
-            assert b"deliverable:d1" not in path.read_bytes(), path
+            assert b"deliverable:secretname" not in path.read_bytes(), path
 
 
 def test_project_responses_are_never_cached(client, project):
     for path in [
-        f"/projects/{project}/canvas",
+        f"/projects/{project}/workspace",
         f"/projects/{project}/files",
         f"/projects/{project}/status",
         "/projects",
@@ -160,12 +143,12 @@ def test_project_responses_are_never_cached(client, project):
     assert "no-store" not in client.get("/health", headers=AUTH).headers.get("cache-control", "")
 
 
-def test_layout_writes_leave_no_audit_row(client, project):
-    put_frames(client, project, FRAMES)
+def test_saving_the_open_document_leaves_no_audit_row(client, project):
+    put_open(client, project, {"open": "files:all", "anchor": None})
     rec = client.app.state.projects.get(project)
     with rec.read() as conn:
         tables = [t for (t,) in conn.execute("SELECT table_name FROM audit")]
-    assert "canvas_frames" not in tables
+    assert "workspace" not in tables
 
 
 # The status --------------------------------------------------------------------------------------
@@ -174,7 +157,7 @@ def test_layout_writes_leave_no_audit_row(client, project):
 def test_status_has_only_what_is_known(client, project, monkeypatch):
     assert client.get(f"/projects/{project}/status", headers=AUTH).json() == {}
     today = date(2026, 11, 4)
-    monkeypatch.setattr(canvas, "today", lambda: today)
+    monkeypatch.setattr(workspace, "today", lambda: today)
     due = (today + timedelta(days=14)).isoformat()
     stage = {"en": "Tender", "ar": "مناقصة"}
     set_meta(client, project, submission_date=due, stage=json.dumps(stage, ensure_ascii=False))
@@ -248,13 +231,18 @@ def test_unknown_file(client, project):
 # The migration -----------------------------------------------------------------------------------
 
 
-def test_migration_adds_canvas_tables_and_keeps_data(tmp_path, monkeypatch):
-    monkeypatch.setattr(schema, "MIGRATIONS", schema.MIGRATIONS[:1])
+def test_migration_drops_canvas_tables(tmp_path, monkeypatch):
+    before = schema.MIGRATIONS.index(schema.WORKSPACE_SQL)
+    monkeypatch.setattr(schema, "MIGRATIONS", schema.MIGRATIONS[:before])
     rec = Records.create(tmp_path / "p", name="عينة", actor="engineer")
     with rec.write("engineer") as conn:
         conn.execute(
             "INSERT INTO items(id, kind, code, created_at, created_by, updated_at, updated_by)"
             " VALUES ('i1', 'boq', '03/02', 't', 'e', 't', 'e')"
+        )
+        conn.execute(
+            "INSERT INTO canvas_frames(key, x, y, w, h, updated_at)"
+            " VALUES ('files:all', 0, 0, 300, 200, 't')"
         )
     rec.close()
     monkeypatch.undo()
@@ -263,8 +251,9 @@ def test_migration_adds_canvas_tables_and_keeps_data(tmp_path, monkeypatch):
         with rec.read() as conn:
             assert conn.execute("PRAGMA user_version").fetchone()[0] == len(schema.MIGRATIONS)
             assert conn.execute("SELECT code FROM items").fetchall() == [("03/02",)]
-            assert conn.execute("SELECT count(*) FROM canvas_frames").fetchone() == (0,)
-            assert conn.execute("SELECT count(*) FROM canvas_view").fetchone() == (0,)
+            tables = {t for (t,) in conn.execute("SELECT name FROM sqlite_master")}
+            assert "canvas_frames" not in tables and "canvas_view" not in tables
+            assert conn.execute("SELECT count(*) FROM workspace").fetchone() == (0,)
             columns = [row[1] for row in conn.execute("PRAGMA table_info(briefs)")]
             assert "selection" in columns
     finally:

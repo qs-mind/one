@@ -356,6 +356,18 @@ WORKLOG_SQL = (
 # takes back exactly what that accept wrote (`deliverables.revert`). NULL for any other version.
 UNDO_SQL = "ALTER TABLE versions ADD COLUMN audit_from INTEGER"
 
+# The workspace: the one document the project has open (`kind:ref`, as the canvas keys were) and
+# where in it. Replaces the canvas layout tables. Screen state, not project facts: not audited.
+# `briefs.selection` stays.
+WORKSPACE_SQL = """
+DROP TABLE canvas_frames;
+DROP TABLE canvas_view;
+CREATE TABLE workspace (id INTEGER PRIMARY KEY CHECK (id = 1),
+  doc TEXT NOT NULL CHECK (doc GLOB '[a-z]*:*'),
+  anchor TEXT CHECK (anchor IS NULL OR json_valid(anchor)),
+  updated_at TEXT NOT NULL)
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -367,4 +379,5 @@ MIGRATIONS: list[str] = [
     EFFORT_SQL,
     WORKLOG_SQL,
     UNDO_SQL,
+    WORKSPACE_SQL,
 ]

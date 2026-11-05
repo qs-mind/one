@@ -14,7 +14,19 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings, undo, usage
+from qsone import (
+    about,
+    activity,
+    chat,
+    copy,
+    keys,
+    models,
+    projects,
+    settings,
+    undo,
+    usage,
+    workspace,
+)
 from qsone.account import routes as account_routes
 from qsone.account import vault as account_vault
 from qsone.account.session import Account
@@ -199,8 +211,8 @@ def create_app(
     app.include_router(deliverables_api.router(registry, trash))
     app.include_router(engine_routes.settings_router(ai_http, trash=trash))
     app.include_router(engine_routes.briefs_router(engine))
-    app.include_router(canvas.router(registry, engine.waiting))
-    app.add_middleware(canvas.no_store)
+    app.include_router(workspace.router(registry, engine.waiting))
+    app.add_middleware(workspace.no_store)
     app.include_router(connector_routes.router(connector_hub, trash))
     app.include_router(undo.router(trash))
     app.include_router(backup_routes.router(backups))

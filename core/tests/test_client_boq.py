@@ -168,26 +168,15 @@ def client(data_dir):
         yield client
 
 
-async def test_the_canvas_lists_client_boqs_and_serves_each(client):
+async def test_the_workspace_lists_client_boqs_and_serves_each(client):
     project = client.post("/projects", json={"name": "برج - عينة"}, headers=AUTH).json()["id"]
     rec = client.app.state.projects.get(project)
-    assert client.get(f"/projects/{project}/canvas", headers=AUTH).json()["client_boqs"] == []
+    assert client.get(f"/projects/{project}/workspace", headers=AUTH).json()["client_boqs"] == []
     f = await import_boq(rec)
-    layout = client.get(f"/projects/{project}/canvas", headers=AUTH).json()
-    assert [e["file_id"] for e in layout["client_boqs"]] == [f]
-    frame = {
-        "key": f"clientboq:{f}",
-        "x": 0,
-        "y": 0,
-        "w": 960,
-        "h": 640,
-        "z": 0,
-        "collapsed": False,
-    }
-    body = {"frames": [frame], "removed": []}
-    assert (
-        client.put(f"/projects/{project}/canvas/frames", json=body, headers=AUTH).status_code == 200
-    )
+    got = client.get(f"/projects/{project}/workspace", headers=AUTH).json()
+    assert [e["file_id"] for e in got["client_boqs"]] == [f]
+    body = {"open": f"clientboq:{f}", "anchor": None}
+    assert client.put(f"/projects/{project}/workspace", json=body, headers=AUTH).status_code == 200
     r = client.get(f"/projects/{project}/client-boq/{f}", headers=AUTH)
     assert r.status_code == 200 and len(r.json()["rows"]) == 3
     r = client.get(f"/projects/{project}/client-boq/{'f' * 32}", headers=AUTH)

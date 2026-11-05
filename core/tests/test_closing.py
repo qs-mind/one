@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from qsone import copy, usage
 from qsone.app import create_app
 from qsone.backup import store as backup_store
-from qsone.canvas import ViewIn, save_view
 from qsone.deliverables import store
 from qsone.deliverables.comments import add as add_comment
 from qsone.deliverables.review import sign_off
@@ -24,6 +23,7 @@ from qsone.records import db, ledger, vault
 from qsone.records.files import add_file
 from qsone.records.project import RecordsError
 from qsone.records.search import search
+from qsone.workspace import save_open
 from tests.conftest import AUTH, SECRET
 from tests.engine_fakes import OPUS, scripted, text
 from tests.engine_fakes import call as step
@@ -101,7 +101,7 @@ def test_archived_project_reads_and_searches_but_refuses_changes(machine):
     with pytest.raises(RecordsError) as e:
         add_file(rec, "ملحق - عينة.txt", b"addendum", actor="engineer")
     assert e.value.status == 423
-    save_view(rec, ViewIn(x=10, y=20, zoom=1))  # the canvas layout is not project data
+    save_open(rec, "files:all", None)  # the open document is not project data
 
 
 def test_archive_then_the_final_backup_with_nothing_left_to_copy(machine, tmp_path, tracked):

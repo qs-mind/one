@@ -1,9 +1,9 @@
-"""Which canvas frame an agent works on, read from its tool calls (Plan 7's `Focus`).
+"""Which document an agent works on, read from its tool calls (Plan 7's `Focus`).
 
 `of(tool, args, rec)` gives `{"frame": "<kind>:<id>", "anchor": {...} | None}` for a call that
 names a Deliverable, a file (or a chunk of one) or a Desk, and None for any other. The frame key is
-only ever built from an id that fits the canvas's keys, so a cursor never points at a frame that
-cannot exist. No PydanticAI here; nothing is logged."""
+only ever built from an id that fits the workspace's keys, so a cursor never points at a document
+that cannot exist. No PydanticAI here; nothing is logged."""
 
 import json
 import re
