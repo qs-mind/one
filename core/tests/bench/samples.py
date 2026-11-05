@@ -30,7 +30,9 @@ def write_boq(path: Path, *, priced: bool = True) -> Path:
     sheet.title = "المقايسة"  # as the tender pack names it: the bench fake must read the name
     sheet.sheet_view.rightToLeft = True
     sheet.append(["جدول كميات - عينة اختبار، أرقام غير حقيقية"])
-    sheet.append(["رقم البند", "الوصف", "الوحدة", "الكمية", "الفئة", "القيمة"][: 6 if priced else 4])
+    sheet.append(
+        ["رقم البند", "الوصف", "الوحدة", "الكمية", "الفئة", "القيمة"][: 6 if priced else 4]
+    )
     for code, description, unit, quantity, rate, amount in BOQ_ROWS:
         row = [
             code or None,

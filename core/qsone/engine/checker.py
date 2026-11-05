@@ -239,7 +239,9 @@ def _coverage(conn, draft: DeliverableDraft) -> dict | None:
     }
     client = [
         c
-        for (c,) in conn.execute("SELECT code FROM items WHERE kind = 'boq_item' AND code IS NOT NULL")
+        for (c,) in conn.execute(
+            "SELECT code FROM items WHERE kind = 'boq_item' AND code IS NOT NULL"
+        )
     ]
     have = codes & set(client)
     if not have:
@@ -274,7 +276,9 @@ def capped(packet: CheckPacket, review: Review) -> Review:
                 "about": "ONE",
                 "text": f"It has {cov['in_deliverable']} of the client's {cov['client_items']} "
                 f"items in its divisions; missing: {missing}"
-                + ("…" if cov["client_items"] - cov["in_deliverable"] > len(cov["missing"]) else ""),
+                + (
+                    "…" if cov["client_items"] - cov["in_deliverable"] > len(cov["missing"]) else ""
+                ),
             }
         )
     return replace(review, code=code, comments=tuple(comments))

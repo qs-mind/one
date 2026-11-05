@@ -783,8 +783,9 @@ class _Brief:
             with rec.read() as c:
                 for i in ids:
                     row = (
-                        c.execute("SELECT coalesce(code, '') FROM items WHERE id = ?", (i,))
-                        .fetchone()
+                        c.execute(
+                            "SELECT coalesce(code, '') FROM items WHERE id = ?", (i,)
+                        ).fetchone()
                         or c.execute("SELECT name FROM files WHERE id = ?", (i,)).fetchone()
                         or c.execute(
                             "SELECT coalesce(i.code, '') FROM numbers n JOIN items i"

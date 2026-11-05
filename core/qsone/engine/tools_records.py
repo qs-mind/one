@@ -462,7 +462,9 @@ def _covers(conn, args: SourceArgs, place: dict) -> dict:
             "supply only. Add it with covers supply (or leave covers out); price labour from "
             "another source, with calculate."
         )
-    return {"covers": args.covers or ("supply_and_install" if truth.covers_labour(here) else "supply")}
+    return {
+        "covers": args.covers or ("supply_and_install" if truth.covers_labour(here) else "supply")
+    }
 
 
 def _web_source(conn, args: SourceArgs) -> dict:

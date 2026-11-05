@@ -12,9 +12,9 @@ from qsone.engine.tools import REGISTRY, call
 from qsone.engine.tools_records import NumberArgs, SourceArgs
 from qsone.engine.truth import Brief, Coverage
 from qsone.engine.types import CheckPacket, DeliverableDraft, Review
-from tests.engine_fakes import OPUS
 from qsone.records import ledger
 from qsone.records.files import add_file
+from tests.engine_fakes import OPUS
 from tests.fakes_tools import tool_ctx
 from tests.samples import sample_pdf
 
@@ -47,7 +47,10 @@ def test_bracketed_blanks_are_found_and_links_are_not():
     table = "| البند | الكمية | القيمة |\n| خرسانة | [الكمية] | [القيمة] |"
     assert truth.placeholders(table) == ["[الكمية]", "[القيمة]"]
     assert truth.placeholders("الإجمالي: [مبلغ إجمالي المقايسة]") == ["[مبلغ إجمالي المقايسة]"]
-    assert truth.placeholders("Dear [Client name], total {{total}}") == ["[Client name]", "{{total}}"]
+    assert truth.placeholders("Dear [Client name], total {{total}}") == [
+        "[Client name]",
+        "{{total}}",
+    ]
     assert truth.placeholders("see [the quote](https://x.example) and note [1], [x]") == []
     blocks = [{"type": "p", "children": [{"text": "بقيمة [مبلغ إجمالي المقايسة] جنيه"}]}]
     assert truth.placeholders_in(blocks) == ["[مبلغ إجمالي المقايسة]"]

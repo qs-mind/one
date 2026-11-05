@@ -4,17 +4,23 @@ ONE's records do not show, and the core puts the facts from its records beside t
 Scripted models make exactly the mistakes gemini-3.1-flash-lite made on the tender day (5 Nov
 2026). Synthetic «عينة» data only; no real AI."""
 
+# ruff: noqa: F811 (the engine fixtures, imported)
+
 from qsone.engine.runner import _stored_events
 from qsone.engine.types import Data, Progress, TextDelta
 from qsone.records import ledger
 from tests.engine_fakes import call, scripted
 from tests.engine_fakes import text as said
-from tests.test_engine_runner import finish, links, started, store_of, team_steps
-from tests.test_engine_runner import (  # noqa: F401 - fixtures
+from tests.test_engine_runner import (  # noqa: F401 - the runner's fixtures
+    finish,
+    links,
     make_engine,
     no_budget_card,
     project,
     registry,
+    started,
+    store_of,
+    team_steps,
 )
 
 
@@ -24,7 +30,11 @@ def boq(rec, n: int = 5) -> list[str]:
         at = rec.clock()
         return [
             ledger.write_item(
-                c, at=at, actor="t", kind="boq_item", code=f"01-01-{i:03}",
+                c,
+                at=at,
+                actor="t",
+                kind="boq_item",
+                code=f"01-01-{i:03}",
                 fields={"description": f"مباني طوب أسمنتي 25 سم - عينة {i}", "unit": "m3"},
             )  # fmt: skip
             for i in range(1, n + 1)
@@ -136,4 +146,3 @@ async def test_the_work_log_names_an_item_by_its_code(make_engine, project, regi
     events = await finish(engine, await engine.start_brief(project, "البند الأول متسعّر؟"))
     [step] = [e for e in events if isinstance(e, Progress) and e.tool]
     assert "01-01-001" in step.text["ar"] and item not in step.text["ar"]
-

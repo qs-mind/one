@@ -128,16 +128,14 @@ def truthful(rec: Records, tool: str, content, kind: str, said: str = "") -> Non
     if blanks:
         wrong.append(
             f"It has blanks left for values: {', '.join(blanks)}. Put each value in from ONE's "
-            "records (a number as {\"type\": \"num\"} or {\"type\": \"cell\"}), or write plainly "
+            'records (a number as {"type": "num"} or {"type": "cell"}), or write plainly '
             "that it is missing."
         )
     if kind == "document":
         day = truth.today(datetime.fromisoformat(rec.clock()))
         text = "\n".join(_texts(content))
         with rec.read() as c:
-            wrong += truth.letter_problems(
-                c, text, day=day, has_total=_has_ref(content), said=said
-            )
+            wrong += truth.letter_problems(c, text, day=day, has_total=_has_ref(content), said=said)
     if wrong:
         raise ModelRetry(f"{tool}: " + " ".join(wrong) + " Nothing was saved.")
 

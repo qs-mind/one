@@ -319,7 +319,9 @@ async def test_unchecked_deliverable_with_numbers_is_checked_before_done(make_en
         "sources": [ids["source"]],
     }
     lead = scripted(call("make_deliverable", deliverable), said("الجدول جاهز - عينة"))
-    checker = scripted(call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]}))
+    checker = scripted(
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)
@@ -337,7 +339,9 @@ async def test_a_deliverable_the_brief_made_is_checked_on_its_saved_version(make
     rows = sample_boq_rows(rec, 2)
     sheet = {"kind": "sheet", "variant": "boq", "title": "جدول - عينة", "language": "ar"}
     lead = scripted(call("deliverable_create", sheet | {"rows": rows}), said("الجدول جاهز - عينة"))
-    checker = scripted(call("final_result", {"code": "B", "comments": [], "checked": ["sources - sample"]}))
+    checker = scripted(
+        call("final_result", {"code": "B", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)
@@ -354,7 +358,9 @@ async def test_a_deliverables_card_stays_in_the_stored_chat(make_engine, registr
     sheet = {"kind": "sheet", "variant": "boq", "title": "جدول - عينة", "language": "ar"}
     rows = sample_boq_rows(rec, 2)
     lead = scripted(call("deliverable_create", sheet | {"rows": rows}), said("الجدول جاهز - عينة"))
-    checker = scripted(call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]}))
+    checker = scripted(
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     await finish(engine, brief)
@@ -382,7 +388,9 @@ async def test_a_deliverable_the_brief_proposed_to_is_checked_once(make_engine, 
         ),
         said("اقترحت تعديل - عينة"),
     )
-    checker = scripted(call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]}))
+    checker = scripted(
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)

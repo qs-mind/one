@@ -123,9 +123,7 @@ class Brief:
 
 _SENTENCE = re.compile(r"[^.!?؟\n]+[.!?؟]?")
 # Pricing done: «تم الانتهاء من تسعير», «سعّرت», «اتسعّرت», "priced all", "finished pricing".
-PRICED = re.compile(
-    r"تسعير|سع[ّ]?ر(?:ت|نا)\b|اتسع[ّ]?ر|مسع[ّ]?ر|\bpric(?:ed|ing)\b", re.IGNORECASE
-)
+PRICED = re.compile(r"تسعير|سع[ّ]?ر(?:ت|نا)\b|اتسع[ّ]?ر|مسع[ّ]?ر|\bpric(?:ed|ing)\b", re.IGNORECASE)
 _DONE = re.compile(
     r"تم\s+(?:ال)?انتهاء|انتهي(?:ت|نا)|خل[ّ]?ص(?:ت|نا)|اكتمل|تم\s+تسعير|سع[ّ]?ر(?:ت|نا)\b"
     r"|اتسع[ّ]?ر|\b(?:completed?|finished|done|have priced|priced)\b",
@@ -408,7 +406,9 @@ def texts_at(conn, file_id: str, locator: dict) -> list[str] | None:
 
 
 def file_text(conn, file_id: str) -> str:
-    return "\n".join(t for (t,) in conn.execute("SELECT text FROM chunks WHERE file_id = ?", (file_id,)))
+    return "\n".join(
+        t for (t,) in conn.execute("SELECT text FROM chunks WHERE file_id = ?", (file_id,))
+    )
 
 
 def value_at(conn, source_id: str, value: str) -> tuple[bool, str, list[str]] | None:
@@ -443,7 +443,8 @@ def value_in(conn, file_id: str, place: dict, value: str) -> tuple[bool, str, li
 # Words that say a price covers labour or installation, in Arabic and English.
 _INSTALL = re.compile(
     r"تركيب|مصنعي[ةه]|عمال[ةه]|توريد\s+و\s*تركيب|شامل(?:ة|اً)?\s+(?:ال)?(?:تركيب|مصنعي|عمال)"
-    r"|\b(?:install(?:ation|ed)?|labou?r|fix(?:ing|ed)|erect(?:ion)?|supply and (?:install|fix|lay))\b",
+    r"|\b(?:install(?:ation|ed)?|labou?r|fix(?:ing|ed)|erect(?:ion)?"
+    r"|supply and (?:install|fix|lay))\b",
     re.IGNORECASE,
 )
 _SUPPLY_ITEM = re.compile(r"توريد(?!\s+و\s*تركيب)|\bsupply(?!\s+and)\b", re.IGNORECASE)
@@ -553,9 +554,7 @@ def file_dates(conn) -> set[date]:
 _TOTAL = re.compile(r"إجمالي|اجمالي|قيم[ةه]\s+العطاء|\btotal\b|\bsum\b", re.I)
 
 
-def letter_problems(
-    conn, text: str, *, day: date, has_total: bool, said: str = ""
-) -> list[str]:
+def letter_problems(conn, text: str, *, day: date, has_total: bool, said: str = "") -> list[str]:
     """What a letter says against the project's files and today's date (English, for the model).
     A date the engineer wrote (`said`, the Brief's text) is theirs to use."""
     wrong: list[str] = []
