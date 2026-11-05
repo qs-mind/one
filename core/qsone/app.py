@@ -14,7 +14,7 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings
+from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings, usage
 from qsone.backup import routes as backup_routes
 from qsone.backup.runner import Backups
 from qsone.calc import routes as calc_routes
@@ -28,6 +28,7 @@ from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
+from qsone.journey import routes as journey_routes
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
 from qsone.records.project import RecordsError
@@ -48,6 +49,23 @@ class SearchKeyIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     value: str = Field(min_length=1, max_length=500)
+
+
+class UsageIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    on: bool
+
+
+class CrashIn(BaseModel):
+    """A crash of the screen or the shell: class and where in our code, never a message."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    origin: Literal["screen", "shell"] = Field(alias="from")
+    kind: str = Field(max_length=80)
+    where: str = Field(max_length=80)
+    version: str = Field(max_length=80)
 
 
 class ModelIn(BaseModel):
@@ -99,6 +117,7 @@ def create_app(
         meaning=service,
     )
     # Task 5 gives the escrow (the account vault); until then the Backup key stays local.
+    sender = usage.Sender()
     backups = Backups(Path(folder), registry, engineer=engine.engineer_records)
     registry.backups = backups
 
@@ -117,6 +136,8 @@ def create_app(
             engine.services = tool_services.services_for(app.state)
         await engine.start()  # never continues a Brief by itself
         backups.start()  # every 30 minutes; closing a project also backs it up
+        usage.app_start()  # queued only when the engineer said yes to Usage Stats
+        sender.start()  # every 5 minutes
         try:
             async with mcp.running():
                 yield
@@ -128,6 +149,7 @@ def create_app(
             await connector_hub.close()  # stdio servers stop with the core
             stop_listening()
             backups.stop()  # waits for a running copy
+            sender.stop()
         service.stop()
         registry.close_all()
 
@@ -155,6 +177,7 @@ def create_app(
     app.add_middleware(canvas.no_store)
     app.include_router(connector_routes.router(connector_hub))
     app.include_router(backup_routes.router(backups))
+    app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):
@@ -166,6 +189,11 @@ def create_app(
     @app.exception_handler(RecordsError)
     async def records_error(request: Request, exc: RecordsError) -> JSONResponse:
         return JSONResponse({"error": exc.text}, status_code=exc.status)
+
+    @app.exception_handler(Exception)
+    async def crashed(request: Request, exc: Exception) -> Response:
+        usage.crash(exc)  # class and module:line only; the error itself still goes to core.log
+        return Response("Internal Server Error", status_code=500)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -188,6 +216,27 @@ def create_app(
     @app.post("/chat")
     async def chat_stream(request: Request) -> Response:
         return await chat.respond(request, engine)
+
+    @app.get("/settings/usage-stats")
+    def usage_stats() -> dict:
+        return {"on": usage.is_on()}  # None: not asked yet
+
+    @app.put("/settings/usage-stats")
+    def choose_usage_stats(body: UsageIn) -> JSONResponse:
+        try:
+            usage.set_on(body.on)
+        except OSError:
+            return JSONResponse({}, status_code=503)  # the screen says it in its own words
+        return JSONResponse({"on": body.on})
+
+    @app.post("/usage/crash", status_code=204)
+    def screen_crash(body: CrashIn) -> Response:
+        data = body.model_dump(by_alias=True)  # {"from", "kind", "where", "version"}
+        if not usage.valid("crash", data):
+            detail = [{"loc": ["body"], "msg": "not a crash report", "type": "value_error"}]
+            return JSONResponse({"detail": detail}, status_code=422)
+        usage.track("crash", **data)
+        return Response(status_code=204)
 
     @app.get("/settings/ai-key")
     def ai_key_status(provider: Provider = "anthropic") -> dict:
