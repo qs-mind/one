@@ -224,7 +224,7 @@ export function TopBar(props: TopBarProps) {
             </PopoverClose>
             <hr className="mx-3 my-1 border-ink/[0.06]" />
             {ai(more.current)}
-            {otherLanguage}
+            <PopoverClose asChild>{otherLanguage}</PopoverClose>
             <PopoverClose asChild>
               <button type="button" title={t("setupAgainHelp")} className={button} onClick={() => openSetup()}>
                 {t("setupAgain")}

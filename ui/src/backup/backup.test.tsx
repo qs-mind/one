@@ -217,4 +217,27 @@ describe("restore", () => {
       { path: "/media/usb/One", project_id: "b", code: CODE },
     ]);
   });
+
+  it("in the Backup panel, the Backup key's ticks change as soon as a restore brings the key", async () => {
+    let here = false;
+    mockCore({
+      "GET /backup": () => Response.json(status({ backup_key: { local: here, in_account: false, code_saved: false } })),
+      "GET /backup/found": () =>
+        Response.json({ projects: here ? [] : [{ id: "b", name: "برج - عينة", last_backup: "2026-11-04T08:00:00Z", needs: "backup_code" }] }),
+      "POST /backup/restore": () => {
+        here = true; // the recovery code brought the Backup key to this computer
+        return Response.json({ name: "برج - عينة" });
+      },
+    });
+    const user = userEvent.setup();
+    render(<BackupPanel onClose={() => undefined} />);
+    const local = (await screen.findByText(texts.backupKeyLocal.en)).closest("li")!;
+    expect(local).toHaveTextContent(texts.no.en);
+    await user.click(screen.getByRole("button", { name: texts.restoreTitle.en }));
+    const restore = screen.getByRole("region", { name: texts.restoreTitle.en });
+    await user.type(within(restore).getByLabelText(texts.backupFolderPath.en), "/media/usb/One{Enter}");
+    await user.type(await within(restore).findByRole("textbox", { name: texts.restoreCode.en }), CODE);
+    await user.click(within(restore).getByRole("button", { name: texts.restoreProject.en }));
+    await waitFor(() => expect(screen.getByText(texts.backupKeyLocal.en).closest("li")).toHaveTextContent(texts.yes.en));
+  });
 });

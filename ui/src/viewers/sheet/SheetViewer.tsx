@@ -281,6 +281,10 @@ export function SheetViewer(props: SheetViewerProps) {
   );
 
   const full = props.mode === "full";
+  // in a frame, the frame's strip already says the client's document is read only: it is not said twice, and the
+  // header, with nothing left to show, keeps only the title for screen readers
+  const badge = readOnly && props.mode !== "frame";
+  const shown = !readOnly || badge || full || !!props.onToggleFullScreen;
   return (
     <div
       ref={root}
@@ -292,13 +296,13 @@ export function SheetViewer(props: SheetViewerProps) {
         if (popover && event.target.matches("input, textarea")) setPopover(null); // the cell editor opened
       }}
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+      <header className={shown ? "flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3" : "sr-only"}>
         {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
         <h2 dir="auto" className={full ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
         {readOnly ? (
-          <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
+          badge && <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
         ) : (
           <>
             <StatusChips view={view} />

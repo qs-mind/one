@@ -169,7 +169,7 @@ export function BackupPanel({ onClose }: { onClose: () => void }) {
 
       <div className="flex flex-col gap-3 border-t border-stone pt-5">
         {restoring ? (
-          <Restore />
+          <Restore onChanged={() => void load()} />
         ) : (
           <button type="button" onClick={() => setRestoring(true)} className={`${secondary} self-start`}>
             {t("restoreTitle")}

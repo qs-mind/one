@@ -232,7 +232,10 @@ describe("SheetViewer", () => {
       total: null,
       sources: { s1: { kind: "boq", title: "BOQ", file_name: "مقايسة العميل - عينة.xlsx", file_id: "f1", locator: { sheet: "BOQ", row: 5, column: "E" }, url: null, dated: null } },
     });
-    render(<SheetViewer projectId={P} view={client} readOnly />);
+    const { rerender } = render(<SheetViewer projectId={P} view={client} mode="frame" readOnly />);
+    // in its frame, the frame's strip says it: the viewer does not say it again
+    expect(screen.queryByText(texts.clientBoqReadOnly.ar)).toBeNull();
+    rerender(<SheetViewer projectId={P} view={client} readOnly />);
     expect(screen.getByText(texts.clientBoqReadOnly.ar)).toBeInTheDocument();
     expect(screen.queryByText(texts.statusDraft.ar)).toBeNull();
     await user.dblClick(cellOf("03/02", "rate"));
