@@ -106,10 +106,22 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     os.environ["QSONE_DATA_DIR"] = str(args.data_dir)
-    guard.install()
+    # QSONE_BENCH_ALLOW_HOST (comma-separated, off by default): an audit that needs one real AI
+    # lets its host through, and the Standard Links it adds are listed beside the bench's own.
+    allow = tuple(
+        h.strip() for h in os.environ.get("QSONE_BENCH_ALLOW_HOST", "").split(",") if h.strip()
+    )
+    guard.install(allow)
     from qsone.engine import connectors
+    from qsone.engine.connectors import standard
 
-    connectors.connectors = lambda **_: fake.connectors()  # the Settings screen's list too
+    if allow:
+        connectors.connectors = lambda **kw: [
+            *fake.connectors(),
+            *standard.links(http_client=kw.get("http_client")),
+        ]
+    else:
+        connectors.connectors = lambda **_: fake.connectors()  # the Settings screen's list too
     check_keys()
     args.data_dir.mkdir(parents=True, exist_ok=True)
     seed()

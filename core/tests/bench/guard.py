@@ -41,12 +41,20 @@ def _local(host) -> bool:
     return host in ("", "localhost", "127.0.0.1", "::1") or host.startswith("127.")
 
 
+_allowed_hosts: set[str] = set()  # named in `install(allow=...)`: an audit's one real AI provider
+_allowed_addresses: set[str] = set()  # what those names were looked up to
+
+
 def _refuse(family, address) -> None:
     if family in (socket.AF_INET, socket.AF_INET6) and not _local(address[0]):
+        if str(address[0]).split("%")[0] in _allowed_addresses:
+            return
         raise ConnectionRefusedError(f"the bench may not reach the internet: {address[0]}")
 
 
-def install() -> None:
+def install(allow: tuple[str, ...] = ()) -> None:
+    """`allow` names hosts the bench may reach after all (none by default)."""
+    _allowed_hosts.update(h.lower() for h in allow)
     keyring.set_keyring(MemoryKeyring())
 
     connect, connect_ex, getaddrinfo = (
@@ -64,6 +72,11 @@ def install() -> None:
         return connect_ex(self, address)
 
     def guarded_getaddrinfo(host, *args, **kwargs):
+        name = host.decode() if isinstance(host, bytes) else str(host or "")
+        if name.lower() in _allowed_hosts:
+            found = getaddrinfo(host, *args, **kwargs)
+            _allowed_addresses.update(str(info[4][0]) for info in found)
+            return found
         if not _local(host):
             raise socket.gaierror(socket.EAI_NONAME, f"the bench may not look up {host}")
         return getaddrinfo(host, *args, **kwargs)
