@@ -604,6 +604,42 @@ def test_text_anchor_follows_its_quote(rec):
     assert thread["anchor_now"] == {"type": "deliverable", "moved": True} and thread["id"] == c
 
 
+def js_length(text: str) -> int:
+    """`text.length` in the Document viewer: UTF-16 code units."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def test_text_offsets_count_as_the_document_viewer_counts(rec):
+    """JS string units (an emoji is two), and a number reference counts nothing."""
+    d = sample_document(rec, sample_sheet(rec))
+    block = letter_block(rec, d)
+    total = next(b for b in view(rec, d)["blocks"] if '"cell"' in json.dumps(b))
+    ref = next(c for c in total["node"]["children"] if c.get("type") == "cell")
+    children = [{"text": "🙂 بإجمالي "}, ref, {"text": " جنيه حالياً"}]
+    edit(
+        rec,
+        d,
+        {"op": "set_block", "block": block["id"], "node": {"type": "p", "children": children}},
+    )
+    before = "🙂 بإجمالي  جنيه "  # the reference adds nothing
+    start = js_length(before)
+    assert start == len(before) + 1  # the emoji counts two
+    anchor = {
+        "type": "text",
+        "block": block["id"],
+        "start": start,
+        "end": start + 6,
+        "quote": "حالياً",
+    }
+    add(rec, d, kind="review", anchor=anchor, body="x - عينة", actor="engineer")
+    [thread] = list_comments(rec, d)
+    assert thread["anchor"] == anchor == thread["anchor_now"]
+    edit(rec, d, {"op": "set_block", "block": block["id"], "node": paragraph("🙂🙂 جنيه حالياً")})
+    [thread] = list_comments(rec, d)
+    moved = js_length("🙂🙂 جنيه ")
+    assert thread["anchor_now"] == anchor | {"start": moved, "end": moved + 6}
+
+
 def test_removed_row_comment_is_moved_not_lost(rec):
     d = sample_sheet(rec)
     row = row_by_code(rec, d, "03/02")

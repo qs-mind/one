@@ -90,11 +90,28 @@ def _column(head: dict, key, field: str) -> str:
     return key
 
 
+def _units(text: str) -> int:
+    """`text.length` as the Document viewer counts it: UTF-16 code units, so a character past
+    U+FFFF (an emoji) counts two. A text anchor's offsets are in these units."""
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _index(text: str, units: int) -> int:
+    """The Python index of the character at `units` UTF-16 code units into `text`."""
+    count = 0
+    for i, ch in enumerate(text):
+        if count >= units:
+            return i
+        count += 2 if ord(ch) > 0xFFFF else 1
+    return len(text)
+
+
 def _found(text: str, quote: str, near: int) -> int | None:
-    """Where `quote` is in `text`, the place nearest `near`; None when it is not there."""
+    """Where `quote` is in `text`, the place nearest `near`, in UTF-16 units; None when it is
+    not there."""
     places, at = [], text.find(quote)
     while at != -1:
-        places.append(at)
+        places.append(_units(text[:at]))
         at = text.find(quote, at + 1)
     return min(places, key=lambda p: (abs(p - near), p)) if places else None
 
@@ -138,7 +155,7 @@ def check_anchor(conn, head: dict, anchor, *, current: bool = True) -> dict:
         "type": "text",
         "block": part["id"],
         "start": start,
-        "end": start + len(quote),
+        "end": start + _units(quote),
         "quote": quote,
     }
 
@@ -171,12 +188,12 @@ def _now(anchor: dict, parts: dict, columns: set[str]) -> dict:
         if not alive(anchor["block"]):
             return _MOVED
         text = compare.block_text(parts[anchor["block"]]["node"])
-        if text[anchor["start"] : anchor["end"]] == anchor["quote"]:
+        if text[_index(text, anchor["start"]) : _index(text, anchor["end"])] == anchor["quote"]:
             return anchor
         start = _found(text, anchor["quote"], anchor["start"])
         if start is None:
             return {"type": "row", "block": anchor["block"], "moved": True}
-        return {**anchor, "start": start, "end": start + len(anchor["quote"])}
+        return {**anchor, "start": start, "end": start + _units(anchor["quote"])}
     return anchor  # the whole Deliverable; "pdf_region" and "drawing_point" are reserved
 
 

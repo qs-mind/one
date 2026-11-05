@@ -135,7 +135,7 @@ def _as_text(value) -> str:
 
 
 def _from_function(fn: Callable, group: str, roles: set[str], risk: Risk) -> Tool:
-    hints = get_type_hints(fn)
+    hints = get_type_hints(fn, include_extras=True)  # keeps Annotated constraints
     params = list(inspect.signature(fn).parameters.values())
     takes_ctx = bool(params) and hints.get(params[0].name) is ToolContext
     fields = {

@@ -17,6 +17,7 @@ whose parent is the run that built it; `spec.id` names it and `specialist_run` f
 Refusals go back as `ModelRetry` and say exactly what to send; the engineer's "no" is `Denied`.
 No cost is ever said to a model (Mizan rule 9): the Brief Budget is the engineer's card only."""
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass, replace
@@ -26,6 +27,8 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from qsone import copy, settings
+from qsone.deliverables import review as deliverable_review
+from qsone.deliverables import tools as outputs
 from qsone.engine import agents, checker, desks, numbers_guard
 from qsone.engine.costs import brief_budget, caps, usd_text
 from qsone.engine.store import Store
@@ -659,10 +662,15 @@ async def check_deliverable(ctx: ToolContext, deliverable_id: str) -> str:
     try:
         draft = store.deliverable(deliverable_id)
     except LookupError:
-        raise ModelRetry(
-            f"submit_for_check: no Deliverable has the id «{deliverable_id}»; use the id "
-            "make_deliverable gave."
-        ) from None
+        found = None
+        if ctx.rec is not None:
+            found = await asyncio.to_thread(outputs.check_draft, ctx.rec, deliverable_id)
+        if found is None:
+            raise ModelRetry(
+                f"submit_for_check: no Deliverable has the id «{deliverable_id}»; use the id "
+                "make_deliverable or deliverable_create gave."
+            ) from None
+        return await _check_output(ctx, *found)
     earlier = store.reviews(draft.id)
     c_rounds = sum(r.code == "C" for r in earlier)
     maker = _maker(store, draft.id)
@@ -680,6 +688,36 @@ async def check_deliverable(ctx: ToolContext, deliverable_id: str) -> str:
     store.save_review(draft.id, review)
     ctx.host.emit(Reviewed(ctx.brief_id, draft.id, review))
     return _json(_review_json(draft.id, review, c_rounds + (review.code == "C")))
+
+
+async def _check_output(
+    ctx: ToolContext, draft: DeliverableDraft, version_n: int, untraced: list[str]
+) -> str:
+    """One check of a Deliverable the engineer reviews beside the chat (Plan 6), of the Saved
+    version it reads: recorded on that version through `review.record_review`, so a Code C
+    blocks Sign-off until the engineer closes its comments. Each version is checked once; the
+    next check needs the fixes accepted by the engineer, which is the round limit here."""
+    if await asyncio.to_thread(outputs.checked, ctx.rec, draft.id, version_n):
+        raise ModelRetry(
+            f"submit_for_check: version {version_n} of «{draft.id}» is checked already. Answer "
+            "the comments with deliverable_propose; once the engineer accepts the changes, "
+            "submit it again."
+        )
+    packet = _unsourced(ctx, draft)
+    packet = replace(packet, unsourced=tuple(dict.fromkeys([*packet.unsourced, *untraced])))
+    review = await checker.check(packet, ctx.store.run(ctx.run_id)["choice"], ctx.host)
+    with ctx.rec.read() as c:
+        (earlier,) = c.execute(
+            "SELECT count(*) FROM checks WHERE deliverable_id = ?", (draft.id,)
+        ).fetchone()
+    review = replace(review, round=earlier + 1)
+    await asyncio.to_thread(
+        deliverable_review.record_review, ctx.rec, draft.id, review, version_n=version_n
+    )
+    ctx.host.emit(Reviewed(ctx.brief_id, draft.id, review))
+    out = _review_json(draft.id, review, 0) | {"version": version_n}
+    out.pop("rounds_left", None)
+    return _json(out)
 
 
 async def _submit_for_check(ctx: ToolContext, args: CheckArgs) -> str:

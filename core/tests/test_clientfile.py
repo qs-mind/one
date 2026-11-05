@@ -327,7 +327,7 @@ def test_xls_is_refused_in_plain_words(rec):
         ),
         (
             lambda p: p | {"columns": p["columns"] | {"rate": "XFE"}},
-            copy.COLUMN_NOT_ALLOWED,
+            copy.FILL_COLUMN_LETTER,
             "columns.rate",
         ),
         (lambda p: p | {"write": ["rate", "floor"]}, copy.COLUMN_NOT_ALLOWED, "write[1]"),
@@ -491,5 +491,21 @@ def test_a_plan_is_kept_with_its_audit_row(rec):
         ).fetchall()
     assert row[:2] == (d, f) and json.loads(row[2])["sheet"] == "BOQ" and row[3] == "lead_qs"
     assert audited == [("lead_qs",)]
-    with pytest.raises(KeyError):
-        preview(rec, "nope")
+
+
+def test_unknown_plans_and_files_are_not_found(rec):
+    d = sample_sheet(rec)
+    for call in (lambda: preview(rec, "nope"), lambda: fill(rec, "f" * 32, actor="engineer")):
+        with pytest.raises(RecordsError) as e:
+            call()
+        assert (text_of(e), e.value.status) == (copy.FILL_PLAN_NOT_FOUND, 404)
+    with pytest.raises(RecordsError) as e:
+        save_plan(rec, d, "f" * 32, plan_for(view(rec, d)), actor="lead_qs")
+    assert (text_of(e), e.value.status, e.value.field) == (copy.FILE_NOT_IN_PROJECT, 404, "file_id")
+    with pytest.raises(RecordsError) as e:
+        read_sheet(rec, "f" * 32)
+    assert e.value.status == 404
+    plan = save_plan(rec, d, client_file(rec), plan_for(view(rec, d)), actor="lead_qs")
+    with pytest.raises(RecordsError) as e:
+        accept_mismatches(rec, plan, "12", actor="engineer")  # rows are a list
+    assert e.value.field == "rows"

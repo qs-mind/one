@@ -514,6 +514,29 @@ def test_review_report_pdf_builds():
     assert "model-x - sample" in english and "2026-11-05 08:00 UTC" in english
 
 
+def test_review_pdf_reads_the_real_review_report(rec):
+    from qsone.deliverables import comments, review
+
+    d = sample_sheet(rec)
+    review.record_check(
+        rec, d, version_n=1, code="B", checker="model-x - sample", same_provider=True,
+        summary="الفئات سليمة - عينة",
+        comments=[{"anchor": {"type": "deliverable"}, "body": "راجع 03/02 - عينة", "code": "B"}],
+    )  # fmt: skip
+    [thread] = comments.list_comments(rec, d)
+    comments.reply(rec, thread["id"], body="اتراجع - عينة", actor="engineer")
+    comments.close(rec, thread["id"], actor="engineer")
+    no = review.sign_off(rec, d, actor="engineer")
+    report = review.review_report(rec, d, no)
+    text = pdf_text(review_pdf(report, "ar"))
+    for part in ("جدول الكميات - عينة", "إصدار 1", "راجع 03/02 - عينة", "اتراجع - عينة"):
+        assert part in text, part
+    assert "الفئات سليمة - عينة" in text and copy.SAMPLE_DATA["ar"] in text
+    assert copy.EXPORT_DRAFT_MARK["ar"] not in text  # signed off
+    english = pdf_text(review_pdf(report, "en"))
+    assert "Code B" in english and "Same-provider check" in english and "Closed" in english
+
+
 def test_export_labels_have_both_languages():
     for name, text in LABELS.items():
         assert set(text) == {"en", "ar"} and all(text.values()), name

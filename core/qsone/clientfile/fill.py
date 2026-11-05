@@ -33,11 +33,12 @@ def _refused(text: dict, field: str | None = None, status: int = 422) -> Records
 
 
 def _client_file(rec: Records, file_id: str) -> tuple[str, bytes]:
-    """(name, bytes) of an xlsx or xlsm in Project Records. Raises `KeyError` for an unknown id."""
+    """(name, bytes) of an xlsx or xlsm in Project Records. FILE_NOT_IN_PROJECT (404) for an
+    unknown id."""
     with rec.read() as conn:
         row = conn.execute("SELECT name, kind FROM files WHERE id = ?", (file_id,)).fetchone()
     if row is None:
-        raise KeyError(file_id)
+        raise _refused(copy.FILE_NOT_IN_PROJECT, "file_id", status=404)
     name, kind = row
     if kind != "xlsx":  # the file store's kind for .xlsx and .xlsm with a zip inside
         raise _refused(copy.FILL_XLS_NOT_SUPPORTED, "file_id")
@@ -123,8 +124,10 @@ def _checked(plan, v: dict, data: bytes) -> dict:
     columns = {}
     for key, letter in given.items():
         letter = letter.strip().upper() if isinstance(letter, str) else ""
-        if key not in ours or patch.column_number(letter) is None:
+        if key not in ours:
             raise _refused(copy.COLUMN_NOT_ALLOWED, f"columns.{key}")
+        if patch.column_number(letter) is None:
+            raise _refused(copy.FILL_COLUMN_LETTER, f"columns.{key}")
         columns[key] = letter
     write = plan.get("write")
     if not isinstance(write, list):
@@ -166,8 +169,9 @@ def _checked(plan, v: dict, data: bytes) -> dict:
 
 def save_plan(rec: Records, deliverable_id: str, file_id: str, plan: dict, *, actor: str) -> str:
     """Checks and keeps a Fill Plan; returns its id. Raises `RecordsError`:
-    FILL_XLS_NOT_SUPPORTED (not an xlsx or xlsm), FILL_SHEET_NOT_FOUND, COLUMN_NOT_ALLOWED (a
-    column letter outside A–XFD, or a `write` key that is not a mapped column of ours),
+    FILE_NOT_IN_PROJECT (404), FILL_XLS_NOT_SUPPORTED (not an xlsx or xlsm),
+    FILL_SHEET_NOT_FOUND, FILL_COLUMN_LETTER (a column letter outside A–XFD),
+    COLUMN_NOT_ALLOWED (not a column of ours, or a `write` key that is not mapped),
     FILL_ROW_TWICE (a row or a part given twice), ROW_NOT_FOUND (not an item row of this
     Deliverable) or FILL_ROW_MISSING (a row the client's sheet does not have)."""
     v = store.view(rec, deliverable_id)
@@ -208,7 +212,7 @@ def _plan(rec: Records, plan_id: str) -> tuple[str, str, dict]:
             "SELECT deliverable_id, file_id, plan FROM fill_plans WHERE id = ?", (plan_id,)
         ).fetchone()
     if row is None:
-        raise KeyError(plan_id)
+        raise _refused(copy.FILL_PLAN_NOT_FOUND, "plan", status=404)
     return row[0], row[1], json.loads(row[2])
 
 
@@ -309,13 +313,15 @@ def preview(rec: Records, plan_id: str) -> dict:
     """What the fill would write, from the newest signed-off Revision: `{"writes": [{"cell",
     "before", "after", "code_ours", "code_theirs", "client_text", …}], "skipped", "mismatches",
     "unmapped_rows", "unmapped_items", …}`. Raises FILL_NEEDS_SIGNOFF without a signed-off
-    Revision, and `KeyError` for an unknown plan."""
+    Revision, and FILL_PLAN_NOT_FOUND (404) for an unknown plan."""
     return _run(rec, plan_id)[0]
 
 
 def accept_mismatches(rec: Records, plan_id: str, rows: list[int], *, actor: str) -> dict:
     """The engineer says these rows are right despite their codes; returns the new preview."""
     deliverable_id, _, plan = _plan(rec, plan_id)
+    if not isinstance(rows, list):
+        raise _refused(copy.fill(copy.FILL_ROW_MISSING, row=rows), "rows")
     in_plan = {e["row"] for e in plan["rows"]}
     for i, row in enumerate(rows):
         if row not in in_plan:

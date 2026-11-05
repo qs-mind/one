@@ -14,8 +14,10 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
-from qsone import chat, copy, keys, models, projects
+from qsone import activity, chat, copy, keys, models, projects
 from qsone.calc import routes as calc_routes
+from qsone.deliverables import api as deliverables_api
+from qsone.deliverables import events as deliverable_events
 from qsone.engine import connectors as engine_connectors
 from qsone.engine import mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
@@ -85,11 +87,19 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        loop = asyncio.get_running_loop()
+        # Deliverables are written in worker threads: their events reach the hub on its loop.
+        stop_listening = deliverable_events.listen(
+            lambda project_id, event: loop.call_soon_threadsafe(activity.publish, project_id, event)
+        )
         service.start()
         await engine.start()  # never continues a Brief by itself
-        async with mcp.running():
-            yield
-            await engine.shutdown()  # each Brief keeps its Checkpoint
+        try:
+            async with mcp.running():
+                yield
+                await engine.shutdown()  # each Brief keeps its Checkpoint
+        finally:
+            stop_listening()
         service.stop()
         registry.close_all()
 
@@ -108,6 +118,7 @@ def create_app(
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
     app.include_router(calc_routes.router(registry))
+    app.include_router(deliverables_api.router(registry))
     app.include_router(engine_routes.settings_router(ai_http))
     app.include_router(engine_routes.briefs_router(engine))
 
