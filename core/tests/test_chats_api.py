@@ -16,7 +16,7 @@ from qsone.app import create_app
 from qsone.engine import costs, focus, roles, selection
 from qsone.engine.connectors.claude_code import ID as CLAUDE_CODE
 from qsone.engine.connectors.claude_code import ClaudeCodeConnector
-from qsone.engine.types import ModelChoice
+from qsone.engine.types import ModelChoice, brief_language
 from tests.conftest import AUTH, SECRET, ui_message
 from tests.engine_fakes import FakeSleep, call, fake_claude_command, read_fake_log, scripted
 from tests.engine_fakes import text as said
@@ -238,3 +238,29 @@ def test_later_agent_events_keep_the_focus(data_dir, published):
     assert json.dumps(events[-1]["agent"]["focus"]) == json.dumps(
         {"frame": f"deliverable:{d}", "anchor": None}
     )  # a later event without news of the focus keeps it
+
+
+# The Brief's language: its Progress words follow the engineer's message, not the screen's -------
+
+
+@pytest.mark.parametrize(
+    ("text", "lang"),
+    [("اقرا الـ BOQ وقولي إجمالي البنود - عينة", "ar"), ("Read the BOQ, sample", "en")],
+)
+def test_progress_and_agent_lines_carry_the_briefs_language(data_dir, published, text, lang):
+    model = Lead(call("deliverable_read", {"id": "b" * 32}), said("تم - عينة")).model
+    app = create_app(SECRET, connectors=lambda: links(lead=model), sleep=FakeSleep())
+    with TestClient(app) as client:
+        pid = client.post("/projects", json={"name": "برج - عينة"}, headers=AUTH).json()["id"]
+        r = send(client, pid, text)
+    found = [json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: {")]
+    langs = [c["data"].get("lang") for c in found if c["type"] == "data-progress"]
+    assert langs and set(langs) == {lang}
+    agents = [e["agent"] for c, e in published if c == pid and e["type"] == "agent"]
+    assert agents and {a["lang"] for a in agents} == {lang}
+
+
+def test_the_briefs_language_is_the_messages():
+    assert brief_language("اقرا الـ BOQ وقولي إجمالي البنود") == "ar"
+    assert brief_language("Read boq-priced.xls and give me the total") == "en"
+    assert brief_language("") == "ar"  # Arabic is the default

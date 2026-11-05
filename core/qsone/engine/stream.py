@@ -61,7 +61,10 @@ class _Parts:
     def data(self, event: Event) -> tuple[str, str, dict] | None:
         """(part type, id, data) for a data event; None for text."""
         if isinstance(event, Progress):
-            return "data-progress", event.run_id, {"agent": event.agent, "text": event.text}
+            data = {"agent": event.agent, "text": event.text}
+            if event.lang is not None:
+                data["lang"] = event.lang  # the Brief's language: the screen shows it in that one
+            return "data-progress", event.run_id, data
         if isinstance(event, TeamMessage):
             data = {"sender": event.sender, "recipient": event.recipient, "text": event.text}
             return "data-team", event.id, data

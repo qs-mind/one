@@ -5,6 +5,7 @@ Money is `Decimal`, and goes out as text.
 """
 
 import json
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal, Protocol, runtime_checkable
@@ -22,6 +23,13 @@ BriefState = Literal[
     "done",
     "failed",
 ]
+
+
+def brief_language(text: str) -> Literal["ar", "en"]:
+    """The Brief's language, the engineer's: English when its message has more Latin letters
+    than Arabic ones, else Arabic (the default). The Brief's Progress words follow it."""
+    latin = len(re.findall(r"[A-Za-z]", text))
+    return "en" if latin > len(re.findall("[\u0600-\u06ff]", text)) else "ar"
 
 
 @dataclass(frozen=True)
@@ -224,6 +232,7 @@ class Progress:
     agent: Text
     text: Text
     focus: dict | None = None  # the canvas frame the agent now works on (Plan 7), when known
+    lang: str | None = None  # the Brief's language; the Brief sets it as it sends the event
 
 
 @dataclass(frozen=True)
