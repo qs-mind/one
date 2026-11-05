@@ -255,3 +255,32 @@ html.lang-wipe::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
 }
+
+/* Thinking, while ONE works: a soft Slate→Ink→Slate sweep over the whole word (never letter by letter), in the
+   reading direction, only while the line is shown. Reduced motion gets plain Slate text from the chat instead. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+.shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-slate) 0%,
+    var(--color-slate) 35%,
+    var(--color-ink) 50%,
+    var(--color-slate) 65%,
+    var(--color-slate) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+[dir="rtl"] .shimmer {
+  animation-direction: reverse;
+}

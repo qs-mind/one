@@ -4,11 +4,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SelectionItem } from "../canvas/types";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
-import { fill, type Language, language, languageOf, pick, t, type Text, useLanguage } from "../i18n";
+import { dir, fill, type Language, language, languageOf, pick, t, type Text, useLanguage } from "../i18n";
 import { UnderstoodCard } from "../import/UnderstoodCard";
 import { HandOffCards } from "../shell/HandOffCard";
 import type { ChatState } from "../shell/useChats";
 import { textOf } from "../shell/useChats";
+import { DUR, play, useReducedMotion } from "../ui/motion";
 import { ApprovalCard, CARD_ANSWERED } from "./parts/ApprovalCard";
 import { ContinueBriefs } from "./parts/ContinueBriefs";
 import { CoordinationRoom } from "./parts/CoordinationRoom";
@@ -16,8 +17,9 @@ import { CostNotice } from "./parts/CostNotice";
 import { ProgressLine } from "./parts/ProgressLine";
 import { ReviewBadge } from "./parts/ReviewBadge";
 import { type OnePart, partsOf } from "./parts/types";
-import { BidiText } from "./bidi";
+import { BidiText, baseDirection } from "./bidi";
 import { Reply } from "./Reply";
+import { takeSentFrom } from "./sent";
 
 // The core sends a model error as an {en, ar} pair in the error text; any other failure gets the plain line.
 function errorLine(error: Error): string {
@@ -58,16 +60,17 @@ function OwnText({ text }: { text: string }) {
 function BriefReply({
   parts,
   lang,
+  live,
   projectId,
   onOpenDeliverable,
-}: { parts: OnePart[]; lang: Language } & Omit<ChatLogProps, "chat" | "label">) {
+}: { parts: OnePart[]; lang: Language; live: boolean } & Omit<ChatLogProps, "chat" | "label">) {
   const text = textOf(parts);
   const progress = partsOf(parts, "progress");
   // the Brief's own language: the core's word for it, else the engineer's message's
   const said = progress.find((item) => item.data.lang)?.data.lang ?? lang;
   return (
     <div className="flex flex-col gap-4">
-      <ProgressLine items={progress} lang={said} />
+      <ProgressLine items={progress} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
       {text && <Reply text={text} unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)} />}
       {partsOf(parts, "card").map((card) => (
@@ -104,8 +107,8 @@ export type ChatLogProps = {
   /** The log's accessible name: the project chat or the General chat. */
   label: string;
   projectId?: string;
-  /** A Deliverable card's Open. */
-  onOpenDeliverable?: (id: string) => void;
+  /** A Deliverable card's Open, with the card it opens from. */
+  onOpenDeliverable?: (id: string, card?: HTMLElement) => void;
 };
 
 /** How near the end (px) still counts as reading the newest message. */
@@ -119,6 +122,16 @@ const waitingCards = (messages: ChatState["messages"]) =>
       .map((card) => card.id),
   );
 
+/** Whether ONE is at work in this chat: a message just sent, or the last Brief running (not one waiting for the
+ * engineer, a connection or a cap). */
+function working({ messages, status, running }: ChatState): boolean {
+  if (status === "submitted") return true;
+  const last = messages.findLast((message) => message.role === "assistant");
+  const state = last && partsOf(last.parts, "status").at(-1)?.data.state;
+  if (state) return running && (state === "running" || state === "queued");
+  return status === "streaming";
+}
+
 /** The messages, as a polite log the engineer can scroll from the keyboard (it is focusable). New content keeps the
  * log at its end while the engineer reads there; scrolled up, a "New below" button shows instead. A card that comes
  * to wait for the engineer is always brought into view. */
@@ -129,6 +142,10 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
   const atEnd = useRef(true);
   const seen = useRef<Set<string> | null>(null);
   const [below, setBelow] = useState(false);
+  const reduced = useReducedMotion();
+  const busy = working(chat);
+  const lastReply = messages.findLastIndex((message) => message.role === "assistant");
+  const sent = useRef<string | undefined>(undefined); // the newest message of the engineer's already in place
 
   const toEnd = () => {
     ref.current?.scrollTo?.({ top: ref.current.scrollHeight });
@@ -158,6 +175,21 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
     }
   }, [messages, status]);
 
+  useLayoutEffect(() => {
+    // a message just sent from the box moves from there into its place (after the log has scrolled to it)
+    const last = messages.at(-1);
+    if (last?.role !== "user" || last.id === sent.current) return;
+    sent.current = last.id;
+    const from = takeSentFrom();
+    const el = [...(ref.current?.querySelectorAll<HTMLElement>("[data-own]") ?? [])].find((li) => li.dataset.own === last.id);
+    if (!from || !el) return;
+    const to = el.getBoundingClientRect();
+    // the side the words start on, from their real rects: the right edges for a line that reads right to left
+    const rtl = (baseDirection(textOf(last.parts)) ?? dir()) === "rtl";
+    const dx = rtl ? from.right - to.right : from.left - to.left;
+    void play(el, [{ transform: `translate(${dx}px, ${from.top - to.top}px)` }, { transform: "none" }], DUR.base);
+  }, [messages]);
+
   return (
     <div className={`flex min-h-0 flex-col ${className}`}>
       <ContinueBriefs onContinued={chat.continued} />
@@ -178,7 +210,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
           {messages.length === 0 && <li className="text-slate">{t("empty")}</li>}
           {messages.map((message, index) =>
             message.role === "user" ? (
-              <li key={message.id} className="max-w-[85%] self-end rounded-2xl bg-stone px-4 py-3">
+              <li key={message.id} data-own={message.id} className="max-w-[85%] self-end rounded-2xl bg-stone px-4 py-3">
                 {message.metadata?.steering && <p className="text-slate">{t("steering")}</p>}
                 {message.metadata?.selection?.length ? (
                   <p className="mb-2 w-fit rounded-lg bg-paper px-3 py-0.5 text-sm text-slate">
@@ -192,13 +224,18 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
                 <BriefReply
                   parts={message.parts}
                   lang={briefLanguage(messages, index)}
+                  live={busy && index === lastReply}
                   projectId={projectId}
                   onOpenDeliverable={onOpenDeliverable}
                 />
               </li>
             ),
           )}
-          {status === "submitted" && <li className="text-slate">{t("thinking")}</li>}
+          {busy && (
+            <li>
+              <span className={reduced ? "text-slate" : "shimmer"}>{t("thinking")}</span>
+            </li>
+          )}
           {error && (
             <li role="alert" className="text-copper">
               {errorLine(error)}

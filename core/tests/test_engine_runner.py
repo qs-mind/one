@@ -279,6 +279,23 @@ async def test_a_deliverable_the_brief_made_is_checked_on_its_saved_version(make
     assert closeout["check"]["version_n"] == 1 and closeout["check"]["code"] == "B"
 
 
+async def test_a_deliverables_card_stays_in_the_stored_chat(make_engine, registry, project):
+    """The chat read again (a page reload) keeps the Deliverable card where the Brief made it."""
+    rec = registry.get(project)
+    sheet = {"kind": "sheet", "variant": "boq", "title": "جدول - عينة", "language": "ar"}
+    rows = sample_boq_rows(rec, 2)
+    lead = scripted(call("deliverable_create", sheet | {"rows": rows}), said("الجدول جاهز - عينة"))
+    checker = scripted(call("final_result", {"code": "A", "comments": []}))
+    engine = await started(make_engine(links(lead=lead, checker=checker)))
+    brief = await engine.start_brief(project, BRIEF)
+    await finish(engine, brief)
+    [d] = [e["id"] for e in deliverables.list_deliverables(rec)]
+    engine._briefs.pop(brief, None)  # read from the store, as after a restart
+    reply = engine.chat_messages(project)[-1]
+    cards = [p for p in reply["parts"] if p["type"] == "data-deliverable"]
+    assert cards == [{"type": "data-deliverable", "id": d, "data": {"id": d}}]
+
+
 async def test_a_deliverable_the_brief_proposed_to_is_checked_once(make_engine, registry, project):
     """A Sheet the team only proposed changes to has its Saved version checked when it has no
     check; one this Brief did not touch, or one checked already, is left as it is."""

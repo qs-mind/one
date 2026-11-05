@@ -12,7 +12,7 @@ export const texts = {
   empty: { en: "Ask the Lead QS about your work.", ar: "اسأل كبير مهندسي الكميات عن شغلك." },
   send: { en: "Send", ar: "إرسال" },
   stop: { en: "Stop", ar: "إيقاف" },
-  thinking: { en: "Working on it…", ar: "جارٍ العمل…" },
+  thinking: { en: "Thinking", ar: "بيفكّر" },
   chatError: { en: "The reply stopped because of an error. Try again.", ar: "توقف الرد بسبب خطأ. حاول مرة أخرى." },
   aiKeyTitle: { en: "Add your Claude key", ar: "أضف مفتاح Claude الخاص بك" },
   aiKeyHelp: {

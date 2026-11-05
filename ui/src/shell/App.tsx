@@ -206,13 +206,13 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     requestAnimationFrame(go);
   }
 
-  function openDeliverable(id: string) {
+  function openDeliverable(id: string, card?: HTMLElement) {
     const key: FrameKey = `deliverable:${id}`;
     if (DELIVERABLE_CARD_OPENS === "frame" && canvasApi.frames().some((frame) => frame.key === key)) {
       if (narrow) setSheetChat(false);
       canvasApi.focusFrame(key);
     } else {
-      deliverable.show(id);
+      deliverable.show(id, false, card); // from its chat card, it grows from there
     }
   }
 

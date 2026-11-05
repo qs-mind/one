@@ -160,7 +160,7 @@ describe("DeliverableCard", () => {
     act(() => live.emit({ type: "deliverable", deliverable: entry({ revision: 2 }) }));
     expect(screen.getByText(fill(texts.reviewRev.ar, { n: 2 }))).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) }));
-    expect(onOpen).toHaveBeenCalledWith(D);
+    expect(onOpen).toHaveBeenCalledWith(D, screen.getByRole("article", { name: "جدول الكميات - عينة" })); // the card it grows from
   });
 });
 
