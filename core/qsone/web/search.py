@@ -175,9 +175,7 @@ def choose_provider(
     return next((found[n] for n in _order(setting) if found[n] is not None), None)
 
 
-def provider_name(
-    *, setting: object, own_key: bool, native: bool, connector: bool = False
-) -> str:
+def provider_name(*, setting: object, own_key: bool, native: bool, connector: bool = False) -> str:
     """Which search One would use, for the Settings screen: "brave", "native", "connector" or
     "none"."""
     have = {"brave": own_key, "native": native, "connector": connector}

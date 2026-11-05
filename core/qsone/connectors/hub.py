@@ -425,7 +425,9 @@ class ConnectorHub:
         except (ConnectorDown, TimeoutError):
             raise ConnectorDown() from None
         except Exception as error:
-            log.warning("Connector %s did not list its tools: %s", config.name, type(error).__name__)
+            log.warning(
+                "Connector %s did not list its tools: %s", config.name, type(error).__name__
+            )
             raise ConnectorDown() from None
         finally:
             await live.close()
@@ -468,7 +470,9 @@ class ConnectorHub:
                 "name": t["name"],
                 "purpose": t["purpose"],
                 "args": compact_args(t["schema"]),
-                "hints": dict(zip(("read_only", "destructive", "open_world"), _hints(t), strict=True)),
+                "hints": dict(
+                    zip(("read_only", "destructive", "open_world"), _hints(t), strict=True)
+                ),
                 "risk": self.risk(name, t["name"]),
             }
             for t in listed
@@ -576,7 +580,9 @@ class ConnectorHub:
             target,
             row,
             ok=not result.is_error,
-            result_sha256=hashlib.sha256(result.model_dump_json(by_alias=True).encode()).hexdigest(),
+            result_sha256=hashlib.sha256(
+                result.model_dump_json(by_alias=True).encode()
+            ).hexdigest(),
             file_ids=[f.id for f in stored_files],
         )
         return _render(name, tool, call_id, at.strftime("%Y-%m-%d %H:%M UTC"), result, notes)
@@ -682,13 +688,20 @@ async def _keep_attachments(ctx, target: Records, connector: str, result) -> tup
             continue
         try:
             info = await asyncio.to_thread(
-                files.add_file, target, name, data, actor=ctx.agent.name["en"], embedder=ctx.embedder
+                files.add_file,
+                target,
+                name,
+                data,
+                actor=ctx.agent.name["en"],
+                embedder=ctx.embedder,
             )
         except RecordsError as error:
             notes.append(f"attachment {n} was not kept: {error.text['en']}")
             continue
         stored.append(info)
-        notes.append(f"attachment kept: file:{info.id} «{info.name}» ({info.kind}); read it with files_read")
+        notes.append(
+            f"attachment kept: file:{info.id} «{info.name}» ({info.kind}); read it with files_read"
+        )
     return stored, notes
 
 
@@ -710,7 +723,10 @@ def _render(name: str, tool: str, call_id: str, read: str, result, notes: list[s
     texts = _texts(result)
     flags = hidden.ai_instruction_flags(Piece({"part": n}, t) for n, t in enumerate(texts, 1))
     notes = [
-        *(f"flag: part {f.locator['part']} looks like an order to an AI: «{f.excerpt}»" for f in flags),
+        *(
+            f"flag: part {f.locator['part']} looks like an order to an AI: «{f.excerpt}»"
+            for f in flags
+        ),
         *notes,
     ]
     if result.is_error:
@@ -783,7 +799,9 @@ class ConnectorSearch:
         if config is None or not config.enabled:
             raise SearchFailed(copy.CONNECTOR_OFF)
         try:
-            result = await self.hub._call_tool(config, self.tool, await self._arguments(query, count))
+            result = await self.hub._call_tool(
+                config, self.tool, await self._arguments(query, count)
+            )
         except (ConnectorDown, ConnectorError):
             raise SearchFailed(copy.CONNECTOR_DOWN, retry_online=True) from None
         except _Refused:

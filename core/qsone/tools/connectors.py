@@ -153,7 +153,9 @@ async def _call(ctx: ToolContext, args: CallArgs) -> str:
 
 
 def _doing(args: CallArgs) -> dict:
-    return copy.fill(copy.DOING_CONNECTOR, connector=args.connector, tool=args.tool, args=_json(args.args))
+    return copy.fill(
+        copy.DOING_CONNECTOR, connector=args.connector, tool=args.tool, args=_json(args.args)
+    )
 
 
 for _tool in (
