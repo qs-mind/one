@@ -12,7 +12,7 @@ import { cellKey, cellName, commentMarks, pendingCells, SheetCell } from "./cell
 import { formatDecimal } from "./format";
 import { loadCollapsed, saveCollapsed, visibleRows } from "./collapse";
 import { Grid, type GridHandle, type SheetColumn } from "./grid";
-import { linesHeight, makeMeasure, oneLineWidth, rowHeight, shownWidth, titleColumnOf } from "./heights";
+import { COMPACT_PAD, linesHeight, makeMeasure, oneLineWidth, rowHeight, shownWidth, titleColumnOf } from "./heights";
 import { normalised, type Cell, type Range } from "./selection";
 import { SourcePopover } from "./SourcePopover";
 import { hideSourceLine, showSourceLine } from "../../sources/line";
@@ -60,6 +60,7 @@ const SCROLLBAR = 16;
 const TITLE_MIN = 240;
 /** The grid's header row and its total row, in px (react-data-grid's summary row with a row-height function). */
 const HEADER_H = 44;
+const DENSE_HEADER_H = 36;
 const TOTAL_H = 35;
 
 /** The status chips with text labels (never colour alone); the Document viewer shows the same. */
@@ -89,6 +90,10 @@ export function SheetViewer(props: SheetViewerProps) {
   const grid = useRef<GridHandle>(null);
 
   const full = props.mode === "full" || props.mode === "workspace";
+  // the open document is denser: 32 px one-line rows under a 36 px header, so more of the bill shows
+  const dense = props.mode === "workspace";
+  const pad = dense ? COMPACT_PAD : undefined;
+  const headerH = dense ? DENSE_HEADER_H : HEADER_H;
   // In full mode the sheet fills the board's width: the room the columns leave goes to the description, so no empty
   // band sits beside the last column (the rows then need fewer lines). In a frame the columns keep their widths.
   const gridBox = useRef<HTMLDivElement>(null);
@@ -178,11 +183,11 @@ export function SheetViewer(props: SheetViewerProps) {
     void fontsLoaded;
     const changed = new Set([...pending.keys()].map((k) => k.split("\u0000")[0]));
     return new Map(
-      rows.map((r) => [r.id, Math.max(rowHeight(r, columns, measure), changed.has(r.id) ? linesHeight(2) : 0)]),
+      rows.map((r) => [r.id, Math.max(rowHeight(r, columns, measure, pad), changed.has(r.id) ? linesHeight(2, pad) : 0)]),
     );
-  }, [rows, columns, measure, pending, fontsLoaded]);
+  }, [rows, columns, measure, pending, fontsLoaded, pad]);
   const contentHeight =
-    HEADER_H + [...heights.values()].reduce((sum, h) => sum + h, 0) + (view.total ? TOTAL_H : 0) + SCROLLBAR;
+    headerH +[...heights.values()].reduce((sum, h) => sum + h, 0) + (view.total ? TOTAL_H : 0) + SCROLLBAR;
 
   const [selection, setSelection] = useState<Range | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -441,7 +446,8 @@ export function SheetViewer(props: SheetViewerProps) {
           columns={gridColumns}
           rows={rows}
           direction={direction}
-          rowHeight={(row) => heights.get(row.id) ?? linesHeight(1)}
+          rowHeight={(row) => heights.get(row.id) ?? linesHeight(1, pad)}
+          headerHeight={headerH}
           rowClass={props.review ? rowClass : undefined}
           renderCell={renderCell}
           canEdit={canEdit}

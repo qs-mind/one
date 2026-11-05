@@ -34,7 +34,7 @@ export function DeliverableDoc(props: {
   const Viewer = viewerFor(kind);
   if (!Viewer)
     return (
-      <div className="flex h-full items-center justify-center bg-paper p-4">
+      <div className="h-full bg-paper p-3">
         <p className="text-slate">{t("noViewer")}</p>
       </div>
     );

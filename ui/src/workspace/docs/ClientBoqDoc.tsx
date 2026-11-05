@@ -42,7 +42,7 @@ export function ClientBoqDoc({ projectId, sources, fileId }: { projectId: string
 
   if (loaded && "view" in loaded) return <SheetViewer projectId={projectId} view={loaded.view} mode="workspace" readOnly />;
   return (
-    <div className="flex h-full items-center justify-center bg-paper p-4">
+    <div className="h-full bg-paper p-3">
       {loaded ? (
         <p role="alert" className="text-copper">
           {pick(loaded.failed)}

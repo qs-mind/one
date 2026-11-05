@@ -39,6 +39,8 @@ export type GridProps<R extends SheetRow> = {
   rows: R[];
   direction: "rtl" | "ltr";
   rowHeight: (row: R) => number;
+  /** The column headers' row; 44 px unless the viewer is denser (the open document). */
+  headerHeight?: number;
   /** `tabIndex` is the grid's own for what the cell holds: 0 on the active cell only, so the grid is one Tab stop. */
   renderCell: (row: R, column: SheetColumn, selected: boolean, tabIndex: number) => ReactNode;
   onCommit: (row: R, column: SheetColumn, text: string) => void;
@@ -233,7 +235,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
         rows={gridRows}
         rowKeyGetter={(g) => g.row.id}
         rowHeight={(g) => props.rowHeight(g.row)}
-        headerRowHeight={44}
+        headerRowHeight={props.headerHeight ?? 44}
         direction={direction}
         enableVirtualization={props.virtualize ?? true}
         bottomSummaryRows={summary ? [{}] : undefined}

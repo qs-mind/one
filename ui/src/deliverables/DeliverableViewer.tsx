@@ -150,7 +150,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
 
   if (!view) {
     return (
-      <div ref={root} className="flex h-full w-full items-center justify-center bg-paper p-4 text-slate">
+      <div ref={root} className={`h-full w-full bg-paper text-slate ${mode === "workspace" ? "p-3" : "flex items-center justify-center p-4"}`}>
         {state.error ? (
           <p role="alert" className="text-copper">
             {pick(state.error)}
@@ -231,10 +231,11 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         undoNotice.current?.undo();
       }}
     >
-      {/* full: a Sheet is as tall as its rows, up to 60%, and the review panels take the rest; a Document keeps 3/5 */}
+      {/* full: a Sheet is as tall as its rows, up to 60% (75% as the open document: the room is the data's), and the
+          review panels take the rest; a Document keeps 3/5 */}
       <div
         ref={body}
-        className={mode === "frame" ? "min-h-0 flex-1" : view.kind === "sheet" ? "flex min-h-0 max-h-[60%] flex-[0_1_auto] flex-col" : "min-h-0 flex-[3_1_0%]"}
+        className={mode === "frame" ? "min-h-0 flex-1" : view.kind === "sheet" ? `flex min-h-0 ${mode === "workspace" ? "max-h-[75%]" : "max-h-[60%]"} flex-[0_1_auto] flex-col` : "min-h-0 flex-[3_1_0%]"}
       >
         {viewer}
       </div>
@@ -280,7 +281,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
             role="tabpanel"
             aria-labelledby={`${tabId(tab)}-tab`}
             dir={language() === "ar" ? "rtl" : "ltr"}
-            className="min-h-0 flex-1 overflow-auto px-5 py-4"
+            className={`min-h-0 flex-1 overflow-auto ${mode === "workspace" ? "p-3" : "px-5 py-4"}`}
           >
             {fillOpen ? (
               <FillPreview projectId={projectId} planId={fillOpen} announce={announce} onClose={() => setFillOpen(null)} />

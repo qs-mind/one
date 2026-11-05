@@ -219,7 +219,14 @@ function working({ messages, status, running }: ChatState): boolean {
 /** The messages, as a polite log the engineer can scroll from the keyboard (it is focusable). New content keeps the
  * log at its end while the engineer reads there; scrolled up, a "New below" button shows instead. A card that comes
  * to wait for the engineer is always brought into view. */
-export function ChatLog({ chat, label, projectId, onOpenDeliverable, className = "" }: ChatLogProps & { className?: string }) {
+export function ChatLog({
+  chat,
+  label,
+  projectId,
+  onOpenDeliverable,
+  className = "",
+  dense = false,
+}: ChatLogProps & { className?: string; /** The project chat beside the document: 12 px round and between messages. */ dense?: boolean }) {
   useLanguage();
   const { messages, status, error, failed } = chat;
   const ref = useRef<HTMLDivElement>(null);
@@ -302,9 +309,9 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
           atEnd.current = log.scrollHeight - log.scrollTop - log.clientHeight <= NEAR_END;
           if (atEnd.current) setBelow(false);
         }}
-        className="scroll-fade relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
+        className={`scroll-fade relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${dense ? "p-3" : "px-5 py-4"} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink`}
       >
-        <ol className="flex flex-col gap-6">
+        <ol className={`flex flex-col ${dense ? "gap-3" : "gap-6"}`}>
           {messages.length === 0 && <li className="text-slate">{t("empty")}</li>}
           {messages.map((message, index) =>
             message.role === "user" ? (
