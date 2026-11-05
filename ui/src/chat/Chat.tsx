@@ -220,7 +220,9 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
   }, [messages]);
 
   return (
-    <div className={`flex min-h-0 flex-col ${className}`}>
+    // a word too long for its line (a long Arabic word, a file name) breaks only there, never by letter where it
+    // fits; a table keeps its words whole and scrolls inside its own box; the chat never scrolls sideways
+    <div className={`flex min-h-0 flex-col [overflow-wrap:anywhere] [&_table]:[overflow-wrap:normal] ${className}`}>
       <ContinueBriefs onContinued={chat.continued} />
       <div
         ref={ref}
@@ -235,7 +237,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
           atEnd.current = log.scrollHeight - log.scrollTop - log.clientHeight <= NEAR_END;
           if (atEnd.current) setBelow(false);
         }}
-        className="scroll-fade relative min-h-0 flex-1 overflow-y-auto px-5 py-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
+        className="scroll-fade relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
       >
         <ol className="flex flex-col gap-6">
           {messages.length === 0 && <li className="text-slate">{t("empty")}</li>}
