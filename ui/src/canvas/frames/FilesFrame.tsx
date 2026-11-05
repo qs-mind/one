@@ -40,17 +40,17 @@ function FilesFrameView(props: NodeProps<Node<FilesData, "files">>) {
         }}
       >
         {files.length === 0 ? (
-          <p className="px-3 py-2 text-slate">{t("noFiles")}</p>
+          <p className="px-5 py-3 text-slate">{t("noFiles")}</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-ink/10">
+          <ul className="flex flex-col gap-1 px-2">
             {files.map((file) => (
               <li key={file.id}>
                 <button
                   type="button"
                   onClick={() => actions.openFile(file.id)}
-                  className="flex w-full flex-col items-start px-3 py-2 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+                  className="flex w-full flex-col items-start rounded-[10px] px-3 py-2.5 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
                 >
-                  <span className="flex w-full items-center justify-between gap-3">
+                  <span className="flex w-full items-center justify-between gap-4">
                     <FileName name={file.name} className="min-w-0 truncate" />
                     <span className={`shrink-0 ${file.status === "read" ? "text-slate" : "text-copper"}`}>
                       {pick(statusText[file.status])}
@@ -62,7 +62,7 @@ function FilesFrameView(props: NodeProps<Node<FilesData, "files">>) {
             ))}
           </ul>
         )}
-        <p className="mt-auto px-3 py-2 text-slate">{t("dropToAdd")}</p>
+        <p className="mt-auto px-5 py-4 text-xs text-slate">{t("dropToAdd")}</p>
       </div>
     </Frame>
   );

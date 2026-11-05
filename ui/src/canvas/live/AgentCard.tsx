@@ -82,7 +82,7 @@ function placeOf(anchor: Anchor | null): string | null {
 }
 
 const button =
-  "nodrag rounded-md border border-ink/20 px-2 py-0.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
+  "nodrag rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
 
 export function AgentCard({ agent }: { agent: LiveAgent }) {
   useLanguage();
@@ -106,7 +106,7 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
   }
 
   return (
-    <li className="flex flex-col gap-1 px-3 py-2" data-agent={agent.id}>
+    <li className="flex flex-col gap-1.5 rounded-[10px] px-3 py-2.5" data-agent={agent.id}>
       <span className="flex items-center justify-between gap-3">
         <span dir="auto" className="min-w-0 truncate font-semibold">
           {role}
@@ -140,7 +140,7 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
         </button>
       )}
       {(cursorShown(agent) || (running && agent.brief_id)) && (
-        <span className="flex flex-wrap gap-2">
+        <span className="flex flex-wrap gap-2 pt-1">
           {cursorShown(agent) && (
             <button
               type="button"

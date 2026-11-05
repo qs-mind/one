@@ -1,7 +1,8 @@
 // The project's status in the top bar: its stage, the submission date and the days left, the BOQ so far (with the
 // Deliverable and Revision it comes from), the open comments. Each shows only when the core sends it; nothing is
-// guessed. When the bar has no room for all of them, the lowest in priority fold into a "More status" button rather
-// than being cut: the stage first, then the open comments, the BOQ so far; the submission date stays longest.
+// guessed. Two at most show in the bar, so it stays calm; the rest, and any with no room, fold into a "More status"
+// button rather than being cut: the stage first, then the open comments, the BOQ so far; the submission date stays
+// longest.
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../canvas/types";
 import { count, fill, language, pick, t, useLanguage } from "../i18n";
@@ -32,8 +33,10 @@ function statusLine(d: DeliverableInfo): string {
   return t("statusDraft");
 }
 
-const chip = "whitespace-nowrap rounded-md px-2 py-0.5";
+const chip = "whitespace-nowrap rounded-lg px-3 py-1.5";
 const GAP = 8; // gap-2
+/** At most this many status items show in the bar; the rest are in More status. */
+export const SHOWN_MOST = 2;
 /** Which item stays longest when the bar is short: lower stays longer. */
 const PRIORITY: Record<string, number> = { submission: 0, boq: 1, comments: 2, stage: 3 };
 
@@ -133,7 +136,8 @@ export function StatusStrip({
       const order = [...items].sort((a, b) => PRIORITY[a.key]! - PRIORITY[b.key]!);
       const widths = order.map((item) => width(item.key));
       if (!widths.some(Boolean)) return setShown(null); // nothing laid out (no layout engine): show them all
-      const n = fitting(widths, room, width("more"));
+      const more = width("more");
+      const n = widths.length > SHOWN_MOST ? fitting(widths.slice(0, SHOWN_MOST), room - more - GAP, 0) : fitting(widths, room, more);
       setShown(n >= items.length ? null : new Set(order.slice(0, n).map((item) => item.key)));
     };
     update();
@@ -170,7 +174,7 @@ export function StatusStrip({
         >
           {t("moreStatus")}
         </PopoverTrigger>
-        <PopoverContent className="flex flex-col items-start gap-1">
+        <PopoverContent className="flex flex-col items-start gap-2">
           {folded.map((item) => (
             <span key={item.key}>{item.node}</span>
           ))}

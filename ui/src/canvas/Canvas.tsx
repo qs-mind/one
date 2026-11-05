@@ -40,7 +40,7 @@ import { deskCounts, startActivity, useDeskCounts, workedOn } from "./live/activ
 import { isMac, isMod, isTyping, matches } from "./keys";
 import { pickLive } from "./lod";
 import { createSaver } from "./persist";
-import { freeArea, READABLE, readable, worldOf } from "./cover";
+import { freeArea, MARGIN, PREFERRED, READABLE, readable, TOGETHER, worldOf } from "./cover";
 import { inView, place, placeInView, sizeFor, STRIP_H, type Incoming } from "./place";
 import { select } from "./selection";
 import { SourceError } from "./sources";
@@ -75,8 +75,8 @@ const nodeTypes = {
   clientboq: ClientBoqFrame,
 };
 const NO_EDGES: Edge[] = [];
-const GAP = 80;
-const ROW_GAP = 120;
+const GAP = 96;
+const ROW_GAP = 144;
 const UNDO_STEPS = 50;
 const FOCUS_RING = "rounded-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
@@ -210,6 +210,17 @@ export function Canvas(props: CanvasProps) {
   );
 }
 
+type FitOptions = {
+  padding?: number;
+  margin?: number;
+  maxZoom?: number;
+  minZoom?: number;
+  animate?: boolean;
+  keepZoom?: boolean;
+  atStart?: boolean;
+  byWidth?: boolean;
+};
+
 function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   const lang = useLanguage();
   const flow = useReactFlow<FrameNode>();
@@ -274,23 +285,31 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
    * measured nodes: with onlyRenderVisibleElements a frame off screen is never measured, so fitView would leave it
    * out. With `keepZoom`, only pans, unless the frames do not fit at the zoom there is. With `minZoom`, never zooms out
    * below it: what does not fit then shows from its top and its start (a tall Document opens readable, at its top).
-   * With `atStart`, they sit at the top and the inline start of the free area, where the layout grows from. */
+   * With `atStart`, they sit at the top and the inline start of the free area, where the layout grows from. `padding`
+   * is a share of the free area on each side; `margin`, when given, is in px instead (a frame opened by itself). With
+   * `byWidth`, the zoom fits the width only: a frame taller than the free area shows from its top. */
   const fitTo = useCallback(
-    (frames: readonly Placed[], { padding = 0.1, maxZoom = 1, minZoom = 0.1, animate = true, keepZoom = false, atStart = false } = {}) => {
+    (
+      frames: readonly Placed[],
+      { padding = 0.1, margin, maxZoom = 1, minZoom = 0.1, animate = true, keepZoom = false, atStart = false, byWidth = false }: FitOptions = {},
+    ) => {
       if (!frames.length) return;
       const area = free();
+      const px = margin === undefined ? padding : margin / area.w;
+      const py = margin === undefined ? padding : margin / area.h;
       const minX = Math.min(...frames.map((f) => f.x));
       const minY = Math.min(...frames.map((f) => f.y));
       const w = Math.max(...frames.map((f) => f.x + f.w)) - minX || 1;
       const h = Math.max(...frames.map((f) => f.y + (f.collapsed ? STRIP_H : f.h))) - minY || 1;
-      const fit = Math.min((area.w * (1 - 2 * padding)) / w, (area.h * (1 - 2 * padding)) / h);
+      const wide = (area.w * (1 - 2 * px)) / w;
+      const fit = byWidth ? wide : Math.min(wide, (area.h * (1 - 2 * py)) / h);
       const now = store.getState().transform[2];
       const zoom = keepZoom && now <= fit ? now : Math.min(maxZoom, 2, Math.max(minZoom, fit));
-      const across = w * zoom > area.w * (1 - 2 * padding);
-      const down = h * zoom > area.h * (1 - 2 * padding);
-      const edge = Math.min(padding, 0.04); // a frame that does not fit starts close to the edge
-      const ex = across ? edge : padding / 2;
-      const ey = down ? edge : padding / 2;
+      const across = w * zoom > area.w * (1 - 2 * px);
+      const down = h * zoom > area.h * (1 - 2 * py);
+      // a frame that does not fit starts close to the edge
+      const ex = across ? Math.min(px, 0.04) : px / 2;
+      const ey = down ? Math.min(py, 0.04) : py / 2;
       const x =
         !across && !atStart
           ? area.x + area.w / 2 - (minX + w / 2) * zoom
@@ -303,8 +322,9 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     [flow, store, free],
   );
 
-  /** A first view: every frame if they can be read together, else the ones that matter most now (the Project files,
-   * what agents work on, the Deliverables changed last), as many as can be read; the rest are a pan away. */
+  /** A first view: every frame, at 100% when they fit (never below 85%), else the ones that matter most now (the
+   * Project files, what agents work on, the Deliverables changed last), as many as fit so; the rest are a pan away.
+   * One frame too big for that by itself is shown smaller, never below the readable zoom. */
   const fitReadable = useCallback(
     (frames: readonly Placed[], opts: { animate?: boolean } = {}) => {
       const boxes = frames.map((f) => ({ ...f, h: f.collapsed ? STRIP_H : f.h }));
@@ -318,10 +338,16 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
         const at = changed.indexOf(key);
         return at === -1 ? 1000 : 2 + at;
       };
-      const shown = new Set(readable(boxes, rank, free()).map((f) => f.key));
-      // when not all of them fit, at the readable zoom itself: the most of the rest is in sight around them
+      const area = free();
+      const shown = new Set(readable(boxes, rank, area, TOGETHER, MARGIN / Math.min(area.w, area.h)).map((f) => f.key));
+      // when not all of them fit, from the top and the start, where the layout grows from: the rest is a pan away
       const some = shown.size < frames.length;
-      fitTo(frames.filter((f) => shown.has(f.key)), { ...opts, ...(some ? { maxZoom: READABLE, minZoom: READABLE, atStart: true } : {}) });
+      fitTo(frames.filter((f) => shown.has(f.key)), {
+        ...opts,
+        margin: MARGIN,
+        maxZoom: PREFERRED,
+        ...(some ? { minZoom: READABLE, atStart: true } : {}),
+      });
     },
     [fitTo, free],
   );
@@ -358,7 +384,7 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     for (const key of removed) committed.current.delete(key);
     if (added.length || removed.length || kept.some((n, i) => n !== nodesRef.current[i])) setNodes(kept);
     if (added.length || removed.length) saver.frames(added, removed);
-    if (added.length && !added.every((p) => inView({ ...p, h: p.collapsed ? STRIP_H : p.h }, view))) fitTo(added, { keepZoom: true });
+    if (added.length && !added.every((p) => inView({ ...p, h: p.collapsed ? STRIP_H : p.h }, view))) fitTo(added, { keepZoom: true, margin: MARGIN, minZoom: READABLE });
   }, [saver, setNodes, seen, fitTo]);
 
   /** Moves frames to a layout (arrange, undo, redo, fold); saves what changed. */
@@ -445,8 +471,9 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       const node = nodesRef.current.find((n) => n.id === key);
       if (!node) return;
       setNodes(nodesRef.current.map((n) => (n.selected === (n.id === key) ? n : { ...n, selected: n.id === key })));
-      // at a zoom it can be read at: a frame never opens on its poster (lod.ts)
-      fitTo([placedOf(node)], { padding: 0.2, maxZoom: Math.max(opts?.zoom ?? 1, READABLE), minZoom: READABLE });
+      // at 100% when its width fits with a margin round it, else as large as fits; a tall one (a Document) from its
+      // top, to be read; never on its poster (lod.ts)
+      fitTo([placedOf(node)], { margin: MARGIN, byWidth: true, maxZoom: Math.max(opts?.zoom ?? PREFERRED, READABLE), minZoom: READABLE });
       requestAnimationFrame(() => {
         document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
       });
@@ -774,11 +801,11 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
           ariaLabelConfig={aria}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgb(14 15 18 / 0.16)" />
+          <Background variant={BackgroundVariant.Dots} gap={24} size={1.25} color="rgb(14 15 18 / 0.09)" />
           <MiniMap
             className="max-[900px]:hidden"
             position={rtl ? "bottom-right" : "bottom-left"}
-            style={{ marginBottom: 72 }}
+            style={{ marginBottom: 80, width: 168, height: 112 }}
             ariaLabel={t("minimap")}
             bgColor="#F9F8F4"
             nodeColor="#F2EEE7"
@@ -826,7 +853,7 @@ function ZoomBar({ onArrange }: { onArrange(): void }) {
   const flow = useReactFlow();
   const percent = useStore((s) => Math.round(s.transform[2] * 100));
   const button =
-    "rounded-md px-2 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
+    "rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink";
   return (
     <div
       role="toolbar"
@@ -834,12 +861,12 @@ function ZoomBar({ onArrange }: { onArrange(): void }) {
       data-canvas-cover
       dir={dir()}
       style={{ [dir() === "rtl" ? "right" : "left"]: 16 }}
-      className="absolute bottom-4 z-10 flex items-center gap-1 rounded-[14px] border border-ink/10 bg-paper p-1 shadow-[0_1px_4px_rgb(14_15_18/0.08)]"
+      className="absolute bottom-4 z-10 flex items-center gap-1 rounded-[16px] border border-ink/[0.08] bg-paper p-1.5 shadow-[0_2px_12px_rgb(14_15_18/0.06)]"
     >
       <button type="button" aria-label={t("zoomOut")} title={t("zoomOut")} className={button} onClick={() => void flow.zoomOut({ duration: duration() })}>
         −
       </button>
-      <span className="min-w-12 text-center tabular-nums">
+      <span className="min-w-14 text-center tabular-nums">
         <span className="sr-only">{fill(t("zoomLevel"), { percent })}</span>
         <bdi dir="ltr" aria-hidden="true">
           {percent}%

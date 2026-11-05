@@ -110,7 +110,11 @@ export class Walk {
   async start(lang: Lang = "ar") {
     await this.page.goto("/");
     await expect(this.page.getByRole("textbox", { name: words.ar.message }).or(this.page.getByRole("textbox", { name: words.en.message }))).toBeVisible();
-    if (lang === "en") await this.page.getByRole("button", { name: "English", exact: true }).click();
+    if (lang === "en") {
+      // the other language is in the top bar's More
+      await this.page.locator('[data-region="topbar"]').getByRole("button", { name: "أكتر", exact: true }).click();
+      await this.page.getByRole("button", { name: "English", exact: true }).click();
+    }
     this.lang = lang;
     await expect(this.page.getByRole("textbox", { name: this.w.message })).toBeVisible();
   }

@@ -26,7 +26,7 @@ function DeskFrameView(props: NodeProps<Node<DeskData, "desk">>) {
       dir={dir()}
       meta={!collapsed && <span className="shrink-0 text-slate">{t(stageText[desk.stage])}</span>}
     >
-      <ul className="flex flex-col divide-y divide-ink/10">
+      <ul className="flex flex-col gap-1 px-2 pb-2">
         {agents.map((agent) => (
           <AgentCard key={agent.id} agent={agent} />
         ))}

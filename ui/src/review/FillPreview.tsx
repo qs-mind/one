@@ -111,7 +111,7 @@ export function FillPreview({ projectId, planId, announce, onClose }: FillPrevie
                     {m.accepted ? (
                       <span className="text-slate">{t("fillMarkedRight")}</span>
                     ) : (
-                      <button type="button" className="rounded border border-slate px-2 py-0.5 hover:bg-stone" onClick={() => void itIsRight(m.row)}>
+                      <button type="button" className="rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone" onClick={() => void itIsRight(m.row)}>
                         {t("fillItIsRight")}
                       </button>
                     )}

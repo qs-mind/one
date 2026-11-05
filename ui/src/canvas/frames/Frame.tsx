@@ -98,7 +98,7 @@ type FrameProps = {
 };
 
 const iconButton =
-  "nodrag shrink-0 rounded-md px-1.5 leading-none text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
+  "nodrag shrink-0 rounded-lg px-2 py-1.5 leading-none text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
 
 export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenFull, closable, scrolls = true, children }: FrameProps) {
   useLanguage();
@@ -109,8 +109,8 @@ export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenF
       dir={dir}
       lang={lang}
       data-frame={id}
-      className={`flex h-full w-full flex-col overflow-hidden rounded-[14px] bg-paper shadow-[0_1px_4px_rgb(14_15_18/0.08)] ${
-        selected ? "border-[1.5px] border-ink" : "border border-ink/10"
+      className={`flex h-full w-full flex-col overflow-hidden rounded-[16px] bg-paper shadow-[0_1px_3px_rgb(14_15_18/0.05)] ${
+        selected ? "border-[1.5px] border-ink" : "border border-ink/[0.07]"
       }`}
     >
       <NodeResizer
@@ -120,8 +120,8 @@ export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenF
         handleClassName="!h-2 !w-2 !rounded-none !border-[1.5px] !border-ink !bg-paper"
         lineClassName="!border-transparent"
       />
-      <header style={{ height: STRIP_H }} className="flex shrink-0 cursor-grab items-center gap-2 px-3">
-        <h3 dir="auto" title={title} className="min-w-0 flex-1 truncate font-semibold">
+      <header style={{ height: STRIP_H }} className="flex shrink-0 cursor-grab items-center gap-3 pe-3 ps-5">
+        <h3 dir="auto" title={title} className="min-w-0 flex-1 truncate text-lg font-semibold">
           <FileName name={title} />
         </h3>
         {meta}
@@ -156,7 +156,7 @@ export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenF
           onWheelCapture={(event) => {
             if (scrolls) event.currentTarget.classList.toggle("nowheel", !(event.ctrlKey || event.metaKey));
           }}
-          className={`nodrag nopan nokey ${scrolls ? "nowheel" : ""} min-h-0 flex-1 cursor-auto overflow-auto border-t border-ink/10 outline-none`}
+          className={`nodrag nopan nokey ${scrolls ? "nowheel" : ""} min-h-0 flex-1 cursor-auto overflow-auto outline-none`}
         >
           {children}
         </div>

@@ -1,7 +1,6 @@
 import "./polyfills";
 import "@fontsource-variable/kumbh-sans";
-import "@fontsource/zain/arabic-400.css";
-import "@fontsource/zain/arabic-700.css";
+// Zain (Arabic, 400 and 700) is declared in styles.css, a little larger than its own size
 import "./styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

@@ -42,9 +42,9 @@ export function ContinueBriefs({ onContinued }: { onContinued: (brief: Unfinishe
 
   if (briefs.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2 border-b border-stone px-4 py-3">
+    <div className="flex flex-col gap-3 px-5 pb-1 pt-4">
       {briefs.map((brief) => (
-        <section key={brief.id} className="mx-auto flex w-full max-w-2xl flex-col gap-2 rounded-md border border-copper px-3 py-2">
+        <section key={brief.id} className="mx-auto flex w-full max-w-2xl flex-col gap-3 rounded-[14px] border border-copper px-5 py-4">
           <p dir="auto" className="font-semibold">
             {brief.project_name ?? t("generalChat")}
           </p>
@@ -54,11 +54,11 @@ export function ContinueBriefs({ onContinued }: { onContinued: (brief: Unfinishe
               type="button"
               disabled={busy === brief.id}
               onClick={() => void resume(brief)}
-              className="rounded-md bg-ink px-3 py-1 text-paper disabled:opacity-40"
+              className="rounded-lg bg-ink px-4 py-2 text-paper disabled:opacity-40"
             >
               {t("continue")}
             </button>
-            <button type="button" onClick={() => drop(brief.id)} className="rounded-md border border-ink px-3 py-1">
+            <button type="button" onClick={() => drop(brief.id)} className="rounded-lg border border-ink px-4 py-2">
               {t("leave")}
             </button>
           </div>

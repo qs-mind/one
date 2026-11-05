@@ -46,7 +46,7 @@ export function VersionsPanel({ projectId, view }: { projectId: string; view: Vi
   const select = (label: string, value: string, set: (v: string) => void) => (
     <label className="flex items-center gap-1">
       {label}
-      <select value={value} onChange={(e) => set(e.target.value)} className="rounded border border-slate bg-paper px-1">
+      <select value={value} onChange={(e) => set(e.target.value)} className="rounded-lg border border-slate bg-paper px-2 py-1">
         {options.map((o) => (
           <option key={o.key} value={o.key}>
             {o.label}
@@ -99,7 +99,7 @@ export function VersionsPanel({ projectId, view }: { projectId: string; view: Vi
         >
           {select(t("reviewFrom"), from, setFrom)}
           {select(t("reviewTo"), to, setTo)}
-          <button type="submit" disabled={from === to} className="rounded border border-slate px-2 py-0.5 hover:bg-stone disabled:opacity-40">
+          <button type="submit" disabled={from === to} className="rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone disabled:opacity-40">
             {t("reviewCompare")}
           </button>
         </form>

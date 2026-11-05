@@ -8,7 +8,7 @@ export function ProgressLine({ items, lang }: { items: { id: string; data: Progr
   useLanguage();
   if (items.length === 0) return null;
   return (
-    <ul aria-label={t("progressLine")} aria-live="polite" className="flex flex-col gap-0.5 text-slate">
+    <ul aria-label={t("progressLine")} aria-live="polite" className="flex flex-col gap-1 text-slate">
       {items.map(({ id, data }) => {
         const said = data.lang ?? lang;
         return (

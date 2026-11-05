@@ -49,7 +49,7 @@ export function StatusChips({ view }: { view: Pick<SheetView, "status" | "code" 
       : view.status === "checked"
         ? fill(t("statusChecked"), { code: view.code ?? "" })
         : t("statusDraft");
-  const chip = "rounded-full border px-2 text-xs leading-5";
+  const chip = "rounded-full border px-2.5 text-xs leading-6";
   return (
     <>
       <span className={`${chip} ${view.code === "C" ? "border-copper text-copper" : "border-slate text-ink"}`}>{status}</span>
@@ -287,12 +287,13 @@ export function SheetViewer(props: SheetViewerProps) {
         if (popover && event.target.matches("input, textarea")) setPopover(null); // the cell editor opened
       }}
     >
-      <header className="flex flex-wrap items-center gap-2 border-b border-stone px-3 py-2">
-        <h2 dir="auto" className="font-semibold">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+        {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
+        <h2 dir="auto" className={full ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
         {readOnly ? (
-          <span className="rounded-full border border-slate px-2 text-xs leading-5 text-slate">{t("clientBoqReadOnly")}</span>
+          <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
         ) : (
           <>
             <StatusChips view={view} />
@@ -305,7 +306,7 @@ export function SheetViewer(props: SheetViewerProps) {
           <button
             type="button"
             aria-pressed={full}
-            className="ms-auto rounded border border-slate px-2 hover:bg-stone"
+            className="ms-auto rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
             onClick={props.onToggleFullScreen}
           >
             {full ? t("sheetLeaveFullScreen") : t("sheetFullScreen")}
@@ -313,12 +314,12 @@ export function SheetViewer(props: SheetViewerProps) {
         )}
       </header>
       {view.sample && (
-        <p role="note" className="bg-stone px-3 py-1 text-ink">
+        <p role="note" className="bg-stone px-5 py-2 text-ink">
           {t("sheetSample")}
         </p>
       )}
       {notice && (
-        <p role="alert" className="flex items-start justify-between gap-2 px-3 py-1 text-copper">
+        <p role="alert" className="flex items-start justify-between gap-3 px-5 py-2 text-copper">
           <span>{notice}</span>
           <button type="button" className="rounded px-2 text-ink hover:bg-stone" onClick={() => setNotice(null)}>
             {t("close")}

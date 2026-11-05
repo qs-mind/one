@@ -258,7 +258,8 @@ describe("the chat in the shell", () => {
 
     await user.type(await box(), "again{enter}");
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(refused.ar));
-    await user.click(screen.getByRole("button", { name: texts.otherLanguage.ar }));
+    await user.click(screen.getByRole("button", { name: texts.more.ar }));
+    await user.click(await screen.findByRole("button", { name: texts.otherLanguage.ar }));
     expect(screen.getByRole("alert")).toHaveTextContent(refused.en);
   });
 
@@ -295,6 +296,7 @@ describe("the chat in the shell", () => {
     core();
     const user = userEvent.setup();
     render(<App />);
+    await user.click(await screen.findByRole("button", { name: texts.more.ar }));
     await user.click(await screen.findByRole("button", { name: texts.ai.ar }));
     const panel = await screen.findByRole("region", { name: texts.aiTitle.ar });
     expect(await within(panel).findByRole("combobox", { name: texts.roleLead.ar })).toBeInTheDocument();
@@ -308,6 +310,7 @@ describe("the chat in the shell", () => {
     core();
     const user = userEvent.setup();
     render(<App />);
+    await user.click(await screen.findByRole("button", { name: texts.more.ar })); // the other language is in More
     await user.click(await screen.findByRole("button", { name: texts.otherLanguage.ar }));
     expect(document.documentElement.dir).toBe("ltr");
     expect(await screen.findByRole("button", { name: texts.send.en })).toBeInTheDocument();
@@ -376,10 +379,10 @@ describe("the chat in the shell", () => {
     const user = userEvent.setup();
     render(<App />);
     const handle = await screen.findByRole("separator", { name: texts.chatWidth.ar });
-    expect(handle).toHaveAttribute("aria-valuenow", "340");
+    expect(handle).toHaveAttribute("aria-valuenow", "420");
     handle.focus();
     await user.keyboard("{ArrowRight}"); // in Arabic the chat is at the left: its edge moves right to widen it
-    expect(handle).toHaveAttribute("aria-valuenow", "356");
+    expect(handle).toHaveAttribute("aria-valuenow", "436");
     await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
     expect(screen.queryByRole("log")).toBeNull();
     await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));

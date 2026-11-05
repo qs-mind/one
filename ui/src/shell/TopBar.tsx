@@ -1,8 +1,8 @@
-// The top bar, 48 px: the mark, the project (or the General chat) with its switcher, the project's status, the agent
-// the view follows, who is working now, "Waiting for you", search, then AI settings, the other language, the Deliverables and Project Records. Below 900 px the
-// status folds into one Status button and the rest into More; below 1280 px search, the panels, AI settings and the
-// other language fold into More, and the status folds what does not fit into More status: the project's name is
-// never cut. The chrome mirrors in Arabic.
+// The top bar, 56 px: the mark, the project (or the General chat) with its switcher, the project's status (its two
+// most important items; the rest in More status), the agent the view follows, who is working now, "Waiting for you",
+// then search, the Deliverables and Project Records. AI settings and the other language are always in More: they are
+// set once, not used every hour. Below 900 px the status folds into one Status button and the rest into More; below
+// 1280 px search and the panels fold into More too: the project's name is never cut. The chrome mirrors in Arabic.
 import { useRef } from "react";
 import type { ProjectSources, ProjectStatus } from "../canvas/types";
 import { isMac } from "../canvas/keys";
@@ -34,7 +34,7 @@ function Mark() {
   );
 }
 
-const button = "whitespace-nowrap rounded-md px-2 py-1 hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
+const button = "whitespace-nowrap rounded-lg px-3 py-1.5 hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
 
 export type TopBarProps = {
   /** None: the General chat. */
@@ -114,7 +114,7 @@ export function TopBar(props: TopBarProps) {
       aria-label={t("topBar")}
       data-region="topbar"
       tabIndex={-1}
-      className="relative z-40 flex h-12 shrink-0 items-center gap-2 border-b border-ink/10 bg-paper px-3 text-slate"
+      className="relative z-40 flex h-14 shrink-0 items-center gap-3 border-b border-ink/[0.06] bg-paper px-5 text-slate"
     >
       <Mark />
       <button
@@ -122,14 +122,14 @@ export function TopBar(props: TopBarProps) {
         data-region-start
         aria-expanded={panel === "projects"}
         title={t("projects")}
-        className={`${button} flex shrink-0 items-center gap-1 font-semibold text-ink`}
+        className={`${button} -ms-1 flex shrink-0 items-center gap-2 font-semibold text-ink`}
         onClick={(event) => onPanel("projects", event.currentTarget)}
       >
         {/* the project's name is never cut: the status folds before it does */}
         <span dir="auto">
           {project?.name ?? t("generalChat")}
         </span>
-        <span aria-hidden="true">▾</span>
+        <span aria-hidden="true" className="text-xs text-slate">▾</span>
       </button>
 
       {project && !narrow && <StatusStrip status={props.status} sources={props.sources} />}
@@ -142,10 +142,10 @@ export function TopBar(props: TopBarProps) {
         </Popover>
       )}
       {props.sample && (
-        <span className="shrink-0 whitespace-nowrap rounded-md border border-copper px-2 py-0.5 text-copper">{t("sampleData")}</span>
+        <span className="shrink-0 whitespace-nowrap rounded-lg border border-copper px-3 py-1 text-copper">{t("sampleData")}</span>
       )}
 
-      <div className="ms-auto flex shrink-0 items-center gap-1">
+      <div className="ms-auto flex shrink-0 items-center gap-2">
         {project && <Following />}
         {project && !narrow && <TeamNow />}
         {project && props.waiting > 0 && (
@@ -153,33 +153,32 @@ export function TopBar(props: TopBarProps) {
             {fill(t("waitingForYou"), { n: props.waiting })}
           </button>
         )}
-        {narrow || compact ? (
-          <>
-            {project && narrow && (
-              <button type="button" aria-expanded={props.chatOpen} className={button} onClick={props.onChat}>
-                {t("projectChat")}
-              </button>
-            )}
-            <Popover>
-              <PopoverTrigger ref={more} className={button}>
-                {t("more")}
-              </PopoverTrigger>
-              <PopoverContent align="end" className="flex flex-col items-start gap-1">
-                {search}
-                {projectPanels(more.current)}
-                {ai(more.current)}
-                {otherLanguage}
-              </PopoverContent>
-            </Popover>
-          </>
-        ) : (
+        {!(narrow || compact) && (
           <>
             {search}
             {projectPanels()}
-            {ai()}
-            {otherLanguage}
           </>
         )}
+        {project && narrow && (
+          <button type="button" aria-expanded={props.chatOpen} className={button} onClick={props.onChat}>
+            {t("projectChat")}
+          </button>
+        )}
+        <Popover>
+          <PopoverTrigger ref={more} className={button}>
+            {t("more")}
+          </PopoverTrigger>
+          <PopoverContent align="end" className="flex min-w-48 flex-col items-stretch gap-1 p-2 [&>button]:text-start">
+            {(narrow || compact) && (
+              <>
+                {search}
+                {projectPanels(more.current)}
+              </>
+            )}
+            {ai(more.current)}
+            {otherLanguage}
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   );

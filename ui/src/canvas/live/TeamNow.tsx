@@ -6,7 +6,7 @@ import { useAgent, useAgents, type LiveAgent } from "./activity";
 import { stateText } from "./AgentCard";
 import { stopFollowing, useFollowing } from "./follow";
 
-const button = "whitespace-nowrap rounded-md px-2 py-1 hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
+const button = "whitespace-nowrap rounded-lg px-3 py-1.5 hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
 const now = (a: LiveAgent) => a.state === "working" || a.state === "thinking" || a.state === "waiting";
 
 export function TeamNow() {
@@ -17,7 +17,7 @@ export function TeamNow() {
     <Popover>
       <PopoverTrigger className={button}>{fill(t("teamNowCount"), { n: team.length })}</PopoverTrigger>
       <PopoverContent align="end">
-        <ul aria-label={t("teamNow")} className="flex flex-col gap-1">
+        <ul aria-label={t("teamNow")} className="flex flex-col gap-2">
           {team.map((a) => (
             <li key={a.id} className="flex justify-between gap-4">
               <span dir="auto" className="font-semibold">

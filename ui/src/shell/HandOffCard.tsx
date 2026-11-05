@@ -58,7 +58,7 @@ function HandOffCard({ handOff }: { handOff: HandOff }) {
   }
 
   return (
-    <article className="flex flex-col gap-2 rounded-lg border border-ink/10 bg-paper p-3">
+    <article className="flex flex-col gap-3 rounded-[14px] bg-stone/70 px-5 py-4">
       <p>{existing ? fill(t("handOffAbout"), { name }) : t("noProjectYet")}</p>
       <p dir="auto" className="text-slate">
         {request}
@@ -67,7 +67,7 @@ function HandOffCard({ handOff }: { handOff: HandOff }) {
         type="button"
         disabled={busy}
         onClick={() => void go()}
-        className="self-start rounded-md bg-ink px-3 py-1 text-paper disabled:opacity-40"
+        className="self-start rounded-lg bg-ink px-4 py-2 text-paper disabled:opacity-40"
       >
         {fill(t(existing ? "continueInProject" : "createProjectNamed"), { name })}
       </button>

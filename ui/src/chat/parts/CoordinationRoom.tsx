@@ -6,9 +6,9 @@ export function CoordinationRoom({ messages }: { messages: { id: string; data: T
   useLanguage();
   if (messages.length === 0) return null;
   return (
-    <details className="rounded-md border border-stone px-3 py-2">
+    <details className="rounded-[14px] bg-stone/70 px-4 py-2.5">
       <summary className="text-slate hover:text-ink">{count("coordinationRoom", messages.length)}</summary>
-      <ol className="mt-2 flex flex-col gap-2">
+      <ol className="mt-3 flex flex-col gap-3">
         {messages.map(({ id, data }) => (
           <li key={id}>
             <p className="text-slate">

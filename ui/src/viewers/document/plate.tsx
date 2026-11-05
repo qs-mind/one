@@ -57,17 +57,17 @@ const useDoc = () => useContext(Doc)!;
 // ---- Blocks ------------------------------------------------------------------------------------------------
 
 const STYLE: Record<string, string> = {
-  p: "my-2",
-  h1: "mb-3 mt-4 text-xl font-semibold",
-  h2: "mb-2 mt-4 text-lg font-semibold",
-  h3: "mb-2 mt-3 font-semibold",
-  blockquote: "my-2 border-s-2 border-slate ps-3",
-  ul: "my-2 list-disc ps-6",
-  ol: "my-2 list-decimal ps-6",
-  li: "my-0.5",
-  table: "my-2 border-collapse",
-  tr: "",
-  td: "border border-stone px-2 py-1 align-top",
+  p: "my-3",
+  h1: "mb-4 mt-2 text-2xl font-semibold",
+  h2: "mb-3 mt-6 text-lg font-semibold",
+  h3: "mb-2 mt-5 font-semibold",
+  blockquote: "my-3 border-s-2 border-slate ps-4",
+  ul: "my-3 list-disc ps-6",
+  ol: "my-3 list-decimal ps-6",
+  li: "my-1",
+  table: "my-4 border-collapse tabular-nums",
+  tr: "border-b border-stone",
+  td: "px-3 py-2 align-top",
 };
 
 /** What sits at a block's end, outside the text: ✓ ✗ for its pending change, and marks for comments on the block. */
@@ -396,7 +396,7 @@ export function DocEditor(props: DocEditorProps) {
           lang={language}
           readOnly={props.readOnly}
           decorate={decorate as never}
-          className="min-h-24 px-4 py-3 text-start outline-none focus-visible:ring-1 focus-visible:ring-slate"
+          className="mx-auto min-h-24 max-w-[44rem] px-8 py-6 text-start outline-none focus-visible:ring-1 focus-visible:ring-slate"
           onDOMBeforeInput={stop}
           onPaste={stop}
           onCut={stop}

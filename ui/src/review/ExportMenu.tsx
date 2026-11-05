@@ -52,7 +52,7 @@ export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, 
           type="button"
           disabled={busy}
           aria-describedby={draft ? markId : undefined}
-          className="rounded border border-slate px-2 py-0.5 hover:bg-stone disabled:opacity-40"
+          className="rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone disabled:opacity-40"
           onClick={() => void make(format)}
         >
           {label}
@@ -61,7 +61,7 @@ export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, 
       {view.kind === "sheet" && fillPlanId && (
         <button
           type="button"
-          className="rounded border border-slate px-2 py-0.5 hover:bg-stone"
+          className="rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone"
           onClick={() => onFill?.(fillPlanId)}
         >
           {t("exportClientFile")}

@@ -4,10 +4,14 @@
 import type { ViewColumn, ViewRow } from "../../deliverables/types";
 import { isNumber } from "../../deliverables/types";
 
-const LINE = 22; // 14px text at line-height 1.6
-const PAD = 14; // block padding inside a cell
-const INLINE_PAD = 16; // the grid's 8px inline padding on each side
-export const FONT = `14px "Kumbh Sans Variable", "Zain", system-ui, sans-serif`;
+const LINE = 24; // 15px text at line-height 1.6
+const PAD = 16; // block padding inside a cell: a one-line row is 40 px
+const INLINE_PAD = 24; // the cells' 12px inline padding on each side (styles.css)
+export const FONT = `15px "Kumbh Sans Variable", "Zain", system-ui, sans-serif`;
+
+/** A column's width on screen: the width the Deliverable gives it was set for 14px text and 8px padding, so it is
+ * widened for 15px text and 12px padding, and its words keep the room they had. */
+export const shownWidth = (width: number) => Math.round(width * 1.07) + 8;
 const BOLD = `700 ${FONT}`;
 
 export type Measure = (text: string, font: string) => number;
@@ -52,7 +56,7 @@ export function rowHeight(row: ViewRow, columns: ViewColumn[], measure: Measure)
         : cell && !isNumber(cell)
           ? cell.text
           : "";
-    if (text) most = Math.max(most, lineCount(text, column.width - INLINE_PAD, font, measure));
+    if (text) most = Math.max(most, lineCount(text, shownWidth(column.width) - INLINE_PAD, font, measure));
   }
   return linesHeight(most);
 }

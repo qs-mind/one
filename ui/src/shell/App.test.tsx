@@ -91,13 +91,14 @@ describe("the top bar", () => {
     const user = userEvent.setup();
     render(<App />);
     await box();
-    for (const [button, heading] of [
-      [texts.ai.ar, texts.aiTitle.ar],
-      [P1.name, texts.projects.ar],
-      [texts.records.ar, texts.records.ar],
+    for (const [button, heading, inMore] of [
+      [texts.ai.ar, texts.aiTitle.ar, true], // AI settings are in More; focus goes back to More
+      [P1.name, texts.projects.ar, false],
+      [texts.records.ar, texts.records.ar, false],
     ] as const) {
-      const opener = within(topBar()).getByRole("button", { name: new RegExp(button) });
+      const opener = within(topBar()).getByRole("button", { name: new RegExp(inMore ? texts.more.ar : button) });
       await user.click(opener);
+      if (inMore) await user.click(await screen.findByRole("button", { name: new RegExp(button) }));
       const panel = await screen.findByRole("region", { name: heading });
       await waitFor(() => expect(panel.contains(document.activeElement) || document.activeElement?.contains(panel)).toBe(true));
       await user.keyboard("{Escape}");

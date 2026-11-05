@@ -184,8 +184,9 @@ export function DocumentViewer(props: DocumentViewerProps) {
         if (event.key === "Escape" && popover) closeSource();
       }}
     >
-      <header className="flex flex-wrap items-center gap-2 border-b border-stone px-3 py-2">
-        <h2 dir="auto" className="font-semibold">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+        {/* in a frame, the frame's strip shows the title: here it is only said, not shown twice */}
+        <h2 dir="auto" className={full ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
         <StatusChips view={view} />
@@ -196,7 +197,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
           <button
             type="button"
             aria-pressed={full}
-            className="ms-auto rounded border border-slate px-2 hover:bg-stone"
+            className="ms-auto rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
             onClick={props.onToggleFullScreen}
           >
             {full ? t("sheetLeaveFullScreen") : t("sheetFullScreen")}
@@ -204,17 +205,17 @@ export function DocumentViewer(props: DocumentViewerProps) {
         )}
       </header>
       {view.sample && (
-        <p role="note" className="bg-stone px-3 py-1 text-ink">
+        <p role="note" className="bg-stone px-5 py-2 text-ink">
           {t("sheetSample")}
         </p>
       )}
       {untraced.length > 0 && (
-        <p role="note" className="px-3 py-1 text-slate">
+        <p role="note" className="px-5 py-2 text-slate">
           {count("docUntracedCount", untraced.length)}
         </p>
       )}
       {notice && (
-        <p role="alert" className="flex items-start justify-between gap-2 px-3 py-1 text-copper">
+        <p role="alert" className="flex items-start justify-between gap-3 px-5 py-2 text-copper">
           <span>{notice}</span>
           <button type="button" className="rounded px-2 text-ink hover:bg-stone" onClick={() => setNotice(null)}>
             {t("close")}
@@ -236,7 +237,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
           onOpenRef={onOpenRef}
           onSelectText={onSelectText}
         />
-        {!props.readOnly && <p className="px-4 pb-3 text-xs text-slate">{t("docCommitHint")}</p>}
+        {!props.readOnly && <p className="mx-auto max-w-[44rem] px-8 pb-6 text-xs text-slate">{t("docCommitHint")}</p>}
       </div>
       {popover && (
         <SourcePopover

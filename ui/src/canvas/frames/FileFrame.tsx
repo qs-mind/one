@@ -81,7 +81,7 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
 
   const pageOf = pages ? fill(t("sheetPageOf"), { page, pages }) : null;
   const button =
-    "rounded-md border border-ink/20 px-2 py-0.5 hover:border-ink disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-ink";
+    "rounded-lg border border-ink/20 px-3 py-1 hover:border-ink disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-ink";
 
   return (
     <Frame
@@ -102,7 +102,7 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
       ) : (
         <div className="flex min-h-full flex-col">
           {pages !== null && pages > 0 && (
-            <div className="flex items-center gap-2 border-b border-ink/10 px-3 py-1.5">
+            <div className="flex items-center gap-3 bg-stone/60 px-5 py-2">
               <button type="button" className={button} disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                 {t("sheetPreviousPage")}
               </button>
@@ -121,7 +121,7 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
           )}
           {showImage &&
             (image === "failed" ? (
-              <p role="alert" className="px-3 py-2 text-copper">
+              <p role="alert" className="px-5 py-3 text-copper">
                 {t("pageNotShown")}
               </p>
             ) : (
@@ -130,11 +130,11 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
           {showText &&
             pieces &&
             (pieces.length === 0 ? (
-              <p className="px-3 py-2 text-slate">{pages ? t("pageScanned") : t("fileNoText")}</p>
+              <p className="px-5 py-3 text-slate">{pages ? t("pageScanned") : t("fileNoText")}</p>
             ) : (
-              <ul className="flex flex-col divide-y divide-ink/10">
+              <ul className="flex flex-col divide-y divide-stone">
                 {pieces.map((piece, index) => (
-                  <li key={index} className="flex flex-col px-3 py-2">
+                  <li key={index} className="flex flex-col gap-1 px-5 py-3">
                     {!pages && where(piece.locator) && <span className="text-slate">{where(piece.locator)}</span>}
                     <span dir="auto" className="whitespace-pre-wrap">
                       {piece.text}
