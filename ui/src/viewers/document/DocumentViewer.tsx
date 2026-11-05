@@ -32,6 +32,8 @@ export type DocumentViewerProps = {
   /** The selected text, as a comment anchor, or null. */
   onSelection?: (anchor: TextAnchor | null) => void;
   onToggleFullScreen?: () => void;
+  /** Whether the board is full screen now, for the toggle's words; left out, the full review mode counts as it. */
+  fullScreen?: boolean;
   ref?: Ref<DocumentHandle>;
 };
 
@@ -189,18 +191,18 @@ export function DocumentViewer(props: DocumentViewerProps) {
         <h2 dir="auto" className={full ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
-        <StatusChips view={view} />
+        <StatusChips view={view} status={props.mode !== "frame"} />
         <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
         {view.revision && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
         {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
         {props.onToggleFullScreen && (
           <button
             type="button"
-            aria-pressed={full}
+            aria-pressed={props.fullScreen ?? full}
             className="ms-auto rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
             onClick={props.onToggleFullScreen}
           >
-            {full ? t("sheetLeaveFullScreen") : t("sheetFullScreen")}
+            {(props.fullScreen ?? full) ? t("sheetLeaveFullScreen") : t("sheetFullScreen")}
           </button>
         )}
       </header>

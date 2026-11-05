@@ -2,10 +2,12 @@
 // source fades in under it: who quoted it or which document, the date, the file and its cell or page, who entered it,
 // and "Open source". For a calculated number, the formula, each input with its own source, and the steps (Plan 3's
 // explain); an input that was itself calculated opens as a new level on top, the one under it sinking behind
-// (scale 0.96, 240 ms), with a Back that says where it goes. Escape closes it and gives the focus back. It sits
-// inside its owner's box (absolutely placed, never a portal), so it scales with a canvas frame. Only what the core
-// has is shown: a number with no source says so.
+// (scale 0.96, 240 ms), with a Back that says where it goes. Escape closes it and gives the focus back. It is drawn
+// in the top layer (a portal), by its number: a canvas frame never cuts it and the message box never covers it; it
+// flips above the number or shifts along to stay whole on the screen (./place.ts), so «افتح المصدر» can always be
+// reached. Only what the core has is shown: a number with no source says so.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { canvasApi } from "../canvas/api";
 import { deliverablesApi } from "../deliverables/api";
 import type { Explained, NumberCell, Source } from "../deliverables/types";
@@ -15,14 +17,45 @@ import { FileName } from "../ui/FileName";
 import { formatDecimal } from "../viewers/sheet/format";
 import { flipFrom } from "./flip";
 import { readingDirection, revealSource } from "./mark";
+import { placeCard } from "./place";
 import { sourceKeys } from "./targets";
 
-const roles: Record<string, Text> = {
-  engineer: texts.sheetTheEngineer,
-  lead_qs: texts.roleLead,
-  checking_qs: texts.roleChecker,
-  calc_engine: texts.reviewCalcEngine,
+/** Who entered a number, in words: the core records a role ("engineer", "calc_engine") or an agent's English name. */
+const enteredBy: Record<string, Text> = {
+  engineer: texts.enteredByYou,
+  lead_qs: texts.enteredByLead,
+  "Lead QS": texts.enteredByLead,
+  checking_qs: texts.enteredByChecker,
+  "Checking QS": texts.enteredByChecker,
+  calc_engine: texts.enteredByCalc,
+  "QS Mind Prices": texts.enteredByPrices,
 };
+const whoEntered = (by: string) => (enteredBy[by] ? pick(enteredBy[by]) : fill(t("sheetEnteredBy"), { who: by }));
+
+/** A day from the core (YYYY-MM-DD, or a full time) in the app's date style: «5 نوفمبر 2026», "5 Nov 2026". */
+export function dayText(date: string): string {
+  const [y, m, d] = date.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return date;
+  return new Intl.DateTimeFormat(language() === "ar" ? "ar-EG-u-nu-latn" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(
+    new Date(y, m - 1, d),
+  );
+}
+
+/** A currency's word as the app writes money: «ج.م.» on an Arabic page, "EGP" on an English one; a rate's unit keeps
+ * what follows the code («ج.م./م3»). Anything else stays as the core sent it. */
+export function unitText(unit: string): string {
+  const found = /^([A-Z]{3})(\/.+)?$/.exec(unit);
+  if (!found || language() !== "ar") return unit;
+  try {
+    const symbol = new Intl.NumberFormat("ar-EG", { style: "currency", currency: found[1] })
+      .formatToParts(1)
+      .find((part) => part.type === "currency")
+      ?.value.replace(/[‎‏؜]/g, "");
+    return symbol ? `${symbol}${found[2] ?? ""}` : unit;
+  } catch {
+    return unit;
+  }
+}
 
 /** How long a level takes to sink behind the next, or come back (the dialog-stack idea, calm: no overshoot). */
 export const SINK_MS = 240;
@@ -45,8 +78,19 @@ function datedLabel(how: string | number | undefined) {
   return "sheetDated";
 }
 
-const valueText = (value: string, unit?: string | null) => `${formatDecimal(value)}${unit ? ` ${unit}` : ""}`;
-const shown = (value: string, unit?: string | null) => <bdi dir="ltr">{valueText(value, unit)}</bdi>;
+const valueText = (value: string, unit?: string | null) => `${formatDecimal(value)}${unit ? ` ${unitText(unit)}` : ""}`;
+/** The figure left to right, then its unit in its own direction: «4,100 ج.م.» reads number first in Arabic too. */
+const shown = (value: string, unit?: string | null) => (
+  <span>
+    <bdi dir="ltr">{formatDecimal(value)}</bdi>
+    {unit && (
+      <>
+        {" "}
+        <bdi dir="auto">{unitText(unit)}</bdi>
+      </>
+    )}
+  </span>
+);
 
 /** The figure as a file may write it, for the mark to go round it alone: 39,850.50, 39850.50, 39850.5. */
 export function figuresOf(value: string): string[] {
@@ -132,8 +176,8 @@ function Level({
             {at && <bdi>{at}</bdi>}
           </span>
         )}
-        {dated && <span>{fill(t(datedLabel(source?.locator?.dated_how)), { date: dated })}</span>}
-        {by && <span>{fill(t("sheetEnteredBy"), { who: roles[by] ? pick(roles[by]) : by })}</span>}
+        {dated && <span>{fill(t(datedLabel(source?.locator?.dated_how)), { date: dayText(dated) })}</span>}
+        {by && <span>{whoEntered(by)}</span>}
         {fileId && (
           <button type="button" className="self-start rounded px-1 underline hover:text-copper" onClick={openSource}>
             {t("sourceOpenFile")}
@@ -166,7 +210,7 @@ function Level({
                     )}
                     <span dir="auto" className="text-slate">
                       <FileName name={input.source.title} />
-                      {input.dated ? ` · ${fill(t("sheetDated"), { date: input.dated })}` : ""}
+                      {input.dated ? ` · ${fill(t("sheetDated"), { date: dayText(input.dated) })}` : ""}
                     </span>
                   </li>
                 ))}
@@ -181,7 +225,7 @@ function Level({
                   <li key={step.n}>
                     <bdi dir="ltr">
                       {step.n}. {step.text} = {formatDecimal(step.value)}
-                      {step.unit ? ` ${step.unit}` : ""}
+                      {step.unit ? ` ${unitText(step.unit)}` : ""}
                     </bdi>
                   </li>
                 ))}
@@ -209,7 +253,8 @@ export type SourceCardProps = {
   projectId: string;
   cell: NumberCell;
   sources: Record<string, Source>;
-  style: CSSProperties;
+  /** Where it stands inside its owner, when it has no number to stand by (`from`); with one it is placed itself. */
+  style?: CSSProperties;
   /** Opened from the keyboard: focus moves in. A click leaves it where it was, so a sheet's arrows keep moving. */
   focus: boolean;
   onClose: () => void;
@@ -242,8 +287,38 @@ function Card({ projectId, cell, sources, style, focus, onClose, from, label }: 
     onClose();
   };
 
+  // the card reads in the direction and language of the words round its number, wherever it is drawn
+  const [side] = useState(() => (from ? readingDirection(from) : undefined));
+  const [lang] = useState(() => from?.closest<HTMLElement>("[lang]")?.lang || undefined);
+
+  // It stands by its number (./place.ts) and keeps to it while the canvas pans or zooms or the chat scrolls: placed
+  // again on each frame the number, the card or the window has moved or changed size.
+  useLayoutEffect(() => {
+    if (!from) return;
+    let frame = 0;
+    let last = "";
+    const place = () => {
+      const el = box.current;
+      if (el && from.isConnected) {
+        const at = from.getBoundingClientRect();
+        const now = [at.top, at.left, at.width, at.height, el.offsetWidth, el.scrollHeight, innerWidth, innerHeight].join();
+        if (now !== last) {
+          last = now;
+          const view = { width: innerWidth, height: innerHeight };
+          const placed = placeCard(at, { width: el.offsetWidth, height: el.scrollHeight }, view, side === "rtl");
+          el.style.top = `${placed.top}px`;
+          el.style.left = `${placed.left}px`;
+          el.style.maxHeight = `${placed.maxHeight}px`;
+        }
+      }
+      if (typeof requestAnimationFrame === "function") frame = requestAnimationFrame(place);
+    };
+    place();
+    return () => cancelAnimationFrame(frame);
+  }, [from, side]);
+
   useEffect(() => {
-    if (focus) box.current?.focus();
+    if (focus) box.current?.focus({ preventScroll: true });
   }, [focus]);
 
   // Escape closes it wherever the focus is (a click leaves focus outside, and WebKit never focuses a clicked button)
@@ -292,14 +367,18 @@ function Card({ projectId, cell, sources, style, focus, onClose, from, label }: 
     setHeads((h) => h.slice(0, -1));
   }
 
-  return (
+  const card = (
     <div
       ref={box}
       role="dialog"
       aria-label={t("sheetSource")}
       tabIndex={-1}
-      style={style}
-      className="absolute z-20 flex max-h-96 w-80 max-w-[90%] flex-col gap-2 overflow-auto rounded-md border border-slate bg-paper p-3 text-start text-ink outline-none"
+      dir={side}
+      lang={lang}
+      style={from ? undefined : style}
+      className={`${
+        from ? "fixed z-[60] max-w-[calc(100vw-16px)] shadow-[0_2px_12px_rgb(14_15_18/0.1)]" : "absolute z-20 max-w-[90%]"
+      } flex max-h-96 w-80 flex-col gap-2 overflow-auto rounded-md border border-slate bg-paper p-3 text-start text-ink outline-none`}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
@@ -361,4 +440,6 @@ function Card({ projectId, cell, sources, style, focus, onClose, from, label }: 
       </div>
     </div>
   );
+  // in the top layer: above every frame, the chat and its message box, never cut by the box the number is in
+  return from ? createPortal(card, document.body) : card;
 }

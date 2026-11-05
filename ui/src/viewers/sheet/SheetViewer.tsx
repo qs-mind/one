@@ -37,6 +37,8 @@ export type SheetViewerProps = {
   onChanged?: () => void;
   onSelection?: (range: SheetRange | null) => void;
   onToggleFullScreen?: () => void;
+  /** Whether the board is full screen now, for the toggle's words; left out, the full review mode counts as it. */
+  fullScreen?: boolean;
   virtualize?: boolean;
   /** A document that is not ours (the client's BOQ): nothing can be typed, pasted or changed. */
   readOnly?: boolean;
@@ -56,7 +58,8 @@ const HEADER_H = 44;
 const TOTAL_H = 35;
 
 /** The status chips with text labels (never colour alone); the Document viewer shows the same. */
-export function StatusChips({ view }: { view: Pick<SheetView, "status" | "code" | "same_provider" | "off_desk"> }) {
+/** The Deliverable's chips. With `status` false the status itself is left out: a frame's strip already says it. */
+export function StatusChips({ view, status: withStatus = true }: { view: Pick<SheetView, "status" | "code" | "same_provider" | "off_desk">; status?: boolean }) {
   const status =
     view.status === "signed_off"
       ? t("statusSignedOff")
@@ -66,7 +69,7 @@ export function StatusChips({ view }: { view: Pick<SheetView, "status" | "code" 
   const chip = "rounded-full border px-2.5 text-xs leading-6";
   return (
     <>
-      <span className={`${chip} ${view.code === "C" ? "border-copper text-copper" : "border-slate text-ink"}`}>{status}</span>
+      {withStatus && <span className={`${chip} ${view.code === "C" ? "border-copper text-copper" : "border-slate text-ink"}`}>{status}</span>}
       {view.same_provider && <span className={`${chip} border-slate text-slate`}>{t("statusSameProvider")}</span>}
       {view.off_desk && <span className={`${chip} border-slate text-slate`}>{t("statusOffDesk")}</span>}
     </>
@@ -292,10 +295,11 @@ export function SheetViewer(props: SheetViewerProps) {
 
   const current = props.review?.current ?? null;
   const renderCell = useCallback(
-    (row: ViewRow, column: SheetColumn) => {
+    (row: ViewRow, column: SheetColumn, _selected: boolean, tabIndex: number) => {
       const vc = byKey.get(column.key)!;
       return (
         <SheetCell
+          tabIndex={tabIndex}
           row={row}
           column={vc}
           titleColumn={titleColumn}
@@ -326,7 +330,7 @@ export function SheetViewer(props: SheetViewerProps) {
   const total = view.total;
   const totalColumn = columns.find((c) => c.kind === "calc")?.key;
   const summary = useCallback(
-    (column: SheetColumn) => {
+    (column: SheetColumn, tabIndex: number) => {
       if (column.key === titleColumn)
         return (
           <span dir="auto" className="font-bold">
@@ -337,6 +341,7 @@ export function SheetViewer(props: SheetViewerProps) {
       return (
         <button
           type="button"
+          tabIndex={tabIndex}
           className="w-full text-end font-bold hover:text-copper"
           onClick={(event) => openSource(total, event.currentTarget, event.detail === 0, pick(texts.sheetTotal, view.language))}
         >
@@ -375,7 +380,7 @@ export function SheetViewer(props: SheetViewerProps) {
           badge && <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
         ) : (
           <>
-            <StatusChips view={view} />
+            <StatusChips view={view} status={props.mode !== "frame"} />
             <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
             {view.revision && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
             {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
@@ -384,11 +389,11 @@ export function SheetViewer(props: SheetViewerProps) {
         {props.onToggleFullScreen && (
           <button
             type="button"
-            aria-pressed={full}
+            aria-pressed={props.fullScreen ?? full}
             className="ms-auto rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
             onClick={props.onToggleFullScreen}
           >
-            {full ? t("sheetLeaveFullScreen") : t("sheetFullScreen")}
+            {(props.fullScreen ?? full) ? t("sheetLeaveFullScreen") : t("sheetFullScreen")}
           </button>
         )}
       </header>

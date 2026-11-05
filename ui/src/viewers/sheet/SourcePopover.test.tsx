@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NumberCell, Source } from "../../deliverables/types";
 import { fill, setLanguage, texts } from "../../i18n";
+import { dayText } from "../../sources/SourceCard";
 import { SourcePopover } from "./SourcePopover";
 
 const DAY = "2026-11-01";
@@ -46,24 +47,24 @@ beforeEach(() => setLanguage("ar"));
 describe("SourcePopover dates", () => {
   it("an undated file's number says it is the date One received it", async () => {
     const { unmount } = popover("received");
-    expect(await screen.findByText(fill(texts.sourceDatedReceived.ar, { date: DAY }))).toBeInTheDocument();
-    expect(screen.queryByText(fill(texts.sheetDated.ar, { date: DAY }))).toBeNull();
+    expect(await screen.findByText(fill(texts.sourceDatedReceived.ar, { date: dayText(DAY) }))).toBeInTheDocument();
+    expect(screen.queryByText(fill(texts.sheetDated.ar, { date: dayText(DAY) }))).toBeNull();
     unmount();
     setLanguage("en"); // the viewer around it re-renders it in the new language
     popover("received");
-    expect(await screen.findByText(fill(texts.sourceDatedReceived.en, { date: DAY }))).toBeInTheDocument();
+    expect(await screen.findByText(fill(texts.sourceDatedReceived.en, { date: dayText(DAY) }))).toBeInTheDocument();
   });
 
   it("a page or a Connector reply with no date of its own says it is the date One read it", async () => {
     popover("read");
-    expect(await screen.findByText(fill(texts.sourceDatedRead.ar, { date: DAY }))).toBeInTheDocument();
-    expect(screen.queryByText(fill(texts.sheetDated.ar, { date: DAY }))).toBeNull();
+    expect(await screen.findByText(fill(texts.sourceDatedRead.ar, { date: dayText(DAY) }))).toBeInTheDocument();
+    expect(screen.queryByText(fill(texts.sheetDated.ar, { date: dayText(DAY) }))).toBeNull();
   });
 
   it("a document's own date stays as it was", async () => {
     for (const how of ["document", undefined]) {
       const { unmount } = popover(how);
-      expect(await screen.findByText(fill(texts.sheetDated.ar, { date: DAY }))).toBeInTheDocument();
+      expect(await screen.findByText(fill(texts.sheetDated.ar, { date: dayText(DAY) }))).toBeInTheDocument();
       unmount();
     }
   });

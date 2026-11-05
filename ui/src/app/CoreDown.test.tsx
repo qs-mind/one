@@ -28,12 +28,12 @@ describe("HealthGate", () => {
     expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
   });
 
-  it("when the core is down, says so in both languages with the path to core.log", async () => {
+  it("when the core is down, says so in the screen's language only, with the path to core.log in mono", async () => {
     const fetch = health(new TypeError("Failed to fetch"));
     render(<HealthGate logPath={logPath}>chat</HealthGate>);
-    expect(await screen.findByText(texts.coreDown.ar)).toBeInTheDocument();
-    expect(screen.getByText(texts.coreDown.en)).toBeInTheDocument();
-    expect(screen.getByText(logPath)).toBeInTheDocument();
+    expect(await screen.findByText(texts.coreDown.en)).toBeInTheDocument(); // jsdom's system language
+    expect(screen.queryByText(texts.coreDown.ar)).toBeNull();
+    expect(screen.getByText(logPath)).toHaveClass("font-mono");
     expect(screen.queryByText("chat")).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith("/api/health", undefined);
   });

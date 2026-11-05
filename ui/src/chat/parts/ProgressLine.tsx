@@ -80,20 +80,51 @@ function RunningChip({ step, lang }: { step: WorkStep; lang: Language }) {
   );
 }
 
-/** One step of the log; rises in (150 ms) when it arrives while the Brief is live. */
-function Step({ step, lang, live }: { step: WorkStep; lang: Language; live: boolean }) {
+/** A line of the log: one step, or the same step done again and again in a row (`times`), its time the sum. */
+type Shown = { step: WorkStep; times: number; took: number; named: boolean };
+
+/** The steps as lines: the agent's name once at the head of each run of its steps (said again to a screen reader on
+ * every line, so each still reads whole), and the same finished step repeated in a row folded into one line, "×2". */
+export function lines(steps: readonly WorkStep[]): Shown[] {
+  const out: Shown[] = [];
+  const same = (a: WorkStep, b: WorkStep) => a.agent.en === b.agent.en && a.text.en === b.text.en && a.text.ar === b.text.ar;
+  for (const step of steps) {
+    const last = out.at(-1);
+    const took = step.until ? span(step.at, step.until) : 0;
+    if (last && last.step.until !== null && step.until !== null && same(last.step, step)) {
+      last.times += 1;
+      last.took += took;
+      continue;
+    }
+    out.push({ step, times: 1, took, named: !last || last.step.agent.en !== step.agent.en });
+  }
+  return out;
+}
+
+/** One line of the log; rises in (150 ms) when it arrives while the Brief is live. */
+function Step({ line: { step, times, took, named }, lang, live }: { line: Shown; lang: Language; live: boolean }) {
   const ref = useRef<HTMLLIElement>(null);
   useLayoutEffect(() => {
     if (live && ref.current) void play(ref.current, [{ opacity: 0, transform: "translateY(0.5em)" }, { opacity: 1, transform: "none" }], DUR.short);
   }, []); // on arrival only
-  const took = step.until ? span(step.at, step.until) : 0;
   return (
     <li ref={ref} className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-      <span className="font-semibold text-ink">{pick(step.agent, lang)}</span>{" "}
+      {named ? (
+        <span data-agent className="basis-full font-semibold text-ink">
+          {pick(step.agent, lang)}
+        </span>
+      ) : (
+        <span className="sr-only">{pick(step.agent, lang)}</span>
+      )}{" "}
       {live && step.until === null ? (
         <RunningChip step={step} lang={lang} />
       ) : (
         <span dir="auto">{pick(step.text, lang)}</span>
+      )}
+      {times > 1 && (
+        <bdi dir="ltr" className="tabular-nums">
+          ×{times}
+        </bdi>
       )}
       {took >= 100 && ( // under a tenth of a second there is nothing honest to show
         <>
@@ -108,8 +139,8 @@ function Step({ step, lang, live }: { step: WorkStep; lang: Language; live: bool
 function Steps({ steps, lang, live }: { steps: WorkStep[]; lang: Language; live: boolean }) {
   return (
     <ul aria-label={t("workSteps", lang)} aria-live={live ? "polite" : undefined} className="flex flex-col gap-1">
-      {steps.map((step) => (
-        <Step key={step.at + pick(step.agent, "en")} step={step} lang={lang} live={live} />
+      {lines(steps).map((line) => (
+        <Step key={line.step.at + pick(line.step.agent, "en")} line={line} lang={lang} live={live} />
       ))}
     </ul>
   );

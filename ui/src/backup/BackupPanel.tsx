@@ -2,13 +2,14 @@
 // restoring from a backup folder. Without an account it offers the Backup key's recovery code, the only way to
 // restore on another computer then. Also the one-time question, after the first project, of where to keep backups.
 import { useCallback, useEffect, useId, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import { api } from "../api";
 import { coreLine, send } from "../core";
 import { primary, quiet, secondary } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { when } from "../review/place";
 import { stopAsking } from "./ask";
-import { FolderPicker } from "./folder";
+import { FolderPicker, pickFolder } from "./folder";
 import { RecoveryCode } from "./RecoveryCode";
 import { Restore } from "./Restore";
 
@@ -186,30 +187,42 @@ export function BackupPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** The one-time question, after the first project: pick a folder now, or later from the Backup panel. */
+/** The one-time question, after the first project: one quiet line at the chat's foot, so the chat keeps its room.
+ * Its action picks a folder (the system dialog in ONE's window; a path field, opened in place, in a plain browser);
+ * Later puts it away until the Backup panel. */
 export function BackupAsk() {
   useLanguage();
   const [failed, setFailed] = useState<Text>();
+  const [typing, setTyping] = useState(false);
+  const use = (path: string) =>
+    void setFolder(path).then((answer) => (answer.status ? stopAsking() : setFailed(answer.line)));
   return (
     <section
       aria-label={t("backupTitle")}
-      className="flex w-full flex-col gap-4 rounded-[14px] border border-ink/[0.08] bg-paper px-5 py-4"
+      className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-[14px] border border-ink/[0.08] bg-paper px-4 py-1.5"
     >
-      <p className="font-semibold">{t("backupAskFolder")}</p>
-      <p className="text-slate">{t("backupNoFolder")}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <FolderPicker
-          label={t("backupPickFolder")}
-          onPicked={(path) =>
-            void setFolder(path).then((answer) => (answer.status ? stopAsking() : setFailed(answer.line)))
-          }
-        />
-        <button type="button" onClick={stopAsking} className={`${quiet} ms-auto`}>
-          {t("backupLater")}
+      <p dir="auto" className="min-w-0 flex-1 break-words">
+        {t("backupAskFolder")}
+      </p>
+      {!typing && (
+        <button
+          type="button"
+          className={`${quiet} -my-1 text-ink`}
+          onClick={() => (isTauri() ? void pickFolder().then((picked) => picked && use(picked)) : setTyping(true))}
+        >
+          {t("backupPickFolder")}
         </button>
-      </div>
+      )}
+      <button type="button" onClick={stopAsking} className={`${quiet} -my-1 -me-3`}>
+        {t("backupLater")}
+      </button>
+      {typing && (
+        <div className="w-full pb-2">
+          <FolderPicker label={t("backupPickFolder")} onPicked={use} />
+        </div>
+      )}
       {failed && (
-        <p role="alert" className="text-copper">
+        <p role="alert" className="w-full text-copper">
           {pick(failed)}
         </p>
       )}

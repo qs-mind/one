@@ -81,10 +81,69 @@
   }
 }
 
+/* The brand focus ring on every control, never the engine's own `auto 1px` outline: 2 px Ink, 2 px off the edge. A
+   control's own focus-visible: classes refine it (a different offset, an inset ring). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+}
+
 /* Focus rings for the keyboard only: after a click or a touch (html[data-pointer], ui/pointerFocus.ts) no ring shows
    until a key moves focus, whatever the engine thinks :focus-visible means. A text field keeps its focus look. */
 html[data-pointer] :focus-visible:not(input, textarea, select, [contenteditable="true"]) {
   outline: none;
+}
+
+/* Brand form controls, still the native inputs underneath (keyboard, screen readers, forms stay as they are). A
+   checkbox or a radio is ticked in Ink, at 16 px. A select drops the engine's blue widget for Paper with a quiet Slate
+   border and a Slate chevron on its inline end (the left in Arabic); the room for the chevron is kept whatever padding
+   the select's own classes give. */
+@layer base {
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-ink);
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+  }
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    border: 1px solid rgb(110 106 100 / 0.4);
+    border-radius: 6px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236e6a64' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: 10px 6px;
+    background-position: right 0.75rem center;
+    text-overflow: ellipsis;
+    /* never wider than its box: a long option (a model's name and price) is cut, the panel never scrolls sideways */
+    max-width: 100%;
+    min-width: 0;
+  }
+  [dir="rtl"] select:not([dir="ltr"]),
+  select[dir="rtl"] {
+    background-position: left 0.75rem center;
+  }
+}
+select:not([class*="pe-"]) {
+  padding-inline-end: 2.25rem;
+}
+
+/* A disabled button reads as disabled and stays on-brand: Slate words, a filled one on Stone, an outlined one with a
+   faint Slate edge; never a grey wash of the button it was (the opacity its own classes ask for is dropped). */
+button:disabled {
+  opacity: 1;
+  color: var(--color-slate);
+}
+button:disabled:is(.bg-ink, .bg-copper, [class*="bg-ink/"]) {
+  background-color: var(--color-stone);
+}
+button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-copper) {
+  border-color: rgb(110 106 100 / 0.3);
 }
 
 /* Scrollbars: thin and quiet, Slate at low opacity on a clear track; under the pointer the thumb is thicker and darker.

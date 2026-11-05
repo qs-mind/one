@@ -467,9 +467,11 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       const target = arrange(nodesRef.current.map(placedOf), status, mode, { dir: dir() });
       remember();
       applyLayout(target);
-      fitReadable(target);
+      // the whole new layout in the free area, clear of the open chat and the controls: every frame is in sight,
+      // smaller if it must be, so none is left under the chat or past the window's edge
+      fitTo(target, { margin: MARGIN, maxZoom: PREFERRED });
     },
-    [applyLayout, fitReadable],
+    [applyLayout, fitTo],
   );
 
   const focusFrame = useCallback(
@@ -738,6 +740,15 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
     if (key === focused.current) return;
     focused.current = key;
     refreshLive();
+    // Tab onto a frame that is off screen or under the chat: the view pans to it (React Flow's own pan counts a frame
+    // half under the chat as seen, and knows nothing of the chat); a click never moves the view
+    const el = event.target as HTMLElement;
+    const node = key && el.matches(".react-flow__node:focus-visible") && nodesRef.current.find((n) => n.id === key);
+    if (!node) return;
+    const frame = placedOf(node);
+    const view = seen();
+    if (!inView({ x: frame.x, y: frame.y, w: Math.min(frame.w, view.w), h: STRIP_H }, view))
+      fitTo([frame], { keepZoom: true, margin: MARGIN, minZoom: READABLE, atStart: frame.w > view.w });
   }
 
   function onDragOver(event: DragEvent<HTMLElement>) {
@@ -815,7 +826,7 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
           proOptions={{ hideAttribution: true }}
         >
           <Background variant={BackgroundVariant.Dots} gap={24} size={1.25} color="rgb(14 15 18 / 0.09)" />
-          <MapAndZoom rtl={rtl} onArrange={() => doArrange("stage")} />
+          <MapAndZoom rtl={rtl} onArrange={() => doArrange("stage")} onFitAll={() => fitTo(nodesRef.current.map(placedOf))} />
           {children}
         </ReactFlow>
       </CanvasActionsContext.Provider>
@@ -849,11 +860,11 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
 /** The minimap's size; the zoom controls under it take its width. */
 const MAP = { w: 168, h: 112 };
 
-/** The minimap and, under it and as wide, zoom out, the zoom level, zoom in and Arrange by stage: one block in the
+/** The minimap and, under it and as wide, zoom out, the zoom level, zoom in, Show everything and Arrange by stage: one block in the
  * bottom inline-start corner (it mirrors in Arabic). Under 900 px the minimap hides and the controls stay. It sits
  * inside React Flow, so the minimap keeps React Flow's own styles; the whole block is a cover (cover.ts), so no fit
  * puts a frame under it. */
-function MapAndZoom({ rtl, onArrange }: { rtl: boolean; onArrange(): void }) {
+function MapAndZoom({ rtl, onArrange, onFitAll }: { rtl: boolean; onArrange(): void; onFitAll(): void }) {
   useLanguage();
   const flow = useReactFlow();
   const percent = useStore((s) => Math.round(s.transform[2] * 100));
@@ -896,6 +907,9 @@ function MapAndZoom({ rtl, onArrange }: { rtl: boolean; onArrange(): void }) {
             </button>
           </Tip>
         </div>
+        <button type="button" className={`${button} w-full`} onClick={onFitAll}>
+          {t("fitAll")}
+        </button>
         <button type="button" className={`${button} w-full`} onClick={onArrange}>
           {t("arrangeByStage")}
         </button>

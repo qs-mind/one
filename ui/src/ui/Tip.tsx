@@ -18,7 +18,18 @@ let cooling: ReturnType<typeof setTimeout> | undefined;
 
 type Shown = { left: number; top: number; above: boolean };
 
-export function Tip({ label, side = "bottom", children }: { label: string; side?: "top" | "bottom"; children: ReactElement }) {
+export function Tip({
+  label,
+  side = "bottom",
+  when,
+  children,
+}: {
+  label: string;
+  side?: "top" | "bottom";
+  /** Shows only when this says so of the trigger at that moment (a name's tip: only when the name is cut). */
+  when?: (trigger: Element) => boolean;
+  children: ReactElement;
+}) {
   const wrap = useRef<HTMLSpanElement>(null);
   const wait = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [shown, setShown] = useState<Shown | null>(null);
@@ -28,7 +39,7 @@ export function Tip({ label, side = "bottom", children }: { label: string; side?
 
   function open() {
     const trigger = wrap.current?.firstElementChild;
-    if (!trigger) return;
+    if (!trigger || (when && !when(trigger))) return;
     const rect = trigger.getBoundingClientRect();
     const above = side === "top" || rect.bottom + 40 > innerHeight;
     const left = Math.min(Math.max(rect.left + rect.width / 2, 8), innerWidth - 8);

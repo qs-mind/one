@@ -5,7 +5,7 @@ import { createRef, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { deliverablesApi, dispositionName } from "../../deliverables/api";
 import type { Change, Explained, SheetView, Thread, ViewColumn, ViewRow } from "../../deliverables/types";
-import { setLanguage, texts } from "../../i18n";
+import { fill, setLanguage, texts } from "../../i18n";
 import { canvasApi } from "../../canvas/api";
 import { SheetViewer, type SheetHandle } from "./SheetViewer";
 
@@ -250,6 +250,16 @@ describe("SheetViewer", () => {
     expect(container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns).toContain("432px");
   });
 
+  it("in a frame the status is not said twice: the frame's strip says it; the board shows it", () => {
+    const view = sheet({ status: "checked", code: "A", off_desk: true });
+    const { rerender } = render(<SheetViewer projectId={P} view={view} mode="frame" />);
+    const status = fill(texts.statusChecked.ar, { code: "A" });
+    expect(screen.queryByText(status)).toBeNull();
+    expect(screen.getByText(texts.statusOffDesk.ar)).toBeInTheDocument(); // the strip does not say this one
+    rerender(<SheetViewer projectId={P} view={view} mode="full" />);
+    expect(screen.getByText(status)).toBeInTheDocument();
+  });
+
   it("read only (the client's BOQ): nothing opens an editor or posts a change, each number opens its file", async () => {
     const user = userEvent.setup();
     const fetch = core({});
@@ -285,6 +295,18 @@ describe("SheetViewer", () => {
     await user.dblClick(cellOf("03/02", "amount"));
     expect(within(cellOf("03/02", "amount")).queryByRole("textbox")).toBeNull();
     expect(cellOf("03/02", "amount")).toHaveAttribute("aria-readonly", "true");
+  });
+
+  it("the grid is one Tab stop: the buttons in its cells (fold, ✓ ✗, the total) are reached on the active cell only", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SheetViewer projectId={P} view={sheet({ pending: 1 })} changes={[change("c1")]} />);
+    const grid = container.querySelector<HTMLElement>(".rdg")!;
+    const tabbable = () => [...grid.querySelectorAll<HTMLElement>("button, [tabindex]")].filter((el) => el.tabIndex >= 0);
+    expect(grid.querySelectorAll("button").length).toBeGreaterThan(2); // folds, ✓ ✗ and the total are there
+    expect(tabbable().filter((el) => el.matches("button"))).toEqual([]);
+    // on the active cell its button is the next Tab stop, and only its
+    await user.click(cellOf("03/02", "rate"));
+    expect(tabbable().filter((el) => el.matches("button")).map((el) => el.getAttribute("aria-label"))).toEqual([texts.sheetAccept.ar, texts.sheetReject.ar]);
   });
 
   it("✓ accepts and ✗ rejects that change only", async () => {
@@ -355,19 +377,19 @@ describe("SheetViewer", () => {
     expect(dialog).toHaveTextContent("بيانات تجريبية - عينة");
     expect(dialog).toHaveTextContent("عرض سعر - عينة.pdf");
     expect(dialog).toHaveTextContent("صفحة 3");
-    expect(dialog).toHaveTextContent("بتاريخ 2026-11-01");
-    await waitFor(() => expect(dialog).toHaveTextContent("أدخله estimator"));
-    expect(dialog.parentElement).toBe(screen.getByRole("grid").closest(".relative")); // inside the viewer, no portal
+    expect(dialog).toHaveTextContent("بتاريخ 1 نوفمبر 2026");
+    await waitFor(() => expect(dialog).toHaveTextContent(fill(texts.sheetEnteredBy.ar, { who: "estimator" })));
+    expect(dialog.parentElement).toBe(document.body); // in the top layer: no frame or box cuts it
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
 
     await user.click(cellOf("03/02", "amount"));
     dialog = await screen.findByRole("dialog");
-    await waitFor(() => expect(dialog).toHaveTextContent("quantity * rate = 4,782,060.00 EGP"));
+    await waitFor(() => expect(dialog).toHaveTextContent("quantity * rate = 4,782,060.00 ج.م."));
     expect(dialog).toHaveTextContent(texts.sheetFormula.ar);
-    expect(dialog).toHaveTextContent("39,850.50 EGP/m3");
+    expect(dialog).toHaveTextContent("39,850.50 ج.م./m3");
     expect(dialog).toHaveTextContent("كميات - عينة");
-    expect(dialog).toHaveTextContent(`أدخله ${texts.reviewCalcEngine.ar}`);
+    expect(dialog).toHaveTextContent(texts.enteredByCalc.ar);
     expect(fetch.mock.calls.map(([u]) => String(u))).toContain(`${base}/numbers/n-amount/explain?page=1`);
   });
 

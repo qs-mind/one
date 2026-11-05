@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { canvasApi } from "../canvas/api";
 import type { FrameKey, ProjectSources } from "../canvas/types";
+import { openSetup } from "../firstlaunch/parts";
 import { fill, language, pick, setLanguage, t, useLanguage } from "../i18n";
 import { type Project, switchProject } from "../records/project";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
@@ -66,6 +67,7 @@ export function Palette({
   onToggleChat,
   onGeneralChat,
   onNewProject,
+  onPanel,
 }: {
   open: boolean;
   /** The search field's place, when it opened the palette. */
@@ -77,6 +79,8 @@ export function Palette({
   onToggleChat(): void;
   onGeneralChat(): void;
   onNewProject(): void;
+  /** Opens one of the shell's panels: AI settings, Backup, Project Records, the Deliverables. */
+  onPanel(kind: "ai" | "backup" | "records" | "deliverables"): void;
 }) {
   useLanguage();
   const [query, setQuery] = useState("");
@@ -187,23 +191,28 @@ export function Palette({
 
   return (
     <CommandDialog title={t("palette")} open={open} onOpenChange={(next) => void change(next)}>
-      <CommandInput ref={grow} value={query} onValueChange={setQuery} placeholder={t("paletteSearch")} />
+      <CommandInput ref={grow} value={query} onValueChange={setQuery} placeholder={t(project ? "paletteSearch" : "paletteSearchGeneral")} />
       <CommandList>
         <CommandEmpty>{t("noResults")}</CommandEmpty>
         {project && frames.length > 0 && (
           <CommandGroup heading={t("paletteFrames")}>
             {frames.map((frame) => (
               <CommandItem key={frame.key} value={`${frame.title} ${frame.key}`} onSelect={() => run(() => canvasApi.focusFrame(frame.key))}>
-                <span dir="auto">{frame.title}</span>
+                <FileName name={frame.title} fit />
               </CommandItem>
             ))}
           </CommandGroup>
         )}
         <CommandGroup heading={t("paletteCommands")}>
           {project && command(t("fitAll"), () => canvasApi.fitAll())}
-          {project && command(t("arrangeByStage"), () => canvasApi.arrange("stage"))}
+          {project && command(t("arrangeByStageCommand"), () => canvasApi.arrange("stage"))}
           {project && command(t("tidy"), () => canvasApi.arrange("tidy"))}
           {project && command(t(chatOpen ? "closeChat" : "openChat"), onToggleChat)}
+          {project && command(t("records"), () => onPanel("records"))}
+          {project && command(t("deliverablesButton"), () => onPanel("deliverables"))}
+          {command(t("ai"), () => onPanel("ai"))}
+          {command(t("backupTitle"), () => onPanel("backup"))}
+          {command(t("usageTitle"), () => openSetup("usage", true))}
           {command(t("otherLanguage"), () => void withTransition(() => setLanguage(language() === "ar" ? "en" : "ar")))}
           {project && command(t("generalChat"), onGeneralChat)}
           {command(t("newProject"), onNewProject)}

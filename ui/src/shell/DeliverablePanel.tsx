@@ -99,6 +99,12 @@ export function DeliverablePanel({
     void play(el, keyframes, DUR.long);
   }, [open, origin, board]);
 
+  // going full screen takes away the button that did it: focus moves to Close, the one way out, so Esc still works
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (panel.full && !board.current?.contains(document.activeElement)) closeButton.current?.focus();
+  }, [panel.full, board]);
+
   if (!open) return null;
   return (
     <div
@@ -117,7 +123,7 @@ export function DeliverablePanel({
     >
       <div className="flex justify-end px-3 pt-2">
         {/* focus moves into the panel, so Esc there closes it and gives focus back to the opener */}
-        <button type="button" autoFocus className="rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink" onClick={() => void panel.close()}>
+        <button ref={closeButton} type="button" autoFocus className="rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink" onClick={() => void panel.close()}>
           {t("close")}
         </button>
       </div>
@@ -128,7 +134,9 @@ export function DeliverablePanel({
           deliverableId={open}
           mode="full"
           onSend={onSend}
-          onToggleFullScreen={panel.toggleFull}
+          // full screen has one way out, Close: no second "Leave full screen" stacked under it
+          onToggleFullScreen={panel.full ? undefined : panel.toggleFull}
+          fullScreen={panel.full}
         />
       </div>
     </div>

@@ -443,6 +443,9 @@ describe("the chat in the shell", () => {
     handle.focus();
     await user.keyboard("{ArrowRight}"); // in Arabic the chat is at the left: its edge moves right to widen it
     expect(handle).toHaveAttribute("aria-valuenow", "436");
+    // focused, the handle shows the brand ring; the chat never takes more than a third of the window (1000 px)
+    expect(handle).toHaveClass("focus-visible:outline-2", "focus-visible:outline-ink");
+    expect(screen.getByRole("complementary", { name: texts.projectChat.ar })).toHaveClass("max-w-[max(320px,33.333vw)]");
     await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
     expect(screen.queryByRole("log")).toBeNull();
     await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));

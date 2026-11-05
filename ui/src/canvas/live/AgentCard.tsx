@@ -8,6 +8,7 @@ import { fill, pick, t, texts, useLanguage, type Text } from "../../i18n";
 import { canvasApi } from "../api";
 import { idOf } from "../frames/Frame";
 import type { AgentInfo, Anchor, FrameKey } from "../types";
+import { FileName } from "../../ui/FileName";
 import { cursorShown, type LiveAgent } from "./activity";
 import { follow, stopFollowing, useFollowing } from "./follow";
 
@@ -96,6 +97,9 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
   const needsYou = agent.state === "waiting" || agent.state === "failed";
   const running = agent.state !== "done" && agent.state !== "failed" && agent.state !== "idle";
   const place = placeOf(agent.focus?.anchor ?? null);
+  const said = place ? t("agentOnAt") : t("agentOn");
+  const on = title ? fill(said, { title, place: place ?? "" }) : "";
+  const [before = "", after = ""] = said.replace("{place}", place ?? "").split("{title}");
 
   async function stop() {
     if (!agent.brief_id) return;
@@ -107,7 +111,8 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
   }
 
   return (
-    <li className="flex flex-col gap-1.5 rounded-[10px] px-3 py-2.5" data-agent={agent.id}>
+    // min-w-0 and words that wrap: the card fits its frame, never scrolls it sideways or cuts its buttons
+    <li className="flex min-w-0 flex-col gap-1.5 rounded-[10px] px-3 py-2.5 [overflow-wrap:anywhere]" data-agent={agent.id}>
       <span className="flex items-center justify-between gap-3">
         <span dir="auto" className="min-w-0 truncate font-semibold">
           {role}
@@ -118,9 +123,11 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
         </span>
       </span>
       {agent.model && (
-        <span className="flex items-center gap-1.5 self-start text-slate">
+        <span className="flex min-w-0 max-w-full items-center gap-1.5 self-start text-slate">
           <ProviderLogo provider={agent.provider ?? ""} />
-          <bdi dir="ltr">{agent.model}</bdi>
+          <bdi dir="ltr" className="min-w-0 truncate">
+            {agent.model}
+          </bdi>
         </span>
       )}
       {agent.noNews && <span className="text-slate">{t("noNews")}</span>}
@@ -132,13 +139,17 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
       {frame && title && (
         <button
           type="button"
-          className="nodrag self-start truncate text-start underline decoration-ink/30 underline-offset-2 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-ink"
+          aria-label={on}
+          className="nodrag flex min-w-0 max-w-full items-baseline self-start whitespace-pre text-start underline decoration-ink/30 underline-offset-2 hover:decoration-ink focus-visible:outline-2 focus-visible:outline-ink"
           onClick={(event) => {
             event.stopPropagation(); // the click must not also select the team frame around the card
             canvasApi.focusFrame(frame, agent.focus?.anchor ? { anchor: agent.focus.anchor } : undefined);
           }}
         >
-          {place ? fill(t("agentOnAt"), { title, place }) : fill(t("agentOn"), { title })}
+          {/* the frame's name keeps to one line, in its own direction; the words round it stay whole */}
+          <span className="shrink-0">{before}</span>
+          <FileName name={title} fit />
+          <span className="shrink-0">{after}</span>
         </button>
       )}
       {(cursorShown(agent) || (running && agent.brief_id)) && (

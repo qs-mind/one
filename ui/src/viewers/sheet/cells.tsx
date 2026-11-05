@@ -98,12 +98,14 @@ function Suggested({
   current,
   onAccept,
   onReject,
+  tabIndex = -1,
 }: {
   pending: Pending;
   end: boolean;
   current: boolean;
   onAccept: (id: string) => void;
   onReject: (id: string) => void;
+  tabIndex?: number;
 }) {
   const value = useRef<HTMLModElement>(null);
   useLayoutEffect(() => {
@@ -125,6 +127,7 @@ function Suggested({
           <>
             <button
               type="button"
+              tabIndex={tabIndex}
               aria-label={t("sheetAccept")}
               title={t("sheetAccept")}
               className="rounded px-1 text-ink hover:bg-stone"
@@ -135,6 +138,7 @@ function Suggested({
             </button>
             <button
               type="button"
+              tabIndex={tabIndex}
               aria-label={t("sheetReject")}
               title={t("sheetReject")}
               className="rounded px-1 text-copper hover:bg-stone"
@@ -170,6 +174,8 @@ export type CellProps = {
   onReject: (changeId: string) => void;
   /** Where the number's source shows (../../sources/targets.ts): hovering it draws the source line. */
   sourceKeys?: string[];
+  /** The grid's for the cell's buttons: reachable by Tab only on the active cell (the arrows move between cells). */
+  tabIndex?: number;
 };
 
 export function SheetCell(p: CellProps) {
@@ -179,7 +185,7 @@ export function SheetCell(p: CellProps) {
   const wrap = column.wrap ? "whitespace-normal break-words" : "truncate";
   let content;
   if (p.pending) {
-    content = <Suggested pending={p.pending} end={number} current={!!p.current} onAccept={p.onAccept} onReject={p.onReject} />;
+    content = <Suggested pending={p.pending} end={number} current={!!p.current} onAccept={p.onAccept} onReject={p.onReject} tabIndex={p.tabIndex} />;
   } else if (row.kind === "section" && column.key === p.titleColumn) {
     content = (
       <span dir="auto" className={`font-bold ${wrap}`}>
@@ -223,12 +229,13 @@ export function SheetCell(p: CellProps) {
   );
 }
 
-function FoldButton({ row, collapsed, direction, onToggle }: CellProps) {
+function FoldButton({ row, collapsed, direction, onToggle, tabIndex = -1 }: CellProps) {
   const chevron = collapsed ? (direction === "rtl" ? "◂" : "▸") : "▾";
   const label = collapsed ? t("sheetExpand") : t("sheetCollapse");
   return (
     <button
       type="button"
+      tabIndex={tabIndex}
       aria-expanded={!collapsed}
       aria-label={`${label}: ${row.title ?? ""}`}
       title={label}

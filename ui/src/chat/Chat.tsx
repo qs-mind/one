@@ -11,6 +11,7 @@ import { FixAction } from "../shell/FixAction";
 import { HandOffCards } from "../shell/HandOffCard";
 import type { ChatState } from "../shell/useChats";
 import { textOf } from "../shell/useChats";
+import { FileName } from "../ui/FileName";
 import { DUR, play, useReducedMotion } from "../ui/motion";
 import { CARD_ANSWERED, useApprovalQueue } from "./parts/ApprovalCard";
 import { ContinueBriefs } from "./parts/ContinueBriefs";
@@ -53,17 +54,24 @@ function ErrorLine({ error }: { error: Error }) {
 }
 
 /** "Selected: BOQ pricing, rows 3/01–3/04", or "3 selected". The name keeps its own direction (an Arabic title on
- * an English page). */
+ * an English page) and to one line: a long one ends in «…», its full name in a Tip. */
 export function SelectionText({ items }: { items: readonly SelectionItem[] }) {
   if (items.length !== 1) return <span>{fill(t("selectedMany"), { n: items.length })}</span>;
   const [item] = items;
-  const name = item!.label ? fill(t("selectedRange"), { title: item!.title, label: item!.label }) : item!.title;
   const [before, after] = t("selected").split("{name}");
+  const range = t("selectedRange"); // "{title}, {label}": the words between the two
+  const between = range.slice(range.indexOf("{title}") + "{title}".length, range.indexOf("{label}"));
   return (
-    <span>
-      {before}
-      <bdi dir="auto">{name}</bdi>
-      {after}
+    <span className="inline-flex min-w-0 max-w-full items-baseline whitespace-pre">
+      {before && <span className="shrink-0">{before}</span>}
+      <FileName name={item!.title} fit />
+      {item!.label && (
+        <span className="shrink-0">
+          {between}
+          <bdi dir="auto">{item!.label}</bdi>
+        </span>
+      )}
+      {after && <span className="shrink-0">{after}</span>}
     </span>
   );
 }
@@ -198,7 +206,10 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
     const waiting = waitingCards(messages);
     const fresh = seen.current ? waiting.filter((id) => !seen.current!.has(id)) : [];
     seen.current = new Set(waiting);
-    if (atEnd.current) toEnd();
+    // a message the engineer just sent always brings the log to it, even scrolled up: it is where they look now
+    const last = messages.at(-1);
+    const ownNew = last?.role === "user" && last.id !== sent.current;
+    if (atEnd.current || ownNew) toEnd();
     else if (messages.length) setBelow(true);
     if (fresh.length) {
       const card = [...log.querySelectorAll<HTMLElement>("[data-card]")].find((el) => el.dataset.card === fresh[0]);
@@ -254,7 +265,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
               <li key={message.id} data-own={message.id} className="max-w-[85%] self-end rounded-2xl bg-stone px-4 py-3">
                 {message.metadata?.steering && <p className="text-slate">{t("steering")}</p>}
                 {message.metadata?.selection?.length ? (
-                  <p className="mb-2 w-fit rounded-lg bg-paper px-3 py-0.5 text-sm text-slate">
+                  <p className="mb-2 flex w-fit max-w-full rounded-lg bg-paper px-3 py-0.5 text-sm text-slate">
                     <SelectionText items={message.metadata.selection} />
                   </p>
                 ) : null}

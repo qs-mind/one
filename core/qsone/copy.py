@@ -784,15 +784,31 @@ CARD_CHOICE = {
 _EXTENSION = re.compile(r"(\.[A-Za-z0-9]{1,8})$")
 
 
+_ARABIC_LETTERS = r"\u0600-\u06FF\u0750-\u077F\u0870-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF"
+_ARABIC = re.compile(f"[{_ARABIC_LETTERS}]")
+_STRONG = re.compile(f"[A-Za-z\u00c0-\u024f{_ARABIC_LETTERS}]")
+_LATIN = re.compile(r"[A-Za-z]")
+
+
 def file_name(name: str) -> str:
     """A file name for a sentence on screen, in Unicode isolates: the whole name first-strong
-    (FSI … PDI), its extension left to right (LRI … PDI), so «مواصفات (sample spec).docx» reads
-    in order inside Arabic or English words. Only for text shown to the engineer, never to a model.
-    The UI's own file names do the same (ui/src/ui/FileName.tsx)."""
+    (FSI … PDI), its extension left to right (LRI … PDI). A name that starts in Arabic and ends
+    in Latin words keeps those words with the extension in that left-to-right run, so
+    «مواصفات (sample spec).docx» reads «مواصفات» then «(sample spec).docx» inside Arabic or
+    English words, never «.docx(sample spec». Only for text shown to the engineer, never to a
+    model. The UI's own file names do the same (ui/src/ui/FileName.tsx)."""
     found = _EXTENSION.search(name)
-    if found is None or found.start() == 0:
-        return f"\u2068{name}\u2069"
-    return f"\u2068{name[: found.start()]}\u2066{found.group(1)}\u2069\u2069"
+    whole = found is None or found.start() == 0
+    stem, extension = (name, "") if whole else (name[: found.start()], found.group(1))
+    first = _STRONG.search(stem)
+    last = max((m.end() for m in _ARABIC.finditer(stem)), default=0)
+    rest = stem[last:]
+    if first and _ARABIC.match(first.group()) and last and _LATIN.search(rest):
+        space = len(rest) - len(rest.lstrip())
+        stem, extension = stem[: last + space], rest[space:] + extension
+    if not extension:
+        return f"\u2068{stem}\u2069"
+    return f"\u2068{stem}\u2066{extension}\u2069\u2069"
 
 
 _BLANK_THEN_STOP = re.compile(r"\{(\w+)\}\.")
@@ -1435,7 +1451,7 @@ EXPORT_LABELS = {
     "review": {"en": "Review comment", "ar": "ملاحظة مراجعة"},
     "open": {"en": "Open", "ar": "مفتوحة"},
     "closed": {"en": "Closed", "ar": "مقفولة"},
-    "none": {"en": "None", "ar": "لا يوجد"},
+    "none": {"en": "None", "ar": "مفيش"},
 }
 
 # The client's own file.

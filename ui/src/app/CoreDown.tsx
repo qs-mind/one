@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, inInstalledApp } from "../api";
 import { systemLanguage } from "../firstlaunch/FirstLaunch";
-import { type Language, savedLanguage, t, texts } from "../i18n";
+import { type Language, savedLanguage, t } from "../i18n";
 import { SLOW_MS, StartScreen } from "./StartScreen";
 
 // Set by the dev server (scripts/core-dev.ts); the installed app asks the shell, which started the core.
@@ -133,17 +133,12 @@ export function HealthGate({ children, logPath }: { children: ReactNode; logPath
   );
 }
 
-/** The core is down: why, in both languages, where its log is, and Retry (in the start screen's language). */
+/** The core is down: why, where its log is, and Retry, all in the start screen's language. */
 export function CoreDown({ logPath, onRetry, lang }: { logPath: string; onRetry: () => void; lang: Language }) {
   return (
     <div className="start-rise mt-6 flex w-full max-w-xl flex-col gap-3">
-      <p lang="ar" dir="rtl">
-        {texts.coreDown.ar}
-      </p>
-      <p lang="en" dir="ltr">
-        {texts.coreDown.en}
-      </p>
-      <code dir="ltr" className="rounded-md bg-stone px-3 py-2 break-all">
+      <p>{t("coreDown", lang)}</p>
+      <code dir="ltr" className="rounded-md bg-stone px-3 py-2 text-start font-mono text-sm break-all">
         {logPath}
       </code>
       <button type="button" onClick={onRetry} className="self-start rounded-md bg-ink px-4 py-2 text-paper">
