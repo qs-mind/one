@@ -12,6 +12,7 @@ a Deliverable (`check_draft` gives it what to read); it has no tool here.
 import asyncio
 import json
 from dataclasses import replace
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints
@@ -21,7 +22,8 @@ from qsone.clientfile import fill
 from qsone.deliverables import changes, comments, compare, ops, store
 from qsone.deliverables import review as checks
 from qsone.deliverables.api import current_view
-from qsone.engine.tools import MAX_RESULT, REGISTRY, ToolContext, register_functions
+from qsone.engine import truth
+from qsone.engine.tools import MAX_RESULT, REGISTRY, ModelRetry, ToolContext, register_functions
 from qsone.engine.types import Data, DeliverableDraft
 from qsone.records.project import Records, RecordsError
 
@@ -78,6 +80,8 @@ async def deliverable_create(
     Example: {"kind": "sheet", "variant": "boq", "title": "جدول الكميات", "language": "ar",
     "rows": [{"section": "أعمال الخرسانة", "level": 1}, {"item_id": "<item id>"}]}"""
     rec = _rec(ctx)
+    said = ctx.store.brief(ctx.brief_id)["text"]
+    await asyncio.to_thread(truthful, rec, "deliverable_create", [title, rows, blocks], kind, said)
     d = await asyncio.to_thread(
         store.create,
         rec,
@@ -94,6 +98,48 @@ async def deliverable_create(
     )
     ctx.host.emit(Data(ctx.brief_id, "deliverable", d, {"id": d}))  # the card in the chat
     return {"id": d, "version": 1}
+
+
+def _texts(value) -> list[str]:
+    """Every text leaf of a Deliverable's content (its title, rows' fields, blocks)."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [t for k, v in value.items() if k not in ("type", "op") for t in _texts(v)]
+    if isinstance(value, list | tuple):
+        return [t for v in value for t in _texts(v)]
+    return []
+
+
+def _has_ref(value) -> bool:
+    if isinstance(value, dict):
+        return value.get("type") in ("num", "cell") or any(_has_ref(v) for v in value.values())
+    return isinstance(value, list | tuple) and any(_has_ref(v) for v in value)
+
+
+def truthful(rec: Records, tool: str, content, kind: str, said: str = "") -> None:
+    """Raises `ModelRetry` when the content has a blank left for a value («[الكمية]», «[مبلغ
+    إجمالي المقايسة]»), or, in a Document, a date that is not today in Cairo and no file states
+    it, or a term (validity, VAT, retention) other than the one the project's files state (the
+    letter of 5 Nov said 60 days, the email ٩٠ يوم; tomorrow's date; no VAT). A date the
+    engineer wrote in the Brief (`said`) is theirs to use."""
+    wrong: list[str] = []
+    blanks = truth.placeholders_in(content)
+    if blanks:
+        wrong.append(
+            f"It has blanks left for values: {', '.join(blanks)}. Put each value in from ONE's "
+            "records (a number as {\"type\": \"num\"} or {\"type\": \"cell\"}), or write plainly "
+            "that it is missing."
+        )
+    if kind == "document":
+        day = truth.today(datetime.fromisoformat(rec.clock()))
+        text = "\n".join(_texts(content))
+        with rec.read() as c:
+            wrong += truth.letter_problems(
+                c, text, day=day, has_total=_has_ref(content), said=said
+            )
+    if wrong:
+        raise ModelRetry(f"{tool}: " + " ".join(wrong) + " Nothing was saved.")
 
 
 def _page(v: dict, offset: int, limit: int) -> dict:
@@ -168,9 +214,12 @@ def deliverable_propose(
     comment_id: the comment this answers. Returns {"change_ids"}.
     Example: {"id": "<deliverable id>", "ops": [{"op": "set_number", "row": "<row id>", "name":
     "rate", "value": "40000.00", "source_id": "<source id>"}], "reason": "عرض المورد الجديد"}"""
-    made = changes.propose(
-        _rec(ctx), id, ops, actor=actor(ctx), reason=reason, comment_id=comment_id
-    )
+    rec = _rec(ctx)
+    with rec.read() as c:
+        row = c.execute("SELECT kind FROM deliverables WHERE id = ?", (id,)).fetchone()
+    said = ctx.store.brief(ctx.brief_id)["text"]
+    truthful(rec, "deliverable_propose", ops, row[0] if row else "sheet", said)
+    made = changes.propose(rec, id, ops, actor=actor(ctx), reason=reason, comment_id=comment_id)
     out: dict = {"change_ids": [c.id for c in made]}
     notes = [c.note["en"] for c in made if c.note]
     if notes:

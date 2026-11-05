@@ -578,7 +578,7 @@ TOOL_ADD_ITEM = {
 
 TOOL_RECORD_NUMBER = {
     "en": "Recording the {name} of item {item}, with its source",
-    "ar": "بيسجّل {name} البند {item} بمصدره",
+    "ar": "بيسجّل {name} للبند {item} بمصدره",
 }
 
 TOOL_CORRECT_NUMBER = {

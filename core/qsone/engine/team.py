@@ -30,7 +30,7 @@ from qsone import copy, settings
 from qsone.clientfile import imported
 from qsone.deliverables import review as deliverable_review
 from qsone.deliverables import tools as outputs
-from qsone.engine import agents, checker, desks, numbers_guard
+from qsone.engine import agents, checker, desks, numbers_guard, truth
 from qsone.engine.costs import brief_budget, caps, usd_text
 from qsone.engine.store import Store
 from qsone.engine.tools import REGISTRY, Denied, ModelRetry, Tool, ToolContext, register
@@ -556,6 +556,14 @@ def _check_refs(ctx: ToolContext, args: DeliverableArgs) -> None:
 
 async def _make_deliverable(ctx: ToolContext, args: DeliverableArgs) -> str:
     _check_refs(ctx, args)
+    if ctx.rec is not None:  # no blank for a value; a letter's dates and terms from the files
+        kind = "document" if args.kind == "document" else "sheet"
+        said = ctx.store.brief(ctx.brief_id)["text"]
+        content = [args.title, args.body, list(args.rows)]
+        await asyncio.to_thread(outputs.truthful, ctx.rec, "make_deliverable", content, kind, said)
+    elif truth.placeholders_in([args.title, args.body]):
+        blanks = ", ".join(truth.placeholders_in([args.title, args.body]))
+        raise ModelRetry(f"make_deliverable: it has blanks left for values: {blanks}. Fill them.")
     draft = DeliverableDraft(
         id=uuid4().hex,
         kind=args.kind,

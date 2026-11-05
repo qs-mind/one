@@ -31,6 +31,8 @@ from qsone import copy
 from qsone.calc import resolve
 from qsone.calc import tool as calc_tool
 from qsone.calc.errors import CalcError
+from qsone.calc.units import UnitTable
+from qsone.engine import truth
 from qsone.engine.tools import ModelRetry, Tool, ToolContext, register
 from qsone.engine.types import Card, Text
 from qsone.records import keep, ledger, search
@@ -307,6 +309,8 @@ async def _ledger_numbers(ctx: ToolContext, args: ItemArgs) -> str:
 # Writing to the Source Ledger ------------------------------------------------------------------
 
 _DATE = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+# What a quote's price covers: the material alone, or its installation (labour) as well.
+Covers = Literal["supply", "supply_and_install", "install"]
 
 
 class SourceArgs(_Args):
@@ -320,6 +324,7 @@ class SourceArgs(_Args):
     card_id: str | None = Field(None, min_length=1, max_length=64)
     question: str | None = Field(None, min_length=1, max_length=40)
     call_id: str | None = Field(None, min_length=1, max_length=64)
+    covers: Covers | None = None
     where: Where = "project"
 
 
@@ -333,11 +338,12 @@ _SOURCE_EXAMPLE = {
 _SOURCE_DOC = f"""Add a source to the Source Ledger before recording any number from it. It \
 must point at real evidence:
 - a file (kind quote, boq, specification, contract, …): file_id and locator (page, or sheet \
-and row) as a tool gave them; dated: the document's own date as written, else leave it out;
+and row) as a tool gave them; dated: the document's own date, else leave it out;
 - kind web: log_id from web_read. kind prices: ref from prices_lookup. kind engineer: card_id \
 (and question) from ask_engineer. kind connector: call_id.
-Links and dates come from the evidence. A computed number goes through calculate, never here.
-- where: engineer to keep it for every project (asks the engineer once).
+A computed number goes through calculate, never here.
+- covers, for a quote: supply, supply_and_install or install, as it says.
+- where: engineer to keep it for every project (asks once).
 Returns source_id and its date.
 Example:
 {_json(_SOURCE_EXAMPLE)}"""
@@ -435,9 +441,28 @@ def _file_source(conn, args: SourceArgs) -> dict:
         "kind": args.kind,
         "title": args.title or name,
         "file_id": args.file_id,
-        "locator": place | {"dated_how": how},
+        "locator": place | {"dated_how": how} | _covers(conn, args, place),
         "dated": dated,
     }
+
+
+def _covers(conn, args: SourceArgs, place: dict) -> dict:
+    """What a quote's price covers, from the quote itself: {"covers": …}, or {} for another
+    kind of file. A quote that says nothing of installation or labour covers supply alone, and
+    one cannot be cited as covering it (the masonry priced at the block's price «شامل العمالة
+    كما ورد في العرض», 5 Nov 2026)."""
+    if args.kind.strip().lower() != "quote":
+        return {"covers": args.covers} if args.covers else {}
+    here = "\n".join(truth.texts_at(conn, args.file_id, place) or [])
+    whole = truth.file_text(conn, args.file_id)
+    labour = truth.covers_labour(here) or truth.covers_labour(whole)
+    if args.covers in ("supply_and_install", "install") and not labour:
+        raise ModelRetry(
+            "add_source: this quote says nothing of installation or labour, so it covers "
+            "supply only. Add it with covers supply (or leave covers out); price labour from "
+            "another source, with calculate."
+        )
+    return {"covers": args.covers or ("supply_and_install" if truth.covers_labour(here) else "supply")}
 
 
 def _web_source(conn, args: SourceArgs) -> dict:
@@ -569,7 +594,16 @@ def _write_source(rec: Records, row: dict, actor: str) -> dict:
     with rec.write(actor) as conn:
         source_id = ledger.write_source(conn, at=rec.clock(), actor=actor, **row)
     how = row["locator"].get("dated_how")
-    return {"source_id": source_id, "dated": row["dated"]} | ({"dated_how": how} if how else {})
+    out = {"source_id": source_id, "dated": row["dated"]} | ({"dated_how": how} if how else {})
+    covers = row["locator"].get("covers")
+    if covers:
+        out |= {"title": row["title"], "covers": covers}
+    if covers == "supply":
+        out["note"] = (
+            "Supply only: a rate from it is the material's price. Say so; an item that is "
+            "installed takes labour from another source, with calculate."
+        )
+    return out
 
 
 async def _add_source_tool(ctx: ToolContext, args: SourceArgs) -> str:
@@ -683,14 +717,85 @@ def _record(rec: Records, args: NumberArgs, actor: str) -> str:
             dated=dated,
             unit=args.unit,
             currency=args.currency,
-        )
+        )  # its own checks first (the value's form, the source), then what the source says
+        _check_number(conn, item, args.name, args.value, args.unit, args.source_id)
     return _json({"number_id": number_id})
+
+
+_RATES = {"rate", "price", "unit_rate", "unit_price"}
+
+
+def _field(name: str) -> dict | str:
+    """A number's name in the engineer's words: rate is «الفئة», quantity «الكمية»."""
+    words = copy.BOQ_FIELDS.get(name.lower())
+    return {"en": words["en"].lower(), "ar": words["ar"]} if words else name
+
+
+def _check_number(conn, item: dict, name: str, value: str, unit: str | None, source_id: str):
+    """Raises `ModelRetry` when the number is not what its source says: a value its file has
+    not at the place cited (2,500 cited to a quote page with no 2,500; 3,795 = 3,450 × 1.1 cited
+    as read), a rate per one unit on an item measured in another (a block's price per «عدد» on
+    a wall in m2), or a supply-only quote's price on an item that is installed."""
+    found = truth.value_at(conn, source_id, value)
+    if found is not None and not found[0]:
+        _, where, seen = found
+        raise ModelRetry(
+            f"record_number: {value} is not at the place its source cites ({where}); that place "
+            f"has {', '.join(seen) or 'no numbers'}. Record the value as written there. A number "
+            "you worked out (a total, an average, a price with waste or a margin) is not read "
+            "from a file: record its inputs, then calculate it with its formula."
+        )
+    if name.lower() not in _RATES:
+        return
+    fields = item["fields"]
+    measured = fields.get("unit") or _quantity_unit(conn, item["id"])
+    if unit and measured and not _same_measure(unit, measured):
+        raise ModelRetry(
+            f"record_number: the rate is per {unit} but item {item['code'] or item['id']} is "
+            f"measured in {measured}. Record the source's price on a resource item in its own "
+            "unit, then work out the item's rate with calculate (the conversion as an input)."
+        )
+    row = conn.execute("SELECT locator FROM sources WHERE id = ?", (source_id,)).fetchone()
+    covers = json.loads(row[0]).get("covers") if row else None
+    description = str(fields.get("description") or "")
+    if covers == "supply" and item["kind"] == "boq_item" and description:
+        if not truth.supply_only_item(description):
+            raise ModelRetry(
+                f"record_number: the source is a supply-only quote, and item "
+                f"{item['code'] or item['id']} («{description[:80]}») is supplied and installed. "
+                "Record the quote's price on a resource item (add_item kind resource), and build "
+                "the item's rate with calculate, with labour from another source; or ask the "
+                "engineer for an installed rate."
+            )
+
+
+def _quantity_unit(conn, item_id: str) -> str | None:
+    row = conn.execute(
+        "SELECT unit FROM numbers WHERE item_id = ? AND name = 'quantity' AND valid_until IS NULL",
+        (item_id,),
+    ).fetchone()
+    return row[0] if row else None
+
+
+_BASE = {"m", "kg", "s", "h"}  # measured dimensions; any other unit counts things
+
+
+def _same_measure(a: str, b: str) -> bool:
+    """Whether two units measure the same thing (m3 and م3; عدد and nr), as far as ONE's unit
+    table knows them: an unknown unit is never refused."""
+    table = UnitTable()
+    try:
+        da, db = table.parse(a).dims, table.parse(b).dims
+    except Exception:  # noqa: BLE001 - a unit the table does not know: nothing to compare
+        return True
+    kind = lambda d: tuple(x for x in d if x[0] in _BASE) or "count"  # noqa: E731
+    return kind(da) == kind(db)
 
 
 async def _record_number(ctx: ToolContext, args: NumberArgs) -> str:
     target = _target(ctx, args.where)
     if args.where == "engineer":
-        action = copy.fill(copy.TOOL_RECORD_NUMBER, name=args.name, item=args.item)
+        action = copy.fill(copy.TOOL_RECORD_NUMBER, name=_field(args.name), item=args.item)
         if not await _engineer_ok(ctx, action):
             return _ENGINEER_REFUSED
     return await asyncio.to_thread(_record, target, args, _actor(ctx))
@@ -726,7 +831,10 @@ Example:
 
 def _correct(rec: Records, args: CorrectionArgs, actor: str) -> str:
     with rec.write(actor) as conn:
-        if conn.execute("SELECT 1 FROM numbers WHERE id = ?", (args.number_id,)).fetchone() is None:
+        old = conn.execute(
+            "SELECT item_id, name, unit FROM numbers WHERE id = ?", (args.number_id,)
+        ).fetchone()
+        if old is None:
             raise CalcError("CALC_NUMBER_NOT_FOUND", field="number_id", ref=args.number_id)
         new_id = ledger.write_correction(
             conn,
@@ -740,6 +848,8 @@ def _correct(rec: Records, args: CorrectionArgs, actor: str) -> str:
             unit=args.unit,
             currency=args.currency,
         )
+        item = resolve.find_item(conn, old[0], field="number_id")
+        _check_number(conn, item, old[1], args.value, args.unit or old[2], args.source_id)
     return _json({"number_id": new_id, "replaces": args.number_id})
 
 
@@ -832,7 +942,7 @@ for _tool in (
         SourceArgs,
         "write",
         _add_source_tool,
-        lambda a: copy.fill(copy.TOOL_ADD_SOURCE, title=a.title),
+        lambda a: copy.fill(copy.TOOL_ADD_SOURCE, title=a.title or a.file_id or a.kind),
         writes=True,
         example=_SOURCE_EXAMPLE,
     ),
@@ -852,7 +962,7 @@ for _tool in (
         NumberArgs,
         "write",
         _record_number,
-        lambda a: copy.fill(copy.TOOL_RECORD_NUMBER, name=a.name, item=a.item),
+        lambda a: copy.fill(copy.TOOL_RECORD_NUMBER, name=_field(a.name), item=a.item),
         writes=True,
         example=_NUMBER_EXAMPLE,
     ),

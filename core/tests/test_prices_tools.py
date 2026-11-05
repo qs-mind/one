@@ -530,7 +530,8 @@ async def test_quote_rows_point_at_the_file(ctx):
     assert first["source"] == {
         "kind": "quote",
         "file_id": f,
-        "locator": {"sheet": "Quote", "row": 2, "dated_how": "document"},
+        # a quote that says nothing of installation covers supply only (tender day, 5 Nov)
+        "locator": {"sheet": "Quote", "row": 2, "dated_how": "document", "covers": "supply"},
     }
     assert second["source"]["locator"]["row"] == 3 and first["fields"]["supplier"] == "مصنع - عينة"
     # the card shows each rate's source as it will be kept: its quote's file and row (decision 16.3)
@@ -541,6 +542,7 @@ async def test_quote_rows_point_at_the_file(ctx):
         "sheet": "Quote",
         "row": 2,
         "dated_how": "document",
+        "covers": "supply",
     }
     assert (one["kind"], one["title"], one["supplier"], two["supplier"]) == (
         "quote",

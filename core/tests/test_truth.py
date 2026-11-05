@@ -1,12 +1,19 @@
 """The truth checks (engine/truth.py), on the exact words a weak model wrote in the tender-day
 walk (gemini-3.1-flash-lite, 5 Nov 2026). Synthetic «عينة» files only."""
 
+import json
 from datetime import UTC, date, datetime
 
-from qsone.engine import truth
+import pytest
+from pydantic_ai import ModelRetry
+
+from qsone.engine import tools_records, truth  # noqa: F401 - registers the record tools
+from qsone.engine.tools import REGISTRY, call
+from qsone.engine.tools_records import NumberArgs, SourceArgs
 from qsone.engine.truth import Brief, Coverage
 from qsone.records import ledger
 from qsone.records.files import add_file
+from tests.fakes_tools import tool_ctx
 from tests.samples import sample_pdf
 
 QUOTE = sample_pdf(
@@ -161,3 +168,97 @@ def test_a_letter_against_the_files_and_today(rec):
         assert any("validity 60" in w and "90" in w for w in wrong)
         assert any("VAT" in w and "14" in w for w in wrong)
         assert truth.letter_problems(c, good, day=day, has_total=True) == []
+
+
+# The record tools: a number must be where its source says, and say what it covers ----------
+
+
+@pytest.fixture
+def ctx(rec):
+    return tool_ctx(rec)
+
+
+async def _quote(ctx) -> dict:
+    quote = add_file(ctx.rec, "04 عرض أسعار المورد - عينة.pdf", QUOTE, actor="engineer").id
+    args = {"kind": "quote", "file_id": quote, "locator": {"page": 1}, "dated": "2026-11-02"}
+    return json.loads(await call("add_source", args, ctx)) | {"file_id": quote}
+
+
+async def _item(ctx, code: str, description: str, unit: str) -> None:
+    fields = {"description": description, "unit": unit}
+    await call("add_item", {"kind": "boq_item", "code": code, "fields": fields}, ctx)
+
+
+async def test_a_quote_that_says_nothing_of_labour_is_supply_only(ctx):
+    found = await _quote(ctx)
+    assert found["covers"] == "supply" and "Supply only" in found["note"]
+    args = {"kind": "quote", "file_id": found["file_id"], "locator": {"page": 1}}
+    with pytest.raises(ModelRetry, match="says nothing of installation"):
+        await call("add_source", args | {"covers": "supply_and_install"}, ctx)
+
+
+async def test_a_number_not_at_its_cited_place_is_refused(ctx):
+    quote = (await _quote(ctx))["source_id"]
+    await _item(ctx, "03-01", "توريد خرسانة عادية C15 - عينة", "m3")
+    rate = {"item": "03-01", "name": "rate", "unit": "m3", "currency": "EGP", "source_id": quote}
+    for wrong in ("2500", "3795", "2625"):  # cited to a page without it, a calc, an average
+        with pytest.raises(ModelRetry, match="not at the place its source cites") as refused:
+            await call("record_number", rate | {"value": wrong}, ctx)
+        assert "2600" in str(refused.value) and "calculate" in str(refused.value)
+    with ctx.rec.read() as c:
+        assert c.execute("SELECT count(*) FROM numbers").fetchone() == (0,)  # nothing kept
+    assert json.loads(await call("record_number", rate | {"value": "2600"}, ctx))["number_id"]
+
+
+async def test_a_blocks_price_is_not_a_walls_rate(ctx):
+    # masonry was priced at the block's price per «عدد», «شامل العمالة كما ورد في العرض»
+    quote = (await _quote(ctx))["source_id"]
+    await _item(ctx, "04-01", "مباني طوب أسمنتي مصمت 25 سم بالمونة - عينة", "m2")
+    rate = {"item": "04-01", "name": "rate", "value": "21", "currency": "EGP", "source_id": quote}
+    with pytest.raises(ModelRetry, match="measured in m2"):
+        await call("record_number", rate | {"unit": "nr"}, ctx)
+    with pytest.raises(ModelRetry, match="supply-only quote"):
+        await call("record_number", rate | {"unit": "m2"}, ctx)
+    # a supply-only item takes a supply quote's price
+    await _item(ctx, "04-02", "توريد طوب أسمنتي مصمت 25 سم - عينة", "nr")
+    supply = rate | {"item": "04-02", "unit": "nr"}
+    assert json.loads(await call("record_number", supply, ctx))["number_id"]
+
+
+def test_the_work_log_says_rate_and_names_the_source():
+    # «بيسجّل rate البند 707d81e9…» and «بيضيف المصدر «None»»
+    number = NumberArgs(item="01-01-001", name="rate", value="21", source_id="s")
+    assert REGISTRY["record_number"].activity(number)["ar"] == "بيسجّل الفئة للبند 01-01-001 بمصدره"
+    source = REGISTRY["add_source"].activity(SourceArgs(kind="quote", file_id="f" * 32))
+    assert "None" not in source["ar"] and "f" * 32 in source["ar"]  # the runner names the file
+
+
+# Deliverables and letters --------------------------------------------------------------------
+
+
+def _letter(*lines: str) -> dict:
+    blocks = [{"type": "p", "children": [{"text": line}]} for line in lines]
+    return {"kind": "document", "variant": "letter", "title": "خطاب العطاء - عينة",
+            "language": "ar", "blocks": blocks}  # fmt: skip
+
+
+async def test_a_deliverable_with_a_blank_for_a_value_is_refused(ctx):
+    letter = _letter("نتقدم بعرضنا بقيمة [مبلغ إجمالي المقايسة] جنيه - عينة")
+    with pytest.raises(ModelRetry, match=r"blanks left for values: \[مبلغ إجمالي المقايسة\]"):
+        await call("deliverable_create", letter, ctx)
+    with ctx.rec.read() as c:
+        assert c.execute("SELECT count(*) FROM deliverables").fetchone() == (0,)
+
+
+async def test_a_letter_takes_its_date_and_terms_from_the_files(ctx):
+    add_file(ctx.rec, "05 إيميل العميل - عينة.txt", EMAIL, actor="engineer")
+    wrong = _letter("القاهرة في 6 نوفمبر 2026", "مدة صلاحية العرض 60 يوماً - عينة")
+    with pytest.raises(ModelRetry) as refused:
+        await call("deliverable_create", wrong, ctx)
+    said = str(refused.value)
+    assert "6 نوفمبر 2026" in said and "validity 60" in said and "Nothing was saved" in said
+    right = _letter(
+        "القاهرة في 5 نوفمبر 2026",
+        "مدة سريان العرض 90 يوم، والأسعار غير شاملة ضريبة القيمة المضافة 14% - عينة",
+    )
+    assert json.loads(await call("deliverable_create", right, ctx))["version"] == 1

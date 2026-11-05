@@ -29,8 +29,8 @@ from uuid import uuid4
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from qsone import copy
-from qsone.engine import tools_records
-from qsone.engine.tools import Tool, ToolContext, register
+from qsone.engine import tools_records, truth
+from qsone.engine.tools import ModelRetry, Tool, ToolContext, register
 from qsone.engine.types import Card, Progress, Text, read_answer
 from qsone.prices import cache
 from qsone.prices.client import COUNTRIES, VATS, PriceItem
@@ -404,7 +404,16 @@ def _file_evidence(ctx: ToolContext, target: Records, args: ProposeArgs) -> list
         source = tools_records.SourceArgs(
             kind="quote", file_id=file_id, locator=locator, dated=r.dated, where=args.where
         )
-        found.append(tools_records.evidence(ctx, target, source))
+        quote = tools_records.evidence(ctx, target, source)
+        with target.read() as conn:  # the rate must be on the row it points at
+            checked = truth.value_in(conn, file_id, quote["locator"], r.rate)
+        if checked is not None and not checked[0]:
+            raise ModelRetry(
+                f"prices_propose: the rate {r.rate} of «{r.description}» is not on the row it "
+                f"points at ({checked[1]}); that row has {', '.join(checked[2]) or 'no numbers'}. "
+                "Give each row's rate as the quote writes it, on its own row."
+            )
+        found.append(quote)
     return found
 
 

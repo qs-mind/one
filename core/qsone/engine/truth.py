@@ -415,20 +415,22 @@ def value_at(conn, source_id: str, value: str) -> tuple[bool, str, list[str]] | 
     """Whether `value` is in the text its file source points at: (found, where in words, the
     numbers that place has). None when the source is not a place in a file, or the place has no
     text to read (a scanned page): nothing to check against."""
-    row = conn.execute(
-        "SELECT s.file_id, s.locator, s.kind, f.name FROM sources s"
-        " LEFT JOIN files f ON f.id = s.file_id WHERE s.id = ?",
-        (source_id,),
-    ).fetchone()
+    row = conn.execute("SELECT file_id, locator, kind FROM sources WHERE id = ?", (source_id,))
+    row = row.fetchone()
     if row is None or row[0] is None:
         return None
-    file_id, locator, kind, name = row
+    file_id, locator, kind = row
     if kind in ("calculation", "sandbox", "web", "prices", "engineer", "connector"):
         return None
-    place = json.loads(locator)
+    return value_in(conn, file_id, json.loads(locator), value)
+
+
+def value_in(conn, file_id: str, place: dict, value: str) -> tuple[bool, str, list[str]] | None:
+    """`value_at` for a file and a place in it."""
     texts = texts_at(conn, file_id, place)
     if not texts:
         return None
+    (name,) = conn.execute("SELECT name FROM files WHERE id = ?", (file_id,)).fetchone() or ("",)
     wanted = numbers_guard.known_values([value])
     have = numbers_guard.known_values(texts)
     where = ", ".join(f"{k} {place[k]}" for k in _PLACE_KEYS if k in place)
@@ -551,10 +553,13 @@ def file_dates(conn) -> set[date]:
 _TOTAL = re.compile(r"إجمالي|اجمالي|قيم[ةه]\s+العطاء|\btotal\b|\bsum\b", re.I)
 
 
-def letter_problems(conn, text: str, *, day: date, has_total: bool) -> list[str]:
-    """What a letter says against the project's files and today's date (English, for the model)."""
+def letter_problems(
+    conn, text: str, *, day: date, has_total: bool, said: str = ""
+) -> list[str]:
+    """What a letter says against the project's files and today's date (English, for the model).
+    A date the engineer wrote (`said`, the Brief's text) is theirs to use."""
     wrong: list[str] = []
-    known_dates = file_dates(conn)
+    known_dates = file_dates(conn) | {d for _, d in dates_in(said)}
     for written, d in dates_in(text):
         if d != day and d not in known_dates:
             wrong.append(
