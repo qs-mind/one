@@ -1,6 +1,6 @@
 // The source line, mark and card where the numbers are: a chat reply, a price card's rows, a sheet cell, a
 // document reference, a file's frame. Values and titles are sample data.
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Reply } from "../chat/Reply";
@@ -9,6 +9,7 @@ import type { CardData } from "../chat/parts/types";
 import { canvasApi } from "../canvas/api";
 import type { Explained, ViewColumn, ViewRow } from "../deliverables/types";
 import { fill, setLanguage, texts } from "../i18n";
+import { dayText } from "./SourceCard";
 import { NumberRef } from "../viewers/document/NumberRef";
 import { SheetCell } from "../viewers/sheet/cells";
 import { hideSourceLine } from "./line";
@@ -31,6 +32,7 @@ afterEach(() => {
   hideSourceLine();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  cleanup(); // a source card is drawn at the page's end: unmount it before the page is emptied
   document.body.innerHTML = "";
 });
 
@@ -68,11 +70,11 @@ describe("a price card's rates", () => {
     await user.click(rate);
     const card = screen.getByRole("dialog", { name: texts.sheetSource.ar });
     expect(card).toHaveTextContent("السعر");
-    expect(card).toHaveTextContent("3,950 EGP");
+    expect(card).toHaveTextContent("3,950 ج.م.");
     expect(card).toHaveTextContent("عرض سعر - عينة.xlsx");
     expect(card).toHaveTextContent(fill(texts.sheetRow.ar, { sheet: "Quote", row: 2 }));
     expect(card).toHaveTextContent(fill(texts.sourceSupplier.ar, { name: "مصنع - عينة" }));
-    expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: DAY }));
+    expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: dayText(DAY) }));
     const openFile = vi.spyOn(canvasApi, "openFile").mockImplementation(() => {
       // the canvas opens the file's frame, and its text shows the quote's row
       const li = document.createElement("li");

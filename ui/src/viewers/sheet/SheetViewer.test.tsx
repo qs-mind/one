@@ -5,7 +5,7 @@ import { createRef, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { deliverablesApi, dispositionName } from "../../deliverables/api";
 import type { Change, Explained, SheetView, Thread, ViewColumn, ViewRow } from "../../deliverables/types";
-import { setLanguage, texts } from "../../i18n";
+import { fill, setLanguage, texts } from "../../i18n";
 import { canvasApi } from "../../canvas/api";
 import { SheetViewer, type SheetHandle } from "./SheetViewer";
 
@@ -355,19 +355,19 @@ describe("SheetViewer", () => {
     expect(dialog).toHaveTextContent("بيانات تجريبية - عينة");
     expect(dialog).toHaveTextContent("عرض سعر - عينة.pdf");
     expect(dialog).toHaveTextContent("صفحة 3");
-    expect(dialog).toHaveTextContent("بتاريخ 2026-11-01");
-    await waitFor(() => expect(dialog).toHaveTextContent("أدخله estimator"));
-    expect(dialog.parentElement).toBe(screen.getByRole("grid").closest(".relative")); // inside the viewer, no portal
+    expect(dialog).toHaveTextContent("بتاريخ 1 نوفمبر 2026");
+    await waitFor(() => expect(dialog).toHaveTextContent(fill(texts.sheetEnteredBy.ar, { who: "estimator" })));
+    expect(dialog.parentElement).toBe(document.body); // in the top layer: no frame or box cuts it
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
 
     await user.click(cellOf("03/02", "amount"));
     dialog = await screen.findByRole("dialog");
-    await waitFor(() => expect(dialog).toHaveTextContent("quantity * rate = 4,782,060.00 EGP"));
+    await waitFor(() => expect(dialog).toHaveTextContent("quantity * rate = 4,782,060.00 ج.م."));
     expect(dialog).toHaveTextContent(texts.sheetFormula.ar);
-    expect(dialog).toHaveTextContent("39,850.50 EGP/m3");
+    expect(dialog).toHaveTextContent("39,850.50 ج.م./m3");
     expect(dialog).toHaveTextContent("كميات - عينة");
-    expect(dialog).toHaveTextContent(`أدخله ${texts.reviewCalcEngine.ar}`);
+    expect(dialog).toHaveTextContent(texts.enteredByCalc.ar);
     expect(fetch.mock.calls.map(([u]) => String(u))).toContain(`${base}/numbers/n-amount/explain?page=1`);
   });
 

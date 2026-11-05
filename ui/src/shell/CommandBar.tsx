@@ -165,7 +165,7 @@ export function CommandBar({
     >
       {selection.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-3 pt-3">
-          <span className="flex items-center gap-1 rounded-lg bg-stone py-1 pe-1 ps-3 text-sm">
+          <span className="flex min-w-0 max-w-full items-center gap-1 rounded-lg bg-stone py-1 pe-1 ps-3 text-sm">
             <SelectionText items={selection} />
             <button
               type="button"

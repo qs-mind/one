@@ -7,7 +7,7 @@ import type { Explained, NumberCell, Source } from "../deliverables/types";
 import { fill, setLanguage, texts } from "../i18n";
 import { DUR, EASE } from "../ui/motion";
 import { SourcePopover } from "../viewers/sheet/SourcePopover";
-import { figuresOf, SINK_MS, SUNK } from "./SourceCard";
+import { dayText, figuresOf, SINK_MS, SUNK } from "./SourceCard";
 
 const DAY = "2026-11-01";
 
@@ -79,14 +79,52 @@ describe("a number opens in place into its source card", () => {
     await user.click(screen.getByTestId("number"));
     const card = screen.getByRole("dialog", { name: texts.sheetSource.ar });
     expect(card).toHaveTextContent("الفئة");
-    expect(card).toHaveTextContent("39,850.50 EGP");
+    expect(card).toHaveTextContent("39,850.50 ج.م.");
     expect(card).toHaveTextContent("عرض سعر - عينة");
     expect(card).toHaveTextContent(fill(texts.sourceSupplier.ar, { name: "شركة النيل - عينة" }));
     expect(card).toHaveTextContent(fill(texts.sheetRow.ar, { sheet: "Quote", row: 12 }));
-    expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: DAY }));
+    expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: dayText(DAY) }));
     const openFile = vi.spyOn(canvasApi, "openFile").mockImplementation(() => {});
     await user.click(within(card).getByRole("button", { name: texts.sourceOpenFile.ar }));
     expect(openFile).toHaveBeenCalledWith("f1", undefined);
+  });
+
+  it("is drawn in the top layer by its number, flipped above it near the window's foot, never cut by its frame", async () => {
+    const user = userEvent.setup();
+    core();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.testid === "number") return new DOMRect(600, innerHeight - 60, 80, 20); // a rate near the foot
+      return new DOMRect(0, 0, 0, 0);
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(320);
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(300);
+    const { container } = render(
+      <div style={{ overflow: "hidden" }} data-testid="frame">
+        <Opener cell={cell} sources={{ s1: quote }} />
+      </div>,
+    );
+    await user.click(screen.getByTestId("number"));
+    const card = screen.getByRole("dialog", { name: texts.sheetSource.ar });
+    expect(container.contains(card)).toBe(false); // not inside the frame that would cut it
+    expect(card.parentElement).toBe(document.body);
+    expect(card).toHaveClass("fixed");
+    expect(card.style.top).toBe(`${innerHeight - 60 - 6 - 300}px`); // above the number, whole
+    expect(Number.parseFloat(card.style.maxHeight)).toBeLessThanOrEqual(innerHeight - 16);
+    expect(within(card).getByRole("button", { name: texts.sourceOpenFile.ar })).toBeInTheDocument();
+  });
+
+  it("says who entered the number in words, its date in the app's style and money as the page writes it", async () => {
+    const user = userEvent.setup();
+    core();
+    render(<Opener cell={cell} sources={{ s1: quote }} />);
+    await user.click(screen.getByTestId("number"));
+    const card = screen.getByRole("dialog");
+    await waitFor(() => expect(card).toHaveTextContent(texts.enteredByLead.ar));
+    expect(card).not.toHaveTextContent("Lead QS");
+    expect(card).toHaveTextContent("1 نوفمبر 2026");
+    expect(card).not.toHaveTextContent(DAY);
+    expect(card).toHaveTextContent("39,850.50 ج.م.");
+    expect(card).not.toHaveTextContent("EGP");
   });
 
   it("the number glides from where it was clicked into the header (FLIP, 300 ms, the calm ease)", async () => {
@@ -135,15 +173,15 @@ describe("a number opens in place into its source card", () => {
     await waitFor(() => expect(card).toHaveTextContent("materials + labour"));
     await user.click(within(card).getByRole("button", { name: /materials/ }));
     await waitFor(() => expect(card).toHaveTextContent("عرض أسمنت - عينة"));
-    expect(document.querySelector("[data-card-value]")).toHaveTextContent("31,000 EGP");
+    expect(document.querySelector("[data-card-value]")).toHaveTextContent("31,000 ج.م.");
     const [first, second] = [...card.querySelectorAll<HTMLElement>("[data-level]")];
     expect(first!.style.transform).toBe(SUNK);
     expect(first).toHaveAttribute("aria-hidden", "true");
     expect(second).not.toHaveAttribute("aria-hidden");
     expect(animate).toHaveBeenCalledWith([{ transform: "none", opacity: 1 }, { transform: SUNK, opacity: 0.5 }], { duration: SINK_MS, easing: EASE });
-    await user.click(within(card).getByRole("button", { name: fill(texts.sourceBackTo.ar, { value: "39,850.50 EGP" }) }));
+    await user.click(within(card).getByRole("button", { name: fill(texts.sourceBackTo.ar, { value: "39,850.50 ج.م." }) }));
     expect(card.querySelectorAll("[data-level]")).toHaveLength(1);
-    expect(document.querySelector("[data-card-value]")).toHaveTextContent("39,850.50 EGP");
+    expect(document.querySelector("[data-card-value]")).toHaveTextContent("39,850.50 ج.م.");
     expect(within(card).queryByRole("button", { name: /ارجع/ })).toBeNull();
     expect(animate).toHaveBeenLastCalledWith([{ transform: SUNK, opacity: 0.5 }, { transform: "none", opacity: 1 }], { duration: SINK_MS, easing: EASE });
   });

@@ -176,6 +176,44 @@ describe("a card that comes mid-Brief", () => {
     expect(screen.queryByRole("button", { name: texts.newBelow.ar })).not.toBeInTheDocument();
   });
 
+  it("scrolled up, a message the engineer sends brings the chat to it: no “New below” for their own words", async () => {
+    setCurrentProject(P1);
+    const live = liveStream();
+    core({ routes: { "POST /api/chat": () => live.response() } });
+    const user = userEvent.setup();
+    render(<App />);
+    const box = await screen.findByRole("textbox", { name: texts.message.ar });
+    await user.type(box, "استورد الـ BOQ{enter}");
+    act(() => {
+      live.send({ type: "start", messageId: "a1" });
+      live.send(status("running"));
+      live.send(progress(1));
+    });
+    await screen.findByText("يبص على أعمدة المقايسة 1");
+    const log = screen.getByRole("log");
+    const scrollTo = vi.fn();
+    Object.assign(log, { scrollTo });
+    Object.defineProperties(log, {
+      scrollHeight: { value: 2000, configurable: true },
+      clientHeight: { value: 300, configurable: true },
+      scrollTop: { value: 100, configurable: true, writable: true },
+    });
+    act(() => void log.dispatchEvent(new Event("scroll"))); // the engineer scrolled up to read
+    act(() => {
+      live.send(progress(2));
+      live.send(status("done"));
+      live.send({ type: "finish" });
+      live.close();
+    });
+    await screen.findByRole("button", { name: texts.newBelow.ar });
+    scrollTo.mockClear();
+    core({ routes: { "POST /api/chat": () => liveStream().response() } });
+    await user.type(box, "وكمان سعّرها{enter}");
+    await screen.findByText("وكمان سعّرها");
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ top: 2000 }));
+    expect(screen.queryByRole("button", { name: texts.newBelow.ar })).not.toBeInTheDocument();
+  });
+
   it("once a card is answered the chat follows the Brief again, to the Lead QS's closing words", async () => {
     setCurrentProject(P1);
     const live = liveStream();

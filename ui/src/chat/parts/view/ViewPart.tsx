@@ -74,6 +74,7 @@ export function ViewPart({ view, projectId }: { view: ViewData; projectId?: stri
             sources={view.sources}
             style={opened.style}
             focus={opened.focus}
+            from={opened.from}
             onClose={close}
           />
         )}

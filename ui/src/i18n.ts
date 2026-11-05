@@ -366,7 +366,12 @@ export const texts = {
   sheetInputs: { en: "Inputs", ar: "المدخلات" },
   sheetSteps: { en: "Steps", ar: "الخطوات" },
   sheetDated: { en: "Dated {date}", ar: "بتاريخ {date}" },
-  sheetEnteredBy: { en: "Entered by {who}", ar: "أدخله {who}" },
+  sheetEnteredBy: { en: "Recorded by {who}", ar: "سجّله {who}" },
+  enteredByYou: { en: "You entered it", ar: "إنت اللي دخّلته" },
+  enteredByLead: { en: "Recorded by the Lead QS", ar: "سجّله كبير مهندسي الكميات" },
+  enteredByChecker: { en: "Recorded by the Checking QS", ar: "سجّله مهندس المراجعة" },
+  enteredByCalc: { en: "Worked out by the QS Calc Engine", ar: "حسبه محرك الحسابات" },
+  enteredByPrices: { en: "From QS Mind Prices", ar: "من أسعار كيو إس مايند" },
   sheetRecalculated: { en: "Recalculated", ar: "اتحسب تاني" },
   sheetSample: {
     en: "Sample data: these numbers are not real.",
