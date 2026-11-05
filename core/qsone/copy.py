@@ -1127,6 +1127,15 @@ FILL_FORMULA_SKIPPED = {
     "ar": "{cell} فيها معادلة العميل، فسيبناها زي ما هي.",
 }
 
+# Accepting while Project Records moved.
+UPDATE_FIRST = {
+    "en": (
+        "First review «Update from Project Records»: "
+        "the Project Records changed since this version."
+    ),
+    "ar": "راجع «تحديث من سجلات المشروع» الأول: سجلات المشروع اتغيرت من ساعة الإصدار ده.",
+}
+
 # Tools (Plan 5). Activity words: the Progress Line and the online and outside cards show them,
 # so they hold the exact thing that would leave One.
 DOING_WEB_SEARCH = {"en": "Search the web for: {query}", "ar": "يدوّر في الويب على: {query}"}
