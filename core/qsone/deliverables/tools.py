@@ -295,6 +295,43 @@ def check_draft(
     return draft, v["version"], [u["text"] for u in v["untraced"]] if "untraced" in v else []
 
 
+def unchecked(rec: Records, returns: list[tuple[str, str]]) -> list[DeliverableDraft]:
+    """The Deliverables a Brief made or proposed changes to, read from its tool results `(tool
+    name, result text)`, whose Saved version has no check yet, as the Checking QS reads them.
+    The Brief Runner checks those with numbers when the Brief ends."""
+    ids: list[str] = []
+    change_ids: list[str] = []
+    for name, text in returns:
+        if name not in ("deliverable_create", "deliverable_propose"):
+            continue
+        try:
+            out = json.loads(text)
+        except ValueError:
+            continue
+        if not isinstance(out, dict):
+            continue
+        if name == "deliverable_create" and isinstance(out.get("id"), str):
+            ids.append(out["id"])
+        elif name == "deliverable_propose" and isinstance(out.get("change_ids"), list):
+            change_ids += [c for c in out["change_ids"] if isinstance(c, str)]
+    if change_ids:
+        with rec.read() as conn:
+            ids += [
+                d
+                for (d,) in conn.execute(
+                    "SELECT deliverable_id FROM changes"
+                    " WHERE id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid",
+                    (json.dumps(change_ids),),
+                )
+            ]
+    found = []
+    for deliverable_id in dict.fromkeys(ids):
+        read = check_draft(rec, deliverable_id)
+        if read is not None and not checked(rec, deliverable_id, read[1]):
+            found.append(read[0])
+    return found
+
+
 def checked(rec: Records, deliverable_id: str, version_n: int) -> bool:
     """Whether Saved version `version_n` already has a check."""
     with rec.read() as conn:

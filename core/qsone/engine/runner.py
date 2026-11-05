@@ -64,6 +64,7 @@ from pydantic_ai.messages import (
 )
 
 from qsone import activity, copy
+from qsone.deliverables import tools as outputs
 from qsone.engine import (
     agents,
     cards,
@@ -1062,7 +1063,16 @@ class _Brief:
             marked = numbers_guard.unsourced(output, self.known())
             if marked:
                 self.emit(Unsourced(self.brief_id, tuple(marked)))
-        for draft in self.store.unchecked(self.brief_id):
+        drafts = self.store.unchecked(self.brief_id)
+        if self.place.rec is not None:  # Plan 6: the Deliverables this Brief made or changed
+            returns = [
+                found
+                for run in self.store.runs(self.brief_id)
+                if run["history"]
+                for found in agents.tool_returns(run["history"])
+            ]
+            drafts += await asyncio.to_thread(outputs.unchecked, self.place.rec, returns)
+        for draft in drafts:
             if checker.has_numbers(draft):
                 try:
                     await team.check_deliverable(self.lead_ctx, draft.id)

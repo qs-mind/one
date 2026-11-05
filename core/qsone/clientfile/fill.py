@@ -21,7 +21,7 @@ from openpyxl.utils import get_column_letter
 from qsone import copy
 from qsone.clientfile import patch
 from qsone.clientfile.patch import Write
-from qsone.deliverables import store
+from qsone.deliverables import events, store
 from qsone.records import arabic, audit, files
 from qsone.records.project import Records, RecordsError
 
@@ -203,7 +203,34 @@ def save_plan(rec: Records, deliverable_id: str, file_id: str, plan: dict, *, ac
             before=None,
             after=row,
         )
+    events.publish_deliverable(rec, rec.id, deliverable_id)  # an open board finds the plan
     return plan_id
+
+
+def list_plans(rec: Records, deliverable_id: str) -> list[dict]:
+    """A Deliverable's Fill Plans, newest first: `[{"id", "file_name", "created_at", "status"}]`,
+    where status is "needs_signoff" until a Revision is signed off, then "ready" (the preview
+    says what else stands in the way). Raises DELIVERABLE_NOT_FOUND (404)."""
+    with rec.read() as conn:
+        found = conn.execute(
+            "SELECT 1 FROM deliverables WHERE id = ?", (deliverable_id,)
+        ).fetchone()
+        if found is None:
+            raise _refused(copy.DELIVERABLE_NOT_FOUND, "deliverable", status=404)
+        (signed,) = conn.execute(
+            "SELECT EXISTS (SELECT 1 FROM revisions WHERE deliverable_id = ? AND signed_off = 1)",
+            (deliverable_id,),
+        ).fetchone()
+        rows = conn.execute(
+            "SELECT p.id, f.name, p.created_at FROM fill_plans p JOIN files f ON f.id = p.file_id"
+            " WHERE p.deliverable_id = ? ORDER BY p.created_at DESC, p.rowid DESC",
+            (deliverable_id,),
+        ).fetchall()
+    status = "ready" if signed else "needs_signoff"
+    return [
+        {"id": plan_id, "file_name": name, "created_at": at, "status": status}
+        for plan_id, name, at in rows
+    ]
 
 
 def _plan(rec: Records, plan_id: str) -> tuple[str, str, dict]:

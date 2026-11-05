@@ -2,7 +2,7 @@
 // and loads it again when the project's live stream says the Deliverable changed. In `mode="frame"` it is the
 // Sheet or Document viewer only, filling its container; in `mode="full"` it is the review board: the viewer, then
 // Changes, Comments, Versions and Close-out, with the exports. Everything it draws stays inside its own box.
-import { useCallback, useImperativeHandle, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Anchor, ViewerProps } from "../canvas/types";
 import { fill, language, pick, t, useLanguage } from "../i18n";
 import { ChangesPanel } from "../review/ChangesPanel";
@@ -15,13 +15,14 @@ import { VersionsPanel } from "../review/VersionsPanel";
 import { DocumentViewer, type DocumentHandle } from "../viewers/document/DocumentViewer";
 import type { TextAnchor } from "../viewers/document/plate";
 import { SheetViewer, type SheetHandle, type SheetRange } from "../viewers/sheet/SheetViewer";
-import type { CommentAnchor, View } from "./types";
+import { deliverablesApi } from "./api";
+import type { CommentAnchor, FillPlanInfo, View } from "./types";
 import { useDeliverable, type Subscribe } from "./useDeliverable";
 
 export type DeliverableViewerProps = ViewerProps & {
   /** Sends a message to the Lead QS, as the chat does ("Fix it"). */
   onSend?: (text: string) => void;
-  /** The Fill Plan of the client's own file, when there is one. */
+  /** The Fill Plan of the client's own file; left out, the board finds the newest one itself. */
   fillPlanId?: string | null;
   onToggleFullScreen?: () => void;
   /** The project's live stream; Plan 7's live store can stand in for the shared one. */
@@ -65,6 +66,21 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
   const [selected, setSelected] = useState<Selected | null>(null);
   const [fillOpen, setFillOpen] = useState<string | null>(null);
   const [status, setStatus] = useState("");
+  const [plan, setPlan] = useState<FillPlanInfo | null>(null);
+
+  // The board finds the Sheet's newest Fill Plan, and looks again each time the Deliverable is loaded (a plan the
+  // Lead QS saves is announced on the live stream).
+  const findPlan = mode === "full" && view?.kind === "sheet" && props.fillPlanId === undefined;
+  useEffect(() => {
+    if (!findPlan) return;
+    let live = true;
+    void deliverablesApi.fillPlans(projectId, deliverableId).then((answer) => {
+      if (live && answer.ok) setPlan(answer.data.plans[0] ?? null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [projectId, deliverableId, findPlan, view]);
 
   /** Where the anchor is, relative to this viewer's root, in its own unscaled pixels (it may sit in a scaled frame). */
   function locate(anchor: Anchor): DOMRect | null {
@@ -183,7 +199,8 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
               <ExportMenu
                 projectId={projectId}
                 view={view}
-                fillPlanId={props.fillPlanId}
+                fillPlanId={props.fillPlanId !== undefined ? props.fillPlanId : (plan?.id ?? null)}
+                fillFileName={props.fillPlanId !== undefined ? null : (plan?.file_name ?? null)}
                 onFill={(id) => setFillOpen(id)}
                 announce={announce}
               />

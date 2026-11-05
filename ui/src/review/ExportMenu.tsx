@@ -12,11 +12,13 @@ export type ExportMenuProps = {
   view: View;
   /** The Fill Plan for the client's own file, when the Lead QS has made one. */
   fillPlanId?: string | null;
+  /** The client's file that plan fills, shown beside the button. */
+  fillFileName?: string | null;
   onFill?: (planId: string) => void;
   announce?: (line: string) => void;
 };
 
-export function ExportMenu({ projectId, view, fillPlanId, onFill, announce }: ExportMenuProps) {
+export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, announce }: ExportMenuProps) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const draft = view.status !== "signed_off";
@@ -64,6 +66,11 @@ export function ExportMenu({ projectId, view, fillPlanId, onFill, announce }: Ex
         >
           {t("exportClientFile")}
         </button>
+      )}
+      {view.kind === "sheet" && fillPlanId && fillFileName && (
+        <bdi dir="auto" className="text-slate">
+          {fillFileName}
+        </bdi>
       )}
       {draft && (
         <span id={markId} className="text-copper">

@@ -330,6 +330,13 @@ def router(projects: Projects) -> APIRouter:
                             format: Literal["pdf"] = "pdf") -> Response:  # fmt: skip
         return await answer(p, _review_report, d, revision, ids=deliverable(d))
 
+    @r.get(base + "/{d}/fill-plans")
+    async def fill_plans(p: str, d: str) -> Response:
+        def run(rec, d):
+            return {"plans": fill.list_plans(rec, d)}
+
+        return await answer(p, run, d, ids=deliverable(d))
+
     fills = "/projects/{p}/fill-plans/{f}"
 
     @r.get(fills + "/preview")

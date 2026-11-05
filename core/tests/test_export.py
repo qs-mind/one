@@ -6,6 +6,7 @@ import io
 import re
 import zipfile
 from decimal import Decimal
+from string import Formatter
 
 import docx
 import openpyxl
@@ -17,7 +18,7 @@ import qsone.calc.engine
 import qsone.export
 from qsone import copy
 from qsone.deliverables.store import create, view
-from qsone.export import LABELS, file_name, format_decimal, review_pdf, to_docx, to_pdf, to_xlsx
+from qsone.export import file_name, format_decimal, review_pdf, to_docx, to_pdf, to_xlsx
 from qsone.records.project import RecordsError
 from tests.samples import SAMPLE_ACTOR, sample_document, sample_sheet
 
@@ -213,7 +214,7 @@ def test_founder_switches(rec, monkeypatch):
     monkeypatch.setattr(qsone.export, "DRAFT_EXPORTS", False)
     with pytest.raises(RecordsError) as e:
         to_xlsx(tiny_sheet())
-    assert e.value.text == LABELS["needs_signoff"]
+    assert e.value.text == copy.EXPORT_LABELS["needs_signoff"]
     assert to_xlsx(signed_off(tiny_sheet()))
 
 
@@ -281,7 +282,7 @@ def test_xlsx_sources_sheet_has_every_number_with_its_source_and_date(rec):
     assert Decimal(str(rate[2])) == Decimal("39850.50") and rate[3] == "EGP"
     assert "بيانات تجريبية - عينة" in rate and "2026-11-01" in rate
     total = rows[-1]
-    assert total[0] == LABELS["total"]["ar"] and "sum(amount)" in total
+    assert total[0] == copy.EXPORT_LABELS["total"]["ar"] and "sum(amount)" in total
     english = openpyxl.load_workbook(io.BytesIO(to_xlsx(tiny_sheet()))).worksheets[1]
     line = next(english.iter_rows(min_row=2, values_only=True))
     assert {"prices - sample.pdf", "https://example.com/sample", "page 3"} <= set(line)
@@ -321,7 +322,7 @@ def test_docx_refs_show_their_value_and_every_source_stays_visible(rec):
     d = docx.Document(io.BytesIO(to_docx(v)))
     text = "\n".join(p.text for p in d.paragraphs)
     assert "بإجمالي 5,182,755.00[1]" in text  # the grand total, formatted, with its note mark
-    assert LABELS["sources"]["ar"] in text
+    assert copy.EXPORT_LABELS["sources"]["ar"] in text
     [sources] = d.tables
     assert [c.text for c in sources.rows[1].cells][:4] == [
         "[1]",
@@ -443,7 +444,9 @@ def test_pdf_marks_every_page_and_lists_the_sources(rec):
     # pdfium reads a Latin run inside a right-to-left line in reverse word order
     # («rate * quantity»); the page draws it right, so only words are checked.
     text = "\n".join(pages)
-    assert LABELS["sources"]["ar"] in text and "محرك الحسابات" in text and "amount" in text
+    assert (
+        copy.EXPORT_LABELS["sources"]["ar"] in text and "محرك الحسابات" in text and "amount" in text
+    )
 
 
 def test_pdf_payload_cannot_inject_typst(rec):
@@ -538,5 +541,10 @@ def test_review_pdf_reads_the_real_review_report(rec):
 
 
 def test_export_labels_have_both_languages():
-    for name, text in LABELS.items():
-        assert set(text) == {"en", "ar"} and all(text.values()), name
+    """The exports' labels live in copy.py with every other text the engineer reads."""
+    assert not hasattr(qsone.export, "LABELS")
+    for name, text in copy.EXPORT_LABELS.items():
+        assert set(text) == {"en", "ar"} and all(v.strip() for v in text.values()), name
+        fields = [{f for _, f, _, _ in Formatter().parse(v) if f} for v in text.values()]
+        assert fields[0] == fields[1], name
+    assert qsone.export.say("rev", "ar", n=2) == "إصدار 2"

@@ -1179,6 +1179,58 @@ EXPORT_FORMAT_NOT_ALLOWED = {
     "ar": "الجدول بيتصدّر Excel أو PDF، والمستند Word أو PDF.",
 }
 
+# The exports' own labels (Excel, Word, PDF), formal like the documents they sit in, each an
+# {en, ar} pair; qsone.export.say fills them in the Deliverable's language.
+EXPORT_LABELS = {
+    "total": {"en": "Grand total", "ar": "الإجمالي العام"},
+    "sources": {"en": "Sources", "ar": "المصادر"},
+    "deliverable": {"en": "Deliverable", "ar": "مُخرَج"},
+    "draft": {"en": "Draft", "ar": "مسودة"},
+    "rev": {"en": "Rev {n}", "ar": "إصدار {n}"},
+    "page_of": {"en": "Page {x} of {y}", "ar": "صفحة {x} من {y}"},
+    "needs_signoff": {
+        "en": "This Deliverable is exported only after Sign-off. Sign it off first.",
+        "ar": "المُخرَج ده بيتصدّر بعد الاعتماد بس. اعتمده الأول.",
+    },
+    # The sources list: one line per number shown.
+    "src_where": {"en": "Item", "ar": "البند"},
+    "src_column": {"en": "Column", "ar": "العمود"},
+    "src_value": {"en": "Value", "ar": "القيمة"},
+    "src_unit": {"en": "Unit or currency", "ar": "الوحدة أو العملة"},
+    "src_title": {"en": "Source", "ar": "المصدر"},
+    "src_file": {"en": "File", "ar": "الملف"},
+    "src_place": {"en": "Place", "ar": "الموضع"},
+    "src_link": {"en": "Link", "ar": "الرابط"},
+    "src_dated": {"en": "Dated", "ar": "التاريخ"},
+    "src_kind": {"en": "Entered by", "ar": "أدخله"},
+    "page": {"en": "page", "ar": "صفحة"},
+    "sheet": {"en": "sheet", "ar": "ورقة"},
+    "row": {"en": "row", "ar": "صف"},
+    "cell": {"en": "cell", "ar": "خلية"},
+    "calc_engine": {"en": "QS Calc Engine", "ar": "محرك الحسابات"},
+    "engineer": {"en": "The engineer", "ar": "المهندس"},
+    # The Review report.
+    "report": {"en": "Review report", "ar": "تقرير المراجعة"},
+    "issued": {"en": "Issued {at} by {by}", "ar": "صدر {at} بواسطة {by}"},
+    "signed_by": {"en": "Signed off {at} by {by}", "ar": "اعتمده {by} في {at}"},
+    "checks": {"en": "Checks", "ar": "المراجعات"},
+    "code": {"en": "Code {code}", "ar": "كود {code}"},
+    "version": {"en": "Version {n}", "ar": "نسخة {n}"},
+    "checker": {"en": "Checker", "ar": "المراجع"},
+    "same_provider": {"en": "Same-provider check", "ar": "مراجعة من نفس الشركة"},
+    "other_provider": {"en": "Another provider", "ar": "شركة أخرى"},
+    "changes": {
+        "en": "Changes: {accepted} accepted, {rejected} rejected",
+        "ar": "التعديلات: {accepted} مقبول، {rejected} مرفوض",
+    },
+    "comments": {"en": "Comments", "ar": "الملاحظات"},
+    "note": {"en": "One's note", "ar": "ملاحظة One"},
+    "review": {"en": "Review comment", "ar": "ملاحظة مراجعة"},
+    "open": {"en": "Open", "ar": "مفتوحة"},
+    "closed": {"en": "Closed", "ar": "مقفولة"},
+    "none": {"en": "None", "ar": "لا يوجد"},
+}
+
 # The client's own file.
 FILL_XLS_NOT_SUPPORTED = {
     "en": "Open the file in Excel, save it as .xlsx, then drop it again.",

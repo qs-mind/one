@@ -215,6 +215,15 @@ export type Compare =
     }
   | { blocks: { id: string; change: "added" | "removed" | "moved" | "changed" | "same"; segments: Segment[] }[] };
 
+/** GET /deliverables/{d}/fill-plans, newest first. The id is for the routes only, never shown. */
+export type FillPlanInfo = {
+  id: string;
+  file_name: string;
+  created_at: string;
+  /** "needs_signoff" until a Revision is signed off, then "ready". */
+  status: "needs_signoff" | "ready";
+};
+
 /** GET /fill-plans/{f}/preview: what filling the client's own file would write, from the newest signed-off
  * Revision. */
 export type FillPreview = {

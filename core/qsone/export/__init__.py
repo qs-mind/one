@@ -21,57 +21,6 @@ from qsone.records.project import RecordsError
 DRAFT_EXPORTS = True  # a Deliverable may be exported before Sign-off, marked «مسودة — غير معتمد»
 WESTERN_DIGITS = True  # numbers in Arabic exports are written 0-9; False writes ٠-٩
 
-# The exports' own labels, formal like the documents they sit in. Each is an {en, ar} pair.
-LABELS = {
-    "total": {"en": "Grand total", "ar": "الإجمالي العام"},
-    "sources": {"en": "Sources", "ar": "المصادر"},
-    "deliverable": {"en": "Deliverable", "ar": "مُخرَج"},
-    "draft": {"en": "Draft", "ar": "مسودة"},
-    "rev": {"en": "Rev {n}", "ar": "إصدار {n}"},
-    "page_of": {"en": "Page {x} of {y}", "ar": "صفحة {x} من {y}"},
-    "needs_signoff": {
-        "en": "This Deliverable is exported only after Sign-off. Sign it off first.",
-        "ar": "المُخرَج ده بيتصدّر بعد الاعتماد بس. اعتمده الأول.",
-    },
-    # The sources list: one line per number shown.
-    "src_where": {"en": "Item", "ar": "البند"},
-    "src_column": {"en": "Column", "ar": "العمود"},
-    "src_value": {"en": "Value", "ar": "القيمة"},
-    "src_unit": {"en": "Unit or currency", "ar": "الوحدة أو العملة"},
-    "src_title": {"en": "Source", "ar": "المصدر"},
-    "src_file": {"en": "File", "ar": "الملف"},
-    "src_place": {"en": "Place", "ar": "الموضع"},
-    "src_link": {"en": "Link", "ar": "الرابط"},
-    "src_dated": {"en": "Dated", "ar": "التاريخ"},
-    "src_kind": {"en": "Entered by", "ar": "أدخله"},
-    "page": {"en": "page", "ar": "صفحة"},
-    "sheet": {"en": "sheet", "ar": "ورقة"},
-    "row": {"en": "row", "ar": "صف"},
-    "cell": {"en": "cell", "ar": "خلية"},
-    "calc_engine": {"en": "QS Calc Engine", "ar": "محرك الحسابات"},
-    "engineer": {"en": "The engineer", "ar": "المهندس"},
-    # The Review report.
-    "report": {"en": "Review report", "ar": "تقرير المراجعة"},
-    "issued": {"en": "Issued {at} by {by}", "ar": "صدر {at} بواسطة {by}"},
-    "signed_by": {"en": "Signed off {at} by {by}", "ar": "اعتمده {by} في {at}"},
-    "checks": {"en": "Checks", "ar": "المراجعات"},
-    "code": {"en": "Code {code}", "ar": "كود {code}"},
-    "version": {"en": "Version {n}", "ar": "نسخة {n}"},
-    "checker": {"en": "Checker", "ar": "المراجع"},
-    "same_provider": {"en": "Same-provider check", "ar": "مراجعة من نفس الشركة"},
-    "other_provider": {"en": "Another provider", "ar": "شركة أخرى"},
-    "changes": {
-        "en": "Changes: {accepted} accepted, {rejected} rejected",
-        "ar": "التعديلات: {accepted} مقبول، {rejected} مرفوض",
-    },
-    "comments": {"en": "Comments", "ar": "الملاحظات"},
-    "note": {"en": "One's note", "ar": "ملاحظة One"},
-    "review": {"en": "Review comment", "ar": "ملاحظة مراجعة"},
-    "open": {"en": "Open", "ar": "مفتوحة"},
-    "closed": {"en": "Closed", "ar": "مقفولة"},
-    "none": {"en": "None", "ar": "لا يوجد"},
-}
-
 FONT = "Arial"  # Excel and Word: on every Windows and Mac machine, Latin and Arabic
 DASH = "—"  # a calculated cell with nothing to show: never an invented 0
 
@@ -82,7 +31,7 @@ _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')  # not allowed in a Windows file 
 
 def say(name: str, language: str, **values) -> str:
     """The export label `name` in `language`, with its {placeholders} filled."""
-    return LABELS[name][language].format(**values)
+    return copy.EXPORT_LABELS[name][language].format(**values)
 
 
 def format_decimal(value: str, places: int = 0, language: str = "en") -> str:
@@ -111,7 +60,7 @@ def places(cell: dict) -> int:
 def check_draft(view: dict) -> None:
     """Refuses a draft export when DRAFT_EXPORTS is off."""
     if not DRAFT_EXPORTS and view.get("status") != "signed_off":
-        raise RecordsError(LABELS["needs_signoff"])
+        raise RecordsError(copy.EXPORT_LABELS["needs_signoff"])
 
 
 def state(view: dict) -> str:
@@ -144,10 +93,10 @@ def file_name(view: dict, ext: str) -> str:
 def who(actor: str | None, language: str) -> str:
     """An actor id as a reader would say it: «المهندس», «مهندس المراجعة», …"""
     known = {
-        "engineer": LABELS["engineer"],
+        "engineer": copy.EXPORT_LABELS["engineer"],
         "lead_qs": copy.ROLE_LEAD,
         "checking_qs": copy.ROLE_CHECKER,
-        "calc_engine": LABELS["calc_engine"],
+        "calc_engine": copy.EXPORT_LABELS["calc_engine"],
     }
     return known[actor][language] if actor in known else actor or ""
 
@@ -156,7 +105,7 @@ def source_kind(kind: str, language: str) -> str:
     """Who or what entered a number, from its source kind."""
     known = {
         "engineer": copy.ENTERED_BY_ENGINEER,
-        "calculation": LABELS["calc_engine"],
+        "calculation": copy.EXPORT_LABELS["calc_engine"],
         "sample": copy.SAMPLE_DATA,
     }
     return known[kind][language] if kind in known else kind
