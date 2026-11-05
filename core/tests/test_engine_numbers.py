@@ -26,6 +26,23 @@ def test_what_counts_as_a_number():
     assert numbers_in(text) == ["2.5", "450", "5", "8", "120"]
 
 
+@pytest.mark.parametrize(
+    ("text", "counted"),
+    [
+        # audit C7: the guard gave only "500", a piece of each end, which the screen cannot mark
+        ("6,500-8,500 EGP/m³", ["6,500", "8,500"]),
+        ("بين 6,500–8,500 جنيه للمتر", ["6,500", "8,500"]),
+        ("٦٬٥٠٠-٨٬٥٠٠ ج.م", ["٦٬٥٠٠", "٨٬٥٠٠"]),
+        ("2.5-3 m deep", ["2.5", "3"]),
+        ("3-4 days", ["3", "4"]),  # a range with its unit
+        # codes and dates stay out
+        ("item 03-02, dated 2026-11-05, rev 12-3", []),
+    ],
+)
+def test_a_range_counts_both_ends_and_never_a_piece_of_one(text, counted):
+    assert numbers_in(text) == counted
+
+
 def test_arabic_numbers_are_kept_as_written():
     text = "الكمية ١٢٠ م٣ والسعر ٣٩٬٨٥٠٫٥٠ جنيه، البند ٠٣/٠٢، صفحة ١٤٫٢"
     assert numbers_in(text) == ["١٢٠", "٣٩٬٨٥٠٫٥٠"]

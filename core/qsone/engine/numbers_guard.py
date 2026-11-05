@@ -4,7 +4,9 @@ A number in the Lead's reply or in a Deliverable counts when it has a decimal po
 digits, or a unit or currency within 2 tokens of it. It must equal a value from a tool result in
 this Brief (a ledger number, a calc result, quoted file text); any other is marked "no source",
 never removed. These are not counted:
-- codes and dates, whose digits are joined by "/" or "-" (item 03/02, 2026-11-05);
+- codes and dates, whose digits are joined by "/" or "-" (item 03/02, 2026-11-05); a range
+  of two numbers (6,500-8,500 EGP, 3-4 days) counts both ends, when either has a thousands
+  separator or a decimal point, or a unit or currency follows it;
 - references: a number right after a word such as page, clause, item, صفحة or بند;
 - a year (four digits from 1900 to 2099) with no unit or currency next to it.
 
@@ -21,12 +23,16 @@ from decimal import Decimal, InvalidOperation
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 
 # A number as written: digits, thousands groups (, or ٬) and a decimal part (. or ٫). Not part
-# of a word, and not a piece of a code or a date (digits joined by / or -).
+# of a word, not a piece of another number ("500" of "6,500"), and not after "/" or a dash
+# (the second part of a code, a date or a range: `_counted` reads those whole).
 _NUMBER = re.compile(
-    r"(?<![^\W_])(?<![/\-])"
+    r"(?<![^\W_])(?<!\d[,٬.٫])(?<![/\-–])"
     r"\d+(?:[,٬]\d{3})*(?:[.٫]\d+)?"
-    r"(?![,٬.٫]?\d)(?![/\-]\d)"
+    r"(?![,٬.٫]?\d)(?!/\d)"
 )
+# The second end of a range: a dash, then one number that no further dash or "/" follows.
+_RANGE_END = re.compile(r"\s?[-–]\s?(\d+(?:[,٬]\d{3})*(?:[.٫]\d+)?)(?![,٬.٫]?\d)(?![/\-–]\d)")
+_JOINED = re.compile(r"\s?[-–]\s?\d")  # digits a dash joins on: a code or a date
 
 # Units and currencies (lower case), as engineers write them in Arabic and English.
 _UNITS = {
@@ -85,23 +91,39 @@ def _has_unit(before: list[str], after: str) -> bool:
 def _counted(text: str):
     """(written, value) for each number in `text` that the guard counts."""
     for match in _NUMBER.finditer(text):
-        written = match.group()
-        value = _canonical(written)
-        if value is None:
-            continue
+        end = _RANGE_END.match(text, match.end())
+        if end is not None:
+            ends = (match.group(), end.group(1))
+            after = text[end.end() :]
+            before = text[: match.start()].split()
+            marks = any(re.search("[,٬.٫]", w) for w in ends)
+            if marks or _has_unit(before, after):  # a range: both ends count, with its unit
+                for written in ends:
+                    yield from _count(text, written, before, after)
+            continue  # else a code: 03-02, rev 12-3
+        if _JOINED.match(text, match.end()):
+            continue  # the first part of a code or a date: 2026-11-05
         before = text[: match.start()].split()
-        after = text[match.end() :]
-        if before and not text[match.start() - 1].isspace() and before[-1][-1:] in "$€£":
-            before = [*before[:-1], before[-1][-1]]  # $12: the sign is a token of its own
-        if before and _word(before[-1]) in _REFERENCES:
-            continue
-        unit = _has_unit(before, after)
-        plain = written.translate(_DIGITS)
-        if not unit and re.fullmatch(r"(19|20)\d\d", plain):
-            continue  # a year
-        digits = sum(ch.isdigit() for ch in plain)
-        if unit or "." in plain or "٫" in written or digits >= 3:
-            yield written, value
+        yield from _count(text, match.group(), before, text[match.end() :], at=match.start())
+
+
+def _count(text: str, written: str, before: list[str], after: str, *, at: int | None = None):
+    """(written, value) when the guard counts this number; `at` is where it stands, when the
+    sign before it may be written onto it ($12)."""
+    value = _canonical(written)
+    if value is None:
+        return
+    if at and before and not text[at - 1].isspace() and before[-1][-1:] in "$€£":
+        before = [*before[:-1], before[-1][-1]]  # $12: the sign is a token of its own
+    if before and _word(before[-1]) in _REFERENCES:
+        return
+    unit = _has_unit(before, after)
+    plain = written.translate(_DIGITS)
+    if not unit and re.fullmatch(r"(19|20)\d\d", plain):
+        return  # a year
+    digits = sum(ch.isdigit() for ch in plain)
+    if unit or "." in plain or "٫" in written or digits >= 3:
+        yield written, value
 
 
 def numbers_in(text: str) -> list[str]:
