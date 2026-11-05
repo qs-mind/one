@@ -470,20 +470,44 @@ def test_outside_ledger_moves_arrive_as_one_change(rec):
     assert not v["records_moved"] and pending(rec, d) == []
 
 
-def test_an_accept_takes_the_records_change_with_it(rec):
-    """The view of a version reads the ledger as of that version, so the moves outside come in
-    with any accept: the pending Update from Project Records is accepted with it, never lost."""
+def test_an_accept_waits_for_the_records_change(rec):
+    """A version reads the ledger as of its own time, so while an Update from Project Records is
+    pending, accepting other changes is refused unless the update is accepted with them."""
     d = sample_sheet(rec)
     row = row_by_code(rec, d, "03/02")
     correct_outside(rec, row["cells"]["rate"]["number_id"], "40000")
-    [up] = pending(rec, d)
     [ch] = propose(rec, d, [set_rate(row_by_code(rec, d, "1-1"), "15")], actor="engineer")
-    out = accept(rec, d, [ch.id], actor="engineer")
-    assert out["version"] == 2 and out["accepted"] == [ch.id, up.id]
+    numbers, versions = table(rec, "numbers"), table(rec, "versions")
+    with pytest.raises(RecordsError) as e:
+        accept(rec, d, [ch.id], actor="engineer")
+    assert e.value.text == copy.UPDATE_FIRST and e.value.field == "ids"
+    with pytest.raises(RecordsError) as e:
+        accept_mine(rec, d, actor="engineer")
+    assert e.value.text == copy.UPDATE_FIRST
+    assert table(rec, "numbers") == numbers and table(rec, "versions") == versions
+    up = next(c for c in pending(rec, d) if c.op["op"] == "update_from_records")
+    assert {c.id for c in pending(rec, d)} == {ch.id, up.id}
+    assert row_by_code(rec, d, "03/02")["cells"]["rate"]["value"] == "39850.50"
+    out = accept(rec, d, [ch.id, up.id], actor="engineer")
+    assert out["version"] == 2 and out["accepted"] == [up.id, ch.id]
     v = view(rec, d)
     assert row_by_code_in(v, "03/02")["cells"]["amount"]["value"] == "4800000.00"
     assert v["total"]["value"] == "5206250.00"  # both changes in the totals
     assert pending(rec, d) == []
+
+
+def test_the_records_change_is_made_even_when_an_accept_is_refused(rec):
+    d = sample_sheet(rec)
+    [ch] = propose(rec, d, [set_rate(row_by_code(rec, d, "1-1"), "15")], actor="engineer")
+    correct_outside(rec, row_by_code(rec, d, "03/02")["cells"]["rate"]["number_id"], "40000")
+    with pytest.raises(RecordsError):
+        accept(rec, d, [ch.id], actor="engineer")
+    with rec.read() as c:
+        made = c.execute(
+            "select count(*) from changes where status = 'pending'"
+            " and json_extract(op, '$.op') = 'update_from_records'"
+        ).fetchone()[0]
+    assert made == 1
 
 
 def test_no_records_change_when_nothing_moved(rec):

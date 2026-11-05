@@ -10,8 +10,8 @@ A Deliverable is pinned to its latest Saved version, and that version's view rea
 of its own time. So a ledger move from outside (a correction in Project Records, an agent's
 calculation) shows only through the one pending "Update from Project Records" change, which
 `refresh_records_change` keeps current. Any accept saves a new version, which takes the ledger
-as it is then, so it also accepts that pending update, by name, with the rest: a move is never
-taken in without a change that shows it.
+as it is then, so while that update is pending an accept must name it with the rest
+(UPDATE_FIRST otherwise): a move is never taken in without the engineer accepting it.
 """
 
 import json
@@ -478,11 +478,13 @@ def accept(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: s
     """Accepts the named pending changes in one transaction and one Saved version: each change in
     the order it was made (an Update from Project Records first) is applied, or marked stale when
     what it was made against has moved; then the amounts and totals they touch are brought up to
-    date, and the version is saved with the ids of the accepted changes. When Project Records
-    moved, the pending Update from Project Records is accepted with them (the version takes the
-    ledger as it is now). Returns {"version", "accepted", "stale"}; with nothing accepted, no
-    version is saved. Only the engineer accepts (ValueError otherwise)."""
+    date, and the version is saved with the ids of the accepted changes. A version takes the
+    ledger as it is then, so while an Update from Project Records is pending, an accept that would
+    apply other changes must name it too: else UPDATE_FIRST, and nothing is written. Returns
+    {"version", "accepted", "stale"}; with nothing accepted, no version is saved. Only the
+    engineer accepts (ValueError otherwise)."""
     _engineer_only(actor)
+    refresh_records_change(rec, deliverable_id)  # kept even when this accept is refused
     with rec.write(actor) as conn:
         head = ops.deliverable(conn, deliverable_id)
         update, _ = _refresh(conn, rec, head)
@@ -490,6 +492,9 @@ def accept(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: s
         todo = [c for c in found.values() if c.status == "pending"]
         todo.sort(key=lambda c: (c.op["op"] != "update_from_records", c.created_at))
         stale = [c for c in change_ids if c not in {t.id for t in todo}]
+        if update is not None and update.id not in change_ids:
+            if any(not ops.is_stale(conn, head, c.op) for c in todo):
+                raise RecordsError(copy.UPDATE_FIRST, status=409, field="ids")
         accepted, rows, everything = [], set(), False
         for change in todo:
             if ops.is_stale(conn, head, change.op):
@@ -501,9 +506,6 @@ def accept(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: s
             rows |= set(touched or [])
             accepted.append(change)
         n = None
-        if accepted and update is not None and update.id not in {c.id for c in accepted}:
-            accepted.append(update)  # the new version shows these moves too
-            everything = True
         if accepted and head["kind"] == "sheet":
             calc.bring_up_to_date(
                 rec, deliverable_id, actor=actor, rows=None if everything else rows
