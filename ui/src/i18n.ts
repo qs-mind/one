@@ -385,7 +385,7 @@ export const texts = {
   placeCell: { en: "{place}, {column}", ar: "{place}، {column}" },
   placeWhole: { en: "The whole Deliverable", ar: "المُخرَج كله" },
   placeParagraph: { en: "A paragraph", ar: "فقرة" },
-  placeQuote: { en: "«{quote}»", ar: "«{quote}»" },
+  placeQuote: { en: "“{quote}”", ar: "«{quote}»" },
   placeMoved: { en: "{place} (moved)", ar: "{place} (اتنقلت)" },
   reviewCommentOn: { en: "On: {place}", ar: "على: {place}" },
   reviewCommentAdd: { en: "Add", ar: "ضيف" },

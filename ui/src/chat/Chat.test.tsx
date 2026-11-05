@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { D, entry, sheet } from "../deliverables/fixtures";
 import { setLanguage, texts } from "../i18n";
 import { setCurrentProject } from "../records/project";
 import { Chat } from "./Chat";
@@ -431,5 +432,41 @@ describe("Chat", () => {
 
     expect((await screen.findByText("total")).tagName).toBe("STRONG");
     expect(screen.getByText("**as typed**")).toBeInTheDocument();
+  });
+
+  it("a Deliverable the Lead QS made shows as a card; Open shows it beside the chat; Esc closes it and gives focus back", async () => {
+    setCurrentProject({ id: "p1", name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00+00:00" });
+    const parts = [reply[0]!, { type: "data-deliverable", id: D, data: { id: D } }, ...reply.slice(1)];
+    const d = `/api/projects/p1/deliverables/${D}`;
+    core({
+      routes: {
+        "POST /api/chat": (init) => streamed(parts, init),
+        "GET /api/projects/p1/deliverables": () => Response.json({ deliverables: [entry()] }),
+        [`GET ${d}`]: () => Response.json(sheet()),
+        [`GET ${d}/changes?status=pending`]: () => Response.json({ changes: [] }),
+        [`GET ${d}/changes?status=stale`]: () => Response.json({ changes: [] }),
+        [`GET ${d}/comments`]: () => Response.json({ comments: [] }),
+      },
+    });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.type(await box(), "اعمل المقايسة{enter}");
+    const card = await screen.findByRole("article", { name: "جدول الكميات - عينة" });
+    const open = within(card).getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) });
+    await user.click(open);
+    expect(await screen.findByText("03/02")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: texts.reviewPanels.ar })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("tablist")).toBeNull());
+    await waitFor(() => expect(open).toHaveFocus());
+  });
+
+  it("“Deliverables” in the header opens the Project Index of the open project", async () => {
+    setCurrentProject({ id: "p1", name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00+00:00" });
+    core({ routes: { "GET /api/projects/p1/deliverables": () => Response.json({ deliverables: [entry()] }) } });
+    const user = userEvent.setup();
+    render(<Chat />);
+    await user.click(await screen.findByRole("button", { name: texts.deliverablesButton.ar }));
+    expect(await screen.findByRole("button", { name: "جدول الكميات - عينة" })).toBeInTheDocument();
   });
 });

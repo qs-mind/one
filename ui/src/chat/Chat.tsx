@@ -305,7 +305,8 @@ export function Chat() {
             {project && panel.open && (
               <div className="flex min-h-[70dvh] flex-1 flex-col">
                 <div className="flex justify-end border-b border-stone px-2 py-1">
-                  <button type="button" className="rounded px-2 hover:bg-stone" onClick={panel.close}>
+                  {/* focus moves into the panel, so Esc there closes it and gives focus back to the opener */}
+                  <button type="button" autoFocus className="rounded px-2 hover:bg-stone" onClick={panel.close}>
                     {t("close")}
                   </button>
                 </div>

@@ -4,7 +4,7 @@
 // Changes, Comments, Versions and Close-out, with the exports. Everything it draws stays inside its own box.
 import { useCallback, useImperativeHandle, useRef, useState } from "react";
 import type { Anchor, ViewerProps } from "../canvas/types";
-import { language, pick, t, useLanguage } from "../i18n";
+import { fill, language, pick, t, useLanguage } from "../i18n";
 import { ChangesPanel } from "../review/ChangesPanel";
 import { CommentsPanel } from "../review/CommentsPanel";
 import { ExportMenu } from "../review/ExportMenu";
@@ -48,7 +48,7 @@ function fromText(text: TextAnchor): Selected {
   return {
     comment: text,
     anchor: { row: text.block, text: [text.start, text.end] },
-    label: `«${quote(text.quote)}»`,
+    label: fill(t("placeQuote"), { quote: quote(text.quote) }),
   };
 }
 
