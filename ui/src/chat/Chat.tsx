@@ -18,6 +18,7 @@ import { ReviewBadge } from "./parts/ReviewBadge";
 import { type OnePart, partsOf } from "./parts/types";
 import { BidiText } from "./bidi";
 import { Reply } from "./Reply";
+import { useScrollEdges } from "../ui/useScrollEdges";
 
 // The core sends a model error as an {en, ar} pair in the error text; any other failure gets the plain line.
 function errorLine(error: Error): string {
@@ -126,6 +127,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
   useLanguage();
   const { messages, status, error, failed } = chat;
   const ref = useRef<HTMLDivElement>(null);
+  useScrollEdges(ref);
   const atEnd = useRef(true);
   const seen = useRef<Set<string> | null>(null);
   const [below, setBelow] = useState(false);
@@ -172,7 +174,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
           atEnd.current = log.scrollHeight - log.scrollTop - log.clientHeight <= NEAR_END;
           if (atEnd.current) setBelow(false);
         }}
-        className="relative min-h-0 flex-1 overflow-y-auto px-5 py-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
+        className="scroll-fade relative min-h-0 flex-1 overflow-y-auto px-5 py-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
       >
         <ol className="flex flex-col gap-6">
           {messages.length === 0 && <li className="text-slate">{t("empty")}</li>}

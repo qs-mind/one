@@ -2,9 +2,11 @@
 // Projects, Project Records, the Project Index), kept as they are. Focus goes into it when it opens; Esc closes it
 // (the shell then gives focus back to the button that opened it).
 import { type ReactNode, useEffect, useRef } from "react";
+import { useScrollEdges } from "../ui/useScrollEdges";
 
 export function FloatingPanel({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
+  useScrollEdges(box);
 
   useEffect(() => {
     // a panel that moves focus itself (Projects focuses the open project) keeps it
@@ -20,7 +22,7 @@ export function FloatingPanel({ onClose, children }: { onClose: () => void; chil
         event.preventDefault();
         onClose();
       }}
-      className="absolute start-4 top-2 z-30 max-h-[calc(100%-16px)] w-[min(420px,calc(100%-32px))] overflow-y-auto rounded-[14px] border border-ink/10 bg-paper shadow-[0_2px_10px_rgb(14_15_18/0.12)] outline-none"
+      className="scroll-fade absolute start-4 top-2 z-30 max-h-[calc(100%-16px)] w-[min(420px,calc(100%-32px))] overflow-y-auto rounded-[14px] border border-ink/10 bg-paper shadow-[0_2px_10px_rgb(14_15_18/0.12)] outline-none"
     >
       {children}
     </div>

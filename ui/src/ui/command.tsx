@@ -1,7 +1,8 @@
 // The command palette's list over cmdk, shadcn-style, with our tokens. `CommandDialog` puts it in the Radix dialog.
 import { Command as Cmdk } from "cmdk";
-import type { ComponentProps, ReactNode } from "react";
+import { type ComponentProps, type ReactNode, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "./dialog";
+import { useScrollEdges } from "./useScrollEdges";
 
 export function Command({ className = "", ...props }: ComponentProps<typeof Cmdk>) {
   return <Cmdk className={`flex flex-col overflow-hidden ${className}`} {...props} />;
@@ -39,7 +40,9 @@ export function CommandInput({ className = "", ...props }: ComponentProps<typeof
 }
 
 export function CommandList({ className = "", ...props }: ComponentProps<typeof Cmdk.List>) {
-  return <Cmdk.List className={`max-h-[50vh] overflow-y-auto p-2 ${className}`} {...props} />;
+  const list = useRef<HTMLDivElement>(null);
+  useScrollEdges(list);
+  return <Cmdk.List ref={list} className={`scroll-fade max-h-[50vh] overflow-y-auto p-2 ${className}`} {...props} />;
 }
 
 export function CommandEmpty({ className = "", ...props }: ComponentProps<typeof Cmdk.Empty>) {
