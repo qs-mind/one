@@ -1,7 +1,8 @@
 // The start screen (docs/specs/2026-11-05-motion-design.md, section 1), shown each time ONE opens, for as long as the
 // core is starting: on Paper, the mark alone draws itself, then «ONE» and the slogan come in, word by word (Arabic
 // never by letter). It covers a real wait and never adds one beyond the drawing (under 1.5 s): once the drawing is
-// done and the core is ready, ONE shows beneath it and the screen fades and grows a little as it leaves. A core still
+// done and the core is ready, its words fade on its Paper and ONE takes its place in one cut (never the two drawn at
+// once: a crossfade showed step 1 through the mark). A core still
 // starting after 3 s gets one quiet line; a core that is down gets its reason, its log and Retry here. Reduced
 // motion: everything whole at once, and an instant swap.
 import { useEffect, useRef, useState } from "react";
@@ -44,6 +45,7 @@ export function StartScreen({
   const [drawn, setDrawn] = useState(!draw);
   const [leaving, setLeaving] = useState(false);
   const screen = useRef<HTMLElement>(null);
+  const content = useRef<HTMLDivElement>(null);
   const left = useRef(false);
 
   useEffect(() => {
@@ -56,10 +58,17 @@ export function StartScreen({
     if (state !== "ready" || !drawn || left.current) return;
     left.current = true;
     setLeaving(true);
-    onShow();
-    const el = screen.current!;
-    void play(el, [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(1.02)" }], DUR.long).then(() => {
+    const el = content.current!;
+    void play(
+      el,
+      [
+        { opacity: 1, transform: "scale(1)" },
+        { opacity: 0, transform: "scale(1.02)" },
+      ],
+      DUR.long,
+    ).then(() => {
       el.style.opacity = "0"; // its end state until it is gone, so it never flashes back for a frame
+      onShow(); // ONE and the Paper it replaces swap in the same frame
       onDone();
     });
   }, [state, drawn, onShow, onDone]);
@@ -78,23 +87,27 @@ export function StartScreen({
       <p role="status" className="sr-only">
         {state === "down" ? "" : t("checking", lang)}
       </p>
-      <Mark draw={draw} size={112} />
-      <p className="start-one mt-7 font-logo text-[30px] leading-none font-bold" style={{ animationDelay: `${ONE_AT}ms` }}>
-        ONE
-      </p>
-      <p className="mt-3 text-lg text-slate">
-        {words.map((word, i) => (
-          <span key={i}>
-            {i > 0 && " "}
-            <span data-word="" className="start-word inline-block" style={{ animationDelay: `${WORDS_AT + i * WORD_GAP_MS}ms` }}>
-              {word}
+      <div ref={content} className="flex w-full flex-col items-center">
+        <Mark draw={draw} size={112} />
+        <p className="start-one mt-7 font-logo text-[30px] leading-none font-bold" style={{ animationDelay: `${ONE_AT}ms` }}>
+          ONE
+        </p>
+        <p className="mt-3 text-lg text-slate">
+          {words.map((word, i) => (
+            <span key={i}>
+              {i > 0 && " "}
+              <span data-word="" className="start-word inline-block" style={{ animationDelay: `${WORDS_AT + i * WORD_GAP_MS}ms` }}>
+                {word}
+              </span>
             </span>
-          </span>
-        ))}
-      </p>
-      {/* room kept for the quiet line, so nothing moves when it comes */}
-      <p className="mt-2 min-h-6 text-xs text-slate">{state === "slow" && <span className="start-rise inline-block">{t("startEngine", lang)}</span>}</p>
-      {state === "down" && <CoreDown logPath={log} onRetry={onRetry} lang={lang} />}
+          ))}
+        </p>
+        {/* room kept for the quiet line, so nothing moves when it comes */}
+        <p className="mt-2 min-h-6 text-xs text-slate">
+          {state === "slow" && <span className="start-rise inline-block">{t("startEngine", lang)}</span>}
+        </p>
+        {state === "down" && <CoreDown logPath={log} onRetry={onRetry} lang={lang} />}
+      </div>
     </main>
   );
 }
