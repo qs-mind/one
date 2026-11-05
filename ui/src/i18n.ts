@@ -1077,6 +1077,12 @@ export const texts = {
   pageView: { en: "Show the page as", ar: "اعرض الصفحة" },
   pageViewImage: { en: "Picture", ar: "صورة" },
   pageViewText: { en: "Text", ar: "نص" },
+  // The document's head and switcher.
+  docRevision: { en: "Revision {n}", ar: "نسخة {n}" },
+  sampleNumbers: { en: "Sample numbers", ar: "الأرقام عينة" },
+  docWorkingOn: { en: "being worked on", ar: "شغالين عليه" },
+  docClientBoq: { en: "Client BOQ", ar: "مقايسة العميل" },
+  docSwitch: { en: "Documents of the project", ar: "مستندات المشروع" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";
