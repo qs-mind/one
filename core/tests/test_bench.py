@@ -126,6 +126,23 @@ def test_the_extra_priced_row_is_flagged_for_the_engineer(bench):
     assert fake.EXTRA_CODE in flags[0]["body"] and flags[0]["status"] == "open"
 
 
+def test_the_lead_shows_a_view_of_sourced_numbers(bench):
+    """bench:view: the first imported item's numbers as a view (decision 16.1), each one a
+    reference resolved to its value and source, and the same view after a reload."""
+    client, project = bench
+    _, reply, events = run(client, project, "bench:view اعرض أول بند")
+    assert "رفضت" not in reply
+    [view] = [e for e in events if e["type"] == "data-view"]
+    data = view["data"]
+    assert [b["kind"] for b in data["blocks"]] == ["heading", "figures", "table", "group"]
+    figures = [i["value"] for i in data["blocks"][1]["items"]]
+    assert figures and all(f["number_id"] and f["source"] in data["sources"] for f in figures)
+    assert data["sample"] is True and data["unsourced"] == []
+    messages = client.get(f"/chat/{project}/messages").json()["messages"]
+    stored = [p for p in messages[-1]["parts"] if p["type"] == "data-view"]
+    assert stored == [{"type": "data-view", "id": view["id"], "data": data}]
+
+
 def test_the_tender_folder_is_understood(bench, tmp_path):
     """The Brief a tender folder's import starts: the BOQ comes in, then the card, every fact with
     its place in a file and the count from the import."""
