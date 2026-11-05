@@ -215,6 +215,23 @@ def test_preview_guesses_english_headers_too(rec):
     assert p["header_guess"] == 2 and p["columns_guess"] == PRICED
 
 
+@pytest.mark.parametrize(
+    "heading, field",
+    [
+        ("م", "code"),
+        ("بيان الأعمال", "description"),
+        ("الكمية حسب العقد", "quantity"),
+        ("سعر الوحدة", "rate"),  # the longest word wins: not the unit
+        ("إجمالي السعر", "amount"),
+        ("Unit", "unit"),
+        ("ملاحظات", None),
+        ("مم", None),  # a short word must be the whole heading
+    ],
+)
+def test_headings_name_their_columns(heading, field):
+    assert boq.heading_field(heading) == field
+
+
 def test_preview_shows_hidden_and_merged_rows(rec):
     data = book(ROWS + [["03/04", "بند مخفي - عينة", "م3", 5]], hidden_rows=(7,), merges=("B4:D4",))
     p = boq.preview(rec, add_boq(rec, data), "BOQ")
@@ -455,8 +472,10 @@ async def test_an_item_with_a_unit_but_no_quantity_yet_is_an_item(ctx):
 
 async def test_rows_limits_the_import(ctx):
     f = add_boq(ctx.rec, sample_boq_xlsx(ROWS))
-    d = data_of(await run_import(ctx, f, rows="٥-٥"))
+    out = await run_import(ctx, f, rows="٥-٥")
+    d = data_of(out)
     assert (d["items"], d["headings"], d["first_row"], d["last_row"]) == (1, 0, 5, 5)
+    assert 'defaults used: rows=[5, 5] (from "٥-٥")' in out
 
 
 # The engineer confirms the columns --------------------------------------------------------------

@@ -281,8 +281,8 @@ def read(book: Workbook, sheet: str | None) -> tuple[list[str], Sheet]:
 _HEADER_WORDS = {
     "code": ("البند", "رقم البند", "م", "مسلسل", "كود", "الكود", "item", "item no", "no", "ref",
              "code", "s n", "serial", "sr"),
-    "description": ("الوصف", "البيان", "بيان الأعمال", "وصف البند", "وصف الأعمال", "description",
-                    "item description", "particulars", "desc"),
+    "description": ("الوصف", "وصف", "البيان", "بيان", "بيان الأعمال", "وصف البند", "وصف الأعمال",
+                    "description", "item description", "particulars", "desc"),
     "unit": ("الوحدة", "وحدة", "وحدة القياس", "unit", "uom", "u m"),
     "quantity": ("الكمية", "كمية", "الكميات", "qty", "quantity", "quantities", "qnty"),
     "rate": ("الفئة", "فئة", "الفئه", "سعر الوحدة", "السعر", "rate", "unit rate", "unit price",
@@ -298,12 +298,12 @@ _KEYWORDS = sorted(
 
 def heading_field(text: str) -> str | None:
     """The BOQ field a column heading names, by its longest matching word ("سعر الوحدة" is the
-    rate, not the unit); short words must be the whole heading."""
+    rate, not the unit); a word of one or two letters ("م", "no") must be the whole heading."""
     t = normalise(text)
     if not t:
         return None
     for word, name in _KEYWORDS:
-        if t == word or (len(word) >= 4 and f" {word} " in f" {t} "):
+        if t == word or (len(word) >= 3 and f" {word} " in f" {t} "):
             return name
     return None
 

@@ -360,10 +360,15 @@ def _result(ctx: ToolContext, rec: Records, args: ImportArgs, out: dict) -> str:
                 "SELECT added_at FROM files WHERE id = ?", (args.file_id,)
             ).fetchone()
         dated = datetime.fromisoformat(added).astimezone().date().isoformat() + " (received)"
+    asked = _rows(args.rows)
+    lenient = (
+        {"rows": f'{list(asked)} (from "{args.rows}")'} if isinstance(args.rows, str) else None
+    )
     return cite.render(
         text,
         data=data,
         notes=notes,
+        defaults_used=lenient,
         sources=[
             SourceRef(
                 ref=f"file:{args.file_id}#sheet={out['sheet']}&rows={span}",
@@ -381,7 +386,7 @@ async def _import(ctx: ToolContext, args: ImportArgs) -> str:
     _names[args.file_id] = book.name
     found = await asyncio.to_thread(boq.earlier, rec, _key(args, args.columns))
     if found is not None:
-        return _result(ctx, rec, args, found | {"already_imported": True})
+        return await asyncio.to_thread(_result, ctx, rec, args, found | {"already_imported": True})
     p = await asyncio.to_thread(_plan, rec, args, args.columns)
     card = _card(ctx, p)
     answer = read_answer(card, await keep.ask(ctx, card))
@@ -401,7 +406,7 @@ async def _import(ctx: ToolContext, args: ImportArgs) -> str:
     if columns != p.columns:
         p = await asyncio.to_thread(_plan, rec, args, columns)
     out = await asyncio.to_thread(_write, ctx, rec, args, p)
-    return _result(ctx, rec, args, out)
+    return await asyncio.to_thread(_result, ctx, rec, args, out)
 
 
 for _tool in (
