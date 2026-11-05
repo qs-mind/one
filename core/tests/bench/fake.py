@@ -3,7 +3,9 @@
 The brain is stateless: each request it reads what it was given (the tools offered, the output
 tool, the Brief, the tool results so far) and picks the next step of the Brief's scenario. A
 scenario is chosen by a keyword in the Brief: "bench:chat", "bench:question", "bench:boq",
-"bench:deliverable", "bench:team", "bench:view" (a view of the first item's numbers); the Briefs
+"bench:deliverable", "bench:team", "bench:view" (a view of the first item's numbers),
+"bench:workspace" (the workspace screens: one rate priced from the supplier's quote, the bid
+letter, then one decision left waiting for the engineer); the Briefs
 One starts itself (a tender folder's "I understood this", a project's lessons) have their own;
 anything else is the full tender walk-through.
 Each step is tried once: a tool that refuses is noted in core.log and the brain moves on, so it
@@ -32,6 +34,7 @@ from pydantic_ai.profiles import ModelProfile
 
 from qsone import copy
 from qsone.engine.types import ModelCard, ModelChoice
+from tests.bench import samples
 from tests.engine_fakes import Scripted, Step, _stream_usage
 
 log = logging.getLogger("qsone.bench")
@@ -41,6 +44,7 @@ PRICE_SOURCE = "bench sample price, not real"
 SCENARIOS = (
     *("chat", "question", "boq", "deliverable", "team", "full", "understand", "lessons", "view"),
     "weak",  # the tender day's weak model: the guards must catch each of its mistakes
+    "workspace",
 )
 _KEYWORD = re.compile(r"bench:(\w+)")
 _ARABIC = re.compile(r"[؀-ۿ]")
@@ -430,6 +434,109 @@ def _view(seen: Seen) -> Step | None:
     return _call("view", "show", {"title": title, "sample": True, "blocks": blocks})
 
 
+# The workspace screens (bench:workspace) ------------------------------------------------------
+
+
+def _import_unpriced(seen: Seen) -> Step | None:
+    """The BOQ without its rates and amounts: the sheet starts unpriced, as a tender's does."""
+    result, ok = seen.done.get("preview", ("", False))
+    found = _NEXT_IMPORT.search(result) if ok else None
+    if found is None:
+        return None
+    args = json.loads(found.group(1))
+    columns = args.get("columns", {})
+    args["columns"] = {k: v for k, v in columns.items() if k not in ("rate", "amount")}
+    return _call("import", "boq_import", args)
+
+
+def _quote_source(seen: Seen) -> Step | None:
+    found = _file(seen, ("pdf",))
+    if found is None:
+        return None
+    args = {"kind": "quote", "file_id": found, "locator": {"page": 1}, "dated": samples.QUOTE_DATED}
+    return _call("quote", "add_source", args)
+
+
+SUPPLY_CODE = samples.SUPPLY_CODE  # the client's supply-only item: the quote's price fits it
+
+
+def _supply_price(seen: Seen) -> Step | None:
+    """Its rate, straight from the supply-only quote; whether to add labour waits on the
+    engineer."""
+    result, ok = seen.done.get("quote", ("", False))
+    source = _data(result).get("source_id") if ok else None
+    if not source or not seen.done.get("items", ("", False))[1]:
+        return None
+    args = {"item": SUPPLY_CODE, "name": "rate", "value": samples.QUOTE_RATE, "unit": "م3",
+            "currency": "EGP", "source_id": source}  # fmt: skip
+    return _call("price", "record_number", args)
+
+
+def _sample_source(seen: Seen) -> Step | None:
+    found = _file(seen, ("pdf",))
+    if found is None or not seen.done.get("price", ("", False))[1]:
+        return None
+    title = _words(seen, "Bench sample quantity", "كمية عينة للاختبار")
+    args = {"kind": "sample", "file_id": found, "locator": {"page": 2}, "title": title,
+            "dated": samples.QUOTE_DATED}  # fmt: skip
+    return _call("samplesource", "add_source", args)
+
+
+def _sample_quantity(seen: Seen) -> Step | None:
+    """The item's quantity, cited as sample data: the sheet says its numbers are a sample."""
+    result, ok = seen.done.get("samplesource", ("", False))
+    source = _data(result).get("source_id") if ok else None
+    if not source:
+        return None
+    args = {"item": SUPPLY_CODE, "name": "quantity", "value": samples.QUOTE_QUANTITY,
+            "unit": "م3", "source_id": source}  # fmt: skip
+    return _call("quantity", "record_number", args)
+
+
+def _bid_letter(seen: Seen) -> Step:
+    def p(text: str) -> dict:
+        return {"type": "p", "children": [{"text": text}]}
+
+    if seen.lang == "ar":
+        title = "خطاب العطاء (عينة تجريبية)"
+        lines = [
+            "السادة / الجهة المالكة (عينة)",
+            "الموضوع: العرض المالي لمناقصة مبنى إداري - عينة تجريبية",
+            "بالإشارة إلى الدعوة المقدمة منكم، نتشرف بتقديم عرضنا المالي لتنفيذ الأعمال طبقاً "
+            "للمقايسة والمواصفات المرفقة. هذا الخطاب نص عينة كتبته منصة الاختبار.",
+            "الأسعار طبقاً لجدول الكميات المسعّر المرفق، والإجمالي يتكتب لما التسعير يخلص.",
+            "وتفضلوا بقبول فائق الاحترام،",
+        ]
+    else:
+        title = "Cover letter (bench sample)"
+        lines = [
+            "To: the Employer (sample)",
+            "Subject: our financial offer for the office building tender (bench sample)",
+            "Further to your invitation, we are pleased to submit our offer for the works as "
+            "the attached BOQ and specification describe. This letter is sample text written "
+            "by the test bench.",
+            "Our prices are those of the attached priced BOQ; the total is written once "
+            "pricing ends.",
+            "Yours faithfully,",
+        ]
+    blocks = [{"type": "h1", "children": [{"text": title}]}, *(p(line) for line in lines)]
+    args = {"kind": "document", "variant": "letter", "title": title, "language": seen.lang,
+            "blocks": blocks}  # fmt: skip
+    return _call("bidletter", "deliverable_create", args)
+
+
+def _decide(seen: Seen) -> Step:
+    """One decision for the engineer, left waiting: the screens show it in the top bar."""
+    text = _words(
+        seen,
+        "Bench question: add labour and formwork to the reinforced concrete?",
+        "سؤال تجريبي: أضيف مصنعية وشدّات للخرسانة المسلحة؟",
+    )
+    options = [_words(seen, "Add them", "ضيفها"), _words(seen, "Not now", "مش دلوقتي")]
+    question = {"id": "q1", "text": text, "options": options}
+    return _call("decide", "ask_engineer", {"questions": [question]})
+
+
 BOQ = (_files_step, _preview, _import, _items)
 LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "chat": (),
@@ -441,6 +548,19 @@ LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "lessons": (_lesson,),
     "view": (*BOQ, _first_item_numbers, _view),
     "weak": (*BOQ, _weak_letter),  # then it claims what the records do not show, every time
+    "workspace": (
+        _files_step,
+        _preview,
+        _import_unpriced,
+        _items,
+        _quote_source,
+        _supply_price,
+        _sample_source,
+        _sample_quantity,
+        _sheet,
+        _bid_letter,
+        _decide,
+    ),  # fmt: skip
     "full": (
         _files_step,
         _read_spec,
@@ -473,6 +593,13 @@ _STEP_OF = {
     _first_item_numbers: "numbers",
     _view: "view",
     _weak_letter: "weakletter",
+    _import_unpriced: "import",
+    _quote_source: "quote",
+    _supply_price: "price",
+    _sample_source: "samplesource",
+    _sample_quantity: "quantity",
+    _bid_letter: "bidletter",
+    _decide: "decide",
 }
 
 

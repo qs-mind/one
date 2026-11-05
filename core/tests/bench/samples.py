@@ -1,9 +1,11 @@
 """Sample input files for the bench, written fresh: every name and text says it is a sample.
 
 - an Arabic BOQ in Excel, six columns: code, description, unit, quantity, rate, amount;
-- a short specification in Word.
+- a short specification in Word;
+- a supplier's quote in PDF (its own folder, for the workspace screens: `write_quote`).
 The quantities and rates are sample values made up for testing, not real prices."""
 
+import re
 from pathlib import Path
 
 import openpyxl
@@ -22,7 +24,7 @@ BOQ_ROWS = [
 ]
 
 
-def write_boq(path: Path, *, priced: bool = True) -> Path:
+def write_boq(path: Path, *, priced: bool = True, rows: list[tuple] = BOQ_ROWS) -> Path:
     """The sample BOQ; `priced=False` leaves out its rates and amounts, as a client's BOQ in a
     tender comes."""
     book = openpyxl.Workbook()
@@ -33,7 +35,7 @@ def write_boq(path: Path, *, priced: bool = True) -> Path:
     sheet.append(
         ["رقم البند", "الوصف", "الوحدة", "الكمية", "الفئة", "القيمة"][: 6 if priced else 4]
     )
-    for code, description, unit, quantity, rate, amount in BOQ_ROWS:
+    for code, description, unit, quantity, rate, amount in rows:
         row = [
             code or None,
             description,
@@ -63,6 +65,48 @@ def write_spec(path: Path) -> Path:
 def write(folder: Path) -> list[Path]:
     folder.mkdir(parents=True, exist_ok=True)
     return [write_boq(folder / BOQ_NAME), write_spec(folder / SPEC_NAME)]
+
+
+QUOTE_NAME = "عرض أسعار المورد - عينة.pdf"
+QUOTE_LINES = (
+    "عرض أسعار توريد خرسانة جاهزة بتاريخ 2 نوفمبر 2026 - عينة اختبار، أسعار غير حقيقية",
+    "خرسانة مسلحة للأسقف - عينة: 3450 جنيه للمتر المكعب",
+)
+QUOTE_RATE = "3450"  # the rate the quote gives the concrete's supply, as its line writes it
+QUOTE_DATED = "2026-11-02"
+# page 2: a quantity for the bench to cite as sample data, so the screens say «الأرقام عينة»
+QUOTE_SAMPLE_LINES = ("كمية عينة للاختبار: 320 متر مكعب",)
+QUOTE_QUANTITY = "320"
+
+
+def _visual(line: str) -> str:
+    """A line in the visual order an Arabic PDF stores it: reversed, its digit runs kept."""
+    return re.sub(r"[0-9][0-9.,]*", lambda m: m.group(0)[::-1], line[::-1])
+
+
+def write_quote(folder: Path) -> Path:
+    """The supplier's quote: its page, supply only (it says nothing of labour), and a page of
+    sample data."""
+    from tests.samples import sample_pdf
+
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / QUOTE_NAME
+    pages = [[_visual(line) for line in lines] for lines in (QUOTE_LINES, QUOTE_SAMPLE_LINES)]
+    path.write_bytes(sample_pdf(pages))
+    return path
+
+
+# The workspace screens' tender: the client's BOQ, unpriced, with a supply-only item whose
+# quantity the BOQ leaves blank (the bench cites it from the quote's sample page), and the quote.
+WORKSPACE_BOQ_NAME = "جدول كميات المناقصة - عينة اختبار.xlsx"
+SUPPLY_CODE = "02/03"
+WORKSPACE_ROWS = [*BOQ_ROWS, (SUPPLY_CODE, "توريد خرسانة جاهزة للأسقف (عينة)", "م3", "", "", "")]
+
+
+def write_workspace(folder: Path) -> list[Path]:
+    folder.mkdir(parents=True, exist_ok=True)
+    boq = write_boq(folder / WORKSPACE_BOQ_NAME, priced=False, rows=WORKSPACE_ROWS)
+    return [boq, write_quote(folder)]
 
 
 TENDER_NAME = "مناقصة عينة - منصة الاختبار"

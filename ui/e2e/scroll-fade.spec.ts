@@ -3,7 +3,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { expect, test, type Locator } from "@playwright/test";
-import { canvasReady, mockCore, small } from "./fixtures";
+import { mockCore, small, workspaceReady } from "./fixtures";
 
 const edges = (area: Locator) =>
   area.evaluate((el) => {
@@ -19,7 +19,7 @@ test("the palette's list fades at the edge with more beyond it, and only there",
   await page.setViewportSize({ width: 1000, height: 420 }); // the list (half the window high) has more than it shows
   await mockCore(page, small());
   await page.goto("/");
-  await canvasReady(page);
+  await workspaceReady(page);
   await page.locator('[data-region="topbar"]').getByRole("button").first().focus();
   await page.keyboard.press(`${process.platform === "darwin" ? "Meta" : "Control"}+KeyK`);
   const list = page.locator("[cmdk-list]");

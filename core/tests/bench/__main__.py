@@ -129,6 +129,7 @@ def main(argv: list[str] | None = None) -> None:
         samples.write(args.samples)
         samples.write_tender(args.samples.parent / "tender")  # beside the loose files
         samples.write_old(args.samples.parent / "old")
+        samples.write_workspace(args.samples.parent / "workspace")  # the workspace screens' tender
 
     import qsone.__main__ as core
     from qsone.__main__ import main as core_main

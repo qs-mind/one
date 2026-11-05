@@ -194,11 +194,9 @@ for (const lang of ["ar", "en"] as const) {
       const { page: own } = await recorded(browser, lang, walk.projectId);
       await own.goto("/");
       await expect(own.locator('[data-region="topbar"]').getByRole("button", { name: projectName })).toBeVisible();
-      // a reopened project's chat shows no cards: the BOQ opens from the Project Index
-      await own.locator('[data-region="topbar"]').getByRole("button", { name: say(lang, "deliverablesButton") }).click();
-      const index = own.locator('section[aria-labelledby="project-index"]');
-      await index.getByRole("button", { name: lang === "ar" ? /جدول كميات/ : /BOQ/ }).first().click();
-      await index.getByRole("button", { name: say(lang, "close"), exact: true }).click(); // it opened full screen
+      // a reopened project's chat shows no cards: the BOQ opens from the document switcher
+      await own.locator('[data-region="topbar"] h1 button[aria-haspopup="menu"]').click();
+      await own.getByRole("menu").getByRole("menuitem", { name: lang === "ar" ? /جدول كميات/ : /BOQ/ }).first().click();
       await own.waitForTimeout(1200);
       const listed = (await (await own.request.get(`/api/projects/${walk.projectId}/deliverables`)).json()) as {
         deliverables: { id: string; kind: string }[];
@@ -250,7 +248,9 @@ for (const lang of ["ar", "en"] as const) {
     await dialog.getByRole("button", { name: new RegExp(`^${say(lang, "aiLinkApiKey")}`) }).click();
     const next = dialog.getByRole("button", { name: say(lang, "setupNext"), exact: true });
     const skip = dialog.getByRole("button", { name: say(lang, "setupSkip"), exact: true });
-    const before = await next.boundingBox();
+    // to the whole pixel: a sub-pixel settle of the dialog (0.4 px, 5 Nov 2026) is no move the eye sees
+    const box = async () => Object.fromEntries(Object.entries((await next.boundingBox())!).map(([k, v]) => [k, Math.round(v)]));
+    const before = await box();
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
     await dialog.getByLabel(say(lang, "aiKeyLabel")).click();
     await paste(page, REFUSED);
@@ -258,7 +258,7 @@ for (const lang of ["ar", "en"] as const) {
     expected(walk, 409, "POST /api/settings/ai/check");
     await page.mouse.move(0, 0);
     await shot(page, "bar-failed", lang);
-    expect(await next.boundingBox(), "the failure never moves Next").toEqual(before);
+    expect(await box(), "the failure never moves Next").toEqual(before);
     await inView(page, next, "Next with the failure, 1440×900");
     for (const [width, height, state] of [[380, 900, "bar-failed-380"], [720, 450, "bar-failed-zoom200"]] as const) {
       await page.setViewportSize({ width, height });
