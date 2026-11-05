@@ -7,6 +7,7 @@ from pathlib import Path
 
 import uvicorn
 
+from qsone import keystore
 from qsone.app import create_app
 
 
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.data_dir is not None:
         os.environ["QSONE_DATA_DIR"] = str(args.data_dir)  # settings.json follows it too
+    keystore.choose()  # before anything uses a key: the system key store, or One's key file
     config = uvicorn.Config(
         create_app(secret, data_dir=args.data_dir),
         host="127.0.0.1",
