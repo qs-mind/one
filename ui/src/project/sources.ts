@@ -9,7 +9,7 @@ import type { Text } from "../i18n";
 import { texts } from "../i18n";
 import { uploadFile } from "../records/RecordsPanel";
 import type { SheetView } from "../deliverables/types";
-import type { ClientBoqInfo, DeliverableInfo, FileInfo, FilePiece, Placed, ProjectSources, Team, View, ViewerProps } from "./types";
+import type { Anchor, ClientBoqInfo, DeliverableInfo, DocKey, FileInfo, FilePiece, Placed,ProjectSources, Team, View, ViewerProps } from "./types";
 
 /** A refused call, with the core's line in both languages. */
 export class SourceError extends Error {
@@ -67,6 +67,13 @@ export function httpSources(projectId: string): ProjectSources {
       json<{ frames: Placed[]; view: View | null; client_boqs?: ClientBoqInfo[] }>(`${base}/canvas`, { frames: [], view: null }),
     saveFrames: (frames, removed, keepalive = false) => put(`${base}/canvas/frames`, { frames, removed }, keepalive),
     saveView: (view, keepalive = false) => put(`${base}/canvas/view`, view, keepalive),
+    workspace: () =>
+      json<{ open: DocKey | null; anchor: Anchor | null; client_boqs: ClientBoqInfo[] }>(`${base}/workspace`, {
+        open: null,
+        anchor: null,
+        client_boqs: [],
+      }),
+    saveWorkspace: (opened, keepalive = false) => put(`${base}/workspace`, opened, keepalive),
     activity(onEvent, signal, onReconnect) {
       if (signal.aborted) return;
       const stop = subscribeActivity(projectId, onEvent, onReconnect);

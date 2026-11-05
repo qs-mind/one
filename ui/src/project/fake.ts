@@ -6,9 +6,11 @@ import type {
   AgentInfo,
   ClientBoqInfo,
   DeliverableInfo,
+  DocKey,
   FileInfo,
   FilePiece,
   FrameKey,
+  Opened,
   Placed,
   ProjectSources,
   ProjectStatus,
@@ -22,6 +24,8 @@ export type FakeOptions = {
   team?: Team;
   status?: ProjectStatus;
   layout?: { frames: Placed[]; view: View | null };
+  /** The saved open document. */
+  workspace?: Opened | null;
   /** Page counts by file id; a file not listed has no pages. */
   pages?: Record<string, number>;
   text?: Record<string, FilePiece[]>;
@@ -38,6 +42,7 @@ export type FakeSources = ProjectSources & {
   saved: {
     frames: { frames: Placed[]; removed: FrameKey[]; keepalive: boolean }[];
     views: { view: View; keepalive: boolean }[];
+    workspace: { opened: Opened; keepalive: boolean }[];
   };
   uploads: File[];
 };
@@ -47,7 +52,8 @@ export function fakeSources(options: FakeOptions): FakeSources {
   const frames = new Map((options.layout?.frames ?? []).map((f) => [f.key, f]));
   let view = options.layout?.view ?? null;
   const listeners = new Set<{ onEvent: (event: ActivityEvent) => void; onReconnect?: () => void }>();
-  const saved: FakeSources["saved"] = { frames: [], views: [] };
+  let opened = options.workspace ?? null;
+  const saved: FakeSources["saved"] = { frames: [], views: [], workspace: [] };
   const uploads: File[] = [];
 
   return {
@@ -68,6 +74,15 @@ export function fakeSources(options: FakeOptions): FakeSources {
     async saveView(next, keepalive = false) {
       saved.views.push({ view: next, keepalive });
       view = next;
+    },
+    workspace: async () => ({
+      open: (opened?.key ?? null) as DocKey | null,
+      anchor: opened?.anchor ?? null,
+      client_boqs: [...(options.clientBoqs ?? [])],
+    }),
+    async saveWorkspace(next, keepalive = false) {
+      saved.workspace.push({ opened: next, keepalive });
+      opened = next;
     },
     activity(onEvent, signal, onReconnect) {
       if (signal.aborted) return;
