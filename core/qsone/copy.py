@@ -286,6 +286,9 @@ TOOL_REFUSED = {
 
 # A row whose item has two current numbers of one name (written before 5 Nov 2026).
 # {name}: a BOQ_FIELDS label; {values}: the values, joined.
+# The close card: a Deliverable that is not right, with the first row that says why.
+CLOSE_ROW_PROBLEM = {"en": "Item {code}: {problem}", "ar": "البند {code}: {problem}"}
+
 ROW_NUMBERS_CONFLICT = {
     "en": "This item has {n} different «{name}» values recorded: {values}. Type the right one in "
     "this row and ONE keeps that one only.",

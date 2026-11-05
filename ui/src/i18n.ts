@@ -896,6 +896,11 @@ export const texts = {
   },
   closeProjectOpenComments: { en: "Review comments still open: {n}", ar: "ملاحظات مراجعة لسه مفتوحة: {n}" },
   closeProjectUnsigned: { en: "Not signed off:", ar: "لسه ماتعتمدش:" },
+  closeProjectBlockers: {
+    en: "These Deliverables are not ready to go out. Fix them first, or archive anyway.",
+    ar: "المُخرَجات دي لسه مش جاهزة تطلع. ظبّطها الأول، أو أرشف برضه.",
+  },
+  closeProjectBroken: { en: "Not right yet:", ar: "لسه فيها مشكلة:" },
   closeProjectReports: { en: "Review reports", ar: "تقارير المراجعة" },
   closeProjectAllClear: { en: "Nothing is open.", ar: "مفيش حاجة مفتوحة." },
   lessonsTitle: { en: "Lessons Learned", ar: "الدروس المستفادة" },
