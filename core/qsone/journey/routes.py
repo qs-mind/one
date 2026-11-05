@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from qsone import chat, copy, usage
 from qsone.engine import connectors as engine_connectors
+from qsone.engine import roles
 from qsone.engine.connectors import claude_code as claude_link
 from qsone.journey import claude_code, closing, engineer, setup_state, understand
 from qsone.journey.setup_state import Language, State
@@ -43,7 +44,8 @@ class ConsentIn(BaseModel):
 class CheckIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    via: Literal["api_key", "claude_code"]
+    via: Literal["api_key", "claude_code", "standard"]
+    connector: str | None = Field(None, max_length=200)  # a Standard Link's id (audit R16)
 
 
 class OpenIn(BaseModel):
@@ -133,6 +135,20 @@ def router(engine: Any) -> APIRouter:
             if failed:
                 return JSONResponse(copy.error(failed), 409)
             usage.track("ai_link", via="api_key")
+            return JSONResponse({"ok": True})
+        if body.via == "standard":  # its own model: the Lead's, if it is on this link
+            link = next((c for c in found if c.id == body.connector), None)
+            listed = [] if link is None else await link.cards()
+            lead = roles.chosen(listed).get("lead")
+            model = lead if lead is not None and lead.connector == body.connector else None
+            if model is None and listed:
+                model = listed[0].choice
+            if model is None:
+                return JSONResponse(copy.error(copy.NO_AI), 409)
+            failed = await engine_connectors.check(f"{model.connector}/{model.model}", among=found)
+            if failed:
+                return JSONResponse(copy.error(failed), 409)
+            usage.track("ai_link", via="standard")
             return JSONResponse({"ok": True})
         saved = claude_link.saved()["path"]
         picked = None  # a Claude Code found outside PATH is saved by its path

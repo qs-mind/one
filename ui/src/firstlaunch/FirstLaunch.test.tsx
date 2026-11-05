@@ -265,6 +265,50 @@ describe("FirstLaunch", () => {
     expect(calls(fetch, "PUT /setup/ai")[0]).toEqual({ state: "done" });
   });
 
+  it("another AI provider: its address and key are added as a Standard Link and checked at once (audit R16)", async () => {
+    const link = { id: "standard:g1", kind: "model", name: "Gemini - sample", provider: "google", on_device: false, key_set: true, error: null };
+    const fetch = mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "POST /settings/ai/standard": () => Response.json(link, { status: 201 }),
+      "POST /settings/ai/check": () => Response.json({ ok: true }),
+    });
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkStandard.en) }));
+    await user.type(screen.getByLabelText(texts.providerName.en), "Gemini - sample");
+    await user.type(screen.getByLabelText(texts.baseUrl.en), "https://generativelanguage.googleapis.com/v1beta/openai");
+    await user.click(screen.getByLabelText(texts.providerKey.en));
+    await user.paste("sample-google-key-not-real");
+    expect(await screen.findByText(texts.aiLinkWorks.en, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(calls(fetch, "POST /settings/ai/standard")).toEqual([
+      { name: "Gemini - sample", base_url: "https://generativelanguage.googleapis.com/v1beta/openai", key: "sample-google-key-not-real" },
+    ]);
+    expect(calls(fetch, "POST /settings/ai/check")).toEqual([{ via: "standard", connector: "standard:g1" }]);
+    expect(noSaveOrCheck()).toEqual([]);
+    expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeEnabled();
+  });
+
+  it("another AI provider whose check fails says why, and takes the link out again", async () => {
+    const link = { id: "standard:g2", kind: "model", name: "Gemini - sample", provider: "google", on_device: false, key_set: true, error: null };
+    const refused = { en: "Gemini - sample refused the key.", ar: "Gemini - sample رفض المفتاح." };
+    const fetch = mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "POST /settings/ai/standard": () => Response.json(link, { status: 201 }),
+      "POST /settings/ai/check": () => Response.json({ error: refused, fix: "ai" }, { status: 409 }),
+      "DELETE /settings/ai/standard/standard%3Ag2": () => Response.json({ undo: "u1", window_ms: 10000 }),
+    });
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkStandard.en) }));
+    await user.type(screen.getByLabelText(texts.providerName.en), "Gemini - sample");
+    await user.type(screen.getByLabelText(texts.baseUrl.en), "https://generativelanguage.googleapis.com/v1beta/openai");
+    await user.click(screen.getByLabelText(texts.providerKey.en));
+    await user.paste("sample-google-key-not-real");
+    expect(await screen.findByText(refused.en, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(calls(fetch, "DELETE /settings/ai/standard/standard%3Ag2")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeDisabled();
+  });
+
   it("a key the check refuses says why, and stays in the field to be fixed", async () => {
     const refused = { en: "The key was refused (sample).", ar: "المفتاح اترفض (عينة)." };
     mockCore({
@@ -425,13 +469,13 @@ describe("FirstLaunch", () => {
     expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeDisabled();
   });
 
-  it("the AI step has no Save or Check button, in either language, for either choice", async () => {
+  it("the AI step has no Save or Check button, in either language, for any choice", async () => {
     mockCore({ "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }) });
     const user = userEvent.setup();
     for (const lang of ["en", "ar"] as const) {
       setLanguage(lang);
       const { unmount } = render(<FirstLaunch initial={{ ...fresh(), steps: { ...fresh().steps, language: "done", account: "skipped" } }} onDone={vi.fn()} />);
-      for (const via of [texts.aiLinkClaudeCode, texts.aiLinkApiKey]) {
+      for (const via of [texts.aiLinkClaudeCode, texts.aiLinkApiKey, texts.aiLinkStandard]) {
         await user.click(await screen.findByRole("button", { name: choice(via[lang]) }));
         expect(noSaveOrCheck()).toEqual([]);
       }
@@ -553,7 +597,7 @@ describe("FirstLaunch", () => {
     const keys: Record<Step | "ready", (keyof typeof texts)[]> = {
       language: ["languageTitle", "languageHelp", "setupNext", "setupSkip"],
       account: ["accountTitle", "accountWhy", "accountSignIn", "accountUseDevice", "setupBack"],
-      ai: ["connectAi", "consentTitle", "consentBody", "consentTerms", "consentPrivacy", "consentAgree", "aiLinkTitle", "aiLinkClaudeCode", "aiLinkApiKey"],
+      ai: ["connectAi", "consentTitle", "consentBody", "consentTerms", "consentPrivacy", "consentAgree", "aiLinkTitle", "aiLinkClaudeCode", "aiLinkApiKey", "aiLinkStandard"],
       card: ["cardTitle", "cardHelp", "cardRole", "cardRoleProcurement", "cardCountry", "cardCountryOther", "cardCity"],
       usage: ["usageTitle", "usageHelp", "usageSentTitle", "usageSent", "usageNeverTitle", "usageNever", "usageShare", "usageDontShare"],
       ready: ["readyTitle", "readyStart"],

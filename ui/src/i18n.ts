@@ -742,6 +742,11 @@ export const texts = {
     en: "A Claude key from Anthropic: you pay Anthropic for what you use.",
     ar: "مفتاح Claude من Anthropic: بتدفع لـ Anthropic على قد استخدامك.",
   },
+  aiLinkStandard: { en: "Another AI provider", ar: "مزوّد ذكاء اصطناعي تاني" },
+  aiLinkStandardHelp: {
+    en: "Any provider with an OpenAI-compatible address and key: Gemini, DeepSeek, or a model on this computer.",
+    ar: "أي مزوّد عنده عنوان متوافق مع OpenAI ومفتاح: Gemini أو DeepSeek أو نموذج على الجهاز ده.",
+  },
   aiLinkChecking: { en: "Checking…", ar: "بنتأكد…" },
   aiLinkWorks: { en: "It works. ONE is connected to AI.", ar: "شغال. ONE اتوصّل بالذكاء الاصطناعي." },
   aiLinkLater: {

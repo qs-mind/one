@@ -340,6 +340,21 @@ def test_check_an_api_key_makes_one_tiny_call(data_dir):
     assert r.json() == {"ok": True} and model.calls == 1
 
 
+def test_check_a_standard_link_makes_one_tiny_call_on_its_model(data_dir):
+    """Audit R16: the first launch offers a Standard Link (an OpenAI-compatible address and key)
+    next to Claude; its check goes through that link's own model."""
+    found = links()
+    model = scripted(text("OK"))
+    found[1].models["deepseek-chat"] = model
+    with make_client(found) as client:
+        body = {"via": "standard", "connector": "standard:deepseek"}
+        r = client.post("/settings/ai/check", json=body, headers=AUTH)
+        assert r.json() == {"ok": True} and model.calls == 1
+        missing = {"via": "standard", "connector": "standard:gone"}
+        r = client.post("/settings/ai/check", json=missing, headers=AUTH)
+        assert r.status_code == 409 and r.json()["error"] == copy.NO_AI
+
+
 def test_check_waits_for_consent(no_consent, data_dir):
     link = FakeClaudeCode()
     with make_client([link]) as client:

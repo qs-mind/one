@@ -1,5 +1,6 @@
 // Connect AI: first the consent (where the engineer's text goes, with the terms and the privacy policy), then how ONE
-// reaches AI: the engineer's own Claude Code, or an API key (the key field AI settings use). Neither choice can be
+// reaches AI: the engineer's own Claude Code, an API key (the key field AI settings use), or another provider's
+// OpenAI-compatible address and key (a Standard Link, audit R16). Neither choice can be
 // made before "I understand"; the core refuses every AI call until then as well (AI_CONSENT_NEEDED). The same step
 // opens alone from the chat's "Connect AI" when the consent is missing. No Check button: choosing Claude Code checks
 // it at once (choosing it again, or coming back to ONE's window after a failed check, checks it again), and a key
@@ -10,6 +11,7 @@ import { ProviderLogo } from "../brand/providers/ProviderLogo";
 import { coreLine, send } from "../core";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
+import { KEY_MIN, useLiveKey } from "../ui/live";
 import { Feedback, type Nav, openSetup, option, primary, quiet, secondary, StepScreen } from "./parts";
 
 // The consent, as GET /settings/ai-consent says: `at` is null until the engineer said yes to `text_version`.
@@ -67,7 +69,7 @@ export function ConsentNeeded() {
   );
 }
 
-type Via = "claude_code" | "api_key";
+type Via = "claude_code" | "api_key" | "standard";
 type Check = "idle" | "checking" | "works" | Text;
 
 export function ConnectAi({ nav }: { nav: Nav }) {
@@ -166,6 +168,10 @@ export function ConnectAi({ nav }: { nav: Nav }) {
             </span>
             <span className={`block text-sm ${via === "api_key" ? "text-paper/80" : "text-slate"}`}>{t("aiLinkApiKeyHelp")}</span>
           </button>
+          <button type="button" aria-pressed={via === "standard"} onClick={() => choose("standard")} className={`${option(via === "standard")} text-start sm:col-span-2`}>
+            <span className="block font-semibold">{t("aiLinkStandard")}</span>
+            <span className={`block text-sm ${via === "standard" ? "text-paper/80" : "text-slate"}`}>{t("aiLinkStandardHelp")}</span>
+          </button>
         </div>
 
         {/* what the choice shows keeps one height (the key field's), so the buttons under it never move */}
@@ -187,9 +193,55 @@ export function ConnectAi({ nav }: { nav: Nav }) {
             </div>
           )}
           {via === "api_key" && <AiKey plain onChecking={() => setCheck("idle")} onChecked={(works) => setCheck(works ? "works" : "idle")} />}
+          {via === "standard" && <StandardFirst onChecked={(works) => setCheck(works ? "works" : "idle")} />}
         </div>
       </fieldset>
     </StepScreen>
+  );
+}
+
+const field = "rounded-md border border-slate bg-paper px-3 py-2 outline-none focus:border-ink";
+
+/** Another provider: its name and OpenAI-compatible address, then its key, which adds the link and checks it at once (no
+ * Save or Check button). A link whose check fails is taken out again, so a corrected key never leaves a second one. */
+function StandardFirst({ onChecked }: { onChecked: (works: boolean) => void }) {
+  const [name, setName] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const ready = name.trim() !== "" && baseUrl.trim() !== "";
+  const key = useLiveKey(KEY_MIN.brave, async (value, signal) => {
+    onChecked(false);
+    const body = { name: name.trim(), base_url: baseUrl.trim(), key: value };
+    const added = await send("/settings/ai/standard", "POST", body, signal);
+    if (!added?.ok) return coreLine(added, added?.status === 422 ? texts.providerUrlRefused : texts.providerNotAdded);
+    const link = (await added.json().catch(() => undefined)) as { id?: string } | undefined;
+    if (!link?.id) return texts.providerNotAdded;
+    const checked = await send("/settings/ai/check", "POST", { via: "standard", connector: link.id }, signal);
+    if (checked?.ok) {
+      onChecked(true);
+      return null;
+    }
+    const line = await coreLine(checked, texts.claudeCodeCheckFailed);
+    await send(`/settings/ai/standard/${encodeURIComponent(link.id)}`, "DELETE");
+    return line;
+  });
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="flex flex-col gap-1">
+        <span>{t("providerName")}</span>
+        <input dir="auto" value={name} onChange={(event) => setName(event.target.value)} className={field} />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span>{t("baseUrl")}</span>
+        <input type="url" dir="ltr" spellCheck={false} value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} className={field} />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span>{t("providerKey")}</span>
+        <input type="password" dir="ltr" autoComplete="off" spellCheck={false} disabled={!ready} {...key.field} className={field} />
+      </label>
+      {key.live.state === "busy" && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
+      {key.live.state === "done" && <Feedback state="done">{t("aiLinkWorks")}</Feedback>}
+      {key.live.state === "failed" && <Feedback state="failed">{pick(key.live.line)}</Feedback>}
+    </div>
   );
 }
 
