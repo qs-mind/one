@@ -70,6 +70,10 @@ export const texts = {
   providerName: { en: "Name", ar: "الاسم" },
   baseUrl: { en: "Base URL", ar: "رابط الـ API (Base URL)" },
   providerKey: { en: "Key (optional: models on this computer have none)", ar: "المفتاح (اختياري: النماذج اللي على الجهاز ملهاش مفتاح)" },
+  providerModel: {
+    en: "Model (optional: the one ONE uses first, by its name at the provider)",
+    ar: "النموذج (اختياري: اللي ONE هيشتغل بيه الأول، باسمه عند المزوّد)",
+  },
   addProvider: { en: "Add provider", ar: "ضيف المزوّد" },
   providerNotAdded: { en: "The provider was not added. Try again.", ar: "المزوّد ماتضافش. جرّب تاني." },
   providerUrlRefused: {
@@ -833,6 +837,8 @@ export const texts = {
   },
   readyLater: { en: "Start without a folder", ar: "ابدأ من غير فولدر" },
   readyStart: { en: "Start", ar: "ابدأ" },
+  readyRolePrice: { en: "${in}/${out} per million tokens", ar: "${in}/${out} لكل مليون توكن" },
+  readyRolesChange: { en: "Change the models", ar: "غيّر النماذج" },
   // Task 11: tender folder import and the "I understood this" card.
   importDrop: { en: "Drop a folder here", ar: "سيب الفولدر هنا" },
   importChoose: { en: "Choose folder", ar: "اختار فولدر" },

@@ -288,6 +288,67 @@ describe("FirstLaunch", () => {
     expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeEnabled();
   });
 
+  it("another AI provider: the model the engineer typed goes with the link (finding 12)", async () => {
+    const link = { id: "standard:g3", kind: "model", name: "Gemini - sample", provider: "google", on_device: false, key_set: true, error: null };
+    const fetch = mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "POST /settings/ai/standard": () => Response.json(link, { status: 201 }),
+      "POST /settings/ai/check": () => Response.json({ ok: true }),
+    });
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkStandard.en) }));
+    await user.type(screen.getByLabelText(texts.providerName.en), "Gemini - sample");
+    await user.type(screen.getByLabelText(texts.baseUrl.en), "https://generativelanguage.googleapis.com/v1beta/openai");
+    await user.type(screen.getByLabelText(texts.providerModel.en), "gemini-3.1-flash-lite");
+    await user.click(screen.getByLabelText(texts.providerKey.en));
+    await user.paste("sample-google-key-not-real");
+    expect(await screen.findByText(texts.aiLinkWorks.en, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(calls(fetch, "POST /settings/ai/standard")[0]).toMatchObject({ model: "gemini-3.1-flash-lite" });
+  });
+
+  it("Ready names each role's model with its price, and a way to change them (finding 12)", async () => {
+    const card = (model: string, name: string, price_in: string | null, price_out: string | null) => ({
+      connector: "standard:g",
+      model,
+      name,
+      provider: "google",
+      images: false,
+      tools: true,
+      context: null,
+      price_in,
+      price_out,
+      price_source: price_in ? "genai-prices 0.2.1: https://ai.google.dev/pricing (sample)" : null,
+      on_device: false,
+      subscription: false,
+    });
+    const lite = card("models/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite", "0.25", "1.5");
+    const gemma = card("models/gemma-3-27b-it", "gemma-3-27b-it", null, null);
+    const pick = (c: typeof lite) => ({ connector: c.connector, model: c.model });
+    const roles = { lead: pick(lite), checker: pick(gemma), specialist: pick(lite), quick: pick(lite) };
+    mockCore({
+      "GET /settings/ai": () =>
+        Response.json({ connectors: [], sheet: [lite, gemma], roles, defaults: roles, effort: null, key_store: "system" }),
+    });
+    const { onOpenPanel } = await import("../shell/FixAction");
+    const user = userEvent.setup();
+    const onDone = flowAt("usage");
+    await user.click(await screen.findByRole("button", { name: texts.setupSkip.en }));
+    const line = await screen.findByText((_, el) => el?.tagName === "P" && (el.textContent ?? "").startsWith(texts.roleLead.en));
+    expect(line.textContent).toBe(
+      `${texts.roleLead.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens) · ` +
+        `${texts.roleChecker.en}: gemma-3-27b-it (${texts.priceUnknown.en}) · ` +
+        `${texts.roleSpecialist.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens) · ` +
+        `${texts.roleQuick.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens)`,
+    );
+    expect(screen.getByText(/genai-prices 0\.2\.1/)).toBeInTheDocument(); // every price with its source
+    await user.click(screen.getByRole("button", { name: texts.readyRolesChange.en }));
+    expect(onDone).toHaveBeenCalled();
+    const opened = vi.fn();
+    onOpenPanel(opened)(); // the app, once it shows, opens AI settings
+    expect(opened).toHaveBeenCalledWith("ai");
+  });
+
   it("another AI provider whose check fails says why, and takes the link out again", async () => {
     const link = { id: "standard:g2", kind: "model", name: "Gemini - sample", provider: "google", on_device: false, key_set: true, error: null };
     const refused = { en: "Gemini - sample refused the key.", ar: "Gemini - sample رفض المفتاح." };

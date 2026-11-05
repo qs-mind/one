@@ -1,7 +1,8 @@
 // The first launch: a full-window flow of six screens, language, QS Mind account, Connect AI, Introduction card,
 // Usage Stats, then Ready. Each step has Back and Skip, and a row of step dots; a skipped step counts as passed and
 // the app works with every step skipped. The core keeps where the engineer is (GET /setup, PUT /setup/{step}), so a
-// first launch closed half-way opens at the next step. No screen mentions a plan or a price.
+// first launch closed half-way opens at the next step. No screen mentions a plan; Ready names the model for each job
+// with its price from the Model Data Sheet, and the price's source (finding 12).
 //
 // The flow opens again from the top bar's More ("Setup"), over the app, and one step opens alone: the chat's
 // "Connect AI", while the AI consent is missing.
@@ -9,14 +10,15 @@ import { type ReactNode, useEffect, useState } from "react";
 import { api } from "../api";
 import { send } from "../core";
 import { dir, fill, language, setLanguage, t, useLanguage } from "../i18n";
-import { useAiSettings } from "../settings/AiSettings";
+import { type Ai, keyOf, type ModelCard, type Role, roleOrder, roleTexts, useAiSettings } from "../settings/AiSettings";
+import { openPanel } from "../shell/FixAction";
 import { useDragDepth } from "../ui/useDragDepth";
 import { Mark } from "../shell/TopBar";
 import { Account } from "./Account";
 import { ConnectAi } from "./ConnectAi";
 import { IntroCard } from "./IntroCard";
 import { Language } from "./Language";
-import { closeSetup, type Nav, primary, type Setup, type Step, StepScreen, STEPS, useSetupRequest } from "./parts";
+import { closeSetup, type Nav, primary, secondary, type Setup, type Step, StepScreen, STEPS, useSetupRequest } from "./parts";
 import { UsageStats } from "./UsageStats";
 
 export { openSetup } from "./parts";
@@ -221,6 +223,8 @@ function Ready({
   );
   return (
     <StepScreen title={t("readyTitle")} help={aiSkipped && ai.connected !== true ? t("aiLinkLater") : undefined} nav={nav} skip={false} next={start}>
+      {/* AI settings open once the app shows: the flow ends first */}
+      <RolesLine ai={ai} onChange={() => (openPanel("ai"), onStart())} />
       {onImport && (
         <div className="flex flex-col gap-4">
           <div
@@ -244,6 +248,44 @@ function Ready({
         </div>
       )}
     </StepScreen>
+  );
+}
+
+function rolePrice(card: ModelCard | undefined): string {
+  if (card?.on_device) return t("onDevice");
+  if (card?.price_in == null || card.price_out == null) return t("priceUnknown"); // never a made-up number
+  return fill(t("readyRolePrice"), { in: card.price_in, out: card.price_out });
+}
+
+/** The model for each job in one line, each with its price as the Model Data Sheet has it, the prices' sources under
+ * it, and the way to AI settings to change them. Nothing while no AI is connected. */
+function RolesLine({ ai, onChange }: { ai: Ai; onChange: () => void }) {
+  if (ai.loaded.state !== "ready") return null;
+  const { sheet, roles } = ai.loaded.settings;
+  const shown = roleOrder.filter((role) => roles[role]);
+  if (shown.length === 0) return null;
+  const cardOf = (role: Role) => sheet.find((card) => keyOf(card) === keyOf(roles[role]!));
+  const sources = [...new Set(shown.map((role) => cardOf(role)?.price_source).filter((source) => source != null))];
+  return (
+    <div className="flex flex-col gap-2">
+      <p>
+        {shown.map((role, index) => {
+          const card = cardOf(role);
+          return (
+            <span key={role}>
+              {index > 0 && " · "}
+              {t(roleTexts[role])}: <bdi>{card?.name ?? roles[role]!.model}</bdi> ({rolePrice(card)})
+            </span>
+          );
+        })}
+      </p>
+      {sources.length > 0 && (
+        <p className="text-sm text-slate">{sources.map((source) => fill(t("priceSource"), { source })).join(" · ")}</p>
+      )}
+      <button type="button" onClick={onChange} className={`${secondary} self-start`}>
+        {t("readyRolesChange")}
+      </button>
+    </div>
   );
 }
 

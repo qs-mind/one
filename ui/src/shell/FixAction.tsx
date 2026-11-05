@@ -8,14 +8,19 @@ import { type Language, t, useLanguage } from "../i18n";
 /** The top-bar panels a text elsewhere can open (App listens). */
 export type FixPanel = "ai" | "backup";
 const listeners = new Set<(panel: FixPanel) => void>();
+let waiting: FixPanel | undefined; // asked for before the app shows (the first launch's Ready): opened when it does
 
 /** Opens AI settings or Backup from anywhere on the screen, as the More menu does. */
 export function openPanel(panel: FixPanel) {
+  if (listeners.size === 0) waiting = panel;
   for (const listener of listeners) listener(panel);
 }
 
 export function onOpenPanel(listener: (panel: FixPanel) => void): () => void {
   listeners.add(listener);
+  const asked = waiting;
+  waiting = undefined;
+  if (asked) listener(asked);
   return () => listeners.delete(listener);
 }
 
