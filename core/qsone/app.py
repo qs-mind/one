@@ -28,6 +28,7 @@ from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
+from qsone.journey import routes as journey_routes
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
 from qsone.records.project import RecordsError
@@ -155,6 +156,7 @@ def create_app(
     app.add_middleware(canvas.no_store)
     app.include_router(connector_routes.router(connector_hub))
     app.include_router(backup_routes.router(backups))
+    app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):

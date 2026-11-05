@@ -240,6 +240,23 @@ def no_browser(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def ai_consent(request, monkeypatch):
+    """Every test but those that ask for `no_consent`: the engineer said yes to the AI note
+    (Plan 8), without writing settings.json, so the AI-call checks let calls through."""
+    if "no_consent" in request.fixturenames:
+        return
+    from qsone.journey import setup_state
+
+    given = {"at": "2026-11-05T08:00:00+00:00", "text_version": setup_state.CONSENT_VERSION}
+    monkeypatch.setattr(setup_state, "consent", lambda: given)
+
+
+@pytest.fixture
+def no_consent():
+    """The real consent from settings.json: none until the test gives it."""
+
+
+@pytest.fixture(autouse=True)
 def fast_scrypt(monkeypatch):
     """Every test: `hashlib.scrypt` runs with n at most 2**10, so a recovery code costs
     milliseconds. Code that calls `hashlib.scrypt(...)` through the module gets it."""

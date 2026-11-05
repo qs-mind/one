@@ -1,0 +1,134 @@
+"""The first launch's routes: its steps, the AI consent, Claude Code, the AI check, the
+introduction card, and the outside links the core opens for the page (decision 6)."""
+
+import asyncio
+import webbrowser
+from typing import Any, Literal
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+
+from qsone import chat
+from qsone.engine import connectors as engine_connectors
+from qsone.engine.connectors import claude_code as claude_link
+from qsone.journey import claude_code, engineer, setup_state
+from qsone.journey.setup_state import Language, State
+
+LINKS = {
+    "terms": "https://qsmind.app/{lang}/one/terms",
+    "privacy": "https://qsmind.app/{lang}/one/privacy",
+    "releases": "https://github.com/qs-mind/one/releases",
+    "sign_in": "https://auth.qsmind.app/{lang}/account",
+}
+
+Step = Literal["language", "account", "ai", "card", "usage"]
+
+
+class StepIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: State
+    lang: Language | None = None  # the language step: the language the engineer chose
+
+
+class ConsentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text_version: int = Field(ge=1, le=1000)
+
+
+class CheckIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    via: Literal["api_key", "claude_code"]
+
+
+class OpenIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link: Literal["terms", "privacy", "releases", "sign_in"]
+    lang: Language | None = None  # the page's language; else the one chosen at the first launch
+
+
+def _not_saved() -> JSONResponse:
+    return JSONResponse({}, status_code=503)  # the screen says it in its own words
+
+
+def router(engine: Any) -> APIRouter:
+    """`engine` is the app's Brief Runner: its Engineer Records hold the card, and its
+    connectors are the ones the check goes through."""
+    r = APIRouter()
+
+    @r.get("/setup")
+    def get_setup() -> dict:
+        return setup_state.setup()
+
+    @r.put("/setup/{step}")
+    def put_setup(step: Step, body: StepIn) -> JSONResponse:
+        try:
+            if step == "language" and body.lang is not None:
+                setup_state.set_language(body.lang)
+            return JSONResponse(setup_state.mark(step, body.state))
+        except OSError:
+            return _not_saved()
+
+    @r.get("/settings/ai-consent")
+    def get_consent() -> dict:
+        given = setup_state.consent()
+        at = given["at"] if given else None
+        return {"at": at, "text_version": setup_state.CONSENT_VERSION}  # the version to send
+
+    @r.put("/settings/ai-consent")
+    def put_consent(body: ConsentIn) -> JSONResponse:
+        try:
+            given = setup_state.give_consent(body.text_version)
+        except OSError:
+            return _not_saved()
+        return JSONResponse({"at": given["at"]})
+
+    @r.get("/settings/claude-code")
+    async def find_claude_code() -> dict:
+        path, version = await asyncio.to_thread(claude_code.find_claude)
+        return {"found": path is not None, "version": version}
+
+    @r.post("/settings/ai/check")
+    async def check_ai(body: CheckIn) -> JSONResponse:
+        """One tiny check through the link the engineer chose, after the consent. A Claude Code
+        that answers is turned on, as the link the Lead QS uses."""
+        setup_state.require_consent()
+        found = list(engine.connectors())
+        if body.via == "api_key":
+            failed = await engine_connectors.check(f"anthropic/{chat.lead_model_id()}", among=found)
+            return JSONResponse({"error": failed}, 409) if failed else JSONResponse({"ok": True})
+        saved = claude_link.saved()["path"]
+        picked = None  # a Claude Code found outside PATH is saved by its path
+        if saved is None and claude_code.on_path() is None:
+            path, _ = await asyncio.to_thread(claude_code.find_claude)
+            picked = None if path is None else str(path)
+        if not any(c.id == claude_link.ID for c in found):
+            found.append(claude_link.ClaudeCodeConnector(saved or picked))
+        failed = await engine_connectors.check(claude_link.ID, among=found)
+        if failed:
+            return JSONResponse({"error": failed}, 409)
+        try:
+            claude_link.save(path=saved or picked, on=True)
+        except OSError:
+            return _not_saved()
+        return JSONResponse({"ok": True})
+
+    @r.get("/engineer/card")
+    def get_card() -> dict:
+        return engineer.card(engine.engineer_records())
+
+    @r.put("/engineer/card")
+    def put_card(body: engineer.Card) -> dict:
+        return engineer.save_card(engine.engineer_records(), body)
+
+    @r.post("/app/open")
+    async def open_link(body: OpenIn) -> dict:
+        url = LINKS[body.link].format(lang=body.lang or setup_state.language())
+        opened = await asyncio.to_thread(webbrowser.open, url)
+        return {"opened": bool(opened)}
+
+    return r

@@ -109,6 +109,7 @@ from qsone.engine.types import (
     brief_language,
     choice_of,
 )
+from qsone.journey import engineer
 from qsone.projects import Projects
 from qsone.records.project import Records, RecordsError
 
@@ -1044,6 +1045,9 @@ class _Brief:
         )
         # The General chat's Lead has its three tools only; a project's has the project's.
         spec = general.lead_spec() if self.place.rec is None else agents.lead_spec()
+        introduced = engineer.card_line(engineer.card(self.engine.engineer_records()))
+        if introduced:  # the introduction card's one line (Plan 8)
+            spec = replace(spec, instructions=f"{spec.instructions}\n\n{introduced}")
         if lead is None:
             self.lead_run_id = self.store.new_run(self.brief_id, spec, picked["lead"], None)
         else:

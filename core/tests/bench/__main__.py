@@ -16,11 +16,15 @@ def seed() -> None:
     a dummy one, in the bench's in-memory key store only."""
     from qsone import keys
     from qsone.engine import roles
+    from qsone.journey import setup_state
 
     for connector in fake.connectors():
         keys.set_key(connector.id, "bench-dummy-not-a-key")
     for role, choice in fake.ROLES.items():
         roles.choose(role, choice)
+    setup_state.give_consent(setup_state.CONSENT_VERSION)  # the AI note, as the screen says yes
+    for step in setup_state.STEPS:  # the walks start in the app, past the first launch
+        setup_state.mark(step, "skipped")
 
 
 def main(argv: list[str] | None = None) -> None:
