@@ -7,6 +7,7 @@ settings themselves).
 """
 
 import re
+from dataclasses import dataclass
 
 NO_KEY = {
     "en": "There is no Claude key yet. Add your Claude key first.",
@@ -820,6 +821,51 @@ def fill(text: dict[str, str], /, **values) -> dict[str, str]:
     return found
 
 
+def _arabic_form(n: int) -> str:
+    """Egyptian Arabic counting: بند واحد، بندين، 3 إلى 10 بنود، 11 فأكتر بند."""
+    if n == 1:
+        return "one"
+    if n == 2:
+        return "two"
+    return "few" if 3 <= n % 100 <= 10 else "other"
+
+
+@dataclass(frozen=True)
+class Noun:
+    """A counted noun's forms, each with {n}: English "one" and "other"; Arabic "one", "two",
+    "few" (3 to 10) and "other"."""
+
+    en: dict[str, str]
+    ar: dict[str, str]
+
+
+def counted(n: int, noun: Noun) -> dict[str, str]:
+    """`n` with its noun in each language's own form. A value for `fill`."""
+    return {
+        "en": noun.en["one" if n == 1 else "other"].format(n=n),
+        "ar": noun.ar[_arabic_form(n)].format(n=n),
+    }
+
+
+ITEMS = Noun(
+    en={"one": "1 item", "other": "{n} items"},
+    ar={"one": "بند واحد", "two": "بندين", "few": "{n} بنود", "other": "{n} بند"},
+)
+HEADINGS = Noun(
+    en={"one": "1 heading", "other": "{n} headings"},
+    ar={"one": "عنوان واحد", "two": "عنوانين", "few": "{n} عناوين", "other": "{n} عنوان"},
+)
+ROWS = Noun(
+    en={"one": "1 row", "other": "{n} rows"},
+    ar={"one": "صف واحد", "two": "صفين", "few": "{n} صفوف", "other": "{n} صف"},
+)
+
+
+def listed(values: list[str]) -> dict[str, str]:
+    """A short list of values in each language: «أ، ب» in Arabic, "a, b" in English."""
+    return {"en": ", ".join(values), "ar": "، ".join(values)}
+
+
 # The formula.
 CALC_UNEXPECTED = {
     "en": (
@@ -1452,6 +1498,12 @@ UPDATE_FIRST = {
 DOING_WEB_SEARCH = {"en": "Search the web for: {query}", "ar": "يدوّر في الويب على: {query}"}
 DOING_WEB_READ = {"en": "Open the web page: {url}", "ar": "يفتح صفحة الويب: {url}"}
 DOING_FILES_READ = {"en": "Read {name}, pages {pages}", "ar": "يقرا {name}، صفحات {pages}"}
+DOING_FILES_READ_PAGE = {"en": "Read {name}, page {page}", "ar": "يقرا {name}، صفحة {page}"}
+DOING_FILES_READ_ROWS = {
+    "en": "Read {name}, sheet {sheet}, rows {rows}",
+    "ar": "يقرا {name}، شيت {sheet}، الصفوف {rows}",
+}
+DOING_FILE_READ = {"en": "Read {name}", "ar": "يقرا {name}"}  # a file with no pages
 DOING_BOQ_IMPORT = {
     "en": "Import the BOQ from {name}, sheet {sheet}",
     "ar": "يستورد المقايسة من {name}، شيت {sheet}",
@@ -1686,25 +1738,29 @@ BOQ_CONFIRM_TITLE = {
     "en": "Import the BOQ from {name}, sheet {sheet}?",
     "ar": "أستورد المقايسة من {name}، شيت {sheet}؟",
 }
+# {items}, {headings} and {count}: counted phrases (counted: ITEMS, HEADINGS, ROWS)
 BOQ_CONFIRM_DETAIL = {
-    "en": "Rows {first} to {last}: {items} items and {headings} headings; {skipped} rows left "
-    "out. Tick each column that is right. An unticked rate or amount is left out.",
-    "ar": "الصفوف من {first} لـ {last}: {items} بند و{headings} عنوان؛ {skipped} صف متسابين. "
-    "علّم على كل عمود صح. الفئة أو الإجمالي اللي مش متعلّم عليه مش هيتستورد.",
+    "en": "Rows {first} to {last}: {items} and {headings}.",
+    "ar": "الصفوف من {first} لـ {last}: {items} و{headings}.",
+}
+BOQ_CONFIRM_SKIPPED = {"en": "Left out: {count}.", "ar": "واتساب {count}."}
+BOQ_CONFIRM_TICK = {
+    "en": "Tick each column that is right. An unticked rate or amount is left out.",
+    "ar": "علّم على كل عمود صح. الفئة أو الإجمالي اللي مش متعلّم عليه مش هيتستورد.",
 }
 BOQ_CONFIRM_HIDDEN = {
-    "en": "{count} rows hidden in Excel are left out.",
-    "ar": "{count} صف مخفيين في Excel متسابين.",
+    "en": "Hidden in Excel and left out: {count}.",
+    "ar": "مخفي في Excel ومتساب: {count}.",
 }
 BOQ_CONFIRM_HIDDEN_IN = {
-    "en": "{count} rows hidden in Excel are included.",
-    "ar": "{count} صف مخفيين في Excel داخلين في الاستيراد.",
+    "en": "Hidden in Excel and included: {count}.",
+    "ar": "مخفي في Excel وداخل في الاستيراد: {count}.",
 }
 BOQ_CONFIRM_FLAGGED = {
-    "en": "{count} rows have hidden text (white, tiny or invisible) or look like orders to an "
-    "AI; they are imported as data only.",
-    "ar": "{count} صف فيهم نص مخفي (أبيض أو صغير جداً أو مش ظاهر) أو شكلهم أوامر لذكاء "
-    "اصطناعي؛ بيتستوردوا كبيانات بس.",
+    "en": "With hidden text (white, tiny or invisible) or what looks like orders to an AI: "
+    "{count}. Imported as data only.",
+    "ar": "فيه نص مخفي (أبيض أو صغير جداً أو مش ظاهر) أو كلام شكله أوامر لذكاء اصطناعي: "
+    "{count}. بيتستورد كبيانات بس.",
 }
 BOQ_CARD_COLUMNS = {
     "field": {"en": "What", "ar": "البيان"},

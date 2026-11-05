@@ -30,7 +30,9 @@ from tests.test_engine_runner import (  # noqa: F401
     until,
 )
 
-QUESTION = {"questions": [{"id": "q1", "text": "الخرسانة جاهزة؟ - عينة", "options": ["أيوه", "لأ"]}]}
+QUESTION = {
+    "questions": [{"id": "q1", "text": "الخرسانة جاهزة؟ - عينة", "options": ["أيوه", "لأ"]}]
+}
 
 
 def reply_parts(engine, chat_id: str) -> list[dict]:

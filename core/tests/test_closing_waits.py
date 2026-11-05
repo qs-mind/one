@@ -37,7 +37,9 @@ async def test_an_understood_card_not_yet_approved_counts_until_it_is(make_engin
     engine = await started(make_engine(links(lead=scripted())))
     rec = engine.projects.get(project)
     assert closing.waiting(rec, 0) == 0  # nothing understood yet: nothing to approve
-    letter = add_file(rec, "خطاب - عينة.pdf", sample_pdf([["عينة"]]), actor="engineer", folder="مناقصة").id
+    letter = add_file(
+        rec, "خطاب - عينة.pdf", sample_pdf([["عينة"]]), actor="engineer", folder="مناقصة"
+    ).id
     sort = ProjectUnderstood(files=[FileSort(file_id=letter, label="خطاب الدعوة", why="عينة")])
     understand.save(rec, sort, actor="lead_qs")
     assert closing.waiting(rec, 0) == 1

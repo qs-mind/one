@@ -132,6 +132,15 @@ describe("RowsCard", () => {
     expect(screen.getByRole("columnheader", { name: "السعر" })).toBeInTheDocument(); // still a table to a reader
   });
 
+  it("an English value in another column keeps the card's direction for its label and space; only the value turns", () => {
+    const boq = { ...rows, payload: { ...rows.payload, rows: [{ description: "حفر - عينة", rate: "Cement CEM I - sample" }] } };
+    render(<ApprovalCard id="c2" card={boq} />);
+    const cell = screen.getByTitle("Cement CEM I - sample");
+    expect(cell).not.toHaveAttribute("dir"); // "السعر: " stays before it, with its space, on the Arabic side
+    expect(cell).toHaveAttribute("data-label", "السعر: ");
+    expect(cell.firstElementChild).toHaveAttribute("dir", "auto");
+  });
+
   it("speaks the Brief's language: an Arabic Brief's card in the English page", () => {
     setLanguage("en");
     render(<ApprovalCard id="c2" card={rows} lang="ar" />);

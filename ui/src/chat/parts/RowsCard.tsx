@@ -21,15 +21,18 @@ function Cell({ value, label, main, children }: { value: string; label: string; 
   return (
     <td
       role="cell"
-      // a value with no letter (a price, a date) takes the card's direction, so its "label: " stays before it
-      dir={baseDirection(value) ? "auto" : undefined}
+      // only the first column takes its own direction: another cell's "label: " and margin stay in the card's, and
+      // its value finds its own inside (the span)
+      dir={main && baseDirection(value) ? "auto" : undefined}
       title={value || undefined}
       data-label={main ? undefined : `${label}: `}
       className={`min-w-0 align-top @lg:table-cell @lg:min-w-[5rem] @lg:max-w-[14rem] @lg:px-3 @lg:py-2.5 @lg:before:content-none ${
         main ? "basis-full pb-1 font-semibold @lg:pb-2.5 @lg:font-normal" : "me-4 flex text-slate before:shrink-0 before:whitespace-pre before:content-[attr(data-label)] @lg:me-0 @lg:text-ink"
       }`}
     >
-      <span className="line-clamp-2 break-words">{children ?? <BidiText text={value} />}</span>
+      <span dir={!main && baseDirection(value) ? "auto" : undefined} className="line-clamp-2 break-words">
+        {children ?? <BidiText text={value} />}
+      </span>
     </td>
   );
 }
