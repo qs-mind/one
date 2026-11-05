@@ -75,7 +75,7 @@ class Heading(_Closed):
 
 
 class Prose(_Closed):
-    """Plain words, or a light Markdown (bold, lists); never HTML."""
+    """Plain words; a blank line starts a paragraph. Never HTML."""
 
     kind: Literal["prose"]
     text: Words

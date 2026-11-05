@@ -19,6 +19,7 @@ import { CostNotice } from "./parts/CostNotice";
 import { ProgressLine } from "./parts/ProgressLine";
 import { ReviewBadge } from "./parts/ReviewBadge";
 import { type OnePart, partsOf } from "./parts/types";
+import { ViewPart } from "./parts/view/ViewPart";
 import { BidiText, baseDirection } from "./bidi";
 import { Reply } from "./Reply";
 import { takeSentFrom } from "./sent";
@@ -92,6 +93,9 @@ function BriefReply({
       <ProgressLine items={progress} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
       {text && <Reply text={text} unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)} />}
+      {partsOf(parts, "view").map((part) => (
+        <ViewPart key={part.id} view={part.data} projectId={projectId} />
+      ))}
       {partsOf(parts, "card").map((card) => (
         // the top bar's "Waiting for you" goes to the first card still waiting
         <div

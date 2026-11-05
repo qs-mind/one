@@ -281,6 +281,9 @@ export const texts = {
   },
   noSource: { en: "No source yet", ar: "لسه ملوش مصدر" },
   noSourceNote: { en: "Some numbers have no source yet; they are marked.", ar: "في أرقام لسه ملهاش مصدر؛ متعلّم عليها." },
+  // A view the Lead QS shows in the chat (decision 16.1): each number's source chip, and a block that failed to draw.
+  viewSourceOf: { en: "Where {value} comes from", ar: "{value} جاي منين" },
+  viewBlockFailed: { en: "This part of the view could not be shown.", ar: "معرفناش نعرض الجزء ده." },
   equivalentCost: {
     en: "Equivalent cost on your Claude subscription (not billed per use).",
     ar: "تكلفة مكافئة على اشتراك Claude بتاعك (مش بتتحاسب على كل استخدام).",
