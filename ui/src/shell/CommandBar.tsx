@@ -9,6 +9,7 @@ import { type FocusEvent, useRef, useState } from "react";
 import { select, useSelection } from "../canvas/selection";
 import type { SelectionItem } from "../canvas/types";
 import { SelectionText } from "../chat/Chat";
+import { sentFrom, takeSentFrom } from "../chat/sent";
 import { dir, t, type texts, useLanguage } from "../i18n";
 import { type Ai, keyOf } from "../settings/AiSettings";
 import { chip, EffortChip, ModelChip } from "./ComposerChips";
@@ -87,11 +88,17 @@ export function CommandBar({
 
   async function submit(words: string, typed: boolean) {
     if (!words.trim() || !chat.canSend) return;
-    if (typed) setDraft("");
+    if (typed) {
+      if (text.current) sentFrom(text.current.getBoundingClientRect()); // the chat moves the words on from here
+      setDraft("");
+    }
     const model = picked && settings?.sheet.some((item) => keyOf(item) === keyOf(picked)) ? picked : undefined;
     const sent = await chat.send(words, selection, { model, effort });
     if (sent) onSent?.();
-    else if (typed) setDraft(words);
+    else if (typed) {
+      takeSentFrom(); // the words stay in the box
+      setDraft(words);
+    }
   }
 
   function left(event: FocusEvent<HTMLElement>) {
