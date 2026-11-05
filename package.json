@@ -31,6 +31,7 @@
   "dependencies": {
     "@ai-sdk/react": "3.0.325",
     "@fontsource-variable/kumbh-sans": "5.3.0",
+    "@fontsource/instrument-sans": "5.3.0",
     "@fontsource/zain": "5.3.0",
     "@platejs/basic-nodes": "53.0.0",
     "@platejs/comment": "53.0.0",
