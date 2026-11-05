@@ -77,12 +77,38 @@ export function SelectionText({ items }: { items: readonly SelectionItem[] }) {
 }
 
 /** The engineer's own message: each line a block that finds its own direction, the other script's runs isolated. */
+// Lines with tabs, as Excel copies a range, show as one table that scrolls in its own box (the text goes as pasted).
 function OwnText({ text }: { text: string }) {
-  return text.split("\n").map((line, i) => (
-    <p key={i} dir="auto" className="min-h-[1lh] whitespace-pre-wrap">
-      <BidiText text={line} />
-    </p>
-  ));
+  const runs: (string | string[][])[] = [];
+  for (const line of text.split("\n")) {
+    const last = runs.at(-1);
+    if (!line.includes("\t")) runs.push(line);
+    else if (Array.isArray(last)) last.push(line.split("\t"));
+    else runs.push([line.split("\t")]);
+  }
+  return runs.map((run, i) =>
+    typeof run === "string" ? (
+      <p key={i} dir="auto" className="min-h-[1lh] whitespace-pre-wrap">
+        <BidiText text={run} />
+      </p>
+    ) : (
+      <div key={i} className="my-1 max-w-full overflow-x-auto">
+        <table dir="auto" className="border-collapse text-sm">
+          <tbody>
+            {run.map((cells, r) => (
+              <tr key={r} className="border-b border-slate/30 last:border-0">
+                {cells.map((cell, c) => (
+                  <td key={c} dir="auto" className="whitespace-nowrap px-2 py-0.5">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ),
+  );
 }
 
 const failedReply = (parts: OnePart[]) => partsOf(parts, "status").at(-1)?.data.state === "failed";
