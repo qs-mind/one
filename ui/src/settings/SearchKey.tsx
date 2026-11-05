@@ -2,6 +2,7 @@
 // Search key. The core keeps the key in the system key store and never sends it back, so the page never shows it.
 // Self-contained: whoever opens Settings places it.
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { api } from "../api";
 import { coreLine, send } from "../core";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 
@@ -26,7 +27,7 @@ export function SearchKey() {
   const [failed, setFailed] = useState<Text>();
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/settings/search").catch(() => undefined);
+    const response = await api("/settings/search").catch(() => undefined);
     const search = response?.ok ? ((await response.json().catch(() => undefined)) as Search | undefined) : undefined;
     setLoaded(search?.provider && search.provider in providerText ? { state: "ready", search } : { state: "failed" });
   }, []);
@@ -40,7 +41,7 @@ export function SearchKey() {
     setSaving(true);
     setSaved(false);
     setFailed(undefined);
-    const response = await send("/api/settings/search-key", "PUT", { value: value.trim() });
+    const response = await send("/settings/search-key", "PUT", { value: value.trim() });
     setSaving(false);
     if (response?.ok) {
       setValue("");

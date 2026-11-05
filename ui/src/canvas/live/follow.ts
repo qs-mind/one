@@ -2,6 +2,7 @@
 // zoom by the engineer stops it, and so does the agent finishing. Built like i18n.ts: one value for the page.
 import { useReactFlow, useStoreApi } from "@xyflow/react";
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { freeArea } from "../cover";
 import { STRIP_H } from "../place";
 import { cursorShown, useAgent } from "./activity";
 import { glide } from "./motion";
@@ -62,7 +63,13 @@ export function useFollowCamera() {
     const { x, y } = node.internals.positionAbsolute;
     const duration = glide();
     ownUntil.current = performance.now() + duration + 100;
-    void flow.setCenter(x + w / 2, y + h / 2, { zoom: state.transform[2], duration });
+    // the middle of what the engineer sees: not under the open chat or the bars at the bottom
+    const area = freeArea(state.domNode, { width: state.width, height: state.height });
+    const zoom = state.transform[2];
+    void flow.setViewport(
+      { x: area.x + area.w / 2 - (x + w / 2) * zoom, y: area.y + area.h / 2 - (y + h / 2) * zoom, zoom },
+      { duration },
+    );
   }, [id, target, flow, store]);
 
   useEffect(() => {

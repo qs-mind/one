@@ -5,15 +5,18 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, generateId } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../api";
 import type { SelectionItem } from "../canvas/types";
 import type { Unfinished } from "../chat/parts/ContinueBriefs";
-import { activeBrief, type OneMessage, type OnePart } from "../chat/parts/types";
+import { activeBrief, type OneMessage, type OnePart, partsOf } from "../chat/parts/types";
 import { coreLine, send as sendJson } from "../core";
 import { type Text, texts } from "../i18n";
 
 // Only the new message goes to the core: it keeps the chat's history with its Briefs. The selection rides along.
+// The transport's own URLs ("/chat", "/chat/<id>/stream") are core routes, so they go through api() too.
 const transport = new DefaultChatTransport<OneMessage>({
-  api: "/api/chat",
+  api: "/chat",
+  fetch: (input, init) => api(String(input), init),
   prepareSendMessagesRequest: ({ id, messages, body }) => ({ body: { ...body, id, messages: messages.slice(-1) } }),
 });
 
@@ -25,6 +28,16 @@ function busyWith(error: Error | undefined): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+const RESYNC_TRIES = 3;
+const RESYNC_MS = 1000;
+
+/** Whether these messages show a card still waiting for the engineer. */
+export function showsWaitingCard(messages: OneMessage[]): boolean {
+  return messages.some((message) =>
+    partsOf(message.parts, "card").some((card) => card.data.status === "pending" || card.data.status === undefined),
+  );
 }
 
 export function textOf(parts: OnePart[]): string {
@@ -59,7 +72,7 @@ export function useChats(chatId: string) {
     // the chat's earlier messages, then the Brief still running in it, replayed from its start (204: none)
     let live = true;
     setLoaded(undefined);
-    fetch(`/api/chat/${encodeURIComponent(chatId)}/messages`)
+    api(`/chat/${encodeURIComponent(chatId)}/messages`)
       .then((response) => (response.ok ? (response.json() as Promise<{ messages?: OneMessage[] }>) : undefined))
       .then((body) => {
         if (!live || !body?.messages) return;
@@ -74,6 +87,33 @@ export function useChats(chatId: string) {
     };
   }, [chatId, setMessages, resumeStream]);
 
+  /** The chat as the core has it now: its messages again, then the running Brief's stream replayed from its start.
+   * For when this page may have missed part of a Brief (its stream dropped, or the core says a card waits that the
+   * chat does not show). */
+  const resync = useCallback(async () => {
+    await stop(); // the old stream, if any, must not write over the core's messages
+    const body = await api(`/chat/${encodeURIComponent(chatId)}/messages`)
+      .then((response) => (response.ok ? (response.json() as Promise<{ messages?: OneMessage[] }>) : undefined))
+      .catch(() => undefined);
+    if (body?.messages?.length) setMessages(body.messages);
+    void resumeStream();
+  }, [chatId, stop, setMessages, resumeStream]);
+
+  // A stream that ended while its Brief still runs (a dropped connection) is joined again, a few times at most.
+  const tries = useRef(new Map<string, number>());
+  const before = useRef(status);
+  useEffect(() => {
+    const was = before.current;
+    before.current = status;
+    const ended = (was === "streaming" || was === "submitted") && (status === "ready" || status === "error");
+    if (!ended || !brief || elsewhere) return;
+    const n = tries.current.get(brief) ?? 0;
+    if (n >= RESYNC_TRIES) return;
+    tries.current.set(brief, n + 1);
+    const timer = setTimeout(() => void resync(), RESYNC_MS * (n + 1));
+    return () => clearTimeout(timer);
+  }, [status, brief, elsewhere, resync]);
+
   useEffect(() => {
     // the chat already had a Brief running (started elsewhere): the message steers it, and the page joins its stream
     if (!elsewhere) return;
@@ -86,7 +126,7 @@ export function useChats(chatId: string) {
 
   async function steerWith(id: string, text: string): Promise<boolean> {
     setFailed(undefined);
-    const response = await sendJson(`/api/briefs/${encodeURIComponent(id)}/steer`, "POST", { text });
+    const response = await sendJson(`/briefs/${encodeURIComponent(id)}/steer`, "POST", { text });
     if (!response?.ok) setFailed(await coreLine(response, texts.steerFailed));
     return response?.ok === true;
   }
@@ -132,7 +172,7 @@ export function useChats(chatId: string) {
     void stop(); // the stream ends here at once; the Brief itself ends only by the stop call
     if (!id) return;
     setStopped((now) => new Set(now).add(id));
-    const response = await sendJson(`/api/briefs/${encodeURIComponent(id)}/stop`, "POST");
+    const response = await sendJson(`/briefs/${encodeURIComponent(id)}/stop`, "POST");
     if (!response?.ok) {
       setStopped((now) => new Set([...now].filter((other) => other !== id)));
       setFailed(await coreLine(response, texts.stopFailed));
@@ -159,6 +199,7 @@ export function useChats(chatId: string) {
     send,
     halt,
     continued,
+    resync,
   };
 }
 

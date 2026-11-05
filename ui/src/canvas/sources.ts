@@ -2,6 +2,7 @@
 // (Task 2). A 404 from a route a later plan adds answers empty, so the canvas shows only what is real.
 import type { ComponentType } from "react";
 import { subscribeActivity } from "../activity";
+import { api } from "../api";
 import { coreLine } from "../core";
 import { deliverablesApi } from "../deliverables/api";
 import type { Text } from "../i18n";
@@ -30,14 +31,14 @@ export function viewerFor(kind: DeliverableInfo["kind"]): ComponentType<ViewerPr
 }
 
 async function json<T>(url: string, empty: T, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init).catch(() => undefined);
+  const response = await api(url, init).catch(() => undefined);
   if (response?.status === 404) return empty;
   if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
   return (await response.json()) as T;
 }
 
 async function put(url: string, body: unknown, keepalive: boolean): Promise<void> {
-  const response = await fetch(url, {
+  const response = await api(url, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -48,7 +49,7 @@ async function put(url: string, body: unknown, keepalive: boolean): Promise<void
 }
 
 export function httpSources(projectId: string): ProjectSources {
-  const base = `/api/projects/${encodeURIComponent(projectId)}`;
+  const base = `/projects/${encodeURIComponent(projectId)}`;
   const file = (id: string) => `${base}/files/${encodeURIComponent(id)}`;
   const images = new Map<string, Promise<string>>(); // oldest first
 
@@ -80,7 +81,7 @@ export function httpSources(projectId: string): ProjectSources {
         return kept;
       }
       const made = (async () => {
-        const response = await fetch(`${file(fileId)}/pages/${page}?width=${width}`).catch(() => undefined);
+        const response = await api(`${file(fileId)}/pages/${page}?width=${width}`).catch(() => undefined);
         if (!response?.ok) throw new SourceError(await coreLine(response, texts.pageNotShown));
         return URL.createObjectURL(await response.blob());
       })();
@@ -94,7 +95,7 @@ export function httpSources(projectId: string): ProjectSources {
       return made;
     },
     async pages(fileId) {
-      const response = await fetch(`${file(fileId)}/pages`).catch(() => undefined);
+      const response = await api(`${file(fileId)}/pages`).catch(() => undefined);
       if (response?.status === 404 || response?.status === 409) return 0; // no route yet, or not a PDF
       if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
       return ((await response.json()) as { pages: number }).pages;

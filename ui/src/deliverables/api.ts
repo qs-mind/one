@@ -1,5 +1,6 @@
 // Typed calls for every Deliverables route of the core (Plan 6 Task 7), plus Plan 3's explain, all under /api.
 // A call never throws: it answers the data, or the core's refusal ({error: {en, ar}, field}) in plain words.
+import { api } from "../api";
 import { texts, type Text } from "../i18n";
 import type {
   Change,
@@ -19,7 +20,7 @@ import type {
 export type Answer<T> = { ok: true; data: T } | { ok: false; error: Text; field: string | null; status: number };
 export type FileBytes = { bytes: Uint8Array; name: string; type: string };
 
-const base = (p: string) => `/api/projects/${encodeURIComponent(p)}`;
+const base = (p: string) => `/projects/${encodeURIComponent(p)}`;
 const id = encodeURIComponent;
 
 async function refusal(response: Response | undefined): Promise<Answer<never>> {
@@ -30,7 +31,7 @@ async function refusal(response: Response | undefined): Promise<Answer<never>> {
 }
 
 async function call<T>(url: string, method = "GET", body?: unknown): Promise<Answer<T>> {
-  const response = await fetch(url, {
+  const response = await api(url, {
     method,
     ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   }).catch(() => undefined);
@@ -53,7 +54,7 @@ export function dispositionName(header: string | null, fallback: string): string
 }
 
 async function bytes(url: string, fallback: string): Promise<Answer<FileBytes>> {
-  const response = await fetch(url).catch(() => undefined);
+  const response = await api(url).catch(() => undefined);
   if (!response?.ok) return refusal(response);
   return {
     ok: true,

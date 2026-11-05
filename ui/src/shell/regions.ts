@@ -1,6 +1,7 @@
 // The screen's four regions, in F6 order: top bar, canvas, chat, command bar (decision 10). Each region is an
 // element with `data-region` (a landmark with a name); F6 and Shift+F6 move focus to the next or previous one that
-// is on screen, to its `data-region-start` element if it has one. Also: whether the window is narrow (below 900 px).
+// is on screen, to its `data-region-start` element if it has one. The command bar sits inside the open chat: the
+// region focus is in is the innermost one. Also: whether the window is narrow (below 900 px).
 import { useSyncExternalStore } from "react";
 
 export const REGIONS = ["topbar", "canvas", "chat", "command"] as const;
@@ -16,7 +17,7 @@ function present(root: ParentNode): HTMLElement[] {
 export function moveRegion(back: boolean, root: ParentNode = document) {
   const regions = present(root);
   if (regions.length === 0) return;
-  const at = regions.findIndex((region) => region.contains(document.activeElement));
+  const at = regions.findLastIndex((region) => region.contains(document.activeElement));
   const next =
     at === -1 ? (back ? regions.length - 1 : 0) : (at + (back ? -1 : 1) + regions.length) % regions.length;
   const region = regions[next]!;
@@ -24,14 +25,23 @@ export function moveRegion(back: boolean, root: ParentNode = document) {
 }
 
 const NARROW = "(max-width: 899px)";
+const COMPACT = "(max-width: 1279px)";
 
-function subscribeNarrow(listener: () => void): () => void {
-  const query = globalThis.matchMedia?.(NARROW);
+const subscribeTo = (media: string) => (listener: () => void) => {
+  const query = globalThis.matchMedia?.(media);
   query?.addEventListener?.("change", listener);
   return () => query?.removeEventListener?.("change", listener);
-}
+};
+const subscribeNarrow = subscribeTo(NARROW);
+const subscribeCompact = subscribeTo(COMPACT);
 
 const isNarrow = () => globalThis.matchMedia?.(NARROW).matches ?? false;
+const isCompact = () => globalThis.matchMedia?.(COMPACT).matches ?? false;
+
+/** Below 1280 px the top bar keeps the project name and the status whole by folding its tools into "More". */
+export function useCompact(): boolean {
+  return useSyncExternalStore(subscribeCompact, isCompact);
+}
 
 /** Below 900 px the chat is a sheet, the status folds into one button and the rest into "More". */
 export function useNarrow(): boolean {

@@ -76,12 +76,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # The npm scripts find the core's Python at core/.venv (bin/python, or Scripts/python.exe on Windows).
-      # The exact versions come from the universal lock; the core itself is added without resolving again.
+      # The exact versions and their hashes come from the universal lock; the core itself is added without resolving
+      # again.
       - name: Core in core/.venv
         run: |
           python -m venv core/.venv
           if [ "$RUNNER_OS" = Windows ]; then py=core/.venv/Scripts/python.exe; else py=core/.venv/bin/python; fi
-          "$py" -m pip install -r core/requirements.lock
+          "$py" -m pip install --require-hashes -r core/requirements.lock
           "$py" -m pip install --no-deps -e "./core[dev]"
 
       - run: npm ci

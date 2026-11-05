@@ -25,7 +25,6 @@ const words = {
     yes: "أيوه",
     open: "افتح",
     zoomOut: "صغّر",
-    done: /ردّك:|مبقاش له لازمة/,
   },
   en: {
     general: "General chat",
@@ -39,7 +38,6 @@ const words = {
     yes: "Yes",
     open: "Open",
     zoomOut: "Zoom out",
-    done: /Your answer:|No longer needed\./,
   },
 } as const;
 
@@ -141,7 +139,8 @@ export class Walk {
   }
 
   private pendingCard(): Locator {
-    return this.chat.locator("section.border-copper").filter({ has: this.page.locator("button") }).filter({ hasNotText: this.w.done });
+    // a card still waiting: an answered one folds to a line and says so (data-answered)
+    return this.chat.locator("section[data-approval-card]:not([data-answered])").filter({ has: this.page.locator("button") });
   }
 
   private stopButton(): Locator {
@@ -187,7 +186,7 @@ export class Walk {
   private async answer(card: Locator): Promise<string> {
     await card.scrollIntoViewIfNeeded();
     // `card` matches only unanswered cards, so once answered it is gone: count the answers in the chat instead.
-    const answers = this.chat.locator("section.border-copper").getByText(this.w.done);
+    const answers = this.chat.locator("section[data-approval-card][data-answered]");
     const before = await answers.count();
     let kind = "approval";
     if (await card.getByRole("checkbox").count()) {

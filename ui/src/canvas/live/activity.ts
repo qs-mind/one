@@ -224,6 +224,11 @@ export function deskCounts(): ReadonlyMap<string, { members: number; working: nu
   return counts;
 }
 
+/** The frames agents are working on now (their cursors are there). */
+export function workedOn(): readonly string[] {
+  return list.filter(cursorShown).map((a) => a.focus!.frame);
+}
+
 // Hooks -----------------------------------------------------------------------------------------------------------
 
 const getList = () => list;

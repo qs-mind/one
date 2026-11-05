@@ -2,6 +2,7 @@
 // the projects, and a search of Project Records (a hit opens its file's frame at its page). For now this is also the
 // Project Index's quick way in: every Deliverable is a frame.
 import { useEffect, useState } from "react";
+import { api } from "../api";
 import { canvasApi } from "../canvas/api";
 import type { FrameKey, ProjectSources } from "../canvas/types";
 import { fill, language, pick, setLanguage, t, useLanguage } from "../i18n";
@@ -61,7 +62,7 @@ export function Palette({
     setQuery("");
     setHits([]);
     let live = true;
-    void fetch("/api/projects")
+    void api("/projects")
       .then((r) => (r.ok ? (r.json() as Promise<{ projects: (Project | { id: string; error: unknown })[] }>) : undefined))
       .then((body) => live && body && setProjects(body.projects.filter((p): p is Project => "name" in p)))
       .catch(() => undefined);
@@ -85,7 +86,7 @@ export function Palette({
     }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      void fetch(`/api/projects/${encodeURIComponent(projectId)}/search?q=${encodeURIComponent(q)}&k=10`, {
+      void api(`/projects/${encodeURIComponent(projectId)}/search?q=${encodeURIComponent(q)}&k=10`, {
         signal: controller.signal,
       })
         .then((r) => (r.ok ? (r.json() as Promise<{ results: Hit[] }>) : undefined))
@@ -104,7 +105,7 @@ export function Palette({
   }
 
   async function openProject(id: string) {
-    const response = await fetch(`/api/projects/${encodeURIComponent(id)}/open`, { method: "POST" }).catch(() => undefined);
+    const response = await api(`/projects/${encodeURIComponent(id)}/open`, { method: "POST" }).catch(() => undefined);
     if (response?.ok) switchProject((await response.json()) as Project);
   }
 

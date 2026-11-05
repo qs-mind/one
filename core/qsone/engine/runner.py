@@ -106,6 +106,7 @@ from qsone.engine.types import (
     Text,
     TextDelta,
     Unsourced,
+    brief_language,
     choice_of,
 )
 from qsone.projects import Projects
@@ -344,6 +345,7 @@ class _Brief:
         self.brief_id: str = brief["id"]
         self.chat_id: str = brief["chat_id"]
         self.text: str = brief["text"]
+        self.lang = brief_language(self.text)  # the engineer's, for the Brief's Progress words
         self.selection: list[dict] | None = brief["selection"]  # on the canvas (Plan 7)
         self.state: BriefState = brief["status"]
         self.step: Text | None = brief["step"]
@@ -376,6 +378,8 @@ class _Brief:
         self._news = asyncio.Event()
 
     def emit(self, event: Event) -> None:
+        if isinstance(event, Progress) and event.lang is None:
+            event = replace(event, lang=self.lang)
         self.log.append(event)
         if isinstance(event, Progress):
             self._agent(event.run_id, state="working", line=event.text, focus=event.focus)
@@ -447,6 +451,7 @@ class _Brief:
             "model": a.model,
             "state": a.state,
             "line": a.line,
+            "lang": self.lang,  # the line's language: the Brief's
             "brief_id": self.brief_id,
             "focus": a.focus,
             "at": a.at,

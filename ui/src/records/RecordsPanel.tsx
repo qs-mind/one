@@ -1,6 +1,7 @@
 // Project Records for the open project: drop or add files, see what One could read in each, and search them.
 // Files go to the core one at a time as their raw bytes; the page never sends a file path.
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { api } from "../api";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import type { FileInfo } from "../canvas/types";
 import { coreLine } from "../core";
@@ -92,7 +93,7 @@ function HiddenText({ projectId, fileId }: { projectId: string; fileId: string }
     setOpen(!open);
     if (open || Array.isArray(flags)) return;
     setFlags(undefined);
-    const response = await fetch(`/api/projects/${projectId}/files/${fileId}/flags`).catch(() => undefined);
+    const response = await api(`/projects/${projectId}/files/${fileId}/flags`).catch(() => undefined);
     const body = response?.ok
       ? ((await response.json().catch(() => undefined)) as { flags?: Flag[] } | undefined)
       : undefined;
@@ -144,7 +145,7 @@ export async function uploadFile(
   projectId: string,
   file: File,
 ): Promise<{ ok: true; info: FileInfo } | { ok: false; line: Text }> {
-  const response = await fetch(`/api/projects/${projectId}/files?name=${encodeURIComponent(file.name)}`, {
+  const response = await api(`/projects/${projectId}/files?name=${encodeURIComponent(file.name)}`, {
     method: "POST",
     body: file,
   }).catch(() => undefined);
@@ -175,7 +176,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
     if (!id) return;
     let live = true;
     void (async () => {
-      const response = await fetch(`/api/projects/${id}/files`).catch(() => undefined);
+      const response = await api(`/projects/${id}/files`).catch(() => undefined);
       if (!live) return;
       if (response?.ok) setFiles(((await response.json()) as { files: FileInfo[] }).files);
       else setFilesFailed(await coreLine(response, texts.filesFailed));
@@ -212,7 +213,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
     const mine = new AbortController();
     turn.current = mine;
     setSearching(true);
-    const response = await fetch(`/api/projects/${id}/search?q=${encodeURIComponent(q)}&k=${ASKED}`).catch(
+    const response = await api(`/projects/${id}/search?q=${encodeURIComponent(q)}&k=${ASKED}`).catch(
       () => undefined,
     );
     setSearching(false);
@@ -230,7 +231,7 @@ export function RecordsPanel({ onClose, onPickProject }: { onClose: () => void; 
 
   // The second step. On any failure, a 409 included, the first list stays and no error is shown.
   async function rerank(projectId: string, q: string, chunkIds: number[], signal: AbortSignal) {
-    const response = await fetch(`/api/projects/${projectId}/rerank`, {
+    const response = await api(`/projects/${projectId}/rerank`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ q, chunk_ids: chunkIds }),
