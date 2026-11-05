@@ -600,8 +600,8 @@ export const texts = {
   sourceOpenPage: { en: "Open the page", ar: "افتح الصفحة" },
   supplyOnly: { en: "Supply only, no labour", ar: "توريد بس، من غير مصنعية" },
   sourceNotMarked: {
-    en: "Opened at its page. The exact place on the page isn't stored, so nothing is marked.",
-    ar: "اتفتح على الصفحة. مكان الرقم بالظبط في الصفحة مش متسجّل، فمفيش حاجة متعلّمة.",
+    en: "The file is open, but the number's exact place in it couldn't be shown, so nothing is marked.",
+    ar: "الملف اتفتح، بس مكان الرقم بالظبط فيه مظهرش، فمفيش حاجة متعلّمة.",
   },
   // A formula's terms in words (ui/src/sources/formula.ts): «الكمية × الفئة», not «quantity * rate»
   termQuantity: { en: "Quantity", ar: "الكمية" },

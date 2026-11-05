@@ -137,12 +137,6 @@ function Open({ projectId, sources, documents, opened }: { projectId: string; so
   return (
     <section data-region="document" aria-label={titleOf(documents, opened.key) ?? t("projectFiles")} tabIndex={-1} className="flex min-h-0 min-w-0 flex-1 flex-col outline-none">
       <div data-document-sheet className="relative min-h-0 flex-1 overflow-hidden rounded-[10px] bg-paper ring-1 ring-slate/18">
-        {unmarked && (
-          // over the sheet's top edge, not a row of its own: the document keeps its height
-          <p role="status" className="absolute end-3 top-2 z-20 rounded-lg bg-stone px-3 py-1 text-sm text-slate">
-            {t("sourceNotMarked")}
-          </p>
-        )}
         <Shown key={opened.key}>
           <div
             ref={setBox}
@@ -152,7 +146,15 @@ function Open({ projectId, sources, documents, opened }: { projectId: string; so
               if (scrolled instanceof HTMLElement && scrolled !== box) setBox(scrolled);
             }}
           >
-            <DocumentView projectId={projectId} sources={sources} opened={opened} ref={setHandle} onSelection={onSelection} />
+            {/* a source whose place cannot be shown is said in the file's own control row, never over its controls */}
+            <DocumentView
+              projectId={projectId}
+              sources={sources}
+              opened={opened}
+              ref={setHandle}
+              onSelection={onSelection}
+              notice={unmarked ? t("sourceNotMarked") : null}
+            />
             <WorkingLine handle={handle} agents={agents} opened={opened.key} box={box} />
           </div>
         </Shown>

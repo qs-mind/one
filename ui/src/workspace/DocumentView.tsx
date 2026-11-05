@@ -14,6 +14,8 @@ export function DocumentView(props: {
   opened: Opened;
   ref?: Ref<ViewerHandle>;
   onSelection?(anchor: Anchor | null, label: string | null): void;
+  /** A line about the opening (a source whose place could not be shown): a file says it under its controls. */
+  notice?: string | null;
 }) {
   const { projectId, sources, opened } = props;
   const viewer = useRef<ViewerHandle>(null);
@@ -31,7 +33,7 @@ export function DocumentView(props: {
     case "clientboq":
       return <ClientBoqDoc key={opened.key} projectId={projectId} sources={sources} fileId={id} />;
     case "file":
-      return <FileDoc key={opened.key} sources={sources} fileId={id} page={opened.anchor?.page} />;
+      return <FileDoc key={opened.key} sources={sources} fileId={id} page={opened.anchor?.page} notice={props.notice} />;
     case "files":
       return <FilesDoc />;
   }

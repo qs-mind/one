@@ -65,11 +65,14 @@ export function FilePages({
   fileId,
   state,
   width,
+  notice,
 }: {
   sources: ProjectSources;
   fileId: string;
   state: FilePage;
   width: number;
+  /** Said under the page controls, a row of its own: it never covers them. */
+  notice?: string | null;
 }) {
   useLanguage();
   const { pages, page, setPage, mode, setMode, pageOf } = state;
@@ -130,6 +133,11 @@ export function FilePages({
           />
         </div>
       )}
+      {notice && (
+        <p role="status" className={`px-5 pb-2 text-sm text-slate ${pages ? "bg-stone/60" : "pt-2"}`}>
+          {notice}
+        </p>
+      )}
       {showImage &&
         (image === "failed" ? (
           <p role="alert" className="px-5 py-3 text-copper">
@@ -168,7 +176,7 @@ export function FilePages({
 }
 
 /** The file as the open document, at `page` when one is asked for. */
-export function FileDoc({ sources, fileId, page }: { sources: ProjectSources; fileId: string; page?: number }) {
+export function FileDoc({ sources, fileId, page, notice }: { sources: ProjectSources; fileId: string; page?: number; notice?: string | null }) {
   useLanguage();
   const state = useFilePage(sources, fileId, page);
   const root = useRef<HTMLDivElement>(null);
@@ -193,7 +201,7 @@ export function FileDoc({ sources, fileId, page }: { sources: ProjectSources; fi
   }, []);
   return (
     <div ref={root} dir={dir()} className="h-full overflow-auto bg-paper text-ink">
-      <FilePages sources={sources} fileId={fileId} state={state} width={width} />
+      <FilePages sources={sources} fileId={fileId} state={state} width={width} notice={notice} />
     </div>
   );
 }

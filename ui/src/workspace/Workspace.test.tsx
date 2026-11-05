@@ -187,13 +187,29 @@ describe("the workspace", () => {
     vi.unstubAllGlobals();
   });
 
-  it("a place that cannot be marked (a PDF page) opens the page and says so, once", async () => {
+  it("a page-level source (a PDF page) opened at its page counts as found: no notice", async () => {
     const spec = { id: "spec", name: "المواصفات - عينة.pdf", status: "read" as const, note: null, replaces: null };
     const sources = fakeSources({ files: [spec], pages: { spec: 4 } });
     render(<Workspace projectId="p1" sources={sources} documents={{ deliverables: [], clientBoqs: [], files: [spec], desks: [] }} />);
     act(() => openSourceFile("spec", { page: 3 }, ["3,450"]));
     expect(workspaceApi.current()).toEqual({ key: "file:spec", anchor: { page: 3 } });
-    expect(await screen.findAllByText(texts.sourceNotMarked.ar)).toHaveLength(1);
+    await waitFor(() => expect(document.querySelector('img[data-source-at="file:spec#page=3"]')).not.toBeNull());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.queryByText(texts.sourceNotMarked.ar)).toBeNull();
+  });
+
+  it("a place that cannot be shown is said once, under the page controls and never over them", async () => {
+    const spec = { id: "spec", name: "المواصفات - عينة.pdf", status: "read" as const, note: null, replaces: null };
+    const sources = fakeSources({ files: [spec], pages: { spec: 4 } });
+    render(<Workspace projectId="p1" sources={sources} documents={{ deliverables: [], clientBoqs: [], files: [spec], desks: [] }} />);
+    act(() => openSourceFile("spec", { page: 3, line: 7 }, ["3,450"])); // a line ONE did not read on that page
+    const [notice] = await screen.findAllByText(texts.sourceNotMarked.ar, {}, { timeout: 3500 });
+    expect(screen.getAllByText(texts.sourceNotMarked.ar)).toHaveLength(1);
+    expect(notice!.className).not.toMatch(/\babsolute\b/); // a row of its own
+    const next = screen.getByRole("button", { name: texts.sheetNextPage.ar });
+    const controls = next.parentElement!;
+    expect(controls.compareDocumentPosition(notice!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // under them
+    expect(controls.contains(notice!)).toBe(false);
     act(() => workspaceApi.open("files:all"));
     await waitFor(() => expect(screen.queryByText(texts.sourceNotMarked.ar)).toBeNull());
   });
