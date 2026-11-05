@@ -27,6 +27,8 @@ export type DeliverableViewerProps = ViewerProps & {
   /** The Fill Plan of the client's own file; left out, the board finds the newest one itself. */
   fillPlanId?: string | null;
   onToggleFullScreen?: () => void;
+  /** Whether the board is full screen now, for the toggle's words; left out, the full review mode counts as it. */
+  fullScreen?: boolean;
   /** The project's live stream; Plan 7's live store can stand in for the shared one. */
   subscribe?: Subscribe;
 };
@@ -53,6 +55,18 @@ function fromText(text: TextAnchor): Selected {
     anchor: { row: text.block, text: [text.start, text.end] },
     label: fill(t("placeQuote"), { quote: quote(text.quote) }),
   };
+}
+
+/** A tab's count: a small chip after the label, a space before it (read as "Comments 1"). */
+function CountChip({ n }: { n: number }) {
+  return (
+    <>
+      {" "}
+      <bdi dir="ltr" data-count className="ms-1 inline-block min-w-5 rounded-full bg-ink/[0.08] px-1.5 text-center text-xs leading-5 tabular-nums">
+        {n}
+      </bdi>
+    </>
+  );
 }
 
 export function DeliverableViewer(props: DeliverableViewerProps) {
@@ -151,6 +165,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         onChanged={changed}
         onSelection={onSheetSelection}
         onToggleFullScreen={props.onToggleFullScreen}
+        fullScreen={props.fullScreen}
         review={mode === "full" ? { active: tab === "changes" && !fillOpen && view.pending > 0, current } : undefined}
         onAccepted={accepted}
       />
@@ -165,6 +180,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         onChanged={changed}
         onSelection={onTextSelection}
         onToggleFullScreen={props.onToggleFullScreen}
+        fullScreen={props.fullScreen}
       />
     );
 
@@ -205,8 +221,8 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
                   }}
                 >
                   {label}
-                  {key === "changes" && view.pending > 0 && <bdi> ({view.pending})</bdi>}
-                  {key === "comments" && view.open_comments > 0 && <bdi> ({view.open_comments})</bdi>}
+                  {key === "changes" && view.pending > 0 && <CountChip n={view.pending} />}
+                  {key === "comments" && view.open_comments > 0 && <CountChip n={view.open_comments} />}
                 </button>
               ))}
               <TabUnderline />

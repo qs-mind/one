@@ -115,6 +115,33 @@ describe("a Deliverable opening from its card", () => {
     expect(back.keyframes).toEqual([{ opacity: 1 }, { opacity: 0 }]);
   });
 
+  it("full screen has one way out, and its tabs show counts as chips after a space", async () => {
+    motion(true);
+    layout();
+    core({
+      routes: {
+        "POST /api/chat": (init) => streamed([reply[0]!, { type: "data-deliverable", id: D, data: { id: D } }, ...reply.slice(1)], init),
+        "GET /api/projects/p1/deliverables": () => Response.json({ deliverables: [entry()] }),
+        [`GET ${d}`]: () => Response.json(sheet({ open_comments: 1 })),
+        [`GET ${d}/changes?status=pending`]: () => Response.json({ changes: [] }),
+        [`GET ${d}/changes?status=stale`]: () => Response.json({ changes: [] }),
+        [`GET ${d}/comments`]: () => Response.json({ comments: [] }),
+      },
+    });
+    const { user, panel } = await openFromCard();
+    expect(screen.getByRole("button", { name: texts.close.ar })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: texts.sheetFullScreen.ar }));
+    // one exit: Leave full screen; no Close beside it
+    expect(screen.queryByRole("button", { name: texts.close.ar })).toBeNull();
+    const leave = screen.getByRole("button", { name: texts.sheetLeaveFullScreen.ar });
+    const tab = screen.getByRole("tab", { name: new RegExp(`^${texts.reviewComments.ar}`) });
+    expect(tab.textContent).toBe(`${texts.reviewComments.ar} 1`);
+    expect(tab.querySelector("[data-count]")).toHaveTextContent(/^1$/);
+    await user.keyboard("{Escape}"); // Esc still closes it
+    await waitFor(() => expect(panel()).toBeNull());
+    expect(leave).not.toBeInTheDocument();
+  });
+
   it("with reduced motion it opens and closes at once", async () => {
     const played = motion(true);
     layout();

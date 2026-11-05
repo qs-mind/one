@@ -250,6 +250,16 @@ describe("SheetViewer", () => {
     expect(container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns).toContain("432px");
   });
 
+  it("in a frame the status is not said twice: the frame's strip says it; the board shows it", () => {
+    const view = sheet({ status: "checked", code: "A", off_desk: true });
+    const { rerender } = render(<SheetViewer projectId={P} view={view} mode="frame" />);
+    const status = fill(texts.statusChecked.ar, { code: "A" });
+    expect(screen.queryByText(status)).toBeNull();
+    expect(screen.getByText(texts.statusOffDesk.ar)).toBeInTheDocument(); // the strip does not say this one
+    rerender(<SheetViewer projectId={P} view={view} mode="full" />);
+    expect(screen.getByText(status)).toBeInTheDocument();
+  });
+
   it("read only (the client's BOQ): nothing opens an editor or posts a change, each number opens its file", async () => {
     const user = userEvent.setup();
     const fetch = core({});

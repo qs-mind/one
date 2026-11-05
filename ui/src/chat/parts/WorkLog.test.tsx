@@ -79,6 +79,39 @@ describe("the settled line", () => {
   });
 });
 
+describe("who did each step", () => {
+  const checker = { en: "Checking QS", ar: "مهندس المراجعة" };
+  const log: WorklogData = {
+    started: T0,
+    ended: at(20),
+    steps: [
+      step("بيشوف ملفات المشروع", 0, 2),
+      step("بيقرا المواصفات", 2, 4),
+      step("بيستورد المقايسة", 4, 6),
+      step("بيستورد المقايسة", 6, 9),
+      { ...step("بيراجع الأسعار", 9, 15), agent: checker },
+      step("بيلخّص", 15, 20),
+    ],
+  };
+
+  it("names the agent once per run of its steps, and folds the same result line repeated into one", () => {
+    render(<ProgressLine items={[]} worklog={log} lang="ar" />);
+    fireEvent.click(screen.getByRole("button", { name: /اشتغل/ }));
+    const list = screen.getByRole("list", { name: texts.workSteps.ar });
+    // three runs: the Lead QS, the Checking QS, the Lead QS again
+    expect([...list.querySelectorAll("[data-agent]")].map((el) => el.textContent)).toEqual([lead.ar, checker.ar, lead.ar]);
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows).toHaveLength(5);
+    expect(within(list).getAllByText("بيستورد المقايسة")).toHaveLength(1);
+    expect(rows[2]).toHaveTextContent("×2");
+    expect(rows[2]).toHaveTextContent("5.0 ث"); // both times together
+    // every line still says who, to a screen reader
+    for (const row of rows) expect(row).toHaveTextContent(/كبير مهندسي الكميات|مهندس المراجعة/);
+    // the settled line counts the real steps, folded or not
+    expect(screen.getByRole("button", { name: /6 خطوات/ })).toBeInTheDocument();
+  });
+});
+
 describe("every duration and step count reads naturally", () => {
   const S = 1000;
   const M = 60 * S;
