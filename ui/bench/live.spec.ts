@@ -7,7 +7,7 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { texts } from "../src/i18n";
 import { expect, test, type Walk } from "./bench";
 
@@ -41,6 +41,14 @@ function expected(walk: Walk, status: number, request: string) {
     const at = walk.problems.findIndex((problem) => problem.includes(line));
     if (at >= 0) walk.problems.splice(at, 1);
   }
+}
+
+/** The button is wholly inside the window as it is, with nothing scrolled to reach it. */
+async function inView(page: Page, button: Locator, why: string) {
+  const box = await button.boundingBox();
+  const { width, height } = page.viewportSize()!;
+  expect(box, why).not.toBeNull();
+  expect(box!.x >= 0 && box!.y >= 0 && box!.x + box!.width <= width && box!.y + box!.height <= height, `${why}: ${JSON.stringify(box)} in ${width}×${height}`).toBe(true);
 }
 
 /** Pastes `text` into the focused field, as the engineer does: through the clipboard. */
@@ -90,6 +98,16 @@ for (const lang of ["ar", "en"] as const) {
       await page.mouse.move(0, 0);
       await shot(page, "failed", lang);
       expect(await next.boundingBox(), "a two-line failure never moves Next").toEqual(before);
+      await inView(page, next, "with a two-line failure, Next is on screen at 1440×900");
+      // RF5: in a 380 px wide window, and at 200% zoom (a 1440×900 window is then 720×450 CSS px)
+      for (const [width, height, where] of [[380, 900, "380 px wide"], [720, 450, "200% zoom"]] as const) {
+        await page.setViewportSize({ width, height });
+        await page.waitForTimeout(300);
+        await inView(page, next, `with a two-line failure, Next is on screen ${where}`);
+        await inView(page, dialog.getByRole("button", { name: say(lang, "setupSkip"), exact: true }), `Skip is on screen ${where}`);
+      }
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.waitForTimeout(300);
 
       await field.click();
       await paste(page, WORKS);

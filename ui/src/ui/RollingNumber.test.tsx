@@ -109,6 +109,22 @@ describe("RollingNumber", () => {
     expect(container.textContent).toBe(format.format(4861330));
   });
 
+  it("while it rolls, the figures keep their left-to-right order in Arabic text, and the words stay whole", () => {
+    // a rolling digit is a box, which the bidi algorithm reads as a neutral: beside Arabic words "1.8" would show
+    // as "8.1". The figures sit in one left-to-right isolate, each in a box of its own; the words are never split.
+    fakeAnimate();
+    const { container, rerender } = render(<RollingNumber text={"\u200f1.8 مليون ج.م.\u200f"} />);
+    rerender(<RollingNumber text={"\u200f1.9 مليون ج.م.\u200f"} />);
+    const face = container.querySelector("[aria-hidden='true']")!;
+    const figures = face.querySelector("bdi[dir='ltr']");
+    expect(figures).not.toBeNull();
+    const boxes = [...figures!.children];
+    expect(boxes.map((el) => el.querySelector("[data-roll-to]")?.textContent ?? el.textContent)).toEqual(["1", ".", "9"]);
+    expect(boxes.every((el) => el.classList.contains("inline-block") || el.hasAttribute("data-roll"))).toBe(true);
+    expect(face.textContent).toContain(" مليون ج.م.");
+    expect([...face.querySelectorAll("span")].some((el) => el.textContent === "م")).toBe(false);
+  });
+
   it("while it rolls, a screen reader gets the final text only", () => {
     fakeAnimate();
     const { container, rerender } = render(<RollingNumber text="120" />);

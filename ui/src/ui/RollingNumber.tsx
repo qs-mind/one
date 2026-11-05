@@ -40,7 +40,7 @@ export function RollingNumber({ text }: { text: string }) {
     const from = last.current;
     last.current = text;
     if (from === text) return;
-    if (reducedMotion() || typeof Element.prototype.animate !== "function") return setRoll(null);
+    if (reducedMotion() || typeof Element.prototype.animate !== "function" || !DIGIT.test(text)) return setRoll(null);
     // a value that comes mid-roll starts again from the one before it, toward the newest
     setRoll({ from, up: rises(from, text), n: ++latest.current });
   }, [text]);
@@ -66,28 +66,42 @@ export function RollingNumber({ text }: { text: string }) {
 
   const chars = [...text];
   const before = [...roll.from];
+  // A rolling digit is a box, which the bidi algorithm reads as a neutral: beside Arabic words "1.8" would show as
+  // "8.1". So the figures, from the first digit to the last, sit in one left-to-right isolate, each in a box of its
+  // own; the words around them stay plain text, never split.
+  const first = chars.findIndex((c) => DIGIT.test(c));
+  const end = chars.findLastIndex((c) => DIGIT.test(c)) + 1;
   return (
     <span className="relative">
       <span className="sr-only">{text}</span>
       <span ref={face} aria-hidden="true">
-        {chars.map((c, i) => {
-          const fromEnd = chars.length - 1 - i;
-          const old = before[before.length - 1 - fromEnd];
-          const key = `${roll.n}:${fromEnd}`;
-          if (!DIGIT.test(c) || old === c) return <span key={key}>{c}</span>;
-          return (
-            <span key={key} data-roll="" className="roll-col">
-              <span data-roll-to="" className="inline-block">
-                {c}
-              </span>
-              {old !== undefined && DIGIT.test(old) && (
-                <span data-roll-from="" className="roll-from" style={{ transform: `translateY(${roll.up ? -100 : 100}%)` }}>
-                  {old}
+        {chars.slice(0, first).join("")}
+        <bdi dir="ltr">
+          {chars.slice(first, end).map((c, at) => {
+            const fromEnd = chars.length - 1 - (first + at);
+            const old = before[before.length - 1 - fromEnd];
+            const key = `${roll.n}:${fromEnd}`;
+            if (!DIGIT.test(c) || old === c)
+              return (
+                <span key={key} className="inline-block">
+                  {c}
                 </span>
-              )}
-            </span>
-          );
-        })}
+              );
+            return (
+              <span key={key} data-roll="" className="roll-col">
+                <span data-roll-to="" className="inline-block">
+                  {c}
+                </span>
+                {old !== undefined && DIGIT.test(old) && (
+                  <span data-roll-from="" className="roll-from" style={{ transform: `translateY(${roll.up ? -100 : 100}%)` }}>
+                    {old}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </bdi>
+        {chars.slice(end).join("")}
       </span>
     </span>
   );

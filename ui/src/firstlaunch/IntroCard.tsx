@@ -85,7 +85,7 @@ export function IntroCard({ nav }: { nav: Nav }) {
 
   const ready = role !== undefined; // not dimmed while it saves: the spinner shows in it
   return (
-    <form onSubmit={save} noValidate>
+    <form onSubmit={save} noValidate className="flex flex-1 flex-col">
       <StepScreen
         title={t("cardTitle")}
         help={t("cardHelp")}

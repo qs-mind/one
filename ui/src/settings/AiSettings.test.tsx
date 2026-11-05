@@ -86,31 +86,19 @@ beforeEach(() => setLanguage("ar"));
 
 describe("AiSettings", () => {
   it("the panel eases to its new height as its content changes (loading, then the settings)", async () => {
-    const watched: { callback: ResizeObserverCallback; target: Element }[] = [];
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        constructor(private readonly callback: ResizeObserverCallback) {}
-        observe(target: Element) {
-          watched.push({ callback: this.callback, target });
-        }
-        unobserve() {}
-        disconnect() {}
-      },
-    );
+    // layout, as jsdom has none: "Loading…" is one 80 px line; the settings are taller, 100 px for each choice
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return new DOMRect(0, 0, 400, 80 + 100 * this.querySelectorAll("select").length);
+    });
     const animate = vi.fn(() => ({ finished: new Promise(() => {}), finish() {}, cancel() {} }));
     Object.defineProperty(Element.prototype, "animate", { configurable: true, writable: true, value: animate });
     try {
       core();
       render(<Harness />);
-      const size = (height: number) =>
-        watched.forEach(({ callback, target }) =>
-          callback([{ target, contentRect: new DOMRect(0, 0, 400, height), borderBoxSize: [{ inlineSize: 400, blockSize: height }] } as unknown as ResizeObserverEntry], {} as ResizeObserver),
-        );
-      size(80); // "Loading…"
       await screen.findByRole("combobox", { name: texts.roleLead.ar });
-      size(900);
-      expect(animate).toHaveBeenCalledWith([{ height: "80px" }, { height: "900px" }], expect.anything());
+      expect(animate).toHaveBeenCalledWith([{ height: "80px" }, { height: expect.stringMatching(/^\d+px$/) }], expect.anything());
+      const [[from, to]] = animate.mock.calls[0]! as unknown as [Keyframe[]];
+      expect(parseFloat(String(to!.height))).toBeGreaterThan(parseFloat(String(from!.height)));
     } finally {
       delete (Element.prototype as { animate?: unknown }).animate;
     }

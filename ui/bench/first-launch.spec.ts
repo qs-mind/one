@@ -6,6 +6,7 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { Page } from "@playwright/test";
 import { expect, test, type Walk } from "./bench";
 
 const benchPort = Number(process.env.QSONE_BENCH_PORT || 1442);
@@ -17,6 +18,14 @@ function forgetFirstLaunch(keys = FIRST_LAUNCH) {
   const saved = JSON.parse(readFileSync(settingsFile, "utf8")) as Record<string, unknown>;
   for (const key of keys) delete saved[key];
   writeFileSync(settingsFile, JSON.stringify(saved));
+}
+
+/** Each step's main button is wholly in the window as it opens, with nothing scrolled: the bar stays at its foot. */
+async function barInView(page: Page, name: string, why: string) {
+  const box = await page.getByRole("button", { name, exact: true }).boundingBox();
+  const { width, height } = page.viewportSize()!;
+  expect(box, why).not.toBeNull();
+  expect(box!.x >= 0 && box!.y >= 0 && box!.x + box!.width <= width && box!.y + box!.height <= height, `${why}: ${JSON.stringify(box)} in ${width}×${height}`).toBe(true);
 }
 
 const ORDER = ["language", "account", "ai-consent", "ai-choice", "card", "usage", "ready", "app", "chat-consent", "connect-ai-alone"];
@@ -87,17 +96,24 @@ for (const lang of ["ar", "en"] as const) {
     await page.getByRole("button", { name: w.pick, exact: true }).click();
     await expect(title(w.language)).toBeVisible();
     await shot(walk, "language");
+    await barInView(page, w.next, "Next on the language step");
     await page.getByRole("button", { name: w.next, exact: true }).click();
 
     await expect(title(w.account)).toBeVisible();
     await shot(walk, "account");
+    await barInView(page, w.skip, "Skip on the account step");
+    const bar = page.locator("[data-step-bar]");
+    const barAt = await bar.boundingBox();
     await page.getByRole("button", { name: w.skip, exact: true }).click();
 
     await expect(title(w.connect)).toBeVisible();
+    // the next step slides in; its bar does not: it is where it was, from the first frame
+    expect(await bar.boundingBox(), "the bar stays still as the step changes").toEqual(barAt);
     await shot(walk, "ai-consent");
     await page.getByRole("button", { name: w.agree, exact: true }).click();
     await page.getByRole("button", { name: w.apiKey }).click();
     await shot(walk, "ai-choice");
+    await barInView(page, w.next, "Next on Connect AI");
     // no Save or Check: Next waits in its place until a key works (live.spec.ts checks keys)
     await expect(page.getByRole("button", { name: w.next, exact: true })).toBeDisabled();
     await page.getByRole("button", { name: w.skip, exact: true }).click(); // the bench has its own AI link already
@@ -109,20 +125,24 @@ for (const lang of ["ar", "en"] as const) {
     await expect(page.getByLabel(w.country).locator("option")).toHaveCount(4); // no blank choice
     await expect(page.locator("input[maxlength='3']")).toHaveCount(0); // the country says the currency
     await shot(walk, "card");
+    await barInView(page, w.next, "Next on the card step");
     // the flow fits a 380 px wide window: nothing scrolls sideways
     const size = page.viewportSize()!;
     await page.setViewportSize({ width: 380, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(380);
     await walk.shot(`card-380-${lang}`);
+    await barInView(page, w.next, "Next on the card step, 380 px wide");
     await page.setViewportSize(size);
     await page.getByRole("button", { name: w.next, exact: true }).click();
 
     await expect(title(w.usage)).toBeVisible();
     await shot(walk, "usage");
+    await barInView(page, w.dontShare, "Don't share on Usage Stats");
     await page.getByRole("button", { name: w.dontShare, exact: true }).click();
 
     await expect(title(w.ready)).toBeVisible();
     await shot(walk, "ready");
+    await barInView(page, w.start, "Start on Ready");
     await page.getByRole("button", { name: w.start, exact: true }).click();
     await expect(page.getByRole("textbox", { name: w.message })).toBeVisible();
     await shot(walk, "app");

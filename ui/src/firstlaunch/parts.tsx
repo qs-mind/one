@@ -141,7 +141,7 @@ export function StepScreen({
   const id = useId();
   useEffect(() => heading.current?.focus({ preventScroll: true }), [title]);
   return (
-    <section aria-labelledby={id} className="flex flex-1 flex-col gap-8">
+    <section aria-labelledby={id} data-step="" className="flex flex-1 flex-col gap-8">
       <div className="flex flex-col gap-3">
         <h1 id={id} ref={heading} tabIndex={-1} className="text-2xl font-semibold text-ink outline-none">
           {title}

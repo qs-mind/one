@@ -137,7 +137,8 @@
     transform: rotate(360deg);
   }
 }
-.fl-step {
+/* the step's content slides; its bar of Back, Skip and Next stays still, in the same place on every step */
+.fl-step [data-step] > :not([data-step-bar]) {
   animation: fl-step-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .fl-step[data-way="back"] {
