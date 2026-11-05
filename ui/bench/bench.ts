@@ -25,6 +25,8 @@ const words = {
     yes: "أيوه",
     open: "افتح",
     zoomOut: "صغّر",
+    clientBoqReadOnly: "مستند العميل: للقراءة بس",
+    notInClient: "البند ده مش موجود في مقايسة العميل",
   },
   en: {
     general: "General chat",
@@ -38,6 +40,8 @@ const words = {
     yes: "Yes",
     open: "Open",
     zoomOut: "Zoom out",
+    clientBoqReadOnly: "The client's document: read only",
+    notInClient: "Not in the client's BOQ",
   },
 } as const;
 
@@ -211,6 +215,39 @@ export class Walk {
     await expect.soft(answers, `the ${kind} card shows its answer`).toHaveCount(before + 1);
     await this.shot(`${kind}-answered`);
     return kind;
+  }
+
+  /** After a BOQ import: the client's BOQ is on the canvas at once, its own read-only frame, and its rows show. */
+  async clientBoq(rowText: string) {
+    const frame = this.page.locator('[data-frame^="clientboq:"]');
+    if (!(await frame.count())) {
+      await this.page.waitForTimeout(3000);
+      if (!(await frame.count())) {
+        await this.problem("the Client BOQ frame is not on the canvas without a reload", "client-boq-not-live");
+        await this.page.reload();
+      }
+    }
+    await expect(frame, "the Client BOQ frame is on the canvas").toHaveCount(1);
+    // Brought forward from the palette, so it is near enough to show its rows.
+    await this.page.keyboard.press("Control+k");
+    await this.page.keyboard.type("clientboq");
+    await this.page.keyboard.press("Enter");
+    await this.page.waitForTimeout(800);
+    await expect.soft(frame.getByRole("grid"), "the Client BOQ frame shows the sheet").toBeVisible();
+    await expect.soft(frame.getByText(rowText).first(), "the client's rows show in the frame").toBeVisible();
+    await expect.soft(frame.getByText(this.w.clientBoqReadOnly).first(), "it says it is read only").toBeVisible();
+    return this.shot("client-boq-frame");
+  }
+
+  /** The Priced BOQ, opened from its chat card, shows the Checking QS's open comment on the extra row. */
+  async notInClientFlag() {
+    const open = this.chat.getByRole("button", { name: new RegExp(`^${this.w.open}: `) }).first();
+    await open.click();
+    await this.page.waitForTimeout(1500);
+    await expect.soft(this.page.getByText(this.w.notInClient).first(), "the extra row's comment shows").toBeVisible();
+    const file = await this.shot("not-in-client-boq-comment");
+    await this.page.keyboard.press("Escape");
+    return file;
   }
 
   /** The Deliverables made by the Brief: on the canvas live, then each opened from its chat card. */

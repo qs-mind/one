@@ -96,7 +96,13 @@ def row_comments(rec, d: str) -> list[dict]:
 async def test_an_import_is_a_read_only_client_boq_sheet(rec):
     f = await import_boq(rec)
     [entry] = imported.list_imported(rec)
-    assert entry | {"at": None} == {"file_id": f, "name": NAME, "items": 2, "headings": 1, "at": None}
+    assert entry | {"at": None} == {
+        "file_id": f,
+        "name": NAME,
+        "items": 2,
+        "headings": 1,
+        "at": None,
+    }
     v = imported.sheet(rec, f)
     assert v["kind"] == "sheet" and v["variant"] == "client_boq" and v["title"] == NAME
     assert v["language"] == "ar" and v["sample"] is False
@@ -169,9 +175,19 @@ async def test_the_canvas_lists_client_boqs_and_serves_each(client):
     f = await import_boq(rec)
     layout = client.get(f"/projects/{project}/canvas", headers=AUTH).json()
     assert [e["file_id"] for e in layout["client_boqs"]] == [f]
-    frame = {"key": f"clientboq:{f}", "x": 0, "y": 0, "w": 960, "h": 640, "z": 0, "collapsed": False}
+    frame = {
+        "key": f"clientboq:{f}",
+        "x": 0,
+        "y": 0,
+        "w": 960,
+        "h": 640,
+        "z": 0,
+        "collapsed": False,
+    }
     body = {"frames": [frame], "removed": []}
-    assert client.put(f"/projects/{project}/canvas/frames", json=body, headers=AUTH).status_code == 200
+    assert (
+        client.put(f"/projects/{project}/canvas/frames", json=body, headers=AUTH).status_code == 200
+    )
     r = client.get(f"/projects/{project}/client-boq/{f}", headers=AUTH)
     assert r.status_code == 200 and len(r.json()["rows"]) == 3
     r = client.get(f"/projects/{project}/client-boq/{'f' * 32}", headers=AUTH)
@@ -193,8 +209,13 @@ async def test_a_priced_row_not_in_the_client_boq_is_flagged_on_its_row(rec):
     assert (flag["code"], flag["description"]) == ("9-9", "سقالات للموقع - عينة")
     [thread] = row_comments(rec, d)
     assert thread["anchor"] == {"type": "row", "row": flag["row"]}
-    assert thread["body"] == "البند ده مش موجود في مقايسة العميل: 9-9 سقالات للموقع - عينة. تسيبه ولا تشيله؟"
-    assert thread["author"] == review.CHECKER and thread["status"] == "open" and thread["code"] is None
+    assert (
+        thread["body"]
+        == "البند ده مش موجود في مقايسة العميل: 9-9 سقالات للموقع - عينة. تسيبه ولا تشيله؟"
+    )
+    assert (
+        thread["author"] == review.CHECKER and thread["status"] == "open" and thread["code"] is None
+    )
     gate = review.closeout(rec, d)
     assert gate["blocking"] == []  # the engineer decides; it never blocks Sign-off by itself
     assert copy.SIGNOFF_OPEN_CODE_C not in gate["reasons"]
