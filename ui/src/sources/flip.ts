@@ -13,5 +13,5 @@ export function flipFrom(from: DOMRect, el: HTMLElement, direction: "rtl" | "ltr
   const dy = (from.top - to.top) / zoom;
   const scale = from.height / to.height;
   el.style.transformOrigin = rtl ? "top right" : "top left";
-  return play(el, [{ transform: `translate(${dx}px, ${dy}px) scale(${scale})` }, { transform: "none" }], DUR.long);
+  return play(el, [{ transform: `translate(${dx}px, ${dy}px) scale(${scale})` }, { transform: "none" }], DUR.short);
 }

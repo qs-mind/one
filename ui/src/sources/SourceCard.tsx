@@ -8,7 +8,6 @@
 // reached. Only what the core has is shown: a number with no source says so.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { canvasApi } from "../canvas/api";
 import { deliverablesApi } from "../deliverables/api";
 import type { Explained, NumberCell, Source } from "../deliverables/types";
 import { fill, language, pick, t, texts, type Text } from "../i18n";
@@ -18,9 +17,9 @@ import { useScrollEdges } from "../ui/useScrollEdges";
 import { formatDecimal } from "../viewers/sheet/format";
 import { flipFrom } from "./flip";
 import { formulaText, termText } from "./formula";
-import { readingDirection, revealSource } from "./mark";
+import { readingDirection } from "./mark";
 import { placeCard } from "./place";
-import { sourceKeys } from "./targets";
+import { workspaceApi } from "../workspace/api";
 
 /** Who entered a number, in words: the core records a role ("engineer", "calc_engine") or an agent's English name. */
 const enteredBy: Record<string, Text> = {
@@ -109,6 +108,7 @@ function Level({
   viewSource,
   onOpen,
   onHead,
+  onClose,
 }: {
   projectId: string;
   numberId: string | null;
@@ -117,6 +117,7 @@ function Level({
   viewSource?: Source;
   onOpen: (id: string) => void;
   onHead: (head: Head) => void;
+  onClose: () => void;
 }) {
   const [page, setPage] = useState(1);
   const [explained, setExplained] = useState<Explained>();
@@ -148,19 +149,16 @@ function Level({
   const fileName = viewSource?.file_name;
   const at = where(source?.locator);
   const fileId = source?.file_id;
-  const value = explained?.number.value ?? cell?.value;
+  const sourcePage = source?.locator?.page;
   const chat = source?.kind === "chat";
   // worked out by the Calc Engine: it says so, in place of a formula as a title and whoever asked for the number
   const calculated = source?.kind === "calculation" || Boolean(calc);
-  const [unmarked, setUnmarked] = useState(false);
 
   function openSource() {
     if (!fileId) return;
-    const page = source?.locator?.page;
-    setUnmarked(false);
-    canvasApi.openFile(fileId, typeof page === "number" ? page : undefined);
-    // nothing to mark (a PDF page: no place on it is stored): said, so the engineer knows to look
-    void revealSource(sourceKeys({ fileId, locator: source?.locator }), value ? figuresOf(value) : []).then((marked) => setUnmarked(!marked));
+    // the file opens as the document, at its page; the card has done its job
+    workspaceApi.open(`file:${fileId}`, typeof sourcePage === "number" ? { page: sourcePage } : {});
+    onClose();
   }
 
   return (
@@ -185,17 +183,18 @@ function Level({
             {at && <bdi>{at}</bdi>}
           </span>
         )}
+        {source?.quote && (
+          <blockquote dir="auto" className="my-1 rounded bg-copper/9 px-2 py-1 ring-1 ring-inset ring-copper/25">
+            {source.quote}
+          </blockquote>
+        )}
+        {source?.locator?.covers === "supply" && <span className="text-copper">{t("supplyOnly")}</span>}
         {dated && <span>{fill(t(datedLabel(source?.locator?.dated_how)), { date: dayText(dated) })}</span>}
         {calculated ? source?.kind !== "calculation" && <span>{t("enteredByCalc")}</span> : by && <span>{whoEntered(by)}</span>}
         {fileId && (
           <button type="button" className="self-start rounded px-1 underline hover:text-copper" onClick={openSource}>
-            {t("sourceOpenFile")}
+            {t(typeof sourcePage === "number" ? "sourceOpenPage" : "sourceOpenFile")}
           </button>
-        )}
-        {unmarked && (
-          <span role="status" className="text-slate">
-            {t("sourceNotMarked")}
-          </span>
         )}
       </section>
       {failed && <p role="alert" className="text-copper">{pick(failed)}</p>}
@@ -353,7 +352,7 @@ function Card({ projectId, cell, sources, style, focus, onClose, from, label }: 
   useLayoutEffect(() => {
     const figure = from?.querySelector("bdi") ?? from;
     if (figure && headValue.current) void flipFrom(figure.getBoundingClientRect(), headValue.current, readingDirection(headValue.current));
-    if (body.current) void play(body.current, [{ opacity: 0 }, { opacity: 1 }], DUR.base);
+    if (body.current) void play(body.current, [{ opacity: 0 }, { opacity: 1 }], DUR.short);
     // once, on opening
   }, []);
 
@@ -449,6 +448,7 @@ function Card({ projectId, cell, sources, style, focus, onClose, from, label }: 
                 cell={i === 0 ? cell : undefined}
                 viewSource={i === 0 ? viewSource : undefined}
                 onOpen={open}
+                onClose={() => close.current()}
                 onHead={(h) => setHeads((all) => all.map((x, n) => (n === i ? h : x)))}
               />
             </div>

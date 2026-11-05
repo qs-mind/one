@@ -6,18 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Reply } from "../chat/Reply";
 import { RowsCard } from "../chat/parts/RowsCard";
 import type { CardData } from "../chat/parts/types";
-import { canvasApi } from "../canvas/api";
+import { workspaceApi } from "../workspace/api";
 import type { Explained, ViewColumn, ViewRow } from "../deliverables/types";
 import { fill, setLanguage, texts } from "../i18n";
 import { dayText } from "./SourceCard";
 import { NumberRef } from "../viewers/document/NumberRef";
 import { SheetCell } from "../viewers/sheet/cells";
 import { hideSourceLine } from "./line";
-import { REVEAL_WAIT_MS } from "./mark";
 
 const DAY = "2026-11-04";
 const line = () => document.querySelector('svg[data-source-overlay] [data-source="line"]');
-const mark = () => document.querySelector('svg[data-source-overlay] [data-source="mark"]');
 
 /** Gives elements matching `selector` a box on screen (jsdom has no layout). */
 function laidOut(boxes: [string, DOMRect][]) {
@@ -62,7 +60,7 @@ const prices: CardData = {
 };
 
 describe("a price card's rates", () => {
-  it("open in place into their source card: the quote, its row, the supplier and the date, and Open source marks the row", async () => {
+  it("open in place into their source card: the quote, its row, the supplier and the date, and Open source opens the file as the document", async () => {
     const user = userEvent.setup();
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener() {}, removeEventListener() {} })));
     render(<RowsCard card={prices} onAnswer={() => undefined} sending={false} label={(o) => o} lang="ar" />);
@@ -75,17 +73,9 @@ describe("a price card's rates", () => {
     expect(card).toHaveTextContent(fill(texts.sheetRow.ar, { sheet: "Quote", row: 2 }));
     expect(card).toHaveTextContent(fill(texts.sourceSupplier.ar, { name: "مصنع - عينة" }));
     expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: dayText(DAY) }));
-    const openFile = vi.spyOn(canvasApi, "openFile").mockImplementation(() => {
-      // the canvas opens the file's frame, and its text shows the quote's row
-      const li = document.createElement("li");
-      li.setAttribute("data-source-at", "file:f1#sheet=Quote&row=2");
-      li.textContent = "أسمنت - عينة طن 3950";
-      document.body.append(li);
-    });
-    laidOut([['li[data-source-at="file:f1#sheet=Quote&row=2"]', new DOMRect(40, 300, 400, 30)]]);
+    const open = vi.spyOn(workspaceApi, "open").mockImplementation(() => {});
     await user.click(within(card).getByRole("button", { name: texts.sourceOpenFile.ar }));
-    expect(openFile).toHaveBeenCalledWith("f1", undefined);
-    await waitFor(() => expect(mark()).not.toBeNull(), { timeout: REVEAL_WAIT_MS });
+    expect(open).toHaveBeenCalledWith("file:f1", {});
   });
 
   it("a rate said in the chat says so, and a card with no sources has no buttons", async () => {

@@ -38,3 +38,22 @@ describe("a row with a problem", () => {
     expect(screen.queryByRole("img")).toBeNull();
   });
 });
+
+describe("a number cell whose source card is open", () => {
+  const price = { key: "rate", from: "rate", label: { en: "Rate", ar: "الفئة" }, kind: "calc" } as unknown as ViewColumn;
+  const priced = { id: "r2", kind: "item", item_id: "i2", version: 1, code: "1-2", cells: { rate: { value: "3450", number_id: "n1", source: null, dated: null } } } as unknown as ViewRow;
+  const numberCell = (open: boolean) => (
+    <SheetCell row={priced} column={price} titleColumn="description" direction="rtl" pending={undefined} marks={undefined} collapsed={false} open={open}
+      onToggle={() => undefined} onAccept={() => undefined} onReject={() => undefined} />
+  );
+
+  it("is outlined 2 px in Ink, radius 4", () => {
+    render(numberCell(true));
+    expect(screen.getByText("3,450").closest("span.w-full")).toHaveClass("outline-2", "outline-ink", "rounded-[4px]");
+  });
+
+  it("has no outline when its card is closed", () => {
+    render(numberCell(false));
+    expect(screen.getByText("3,450").closest("span.w-full")).not.toHaveClass("outline-2");
+  });
+});

@@ -2,10 +2,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { canvasApi } from "../canvas/api";
 import type { Explained, NumberCell, Source } from "../deliverables/types";
 import { fill, setLanguage, texts } from "../i18n";
 import { DUR, EASE } from "../ui/motion";
+import { workspaceApi } from "../workspace/api";
 import { SourcePopover } from "../viewers/sheet/SourcePopover";
 import { dayText, figuresOf, SINK_MS, SUNK } from "./SourceCard";
 
@@ -84,9 +84,10 @@ describe("a number opens in place into its source card", () => {
     expect(card).toHaveTextContent(fill(texts.sourceSupplier.ar, { name: "شركة النيل - عينة" }));
     expect(card).toHaveTextContent(fill(texts.sheetRow.ar, { sheet: "Quote", row: 12 }));
     expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: dayText(DAY) }));
-    const openFile = vi.spyOn(canvasApi, "openFile").mockImplementation(() => {});
+    const open = vi.spyOn(workspaceApi, "open").mockImplementation(() => {});
     await user.click(within(card).getByRole("button", { name: texts.sourceOpenFile.ar }));
-    expect(openFile).toHaveBeenCalledWith("f1", undefined);
+    expect(open).toHaveBeenCalledWith("file:f1", {});
+    expect(screen.queryByRole("dialog")).toBeNull(); // the card closes
   });
 
   it("is drawn in the top layer by its number, flipped above it near the window's foot, never cut by its frame", async () => {
@@ -128,7 +129,7 @@ describe("a number opens in place into its source card", () => {
     expect(card).not.toHaveTextContent("EGP");
   });
 
-  it("the number glides from where it was clicked into the header (FLIP, 300 ms, the calm ease)", async () => {
+  it("the number glides from where it was clicked into the header (FLIP, 150 ms, the calm ease)", async () => {
     const user = userEvent.setup();
     core();
     const animate = vi.fn(() => ({ finished: Promise.resolve(), finish() {} }));
@@ -143,7 +144,7 @@ describe("a number opens in place into its source card", () => {
     await user.click(screen.getByTestId("number"));
     const value = document.querySelector<HTMLElement>("[data-card-value]")!;
     // lined up on the inline-start edge (the right in Arabic): 400 → 400, 100 − 220 up, 20/24 the size
-    expect(animate).toHaveBeenCalledWith([{ transform: `translate(0px, -120px) scale(${20 / 24})` }, { transform: "none" }], { duration: DUR.long, easing: EASE });
+    expect(animate).toHaveBeenCalledWith([{ transform: `translate(0px, -120px) scale(${20 / 24})` }, { transform: "none" }], { duration: DUR.short, easing: EASE });
     expect(value.style.transformOrigin).toBe("top right");
     expect((animate.mock.calls as unknown as [Keyframe[]][]).flatMap(([frames]) => frames).every((f) => Object.keys(f).every((k) => ["transform", "opacity"].includes(k)))).toBe(true);
   });
@@ -226,16 +227,35 @@ describe("a number opens in place into its source card", () => {
     expect(card).toHaveClass("scroll-fade"); // a long card fades where it scrolls, never just cut
   });
 
-  it("Open source on a PDF page says the exact place on the page is not stored, as nothing is marked", async () => {
+  it("shows the quoted line on its Copper ground and Open the page opens the file at that page as the document", async () => {
     const user = userEvent.setup();
     core();
-    vi.spyOn(canvasApi, "openFile").mockImplementation(() => {});
-    const pdf: Source = { kind: "quote", title: "عرض سعر - عينة", file_name: "عرض سعر - عينة.pdf", file_id: "f2", locator: { page: 1 }, dated: DAY };
+    const open = vi.spyOn(workspaceApi, "open").mockImplementation(() => {});
+    const pdf: Source = {
+      kind: "quote", title: "عرض سعر - عينة", file_name: "عرض سعر - عينة.pdf", file_id: "f1", locator: { page: 1 }, dated: DAY,
+      quote: "أسمنت بورتلاندي 3,450 ج.م. للطن - عينة",
+    };
     render(<Opener cell={cell} sources={{ s1: pdf }} />);
     await user.click(screen.getByTestId("number"));
     const card = screen.getByRole("dialog");
-    await user.click(within(card).getByRole("button", { name: texts.sourceOpenFile.ar }));
-    expect(await within(card).findByText(texts.sourceNotMarked.ar)).toBeInTheDocument();
+    const line = within(card).getByText("أسمنت بورتلاندي 3,450 ج.م. للطن - عينة");
+    expect(line).toHaveClass("bg-copper/9", "ring-copper/25");
+    await user.click(within(card).getByRole("button", { name: texts.sourceOpenPage.ar }));
+    expect(open).toHaveBeenCalledWith("file:f1", { page: 1 });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("says Supply only in Copper when the quote covers supply alone, and not for supply and install", async () => {
+    const user = userEvent.setup();
+    core();
+    const supply: Source = { ...quote, locator: { page: 1, covers: "supply" } };
+    const { unmount } = render(<Opener cell={cell} sources={{ s1: supply }} />);
+    await user.click(screen.getByTestId("number"));
+    expect(within(screen.getByRole("dialog")).getByText(texts.supplyOnly.ar)).toHaveClass("text-copper");
+    unmount();
+    render(<Opener cell={cell} sources={{ s1: { ...quote, locator: { page: 1, covers: "supply_and_install" } } }} />);
+    await user.click(screen.getByTestId("number"));
+    expect(screen.queryByText(texts.supplyOnly.ar)).toBeNull();
   });
 
   it("a number with no source says so, and offers nothing to open", async () => {

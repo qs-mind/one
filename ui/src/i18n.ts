@@ -607,6 +607,9 @@ export const texts = {
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
   sourceOpenFile: { en: "Open source", ar: "افتح المصدر" },
+  // The source card in the workspace: the quoted line, what the quote covers, and the page opened as the document
+  sourceOpenPage: { en: "Open the page", ar: "افتح الصفحة" },
+  supplyOnly: { en: "Supply only, no labour", ar: "توريد بس، من غير مصنعية" },
   sourceNotMarked: {
     en: "Opened at its page. The exact place on the page isn't stored, so nothing is marked.",
     ar: "اتفتح على الصفحة. مكان الرقم بالظبط في الصفحة مش متسجّل، فمفيش حاجة متعلّمة.",

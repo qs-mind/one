@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { deliverablesApi, dispositionName } from "../../deliverables/api";
 import type { Change, Explained, SheetView, Thread, ViewColumn, ViewRow } from "../../deliverables/types";
 import { fill, setLanguage, texts } from "../../i18n";
-import { canvasApi } from "../../canvas/api";
+import { workspaceApi } from "../../workspace/api";
 import { SheetViewer, type SheetHandle } from "./SheetViewer";
 
 const P = "p1";
@@ -293,7 +293,7 @@ describe("SheetViewer", () => {
   it("read only (the client's BOQ): nothing opens an editor or posts a change, each number opens its file", async () => {
     const user = userEvent.setup();
     const fetch = core({});
-    const openFile = vi.spyOn(canvasApi, "openFile").mockImplementation(() => {});
+    const openFile = vi.spyOn(workspaceApi, "open").mockImplementation(() => {});
     const client = sheet({
       variant: "client_boq",
       sample: false,
@@ -315,7 +315,7 @@ describe("SheetViewer", () => {
     const dialog = await screen.findByRole("dialog", { name: texts.sheetSource.ar });
     expect(dialog).toHaveTextContent("مقايسة العميل - عينة.xlsx");
     await user.click(within(dialog).getByRole("button", { name: texts.sourceOpenFile.ar }));
-    expect(openFile).toHaveBeenCalledWith("f1", undefined);
+    expect(openFile).toHaveBeenCalledWith("file:f1", {});
     openFile.mockRestore();
   });
 
