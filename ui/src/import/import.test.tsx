@@ -231,6 +231,53 @@ describe("importing a folder", () => {
     expect(currentProject()).toMatchObject({ id: "p1", archived_at: null });
   });
 
+  it("a tender folder chosen with a project open goes into that project, never a new one", async () => {
+    const uploads: string[] = [];
+    const fetch = mockCore({
+      "POST /projects/p7/files": (_, url) => {
+        uploads.push(decodeURIComponent(url.split("?")[1]!));
+        return Response.json({ status: "read" }, { status: 201 });
+      },
+    });
+    setCurrentProject({ id: "p7", name: "مناقصة - عينة", created_at: "x" });
+    render(<ImportReports />);
+    await act(() => importFolders([file("عقد.pdf", "مناقصة - عينة/عقد.pdf")], { old: false }));
+    expect(keys(fetch)).not.toContain("POST /projects");
+    expect(uploads).toEqual(["name=عقد.pdf&folder=مناقصة - عينة"]);
+    expect(currentProject()?.id).toBe("p7");
+  });
+
+  it("a tender whose name is taken goes into the project of that name", async () => {
+    const there = { id: "p3", name: "مناقصة - عينة", created_at: "x" };
+    const fetch = mockCore({
+      "POST /projects": () => Response.json({ error: { en: "Taken.", ar: "متاخد." }, field: "name", project: there }, { status: 409 }),
+      "POST /projects/p3/open": () => Response.json({ ...there, open: true }),
+      "POST /projects/p3/files": () => Response.json({ status: "read" }, { status: 201 }),
+    });
+    render(<ImportReports />);
+    await act(() => importFolders([file("عقد.pdf", "مناقصة - عينة/عقد.pdf")], { old: false }));
+    expect(keys(fetch).filter((k) => k === "POST /projects")).toHaveLength(1);
+    expect(keys(fetch)).toContain("POST /projects/p3/files");
+    expect(currentProject()?.id).toBe("p3");
+  });
+
+  it("old work whose name is taken gets (2) after it", async () => {
+    const names: unknown[] = [];
+    mockCore({
+      "POST /projects": (body) => {
+        names.push(body!.name);
+        if (names.length === 1) return Response.json({ error: { en: "Taken.", ar: "متاخد." }, project: { id: "p0", name: "برج", created_at: "x" } }, { status: 409 });
+        return Response.json({ id: "p1", name: body!.name, created_at: "x" }, { status: 201 });
+      },
+      "POST /projects/p1/files": () => Response.json({ status: "read" }, { status: 201 }),
+      "POST /projects/p1/archive": () => Response.json({ archived_at: "2026-11-05T09:00:00Z", backed_up: false, note: null }),
+      "POST /projects/p1/close": () => Response.json({ open: false }),
+    });
+    render(<ImportReports />);
+    await act(() => importFolders([file("a.pdf", "برج/a.pdf")], { old: true }));
+    expect(names).toEqual(["برج", "برج (2)"]);
+  });
+
   it("says why the Lead QS could not start", async () => {
     mockCore({
       "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "x" }, { status: 201 }),

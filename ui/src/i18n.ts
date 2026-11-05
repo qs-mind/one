@@ -181,6 +181,9 @@ export const texts = {
   sendBackToFix: { en: "No, send it back to be fixed", ar: "لأ، رجّعه يتصلّح" },
   keepForAll: { en: "Keep it for all projects", ar: "احفظه لكل المشاريع" },
   keepTicked: { en: "Keep the ticked rows", ar: "احفظ الصفوف المعلّمة" },
+  // a BOQ import's card: each column of the sheet with what it holds (core: tools/boq.py)
+  keepColumns: { en: "Import with these columns", ar: "استورد بالأعمدة دي" },
+  columnMeaning: { en: "What column {letter} holds", ar: "العمود {letter} فيه إيه" },
   keepNone: { en: "Don't keep any", ar: "ماتحفظش حاجة" },
   goAhead: { en: "Go ahead", ar: "كمّل" },
   notNow: { en: "Not now", ar: "مش دلوقتي" },
@@ -1156,6 +1159,11 @@ export const counted = {
   rowsApproved: {
     en: { one: "approved {n} row", other: "approved {n} rows" },
     ar: { one: "وافقت على صف واحد", two: "وافقت على صفين", few: "وافقت على {n} صفوف", other: "وافقت على {n} صف" },
+  },
+  // a folded BOQ columns card's answer: the columns it imports
+  columnsApproved: {
+    en: { one: "approved {n} column", other: "approved {n} columns" },
+    ar: { one: "وافقت على عمود واحد", two: "وافقت على عمودين", few: "وافقت على {n} أعمدة", other: "وافقت على {n} عمود" },
   },
   rowsApprovedOf: {
     en: { one: "approved {kept} of {n} row", other: "approved {kept} of {n} rows" },

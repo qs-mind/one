@@ -62,6 +62,11 @@ PROJECT_NOT_FOUND = {
     "ar": "المشروع ده مش موجود على الجهاز ده.",
 }
 
+PROJECT_NAME_TAKEN = {
+    "en": "A project with this name is already on this computer. Open it, or pick another name.",
+    "ar": "فيه مشروع بالاسم ده على الجهاز. افتحه، أو اختار اسم تاني.",
+}
+
 PROJECT_NOT_OPEN = {
     "en": "Open the project first.",
     "ar": "افتح المشروع الأول.",

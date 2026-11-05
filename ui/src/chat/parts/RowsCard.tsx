@@ -1,5 +1,7 @@
 // A table card (kind "rows"): prices to keep (prices_propose), the columns of a BOQ import (boq_import). With `tick`, the
-// engineer ticks the rows to take, and Keep sends them as rows_ok; Refuse sends none. Once sent, or settled in the
+// engineer ticks the rows to take, and Keep sends them as rows_ok; Refuse sends none. With `meanings` (a BOQ import),
+// each row is a column of the sheet and its `meaning_column` cell is a choice of what it holds, set as mapped; Keep
+// sends every column's meaning as answers by letter. Once sent, or settled in the
 // stream, the rows left out are struck through (never by colour alone); the card's folded line says how many were kept.
 // The card is as wide as the chat (280 to 560 px). Below 32rem of card each row stacks: its first column on a line of
 // its own, the others under it as "label: value", so every column shows whole at any chat width; from 32rem it is a
@@ -42,6 +44,10 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
   const payload = card.payload ?? {};
   const columns = payload.columns ?? [];
   const rows = payload.rows ?? [];
+  const meaningKey = payload.meanings?.length ? payload.meaning_column : undefined;
+  const [meanings, setMeanings] = useState<Record<string, string>>(() =>
+    meaningKey ? Object.fromEntries(rows.map((r) => [r.column ?? "", r[meaningKey] ?? "none"])) : {},
+  );
   const tickable = Boolean(payload.tick && rows.length);
   const settled = card.status === "settled";
   const open = !settled && card.status !== "withdrawn";
@@ -70,8 +76,33 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
 
   const tick = (i: number) => setTicked((all) => (all.includes(i) ? all.filter((r) => r !== i) : [...all, i]));
   function send(option: string) {
+    if (option !== REFUSE && meaningKey) return onAnswer(option, { answers: meanings });
     if (option === REFUSE || !tickable) return onAnswer(option);
     onAnswer(option, { rows_ok: [...ticked].sort((a, b) => a - b) });
+  }
+  const words = (option: string) => (meaningKey && option !== REFUSE ? t("keepColumns", lang) : label(option));
+
+  /** A column's meaning: a choice while the card waits, its words once answered. */
+  function meaningCell(row: Record<string, string>) {
+    const letter = row.column ?? "";
+    const chosen = (settled && card.answers?.[letter]) || meanings[letter] || "none";
+    const named = payload.meanings?.find((m) => m.key === chosen);
+    if (!open) return <span>{named ? pick(named.label, lang) : chosen}</span>;
+    return (
+      <select
+        aria-label={fill(t("columnMeaning", lang), { letter })}
+        value={chosen}
+        disabled={sending}
+        onChange={(event) => setMeanings((all) => ({ ...all, [letter]: event.target.value }))}
+        className="max-w-full rounded-md border border-stone bg-paper px-1 py-0.5 text-ink"
+      >
+        {payload.meanings?.map((m) => (
+          <option key={m.key} value={m.key}>
+            {pick(m.label, lang)}
+          </option>
+        ))}
+      </select>
+    );
   }
 
   return (
@@ -115,8 +146,12 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
                       </td>
                     )}
                     {columns.map((c, n) => (
-                      <Cell key={c.key} value={row[c.key] ?? ""} label={pick(c.label, lang)} main={n === 0}>
-                        {c.key === payload.number_column && sources[i] ? sourcedNumber(i, row[c.key] ?? "", pick(c.label, lang)) : undefined}
+                      <Cell key={c.key} value={c.key === meaningKey ? "" : (row[c.key] ?? "")} label={pick(c.label, lang)} main={n === 0}>
+                        {c.key === meaningKey
+                          ? meaningCell(row)
+                          : c.key === payload.number_column && sources[i]
+                            ? sourcedNumber(i, row[c.key] ?? "", pick(c.label, lang))
+                            : undefined}
                       </Cell>
                     ))}
                   </tr>
@@ -137,7 +172,7 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
               onClick={() => send(option)}
               className={`rounded-lg px-4 py-2 disabled:opacity-40 ${option === REFUSE ? "border border-ink" : "bg-ink text-paper"}`}
             >
-              {label(option)}
+              {words(option)}
             </button>
           ))}
         </div>
