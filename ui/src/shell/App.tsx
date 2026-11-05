@@ -276,7 +276,16 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         <RecordsPanel onClose={closePanel} onPickProject={() => setPanel("projects")} />
       )}
       {panel === "deliverables" && project && (
-        <ProjectIndex projectId={project.id} onOpen={(id) => deliverable.show(id)} onClose={closePanel} />
+        <ProjectIndex
+          projectId={project.id}
+          onOpen={(id) => {
+            // the index closes, so it never sits over the board; the board's Close gives focus back to its button
+            opener.current?.focus();
+            setPanel(null);
+            deliverable.show(id);
+          }}
+          onClose={closePanel}
+        />
       )}
       {panel === "backup" && <BackupPanel onClose={closePanel} />}
       {panel === "close" && project && (

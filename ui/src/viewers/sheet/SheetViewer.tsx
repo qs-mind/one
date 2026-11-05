@@ -2,7 +2,7 @@
 // Deliverable's language, not the screen's. Every edit, typed or pasted, is sent as a Suggested change and
 // shows old → new with ✓ ✗ until the engineer decides; nothing on this screen adds, multiplies or totals.
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
-import { deliverablesApi, type Accepted } from "../../deliverables/api";
+import { deliverablesApi, type Accepted, type Rejected } from "../../deliverables/api";
 import type { Change, NumberCell, Op, SheetView, Thread, ViewRow } from "../../deliverables/types";
 import { isNumber } from "../../deliverables/types";
 import { count, dir, fill, language, pick, t, texts, useLanguage, type Text } from "../../i18n";
@@ -12,7 +12,7 @@ import { cellKey, cellName, commentMarks, pendingCells, SheetCell } from "./cell
 import { formatDecimal } from "./format";
 import { loadCollapsed, saveCollapsed, visibleRows } from "./collapse";
 import { Grid, type GridHandle, type SheetColumn } from "./grid";
-import { linesHeight, makeMeasure, rowHeight, shownWidth, titleColumnOf } from "./heights";
+import { linesHeight, makeMeasure, oneLineWidth, rowHeight, shownWidth, titleColumnOf } from "./heights";
 import { normalised, type Cell, type Range } from "./selection";
 import { SourcePopover } from "./SourcePopover";
 import { hideSourceLine, showSourceLine } from "../../sources/line";
@@ -47,12 +47,16 @@ export type SheetViewerProps = {
   review?: { active: boolean; current: string | null };
   /** After an accept from a cell: its answer, with its Undo when it has one. */
   onAccepted?: (answer: Accepted) => void;
+  /** After a reject from a cell: its answer, with its Undo. */
+  onRejected?: (answer: Rejected) => void;
   ref?: Ref<SheetHandle>;
 };
 
 const NONE: never[] = [];
 /** Room kept for a scroll bar, in px. */
 const SCROLLBAR = 16;
+/** The narrowest the description gets when the board gives the columns less room than they ask (as set, px). */
+const TITLE_MIN = 240;
 /** The grid's header row and its total row, in px (react-data-grid's summary row with a row-height function). */
 const HEADER_H = 44;
 const TOTAL_H = 35;
@@ -97,14 +101,32 @@ export function SheetViewer(props: SheetViewerProps) {
     return () => sizes.disconnect();
   }, [full]);
 
-  // Frozen columns first: react-data-grid moves them to the start edge, so screen order matches indexes.
+  // Row heights and one-line widths in the real font once it has loaded.
+  const measure = useMemo(makeMeasure, []);
+  const [fontsLoaded, setFontsLoaded] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void document.fonts?.ready.then(() => live && setFontsLoaded((n) => n + 1));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Frozen columns first: react-data-grid moves them to the start edge, so screen order matches indexes. A one-line
+  // column is as wide as its longest value (a code is never cut). In full mode the description takes what the board
+  // has left, or gives room back down to TITLE_MIN so every column fits; only past that does the grid scroll.
   const columns = useMemo(() => {
-    const ordered = [...view.columns.filter((c) => c.frozen), ...view.columns.filter((c) => !c.frozen)];
+    void fontsLoaded;
+    const totalText = view.total ? [formatDecimal(view.total.value, view.total.currency ? 2 : undefined)] : [];
+    const ordered = [...view.columns.filter((c) => c.frozen), ...view.columns.filter((c) => !c.frozen)].map((c) => ({
+      ...c,
+      width: oneLineWidth(c, pick(c.label, view.language), view.rows, measure, c.kind === "calc" ? totalText : []),
+    }));
     const title = titleColumnOf(ordered);
     const extra = room - ordered.reduce((sum, c) => sum + shownWidth(c.width), 0) - SCROLLBAR;
-    if (!full || !title || extra <= 0) return ordered;
-    return ordered.map((c) => (c.key === title ? { ...c, width: c.width + extra } : c));
-  }, [view.columns, full, room]);
+    if (!full || !title || room <= 0 || extra === 0) return ordered;
+    return ordered.map((c) => (c.key === title ? { ...c, width: Math.max(c.width + extra, Math.min(c.width, TITLE_MIN)) } : c));
+  }, [view.columns, view.rows, view.total, view.language, full, room, measure, fontsLoaded]);
   const byKey = useMemo(() => new Map(columns.map((c) => [c.key, c])), [columns]);
   const titleColumn = titleColumnOf(columns);
   const gridColumns = useMemo<SheetColumn[]>(
@@ -150,16 +172,7 @@ export function SheetViewer(props: SheetViewerProps) {
   );
   const marks = useMemo(() => commentMarks(comments, columns), [comments, columns]);
 
-  // Row heights in the real font once it has loaded; a row with a Suggested change holds two lines.
-  const measure = useMemo(makeMeasure, []);
-  const [fontsLoaded, setFontsLoaded] = useState(0);
-  useEffect(() => {
-    let live = true;
-    void document.fonts?.ready.then(() => live && setFontsLoaded((n) => n + 1));
-    return () => {
-      live = false;
-    };
-  }, []);
+  // a row with a Suggested change holds two lines
   const heights = useMemo(() => {
     void fontsLoaded;
     const changed = new Set([...pending.keys()].map((k) => k.split("\u0000")[0]));
@@ -260,6 +273,7 @@ export function SheetViewer(props: SheetViewerProps) {
     if (!answer.ok) return say(answer.error);
     setDecided((ids) => new Set([...ids, changeId]));
     if (accept) props.onAccepted?.(answer.data as Accepted);
+    else props.onRejected?.(answer.data as Rejected);
     onChanged?.();
   }
 

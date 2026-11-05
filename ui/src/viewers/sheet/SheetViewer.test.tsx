@@ -250,6 +250,36 @@ describe("SheetViewer", () => {
     expect(container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns).toContain("432px");
   });
 
+  it("a long item code shows whole: its column is as wide as the longest code (tender day: «…01-01» on every row)", () => {
+    core({});
+    const long = rows.map((r) => (r.id === "p4" ? { ...r, code: "02-01-001-B" } : r));
+    const { container } = render(<SheetViewer projectId={P} view={sheet({ rows: long })} mode="frame" />);
+    const widths = (container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns ?? "").match(/\d+(?=px)/g)!.map(Number);
+    // jsdom measures 7 px a character: 11 characters, the cell's 24 px padding, and the 12 px the screen adds
+    expect(widths[0]).toBeGreaterThanOrEqual(11 * 7 + 24);
+  });
+
+  it("full mode on a narrow board: the description gives room back, so the Amount column and the total stay in sight", () => {
+    core({});
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(900);
+    try {
+      const { container } = render(<SheetViewer projectId={P} view={sheet()} mode="full" />);
+      const widths = (container.querySelector<HTMLElement>(".rdg")?.style.gridTemplateColumns ?? "").match(/\d+(?=px)/g)!.map(Number);
+      expect(widths.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(900 - 16);
+      expect(widths[1]).toBeGreaterThanOrEqual(240); // the description stays readable
+    } finally {
+      width.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("in a frame the status is not said twice: the frame's strip says it; the board shows it", () => {
     const view = sheet({ status: "checked", code: "A", off_desk: true });
     const { rerender } = render(<SheetViewer projectId={P} view={view} mode="frame" />);

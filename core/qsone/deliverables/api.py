@@ -243,6 +243,16 @@ def router(projects: Projects, trash: Trash | None = None) -> APIRouter:
 
     trash.kind("accepted", restore=take_back, purge=lambda entry: None)  # nothing kept aside
 
+    def wait_again(entry: dict) -> bool | dict:
+        try:
+            rec = projects.get(entry["project"])
+            changes.unreject(rec, entry["deliverable"], entry["ids"], actor=ACTOR)
+        except RecordsError as e:
+            return e.text
+        return True
+
+    trash.kind("rejected", restore=wait_again, purge=lambda entry: None)  # a reject keeps nothing aside
+
     async def answer(project_id: str, fn, *args, status: int = 200, ids=()) -> Response:
         """Runs `fn(rec, *args)` in the thread pool: JSON (or the file) on success, else the
         refusal. `ids` are (value, not-found text, field) checked first."""
@@ -300,10 +310,15 @@ def router(projects: Projects, trash: Trash | None = None) -> APIRouter:
 
     @r.post(base + "/{d}/changes/reject")
     async def reject(p: str, d: str, body: Json) -> Response:
-        def run(rec, d):
-            return {"rejected": changes.reject(rec, d, body.get("ids"), actor=ACTOR)}
-
-        return await answer(p, run, d, ids=deliverable(d))
+        try:
+            _known(d, copy.DELIVERABLE_NOT_FOUND, "deliverable")
+            rec = await run_in_threadpool(projects.get, p)
+            done = await run_in_threadpool(changes.reject, rec, d, body.get("ids"), actor=ACTOR)
+        except RecordsError as e:
+            return _refusal(e)
+        # its Undo token and window, as an accept answers: Undo makes the changes wait again
+        undo = trash.put("rejected", {"project": p, "deliverable": d, "ids": done})
+        return JSONResponse({"rejected": done} | undo)
 
     @r.get(base + "/{d}/versions")
     async def versions(p: str, d: str) -> Response:

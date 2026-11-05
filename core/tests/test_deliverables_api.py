@@ -146,9 +146,8 @@ def test_reject_and_refusals_name_the_field(client, project, sheet):
     r = post(client, f"{path}/changes", {"ops": [{"op": "set_number", "row": row["id"],
              "name": "rate", "value": "1"}]})  # fmt: skip
     [change] = r.json()["changes"]
-    assert post(client, f"{path}/changes/reject", {"ids": [change["id"]]}).json() == {
-        "rejected": [change["id"]]
-    }
+    rejected = post(client, f"{path}/changes/reject", {"ids": [change["id"]]}).json()
+    assert rejected["rejected"] == [change["id"]] and rejected["window_ms"] == 6000  # with its Undo
     r = post(client, f"{path}/changes/reject", {"ids": [change["id"]]})
     assert r.status_code == 409 and r.json() == {
         "error": copy.CHANGE_NOT_PENDING,

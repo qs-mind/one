@@ -1021,6 +1021,7 @@ export const texts = {
   undoFailed: { en: "It was not put back. Add it again if you need it.", ar: "مارجعش. ضيفه تاني لو محتاجه." },
   // The BOQ change review (ui/src/review/ChangesPanel.tsx)
   reviewAcceptedShort: { en: "Accepted", ar: "اتقبل" },
+  reviewRejectedShort: { en: "Rejected", ar: "اترفض" },
   changeSource: { en: "Source: {title}", ar: "المصدر: {title}" },
   changeTyped: { en: "Typed in by the engineer", ar: "كتبه المهندس بنفسه" },
   reviewKeys: { en: "J K or ↑ ↓ to move · A accept · R reject", ar: "J K أو ↑ ↓ للتنقل · A اقبل · R ارفض" },

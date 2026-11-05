@@ -125,6 +125,50 @@ describe("BOQ change review", () => {
     await waitFor(() => expect(screen.queryByText(texts.reviewAcceptedShort.ar)).toBeNull());
   });
 
+  it("a reject has its Undo too: «اترفض · تراجع», and Undo makes the change wait again (tender day)", async () => {
+    const user = userEvent.setup();
+    const fetch = board([sourced, typed], {
+      [`POST ${reject}`]: () => json({ rejected: ["c2"], undo: "tok2", window_ms: 6000 }),
+      "POST /api/undo/tok2": () => new Response(null, { status: 204 }),
+    });
+    await screen.findByText("03/02");
+    await user.click(within(changeItems()[1]!).getByRole("button", { name: texts.sheetReject.ar }));
+    const notice = await screen.findByText(texts.reviewRejectedShort.ar);
+    await user.click(within(notice.closest('[role="status"]') as HTMLElement).getByRole("button", { name: texts.undo.ar }));
+    expect(fetch.mock.calls.some(([u, i]) => String(u) === "/api/undo/tok2" && i?.method === "POST")).toBe(true);
+    await waitFor(() => expect(screen.queryByText(texts.reviewRejectedShort.ar)).toBeNull());
+  });
+
+  it("Ctrl+Z on the grid takes back the last accept, by the key's place (the Arabic layout too)", async () => {
+    const user = userEvent.setup();
+    const fetch = board([sourced, typed], {
+      [`POST ${accept}`]: () => json({ version: 4, accepted: ["c1"], stale: [], undo: "tok", window_ms: 6000 }),
+      "POST /api/undo/tok": () => new Response(null, { status: 204 }),
+    });
+    await screen.findByText("03/02");
+    await user.click(within(changeItems()[0]!).getByRole("button", { name: texts.sheetAccept.ar }));
+    await screen.findByText(texts.reviewAcceptedShort.ar);
+    const cell = within(rowOf("03/04")).getAllByRole("gridcell")[0]!;
+    act(() => cell.focus());
+    await user.keyboard("{Control>}[KeyZ]{/Control}");
+    await waitFor(() => expect(fetch.mock.calls.some(([u, i]) => String(u) === "/api/undo/tok" && i?.method === "POST")).toBe(true));
+  });
+
+  it("in a canvas frame, accepting in a cell shows the Undo there too", async () => {
+    const user = userEvent.setup();
+    const fetch = core({
+      ...viewRoutes(sheet({ pending: 1 }), { pending: [sourced] }),
+      [`POST ${accept}`]: () => json({ version: 4, accepted: ["c1"], stale: [], undo: "tok", window_ms: 6000 }),
+      "POST /api/undo/tok": () => new Response(null, { status: 204 }),
+    });
+    render(<DeliverableViewer projectId="p1" deliverableId={D} mode="frame" subscribe={fakeLive().subscribe} />);
+    await screen.findByText("03/02");
+    await user.click(within(rowOf("03/02")).getByRole("button", { name: texts.sheetAccept.ar }));
+    const notice = await screen.findByText(texts.reviewAcceptedShort.ar);
+    await user.click(within(notice.closest('[role="status"]') as HTMLElement).getByRole("button", { name: texts.undo.ar }));
+    expect(fetch.mock.calls.some(([u, i]) => String(u) === "/api/undo/tok" && i?.method === "POST")).toBe(true);
+  });
+
   it("rejects one change, and accepts or rejects all of them", async () => {
     const user = userEvent.setup();
     const fetch = board([sourced, typed], {

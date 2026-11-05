@@ -545,3 +545,24 @@ def reject(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: s
             _decide(conn, rec, found[change_id], "rejected", actor=actor)
     events.publish_deliverable(rec, rec.id, deliverable_id)
     return list(change_ids)
+
+
+def unreject(rec: Records, deliverable_id: str, change_ids: list[str], *, actor: str) -> list[str]:
+    """Undo after a reject: the named changes that are still rejected wait again (nothing else
+    was written by the reject, so nothing else moves). Returns their ids. Only the engineer."""
+    _engineer_only(actor)
+    with rec.write(actor) as conn:
+        back = [
+            c
+            for c in _changes(
+                conn,
+                deliverable_id,
+                "AND status = 'rejected' AND id IN (SELECT value FROM json_each(?))",
+                (_dump(change_ids),),
+            )
+        ]
+        for change in back:
+            _decide(conn, rec, change, "pending", actor=actor)
+    if back:
+        events.publish_deliverable(rec, rec.id, deliverable_id)
+    return [c.id for c in back]
