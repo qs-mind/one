@@ -121,7 +121,8 @@ describe("RowsCard", () => {
     expect(cell.firstElementChild).toHaveClass("line-clamp-2");
     expect(cell.querySelector("bdi")).toHaveTextContent("boq-priced.xls"); // the English run stays whole
     expect(cell).toHaveTextContent(long);
-    expect(screen.getByTitle("1-1, 1-3, 1-4")).toHaveAttribute("dir", "auto");
+    // no letter in it: it takes the card's direction, so its stacked "label: " stays before it
+    expect(screen.getByTitle("1-1, 1-3, 1-4")).not.toHaveAttribute("dir");
     // narrower than 32rem the rows stack, every column whole as "label: value"; wider, a table
     const scroller = container.querySelector("[data-rows-scroll]")!;
     expect(scroller).toHaveClass("@container");

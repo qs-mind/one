@@ -11,7 +11,7 @@ export const PopoverClose = Radix.Close;
 export function PopoverContent({
   className = "",
   align = "start",
-  sideOffset = 6,
+  sideOffset = 8,
   inline = false,
   ...props
 }: ComponentProps<typeof Radix.Content> & { inline?: boolean }) {
@@ -19,7 +19,7 @@ export function PopoverContent({
     <Radix.Content
       align={align}
       sideOffset={sideOffset}
-      className={`z-50 max-w-sm rounded-[14px] border border-ink/10 bg-paper p-3 text-ink shadow-lg shadow-ink/12 outline-none ${className}`}
+      className={`z-50 max-w-sm rounded-[14px] border border-ink/[0.08] bg-paper p-4 text-ink shadow-[0_4px_16px_rgb(14_15_18/0.08)] outline-none ${className}`}
       {...props}
     />
   );

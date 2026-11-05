@@ -10,11 +10,11 @@ export function ReviewBadge({ review }: { review: ReviewData }) {
     <span className={`font-semibold ${review.code === "C" ? "text-copper" : ""}`}>{t(names[review.code])}</span>
   );
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-stone px-3 py-2">
+    <div className="flex flex-col gap-2 rounded-[14px] bg-stone/70 px-4 py-2.5">
       {review.comments.length > 0 ? (
         <details>
           <summary className="hover:text-copper">{name}</summary>
-          <ul className="mt-2 flex flex-col gap-1">
+          <ul className="mt-3 flex flex-col gap-2">
             {review.comments.map((comment, index) => (
               <li key={index}>
                 <span dir="auto" className="font-semibold">

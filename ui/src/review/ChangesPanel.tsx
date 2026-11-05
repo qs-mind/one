@@ -217,7 +217,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
     onChanged();
   }
 
-  const button = "rounded border border-slate px-2 py-0.5 hover:bg-stone disabled:opacity-40";
+  const button = "rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone disabled:opacity-40";
   return (
     <section aria-label={t("reviewChanges")} className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
@@ -237,7 +237,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
           {updateFirst && update && (
             <button
               type="button"
-              className="rounded border border-ink px-2 py-0.5 text-ink hover:bg-stone"
+              className="rounded-lg border border-ink px-3 py-1 text-ink hover:bg-stone"
               onClick={() => void accept({ ids: [update.id, ...updateFirst.filter((id) => id !== update.id)] })}
             >
               {t("reviewAcceptWithUpdate")}
@@ -246,11 +246,11 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
         </div>
       )}
       {pending.length === 0 && <p className="text-slate">{t("reviewNoChanges")}</p>}
-      <ol className="flex flex-col gap-2">
+      <ol className="flex flex-col gap-3">
         {pending.map((change) => {
           const records = change.op.op === "update_from_records";
           return (
-            <li key={change.id} className={`flex flex-col gap-1 rounded-md border p-2 ${records ? "border-ink" : "border-stone"}`}>
+            <li key={change.id} className={`flex flex-col gap-2 rounded-xl border bg-paper px-4 py-3 ${records ? "border-ink" : "border-stone"}`}>
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="font-semibold">{records ? t("reviewRecordsMoved") : authorName(change.author)}</span>
                 {records && <span className="text-slate">{authorName(change.author)}</span>}
@@ -261,7 +261,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
                     aria-label={t("sheetAccept")}
                     title={t("sheetAccept")}
                     disabled={busy}
-                    className="rounded border border-slate px-2 hover:bg-stone disabled:opacity-40"
+                    className="rounded-md border border-ink/20 px-2.5 py-0.5 hover:bg-stone disabled:opacity-40"
                     onClick={() => void accept({ ids: [change.id] })}
                   >
                     <span aria-hidden>✓ </span>
@@ -272,7 +272,7 @@ export function ChangesPanel({ projectId, view, changes, stale, onChanged, onLoc
                     aria-label={t("sheetReject")}
                     title={t("sheetReject")}
                     disabled={busy}
-                    className="rounded border border-slate px-2 text-copper hover:bg-stone disabled:opacity-40"
+                    className="rounded-md border border-ink/20 px-2.5 py-0.5 text-copper hover:bg-stone disabled:opacity-40"
                     onClick={() => void reject([change.id])}
                   >
                     <span aria-hidden>✗ </span>

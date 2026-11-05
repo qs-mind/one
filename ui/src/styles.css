@@ -3,7 +3,9 @@
 /* QS Mind colours only. Kumbh Sans for Latin; it has no Arabic, so Arabic letters fall to Zain (open licence;
    Thmanyah files never go in this public repo). WebKitGTK 2.54, the Linux app's engine, misplaces a mark that ends
    a word, such as the tanween in «حالياً»: it lifts the whole word by the mark's offset. Zain draws that tanween
-   where it belongs (offset near zero) and its dots are part of each letter; IBM Plex Sans Arabic lifted the word. */
+   where it belongs (offset near zero) and its dots are part of each letter; IBM Plex Sans Arabic lifted the word.
+   The type scale: 13 px for meta, 15 px body (16 px on an Arabic page), 18 px frame titles, 22 px page titles; nothing
+   under 12 px at 100%. The spacing scale is Tailwind's 1, 2, 3, 4, 6, 8 (4, 8, 12, 16, 24, 32 px). */
 @theme {
   --color-*: initial;
   --color-ink: #0e0f12;
@@ -12,14 +14,51 @@
   --color-slate: #6e6a64;
   --color-copper: #a6491b;
   --font-sans: "Kumbh Sans Variable", "Zain", system-ui, sans-serif;
+  --text-xs: 0.8125rem; /* 13 px: meta */
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.55;
+  --text-lg: 1.125rem; /* 18 px: frame titles */
+  --text-lg--line-height: 1.45;
+  --text-2xl: 1.375rem; /* 22 px: page titles */
+  --text-2xl--line-height: 1.35;
+}
+
+/* Zain's Arabic letters are drawn smaller than Kumbh Sans's Latin at the same size: they are drawn a little larger,
+   so an Arabic file name or BOQ line reads as large as the English beside it, on either page. Same files as the
+   @fontsource/zain Arabic subsets (400 and 700), only the size differs. */
+@font-face {
+  font-family: "Zain";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  size-adjust: 108%;
+  src: url("../../node_modules/@fontsource/zain/files/zain-arabic-400-normal.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
+    U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+@font-face {
+  font-family: "Zain";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  size-adjust: 108%;
+  src: url("../../node_modules/@fontsource/zain/files/zain-arabic-700-normal.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
+    U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 
 @layer base {
   body {
     background: var(--color-paper);
     color: var(--color-ink);
-    font-size: 14px;
+    font-size: 15px;
     line-height: 1.6;
+  }
+  /* Arabic needs more room between its lines for its dots and marks */
+  html:lang(ar) body {
+    font-size: 16px;
+    line-height: 1.75;
   }
   button:not(:disabled) {
     cursor: pointer;
@@ -29,4 +68,12 @@
   li {
     text-align: start;
   }
+}
+
+/* The sheet grid (react-data-grid, in its own cascade layer: unlayered rules win): rows divided by a quiet line
+   only, no rule between columns, roomier cells, figures in tabular digits. */
+.rdg-cell {
+  border-inline-end: none;
+  padding-inline: 12px;
+  font-variant-numeric: tabular-nums;
 }

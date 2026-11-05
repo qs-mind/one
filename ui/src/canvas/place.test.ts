@@ -68,13 +68,13 @@ describe("place", () => {
   });
 
   it("default sizes by kind", () => {
-    expect(sizeFor("files:all")).toEqual({ w: 360, h: 520 });
-    expect(sizeFor("file:a")).toEqual({ w: 480, h: 640 });
+    expect(sizeFor("files:all")).toEqual({ w: 400, h: 560 });
+    expect(sizeFor("file:a")).toEqual({ w: 520, h: 680 });
     expect(sizeFor("deliverable:a", { kind: "sheet" })).toEqual({ w: 960, h: 640 });
     expect(sizeFor("deliverable:a", { kind: "document" })).toEqual({ w: 720, h: 900 });
     expect(sizeFor("deliverable:a", { kind: "board" })).toEqual({ w: 720, h: 560 });
-    expect(sizeFor("team:core")).toEqual({ w: 320, h: 240 });
-    expect(sizeFor("desk:p", { agents: 1 }).w).toBe(320);
+    expect(sizeFor("team:core")).toEqual({ w: 360, h: 280 });
+    expect(sizeFor("desk:p", { agents: 1 }).w).toBe(360);
     expect(sizeFor("desk:p", { agents: 6 }).h).toBeGreaterThan(sizeFor("desk:p", { agents: 1 }).h);
     expect(sizeFor("desk:p", { agents: 0 }).h).toBeGreaterThanOrEqual(160);
     expect(STRIP_H).toBeLessThan(160);

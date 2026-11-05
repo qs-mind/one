@@ -6,7 +6,7 @@
 // table (which scrolls sideways inside the card if it must). Each cell finds its own direction, and a long value shows
 // two lines with the whole of it as the cell's title. Table roles are set by hand: a stacked table keeps them.
 import { useState } from "react";
-import { BidiText } from "../bidi";
+import { baseDirection, BidiText } from "../bidi";
 import { fill, pick, t } from "../../i18n";
 import type { CardKindProps } from "./cardKinds";
 
@@ -16,11 +16,12 @@ function Cell({ value, label, main }: { value: string; label: string; main: bool
   return (
     <td
       role="cell"
-      dir="auto"
+      // a value with no letter (a price, a date) takes the card's direction, so its "label: " stays before it
+      dir={baseDirection(value) ? "auto" : undefined}
       title={value || undefined}
       data-label={main ? undefined : `${label}: `}
-      className={`min-w-0 align-top @lg:table-cell @lg:min-w-[5rem] @lg:max-w-[14rem] @lg:px-2 @lg:py-1 @lg:before:content-none ${
-        main ? "basis-full font-semibold @lg:font-normal" : "me-3 flex text-slate before:shrink-0 before:whitespace-pre before:content-[attr(data-label)] @lg:me-0 @lg:text-ink"
+      className={`min-w-0 align-top @lg:table-cell @lg:min-w-[5rem] @lg:max-w-[14rem] @lg:px-3 @lg:py-2.5 @lg:before:content-none ${
+        main ? "basis-full pb-1 font-semibold @lg:pb-2.5 @lg:font-normal" : "me-4 flex text-slate before:shrink-0 before:whitespace-pre before:content-[attr(data-label)] @lg:me-0 @lg:text-ink"
       }`}
     >
       <span className="line-clamp-2 break-words">
@@ -60,7 +61,7 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
                     role="columnheader"
                     scope="col"
                     dir="auto"
-                    className="min-w-[5rem] max-w-[14rem] px-2 py-1 text-start align-bottom font-semibold"
+                    className="min-w-[5rem] max-w-[14rem] px-3 py-2 text-start align-bottom text-sm font-semibold text-slate"
                   >
                     {pick(c.label, lang)}
                   </th>
@@ -72,10 +73,10 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
                 <tr
                   key={i}
                   role="row"
-                  className={`flex flex-wrap border-t border-stone py-1.5 @lg:table-row @lg:py-0 ${open && tickable ? "ps-7 @lg:ps-0" : ""} ${!open && payload.tick && !shownTicked.includes(i) ? "text-slate line-through" : ""}`}
+                  className={`flex flex-wrap border-t border-stone py-3 @lg:table-row @lg:py-0 ${open && tickable ? "ps-8 @lg:ps-0" : ""} ${!open && payload.tick && !shownTicked.includes(i) ? "text-slate line-through" : ""}`}
                 >
                   {open && tickable && (
-                    <td role="cell" className="-ms-7 w-7 shrink-0 align-top @lg:ms-0 @lg:table-cell @lg:w-auto @lg:px-1 @lg:py-1">
+                    <td role="cell" className="-ms-8 w-8 shrink-0 pt-0.5 align-top @lg:ms-0 @lg:table-cell @lg:w-auto @lg:px-2 @lg:py-2.5">
                       <input
                         type="checkbox"
                         aria-label={fill(t("tickRow", lang), { n: i + 1 })}
@@ -95,14 +96,14 @@ export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps
         </div>
       )}
       {open && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pt-1">
           {card.options.map((option) => (
             <button
               key={option}
               type="button"
               disabled={sending || (option !== REFUSE && tickable && ticked.length === 0)}
               onClick={() => send(option)}
-              className={`rounded-md px-3 py-1 disabled:opacity-40 ${option === REFUSE ? "border border-ink" : "bg-ink text-paper"}`}
+              className={`rounded-lg px-4 py-2 disabled:opacity-40 ${option === REFUSE ? "border border-ink" : "bg-ink text-paper"}`}
             >
               {label(option)}
             </button>

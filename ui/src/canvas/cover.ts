@@ -75,6 +75,12 @@ export function worldOf(free: Rect, [tx, ty, zoom]: readonly [number, number, nu
 
 /** Below this zoom a frame shows only its poster (lod.ts): a first view keeps to it or above. */
 export const READABLE = 0.6;
+/** The zoom a first view and Open prefer: 100%, the size the text is set for, whenever the frames fit there. */
+export const PREFERRED = 1;
+/** A first view keeps the frames that matter most together down to this zoom, rather than leave one out. */
+export const TOGETHER = 0.85;
+/** The room, in px, a first view or an opened frame keeps between the frames and the free area's edges. */
+export const MARGIN = 32;
 
 type Framed = { key: string; x: number; y: number; w: number; h: number };
 

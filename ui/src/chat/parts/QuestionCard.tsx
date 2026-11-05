@@ -22,9 +22,9 @@ export function QuestionCard({ card, onAnswer, sending, label }: CardKindProps) 
     if (card.choice === REFUSE) return <></>;
     const given = card.answers ?? {};
     return (
-      <ol className="flex flex-col gap-3">
+      <ol className="flex flex-col gap-4">
         {questions.map((q) => (
-          <li key={q.id} className="flex flex-col">
+          <li key={q.id} className="flex flex-col gap-1">
             <span dir="auto">{q.text}</span>
             <span dir="auto" className="font-semibold">
               {given[q.id] ?? ""}
@@ -43,16 +43,16 @@ export function QuestionCard({ card, onAnswer, sending, label }: CardKindProps) 
 
   return (
     <>
-      <ol className="flex flex-col gap-3">
+      <ol className="flex flex-col gap-5">
         {questions.map((q, i) => {
           const options = q.options ?? [];
           const given = answers[q.id] ?? "";
           return (
             <li key={q.id}>
-              <fieldset className="flex flex-col gap-1" disabled={sending}>
-                <legend dir="auto">{q.text}</legend>
+              <fieldset className="flex flex-col gap-2" disabled={sending}>
+                <legend dir="auto" className="mb-2 font-semibold">{q.text}</legend>
                 {options.map((option) => (
-                  <label key={option} className="flex items-center gap-2" dir="auto">
+                  <label key={option} className="flex items-center gap-3 py-0.5" dir="auto">
                     <input
                       type="radio"
                       name={`${group}-${i}`}
@@ -70,7 +70,7 @@ export function QuestionCard({ card, onAnswer, sending, label }: CardKindProps) 
                     aria-label={q.text}
                     value={options.includes(given) ? "" : given}
                     onChange={(e) => answer(q.id, e.target.value)}
-                    className="rounded-md border border-slate px-2 py-1"
+                    className="rounded-lg border border-slate bg-paper px-3 py-2 focus:border-ink focus:outline-1 focus:outline-ink"
                   />
                 )}
               </fieldset>
@@ -78,14 +78,14 @@ export function QuestionCard({ card, onAnswer, sending, label }: CardKindProps) 
           );
         })}
       </ol>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 pt-1">
         {card.options.map((option) => (
           <button
             key={option}
             type="button"
             disabled={sending || (option !== REFUSE && !complete(questions, answers))}
             onClick={() => send(option)}
-            className={`rounded-md px-3 py-1 disabled:opacity-40 ${option === REFUSE ? "border border-ink" : "bg-ink text-paper"}`}
+            className={`rounded-lg px-4 py-2 disabled:opacity-40 ${option === REFUSE ? "border border-ink" : "bg-ink text-paper"}`}
           >
             {label(option)}
           </button>

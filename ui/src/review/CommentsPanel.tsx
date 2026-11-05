@@ -83,10 +83,10 @@ function ThreadItem(props: {
   }
 
   const anchor = toAnchor(thread.anchor_now ?? thread.anchor);
-  const small = "rounded border border-slate px-2 py-0.5 hover:bg-stone";
+  const small = "rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone";
   return (
     <li
-      className={`flex flex-col gap-1 rounded-md border p-2 ${
+      className={`flex flex-col gap-2 rounded-xl border bg-paper px-4 py-3 ${
         thread.kind === "note" ? "border-dashed border-slate" : "border-s-4 border-stone border-s-copper"
       } ${open ? "" : "opacity-70"}`}
     >
@@ -110,7 +110,7 @@ function ThreadItem(props: {
         {thread.body}
       </p>
       {thread.replies.length > 0 && (
-        <ol className="flex flex-col gap-1 border-s border-stone ps-3">
+        <ol className="flex flex-col gap-2 border-s border-stone ps-4">
           {thread.replies.map((r) => (
             <li key={r.id}>
               <span className="text-sm text-slate">
@@ -137,7 +137,7 @@ function ThreadItem(props: {
           placeholder={t("reviewReplyText")}
           value={reply}
           onChange={(e) => setReply(e.target.value)}
-          className="min-w-0 flex-1 rounded border border-slate bg-paper px-2"
+          className="min-w-0 flex-1 rounded-lg border border-slate bg-paper px-3 py-1.5"
         />
         <button type="submit" className={small} disabled={!reply.trim()}>
           {t("reviewReply")}
@@ -196,7 +196,7 @@ export function CommentsPanel(props: CommentsPanelProps) {
   return (
     <section aria-label={t("reviewComments")} className="flex flex-col gap-3">
       <form
-        className="flex flex-col gap-1 rounded-md border border-stone p-2"
+        className="flex flex-col gap-2 rounded-xl border border-stone bg-paper px-4 py-3"
         onSubmit={(event) => {
           event.preventDefault();
           void add();
@@ -212,7 +212,7 @@ export function CommentsPanel(props: CommentsPanelProps) {
           placeholder={t("reviewCommentText")}
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          className="resize-y rounded border border-slate bg-paper px-2 py-1"
+          className="resize-y rounded-lg border border-slate bg-paper px-3 py-2"
         />
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1">
@@ -239,7 +239,7 @@ export function CommentsPanel(props: CommentsPanelProps) {
         ))}
       </fieldset>
       {shown.length === 0 && <p className="text-slate">{t("reviewNoComments")}</p>}
-      <ol className="flex flex-col gap-2">
+      <ol className="flex flex-col gap-3">
         {shown.map((thread) => (
           <ThreadItem
             key={thread.id}

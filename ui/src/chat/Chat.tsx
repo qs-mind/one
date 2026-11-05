@@ -65,7 +65,7 @@ function BriefReply({
   // the Brief's own language: the core's word for it, else the engineer's message's
   const said = progress.find((item) => item.data.lang)?.data.lang ?? lang;
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <ProgressLine items={progress} lang={said} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
       {text && <Reply text={text} unsourced={partsOf(parts, "unsourced").flatMap((part) => part.data.values)} />}
@@ -168,16 +168,16 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
           atEnd.current = log.scrollHeight - log.scrollTop - log.clientHeight <= NEAR_END;
           if (atEnd.current) setBelow(false);
         }}
-        className="relative min-h-0 flex-1 overflow-y-auto px-4 py-4 focus-visible:outline-2 focus-visible:outline-ink"
+        className="relative min-h-0 flex-1 overflow-y-auto px-5 py-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
       >
-        <ol className="flex flex-col gap-4">
+        <ol className="flex flex-col gap-6">
           {messages.length === 0 && <li className="text-slate">{t("empty")}</li>}
           {messages.map((message, index) =>
             message.role === "user" ? (
-              <li key={message.id} className="max-w-[85%] self-end rounded-lg bg-stone px-3 py-2">
+              <li key={message.id} className="max-w-[85%] self-end rounded-2xl bg-stone px-4 py-3">
                 {message.metadata?.steering && <p className="text-slate">{t("steering")}</p>}
                 {message.metadata?.selection?.length ? (
-                  <p className="mb-1 w-fit rounded-md border border-ink/10 bg-paper px-2 text-slate">
+                  <p className="mb-2 w-fit rounded-lg bg-paper px-3 py-0.5 text-sm text-slate">
                     <SelectionText items={message.metadata.selection} />
                   </p>
                 ) : null}
@@ -211,7 +211,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
             <button
               type="button"
               onClick={toEnd}
-              className="pointer-events-auto rounded-full border border-ink/10 bg-paper px-3 py-1 shadow-[0_2px_10px_rgb(14_15_18/0.12)] hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+              className="pointer-events-auto rounded-full border border-ink/[0.08] bg-paper px-4 py-1.5 shadow-[0_2px_12px_rgb(14_15_18/0.08)] hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
             >
               {t("newBelow")}
             </button>

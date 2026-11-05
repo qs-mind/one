@@ -105,11 +105,15 @@ describe("the Project Canvas", () => {
       deliverables: [deliverable("a"), deliverable("b", { kind: "document" })],
     });
     expect(await frameEl(texts.projectFiles.ar)).toHaveTextContent("مواصفات - عينة.pdf");
+    // the first view is at 100% on what matters most; the team opens readable, and "Show everything" brings every
+    // frame into view
+    act(() => canvasApi.focusFrame("team:core"));
+    const team = await frameEl(texts.projectTeam.ar);
+    await waitFor(() => expect(team).toHaveTextContent(texts.roleLead.ar));
+    expect(team).toHaveTextContent(texts.stateIdle.ar);
+    act(() => canvasApi.fitAll());
     expect(await frameEl("تسعير a - عينة")).toBeInTheDocument();
     expect(await frameEl("تسعير b - عينة")).toBeInTheDocument();
-    const team = await frameEl(texts.projectTeam.ar);
-    expect(team).toHaveTextContent(texts.roleLead.ar);
-    expect(team).toHaveTextContent(texts.stateIdle.ar);
     // files get their own frame only when opened
     expect(screen.queryByRole("group", { name: "مواصفات - عينة.pdf" })).toBeNull();
   });

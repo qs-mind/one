@@ -13,6 +13,7 @@ import {
   type RenderEditCellContentProps,
 } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
+import { shownWidth } from "./heights";
 import { extend, inRange, normalised, type Arrow, type Cell, type Range } from "./selection";
 
 export type SheetColumn = {
@@ -72,7 +73,7 @@ const theme = {
   "--rdg-row-hover-background-color": "var(--color-paper)",
   "--rdg-selection-color": "var(--color-copper)",
   "--rdg-frozen-column-shadow-color": "color-mix(in srgb, var(--color-ink) 15%, transparent)",
-  "--rdg-font-size": "14px",
+  "--rdg-font-size": "15px",
   blockSize: "100%",
   fontFamily: "inherit",
 } as CSSProperties;
@@ -134,7 +135,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
       columns.map((column, col) => ({
         key: column.key,
         name: column.label,
-        width: column.width,
+        width: shownWidth(column.width),
         minWidth: 40,
         frozen: column.frozen,
         editable: (g: GridRow<R>) => canEdit(g.row, column),
@@ -142,7 +143,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
           const selected = inRange(selection, rowIdx, col);
           return (
             <div
-              className={`-mx-2 flex h-full items-center px-2 ${selected ? "bg-copper/10" : ""}`}
+              className={`-mx-3 flex h-full items-center px-3 ${selected ? "bg-copper/10" : ""}`}
               data-selected={selected || undefined}
             >
               {renderCell(g.row, column, selected)}
@@ -229,7 +230,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
         rows={gridRows}
         rowKeyGetter={(g) => g.row.id}
         rowHeight={(g) => props.rowHeight(g.row)}
-        headerRowHeight={36}
+        headerRowHeight={44}
         direction={direction}
         enableVirtualization={props.virtualize ?? true}
         bottomSummaryRows={summary ? [{}] : undefined}

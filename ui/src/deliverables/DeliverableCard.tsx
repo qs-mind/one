@@ -19,7 +19,7 @@ export function Facts({ d }: { d: DeliverableInfo }) {
       <span className="text-slate">{d.revision !== null ? fill(t("reviewRev"), { n: d.revision }) : t("deliverableNoRevision")}</span>
       {(d.pending ?? 0) > 0 && <span>{count("sheetPending", d.pending ?? 0)}</span>}
       {d.open_comments > 0 && <span className="text-copper">{count("openComments", d.open_comments)}</span>}
-      {d.sample && <span className="rounded-full border border-slate px-2 text-xs leading-5">{t("sampleData")}</span>}
+      {d.sample && <span className="rounded-full border border-slate px-2.5 text-xs leading-6">{t("sampleData")}</span>}
     </>
   );
 }
@@ -68,20 +68,20 @@ export function DeliverableCard({ projectId, id, onOpen, subscribe = subscribeAc
   return (
     <article
       aria-label={entry.title}
-      className="flex flex-col gap-1 rounded-lg border border-ink/10 bg-paper p-3"
+      className="flex flex-col gap-3 rounded-[14px] bg-stone/70 px-5 py-4"
     >
-      <div className="flex items-baseline gap-2">
+      <div className="flex flex-col">
         <span className="text-xs text-slate">{kindName(entry.kind)}</span>
         <h3 dir="auto" lang={entry.language} className="font-semibold">
           {entry.title}
         </h3>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         <StatusChips view={entry} />
         <Facts d={entry} />
         <button
           type="button"
-          className="ms-auto rounded bg-ink px-3 py-0.5 text-paper"
+          className="ms-auto rounded-lg bg-ink px-4 py-1.5 text-paper"
           aria-label={`${t("deliverableOpen")}: ${entry.title}`}
           onClick={() => onOpen(entry.id)}
         >

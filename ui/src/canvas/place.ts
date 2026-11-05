@@ -3,7 +3,7 @@
 import type { DeliverableInfo, FrameKey, Placed } from "./types";
 
 /** The height of a frame's name strip, and of a folded frame. */
-export const STRIP_H = 40;
+export const STRIP_H = 52;
 export const MIN_W = 240;
 export const MIN_H = 160;
 /** Rows are at least this wide before they wrap. */
@@ -17,9 +17,9 @@ export function sizeFor(key: FrameKey, info: { kind?: DeliverableInfo["kind"]; a
   const kind = key.slice(0, key.indexOf(":"));
   switch (kind) {
     case "files":
-      return { w: 360, h: 520 };
+      return { w: 400, h: 560 };
     case "file":
-      return { w: 480, h: 640 };
+      return { w: 520, h: 680 };
     case "deliverable":
       if (info.kind === "sheet") return { w: 960, h: 640 };
       if (info.kind === "document") return { w: 720, h: 900 };
@@ -27,9 +27,9 @@ export function sizeFor(key: FrameKey, info: { kind?: DeliverableInfo["kind"]; a
     case "clientboq":
       return { w: 960, h: 640 };
     case "desk":
-      return { w: 320, h: Math.max(MIN_H, 64 + 48 * (info.agents ?? 0)) };
+      return { w: 360, h: Math.max(MIN_H, 72 + 64 * (info.agents ?? 0)) };
     default:
-      return { w: 320, h: 240 };
+      return { w: 360, h: 280 };
   }
 }
 

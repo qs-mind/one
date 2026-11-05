@@ -91,7 +91,8 @@ describe("SearchKey", () => {
     searchCore({ provider: "native", own_key: false });
     const user = userEvent.setup();
     render(<App />);
-    await user.click(within(screen.getByRole("banner")).getByRole("button", { name: new RegExp(texts.ai.ar) }));
+    await user.click(within(screen.getByRole("banner")).getByRole("button", { name: texts.more.ar }));
+    await user.click(await screen.findByRole("button", { name: new RegExp(texts.ai.ar) }));
     const panel = (await screen.findByRole("region", { name: texts.aiTitle.ar })).parentElement!;
     expect(within(panel).getByRole("region", { name: texts.searchTitle.ar })).toBeInTheDocument();
     expect(within(panel).getByRole("region", { name: texts.connectors.ar })).toBeInTheDocument();

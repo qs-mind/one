@@ -172,8 +172,8 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         {viewer}
       </div>
       {mode === "full" && (
-        <div className="flex min-h-0 flex-[2_1_0%] flex-col border-t border-stone">
-          <div className="flex flex-wrap items-center gap-2 px-3 py-1">
+        <div className="flex min-h-0 flex-[2_1_0%] flex-col bg-stone/50">
+          <div className="flex flex-wrap items-center gap-3 px-5 pb-1 pt-3">
             <div role="tablist" aria-label={t("reviewPanels")} className="flex flex-wrap gap-1">
               {tabs.map(([key, label]) => (
                 <button
@@ -183,7 +183,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
                   role="tab"
                   aria-selected={tab === key}
                   aria-controls={tabId(key)}
-                  className={`rounded px-2 py-0.5 ${tab === key ? "bg-ink text-paper" : "hover:bg-stone"}`}
+                  className={`rounded-lg px-3 py-1.5 ${tab === key ? "bg-ink text-paper" : "hover:bg-stone"}`}
                   onClick={() => {
                     setTab(key);
                     setFillOpen(null);
@@ -211,7 +211,7 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
             role="tabpanel"
             aria-labelledby={`${tabId(tab)}-tab`}
             dir={language() === "ar" ? "rtl" : "ltr"}
-            className="min-h-0 flex-1 overflow-auto px-3 py-2"
+            className="min-h-0 flex-1 overflow-auto px-5 py-4"
           >
             {fillOpen ? (
               <FillPreview projectId={projectId} planId={fillOpen} announce={announce} onClose={() => setFillOpen(null)} />

@@ -39,9 +39,9 @@ export function ConnectorCard({ card, onAnswer, sending, label }: CardKindProps)
 
   return (
     <>
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-2">
         {tools.map((tool) => (
-          <li key={tool.name} className="flex flex-col rounded-md bg-stone px-3 py-1">
+          <li key={tool.name} className="flex flex-col rounded-lg bg-stone px-4 py-2">
             <span dir="auto" className="font-semibold">
               {tool.name}
             </span>
@@ -85,7 +85,7 @@ export function ConnectorCard({ card, onAnswer, sending, label }: CardKindProps)
                 key={option}
                 type="button"
                 onClick={() => send(option)}
-                className={`rounded-md px-3 py-1 disabled:opacity-40 ${option === REFUSE ? "border border-ink" : "bg-ink text-paper"}`}
+                className={`rounded-lg px-4 py-2 disabled:opacity-40 ${option === REFUSE ? "border border-ink" : "bg-ink text-paper"}`}
               >
                 {label(option)}
               </button>

@@ -37,7 +37,7 @@ function TeamFrameView(props: NodeProps<Node<TeamData, "team">>) {
       title={frameTitle({ type: "team", data: props.data })}
       dir={dir()}
     >
-      <ul className="flex flex-col divide-y divide-ink/10">
+      <ul className="flex flex-col gap-1 px-2 pb-2">
         {rows.map((agent) => (
           <AgentCard key={agent.id} agent={agent} />
         ))}

@@ -64,7 +64,7 @@ export function SignOff({ projectId, view, onChanged, announce }: SignOffProps) 
       {signed !== null ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{fill(t("reviewSignedOff"), { n: signed })}</span>
-          <button type="button" className="rounded border border-slate px-2 py-0.5 hover:bg-stone" onClick={() => void report(signed)}>
+          <button type="button" className="rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone" onClick={() => void report(signed)}>
             {t("reviewReport")} <bdi>PDF</bdi>
           </button>
         </div>
@@ -96,7 +96,7 @@ export function SignOff({ projectId, view, onChanged, announce }: SignOffProps) 
               <button
                 type="button"
                 disabled={busy}
-                className="rounded border border-slate px-3 py-1 hover:bg-stone disabled:opacity-40"
+                className="rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone disabled:opacity-40"
                 onClick={() => void issue()}
               >
                 {t("reviewIssueRevision")}

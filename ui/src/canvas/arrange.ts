@@ -34,7 +34,7 @@ export function arrange(
   frames: readonly Placed[],
   status: ReadonlyMap<FrameKey, Status>,
   mode: "stage" | "tidy",
-  { dir, gap = 80, rowGap = 120 }: ArrangeOptions,
+  { dir, gap = 96, rowGap = 144 }: ArrangeOptions,
 ): Placed[] {
   if (frames.length === 0) return [];
   const minX = Math.min(...frames.map((f) => f.x));

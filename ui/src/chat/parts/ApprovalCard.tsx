@@ -95,7 +95,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
       data-answered={done || undefined}
       lang={lang}
       dir={dir(lang)}
-      className={`flex min-w-0 flex-col gap-2 rounded-md border px-3 py-2 ${done ? "border-ink/10" : "border-copper"}`}
+      className={`flex min-w-0 flex-col rounded-[14px] ${done ? "gap-3 bg-stone/70 px-4 py-2.5" : "gap-3 border border-copper bg-paper px-5 py-4"}`}
     >
       {done ? (
         <h3 className="min-w-0">
@@ -119,7 +119,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
           {pick(card.title, lang)}
         </h3>
       )}
-      <div hidden={done && !unfolded} className="flex min-w-0 flex-col gap-2">
+      <div hidden={done && !unfolded} className="flex min-w-0 flex-col gap-4">
         <p dir="auto">{pick(card.detail, lang)}</p>
         {Kind && (
           <Kind
@@ -132,7 +132,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
         )}
         {done || Kind ? null : (
           <>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 pt-1">
               {card.options.map((option) => (
                 <button
                   key={option}
@@ -140,7 +140,7 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
                   disabled={sending}
                   aria-expanded={option === "raise" ? raising : undefined}
                   onClick={() => choose(option)}
-                  className={`rounded-md px-3 py-1 disabled:opacity-40 ${option === "no" ? "border border-ink" : "bg-ink text-paper"}`}
+                  className={`rounded-lg px-4 py-2 disabled:opacity-40 ${option === "no" ? "border border-ink" : "bg-ink text-paper"}`}
                 >
                   {optionLabel(card.kind, option, lang)}
                 </button>

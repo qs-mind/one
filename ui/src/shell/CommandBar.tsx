@@ -56,10 +56,10 @@ export function CommandBar({
       data-canvas-cover={floating ? true : undefined}
       className={
         floating
-          ? "pointer-events-auto w-full max-w-[560px] rounded-[14px] border border-ink/10 bg-paper p-2 shadow-[0_2px_10px_rgb(14_15_18/0.12)]"
+          ? "pointer-events-auto w-full max-w-[560px] rounded-[16px] border border-ink/[0.08] bg-paper p-3 shadow-[0_2px_12px_rgb(14_15_18/0.08)]"
           : inPanel
-            ? "shrink-0 border-t border-ink/10 p-2"
-            : "mx-auto w-full max-w-[42rem] px-4 pb-4"
+            ? "shrink-0 px-4 pb-4 pt-3"
+            : "mx-auto w-full max-w-[46rem] px-6 pb-6"
       }
     >
       <form
@@ -67,18 +67,18 @@ export function CommandBar({
           event.preventDefault();
           void submit(draft, true);
         }}
-        className="flex flex-col gap-2"
+        className="flex flex-col gap-3"
       >
         {selection.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1 rounded-md bg-stone px-2 py-0.5">
+            <span className="flex items-center gap-1 rounded-lg bg-stone py-1 pe-1 ps-3">
               <SelectionText items={selection} />
               <button
                 type="button"
                 aria-label={t("clearSelection")}
                 title={t("clearSelection")}
                 onClick={() => select([])}
-                className="rounded px-1 text-slate hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+                className="rounded-md px-2 text-slate hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
               >
                 ✕
               </button>
@@ -89,7 +89,7 @@ export function CommandBar({
                 type="button"
                 disabled={!chat.canSend}
                 onClick={() => void submit(t(key), false)}
-                className="rounded-md border border-ink/10 px-2 py-0.5 hover:bg-stone disabled:opacity-40"
+                className="rounded-lg border border-ink/15 px-3 py-1 hover:bg-stone disabled:opacity-40"
               >
                 {t(key)}
               </button>
@@ -104,7 +104,7 @@ export function CommandBar({
               aria-hidden="true"
               dir="auto"
               data-command-mirror
-              className="invisible col-start-1 row-start-1 max-h-40 min-h-9 overflow-hidden whitespace-pre-wrap break-words rounded-md border border-transparent px-3 py-1.5"
+              className="invisible col-start-1 row-start-1 max-h-40 min-h-11 overflow-hidden whitespace-pre-wrap break-words rounded-xl border border-transparent px-4 py-2.5"
             >
               {(draft || placeholder) + " "}
             </div>
@@ -123,18 +123,18 @@ export function CommandBar({
                 void submit(draft, true);
               }
             }}
-            className="col-start-1 row-start-1 max-h-40 min-h-9 w-full resize-none overflow-y-auto rounded-md border border-ink/10 bg-paper px-3 py-1.5 outline-none focus:border-ink"
+            className="col-start-1 row-start-1 max-h-40 min-h-11 w-full resize-none overflow-y-auto rounded-xl border border-transparent bg-stone px-4 py-2.5 outline-none placeholder:text-slate focus:border-ink focus:bg-paper"
           />
           </div>
           <button
             type="submit"
             disabled={!draft.trim() || !chat.canSend}
-            className="shrink-0 rounded-md bg-ink px-4 py-1.5 text-paper disabled:opacity-40"
+            className="min-h-11 shrink-0 rounded-xl bg-ink px-5 text-paper disabled:opacity-40"
           >
             {t("send")}
           </button>
           {chat.running && (
-            <button type="button" onClick={() => void chat.halt()} className="shrink-0 rounded-md border border-ink px-4 py-1.5">
+            <button type="button" onClick={() => void chat.halt()} className="min-h-11 shrink-0 rounded-xl border border-ink px-5">
               {t("stop")}
             </button>
           )}

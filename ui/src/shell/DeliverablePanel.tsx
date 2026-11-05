@@ -57,9 +57,9 @@ export function DeliverablePanel({
         panel.close();
       }}
     >
-      <div className="flex justify-end border-b border-ink/10 px-2 py-1">
+      <div className="flex justify-end px-3 pt-2">
         {/* focus moves into the panel, so Esc there closes it and gives focus back to the opener */}
-        <button type="button" autoFocus className="rounded px-2 hover:bg-stone" onClick={panel.close}>
+        <button type="button" autoFocus className="rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink" onClick={panel.close}>
           {t("close")}
         </button>
       </div>
