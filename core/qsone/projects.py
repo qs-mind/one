@@ -2,14 +2,19 @@
 
 Each project is a folder under `<data folder>/projects/`, named by its random id; nothing else about
 it is readable on disk. The list comes from opening each file, and the names are kept in memory
-only. Log ids only: never a project name, a file name or file text."""
+only. Log ids only: never a project name, a file name or file text.
 
+Next to `records.db` sits `key.json`: the project key wrapped by the Backup key, or by the
+project's recovery code for a Confidential Project (Plan 8). When the key store loses a project
+key, One puts it back from there."""
+
+import logging
 import re
 import threading
 import uuid
 from dataclasses import asdict
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
@@ -18,10 +23,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from qsone import activity, copy, settings
+from qsone.backup import keys as backup_keys
 from qsone.meaning.service import Meaning, ModelFailed
-from qsone.records import files, search
+from qsone.records import audit, files, search, vault
 from qsone.records.project import FILE_NAME, Records, RecordsError
 
+if TYPE_CHECKING:
+    from qsone.backup.runner import Backups
+
+log = logging.getLogger(__name__)
 ACTOR = "engineer"  # every HTTP call is the engineer at the screen
 _ID = re.compile(r"[0-9a-f]{32}")
 
@@ -39,6 +49,64 @@ class Projects:
         self._open: dict[str, Records] = {}
         self._known: dict[str, dict] = {}  # id -> {"id", "name", "created_at"}, from the file
         self._lock = threading.RLock()
+        self.backups: Backups | None = None  # set by the app: a copy on close, the escrow
+
+    def _escrow(self) -> backup_keys.Escrow | None:
+        return self.backups.escrow() if self.backups is not None else None
+
+    def _key_doc(self, rec: Records, *, confidential: bool) -> None:
+        """Writes key.json when it is missing or stale; a failure is logged, never raised (the
+        next backup writes it)."""
+        try:
+            key = vault.get_key(rec.id)
+            if key is not None:
+                backup_keys.ensure_key_doc(
+                    rec.folder, rec.id, key, confidential=confidential, escrow=self._escrow()
+                )
+        except (OSError, KeyringError, RecordsError) as e:
+            log.warning("Key file of %s not written (%s)", rec.id, type(e).__name__)
+
+    def _recover_key(self, folder: Path) -> None:
+        """Puts a lost project key back in the key store from key.json. Raises `RecordsError`:
+        PROJECT_KEY_MISSING (no Backup key wrap, as for a Confidential Project),
+        BACKUP_NEEDS_SIGN_IN (this computer has not got the Backup key), BACKUP_KEY_WRONG."""
+        doc = backup_keys.read_doc(folder / backup_keys.KEY_FILE)
+        if doc is None or doc.get("kind") != backup_keys.KIND_KEY:
+            raise RecordsError(copy.PROJECT_KEY_MISSING)
+        wanted = str(doc.get("key_id"))
+        found = backup_keys.known_key(wanted)
+        escrow = self._escrow() if found is None else None
+        if escrow is not None:
+            try:
+                kept = escrow.get()
+            except Exception as e:  # noqa: BLE001 - offline: the engineer is told what is needed
+                log.warning("The Backup key escrow failed (%s)", type(e).__name__)
+                kept = None
+            if kept is not None and backup_keys.key_id(kept) == wanted:
+                found = kept
+                if backup_keys.backup_key() is None:
+                    backup_keys.set_backup_key(kept)
+        if found is None:
+            raise backup_keys.BackupError(copy.BACKUP_NEEDS_SIGN_IN)
+        vault.put_key(folder.name, backup_keys.unwrap(doc, backup_key=found))
+        log.warning("PROJECT_KEY_RESTORED %s", folder.name)
+
+    def _open_file(self, folder: Path) -> tuple[Records, bool]:
+        """`Records.open`, putting a lost key back first; True when it was put back."""
+        try:
+            return Records.open(folder), False
+        except RecordsError as e:
+            if e.text is not copy.PROJECT_KEY_MISSING:
+                raise
+        try:
+            self._recover_key(folder)
+        except KeyringError:
+            raise RecordsError(copy.PROJECT_KEY_STORE_DOWN, status=503) from None
+        return Records.open(folder), True
+
+    def open_file(self, project_id: str) -> Records:
+        """The project's file opened on its own, not counted as open (a backup copy). Close it."""
+        return self._open_file(self._folder(project_id))[0]
 
     def _folder(self, project_id: str) -> Path:
         """An id never becomes a path unless it is 32 lower-case hex digits."""
@@ -62,6 +130,7 @@ class Projects:
             rec = Records.create(self.root / project_id, name=name, actor=actor)
         except KeyringError:
             raise RecordsError(copy.PROJECT_KEY_STORE_DOWN, status=503) from None
+        self._key_doc(rec, confidential=False)
         with self._lock:
             self._open[project_id] = rec
             return {**self._remember(rec), "open": True}
@@ -83,7 +152,7 @@ class Projects:
                     continue
                 if project_id not in self._known:
                     try:
-                        rec = Records.open(folder)
+                        rec, _ = self._open_file(folder)
                         try:
                             self._remember(rec)
                         finally:
@@ -103,8 +172,9 @@ class Projects:
         folder = self._folder(project_id)
         with self._lock:
             rec = self._open.get(project_id)
+            restored = False
             if rec is None or not rec.is_open:
-                rec = Records.open(folder)
+                rec, restored = self._open_file(folder)
                 try:
                     search.ensure_index(rec)
                     self._remember(rec)
@@ -112,7 +182,9 @@ class Projects:
                     rec.close()
                     raise
                 self._open[project_id] = rec
-            return {**self._known[project_id], "open": True}
+                self._key_doc(rec, confidential=self._known[project_id]["confidential"])
+            opened = {**self._known[project_id], "open": True}
+            return opened | {"note": copy.PROJECT_KEY_RESTORED} if restored else opened
 
     def get(self, project_id: str) -> Records:
         """Raises `RecordsError`: PROJECT_NOT_FOUND (404) or PROJECT_NOT_OPEN (409)."""
@@ -125,14 +197,58 @@ class Projects:
             raise RecordsError(copy.PROJECT_NOT_FOUND, status=404)
         raise RecordsError(copy.PROJECT_NOT_OPEN)
 
-    def close(self, project_id: str) -> None:
+    def close(self, project_id: str, *, back_up: bool = True) -> None:
+        """Backs the project up first (when the app runs backups), unless `back_up` is False."""
         self._folder(project_id)
+        with self._lock:
+            opened = self._open.get(project_id)
+        # Outside this lock: a backup run takes its own lock first, then this one.
+        if back_up and self.backups is not None and opened is not None and opened.is_open:
+            self.backups.closing(opened)
         with self._lock:
             rec = self._open.pop(project_id, None)
             if rec is not None and rec.is_open:
                 self._remember(rec)  # the list keeps its latest meta while it is closed
         if rec is not None:
             rec.close()
+
+    def forget(self, project_id: str) -> None:
+        """The file was replaced (a restore): its name and meta are read again."""
+        with self._lock:
+            self._known.pop(project_id, None)
+
+    def set_confidential(self, project_id: str, on: bool) -> dict:
+        """Marks an open project Confidential, or not, audited. On: a new recovery code wraps
+        the key, and key.json holds that wrap only, so the Backup key and the account never
+        meet this project's key; the code is in this answer only. Off: a Backup key wrap again.
+        Raises `RecordsError`, `KeyringError`, `OSError`."""
+        rec = self.get(project_id)
+        key = vault.get_key(project_id)
+        if key is None:
+            raise RecordsError(copy.PROJECT_KEY_MISSING)
+        code = backup_keys.new_recovery_code() if on else None
+        if code is not None:
+            doc = backup_keys.wrap_with_code(key, project_id=project_id, code=code)
+        else:
+            current = backup_keys.ensure_backup_key(self._escrow())
+            doc = backup_keys.wrap(key, project_id=project_id, backup_key=current)
+        backup_keys.write_doc(rec.folder / backup_keys.KEY_FILE, doc)
+        before = rec.meta().get("confidential") == "1"
+        with rec.write(ACTOR) as conn:
+            rec.set_meta(conn, "confidential", "1" if on else "0")
+            audit.record(
+                conn,
+                at=rec.clock(),
+                actor=ACTOR,
+                action="update",
+                table="meta",
+                row_id="confidential",
+                before={"confidential": before},
+                after={"confidential": on},
+            )
+        with self._lock:
+            self._remember(rec)
+        return {"confidential": on, "code": code} if code else {"confidential": on}
 
     def close_all(self) -> None:
         with self._lock:

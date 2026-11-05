@@ -197,9 +197,10 @@ def test_an_unknown_project_is_not_found(client):
         assert r.status_code == 404 and r.json()["error"] == copy.PROJECT_NOT_FOUND, url
 
 
-def test_missing_key_answers_in_plain_words(client, project, memory_keyring):
+def test_missing_key_answers_in_plain_words(client, project, data_dir, memory_keyring):
     client.post(f"/projects/{project}/close", headers=AUTH)
     memory_keyring.store.clear()
+    (data_dir / "projects" / project / "key.json").unlink()  # nothing to put it back from
     r = client.post(f"/projects/{project}/open", headers=AUTH)
     assert r.status_code == 409 and r.json() == {"error": copy.PROJECT_KEY_MISSING}
     assert "Traceback" not in r.text
@@ -209,6 +210,7 @@ def test_a_project_that_cannot_be_read_is_listed_with_its_reason(data_dir, memor
     with TestClient(create_app(SECRET, data_dir=data_dir)) as client:
         pid = client.post("/projects", json={"name": "x"}, headers=AUTH).json()["id"]
     memory_keyring.store.clear()
+    (data_dir / "projects" / pid / "key.json").unlink()  # nothing to put the key back from
     with TestClient(create_app(SECRET, data_dir=data_dir)) as client:
         listed = client.get("/projects", headers=AUTH).json()["projects"]
     assert listed == [{"id": pid, "error": copy.PROJECT_KEY_MISSING}]

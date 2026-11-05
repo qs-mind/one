@@ -28,3 +28,8 @@ def get_key(project_id: str) -> bytes | None:
 def delete_key(project_id: str) -> None:
     """Only to undo a failed create."""
     keyring.delete_password(SERVICE, _user(project_id))
+
+
+def put_key(project_id: str, key: bytes) -> None:
+    """Puts a project key back (from its key.json or a backup). Raises `KeyringError`."""
+    keyring.set_password(SERVICE, _user(project_id), key.hex())
