@@ -221,7 +221,11 @@ function Level({
                       </span>
                     )}
                     <span dir="auto" className="text-slate">
-                      <FileName name={input.source.title} />
+                      {input.source.kind === "calculation" ? (
+                        <bdi dir="auto">{formulaText(input.source.title)}</bdi> // worked out: its formula in words
+                      ) : (
+                        <FileName name={input.source.title} />
+                      )}
                       {input.dated ? ` · ${fill(t("sheetDated"), { date: dayText(input.dated) })}` : ""}
                     </span>
                   </li>

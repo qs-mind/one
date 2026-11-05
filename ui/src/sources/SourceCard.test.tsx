@@ -208,6 +208,7 @@ describe("a number opens in place into its source card", () => {
         id: "c2", formula: "quantity * rate", unit: "EGP", stale: false, page: 1, pages: 1,
         inputs: [
           { name: "quantity", seq: null, number: "n-q", value: "138.2", unit: "m3", dated: DAY, source: { kind: "file", title: "01 المقايسة - عينة.xlsx" }, calculated: false },
+          { name: "amount", seq: 1, number: "n-a1", value: "102000", unit: "EGP", dated: DAY, source: { kind: "calculation", title: "quantity * rate" }, calculated: true },
           { name: "rate", seq: null, number: "n-r", value: "3795", unit: "EGP/m3", dated: DAY, source: { kind: "quote", title: "04 عرض أسعار - عينة.pdf" }, calculated: false },
         ],
         steps: [{ n: 1, text: "138.2 * 3795", op: "*", value: "524469.00", unit: "EGP" }],
