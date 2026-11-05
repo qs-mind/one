@@ -40,7 +40,8 @@ describe("viewerFor", () => {
     const ref = createRef<ViewerHandle>();
     render(<Viewer projectId="p1" deliverableId={D} mode="frame" ref={ref} {...({ subscribe: live.subscribe } as object)} />);
     await screen.findByText("03/02");
-    expect(ref.current!.locate({ row: "p3", column: "rate" })).toBeInstanceOf(DOMRect);
+    // the grid's ref is attached a tick after its first rows draw, so wait for it under a loaded test run
+    await waitFor(() => expect(ref.current!.locate({ row: "p3", column: "rate" })).toBeInstanceOf(DOMRect));
     expect(ref.current!.locate({ row: "nope", column: "rate" })).toBeNull();
     // the frame is the viewer only: no review panels, no exports
     expect(screen.queryByRole("tablist")).toBeNull();
