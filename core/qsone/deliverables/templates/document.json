@@ -1,0 +1,12 @@
+{
+  "kind": "document",
+  "version": 1,
+  "nodes": ["p", "h1", "h2", "h3", "ul", "ol", "li", "table", "tr", "td", "blockquote"],
+  "inlines": {
+    "num": ["number"],
+    "cell": ["deliverable", "row", "column"]
+  },
+  "marks": ["bold", "italic"],
+  "ops": ["set_block", "insert_block", "remove_block", "move_block"],
+  "anchors": ["text", "row", "deliverable"]
+}
