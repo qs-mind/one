@@ -14,8 +14,10 @@ import type { Explained, NumberCell, Source } from "../deliverables/types";
 import { fill, language, pick, t, texts, type Text } from "../i18n";
 import { DUR, play } from "../ui/motion";
 import { FileName } from "../ui/FileName";
+import { useScrollEdges } from "../ui/useScrollEdges";
 import { formatDecimal } from "../viewers/sheet/format";
 import { flipFrom } from "./flip";
+import { formulaText, termText } from "./formula";
 import { readingDirection, revealSource } from "./mark";
 import { placeCard } from "./place";
 import { sourceKeys } from "./targets";
@@ -148,12 +150,17 @@ function Level({
   const fileId = source?.file_id;
   const value = explained?.number.value ?? cell?.value;
   const chat = source?.kind === "chat";
+  // worked out by the Calc Engine: it says so, in place of a formula as a title and whoever asked for the number
+  const calculated = source?.kind === "calculation" || Boolean(calc);
+  const [unmarked, setUnmarked] = useState(false);
 
   function openSource() {
     if (!fileId) return;
     const page = source?.locator?.page;
+    setUnmarked(false);
     canvasApi.openFile(fileId, typeof page === "number" ? page : undefined);
-    void revealSource(sourceKeys({ fileId, locator: source?.locator }), value ? figuresOf(value) : []);
+    // nothing to mark (a PDF page: no place on it is stored): said, so the engineer knows to look
+    void revealSource(sourceKeys({ fileId, locator: source?.locator }), value ? figuresOf(value) : []).then((marked) => setUnmarked(!marked));
   }
 
   return (
@@ -162,6 +169,8 @@ function Level({
         <span className="text-xs text-slate">{t("sheetSource")}</span>
         {chat ? (
           <span>{t("sourceSaidInChat")}</span>
+        ) : source?.kind === "calculation" ? (
+          <span>{t("enteredByCalc")}</span>
         ) : source?.title ? (
           <FileName name={source.title} />
         ) : (
@@ -177,11 +186,16 @@ function Level({
           </span>
         )}
         {dated && <span>{fill(t(datedLabel(source?.locator?.dated_how)), { date: dayText(dated) })}</span>}
-        {by && <span>{whoEntered(by)}</span>}
+        {calculated ? source?.kind !== "calculation" && <span>{t("enteredByCalc")}</span> : by && <span>{whoEntered(by)}</span>}
         {fileId && (
           <button type="button" className="self-start rounded px-1 underline hover:text-copper" onClick={openSource}>
             {t("sourceOpenFile")}
           </button>
+        )}
+        {unmarked && (
+          <span role="status" className="text-slate">
+            {t("sourceNotMarked")}
+          </span>
         )}
       </section>
       {failed && <p role="alert" className="text-copper">{pick(failed)}</p>}
@@ -189,9 +203,7 @@ function Level({
         <>
           <section className="flex flex-col">
             <span className="text-xs text-slate">{t("sheetFormula")}</span>
-            <bdi dir="ltr" className="font-mono">
-              {calc.formula}
-            </bdi>
+            <bdi dir="auto">{formulaText(calc.formula)}</bdi>
           </section>
           {calc.inputs.length > 0 && (
             <section className="flex flex-col">
@@ -201,11 +213,11 @@ function Level({
                   <li key={`${input.name}-${input.seq ?? ""}-${input.number}`} className="flex flex-col">
                     {input.calculated ? (
                       <button type="button" className="self-start underline hover:text-copper" onClick={() => onOpen(input.number)}>
-                        <bdi dir="ltr">{input.name}</bdi> = {shown(input.value, input.unit)}
+                        <bdi dir="auto">{termText(input.name)}</bdi> = {shown(input.value, input.unit)}
                       </button>
                     ) : (
                       <span>
-                        <bdi dir="ltr">{input.name}</bdi> = {shown(input.value, input.unit)}
+                        <bdi dir="auto">{termText(input.name)}</bdi> = {shown(input.value, input.unit)}
                       </span>
                     )}
                     <span dir="auto" className="text-slate">
@@ -224,7 +236,7 @@ function Level({
                 {calc.steps.map((step) => (
                   <li key={step.n}>
                     <bdi dir="ltr">
-                      {step.n}. {step.text} = {formatDecimal(step.value)}
+                      {step.n}. {formulaText(step.text)} = {formatDecimal(step.value)}
                       {step.unit ? ` ${unitText(step.unit)}` : ""}
                     </bdi>
                   </li>
@@ -272,6 +284,7 @@ export function SourceCard(props: SourceCardProps) {
 
 function Card({ projectId, cell, sources, style, focus, onClose, from, label }: SourceCardProps) {
   const box = useRef<HTMLDivElement>(null);
+  useScrollEdges(box); // a card taller than the room fades where it scrolls, never just cut
   const headValue = useRef<HTMLSpanElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const levels = useRef<(HTMLDivElement | null)[]>([]);
@@ -378,7 +391,7 @@ function Card({ projectId, cell, sources, style, focus, onClose, from, label }: 
       style={from ? undefined : style}
       className={`${
         from ? "fixed z-[60] max-w-[calc(100vw-16px)] shadow-[0_2px_12px_rgb(14_15_18/0.1)]" : "absolute z-20 max-w-[90%]"
-      } flex max-h-96 w-80 flex-col gap-2 overflow-auto rounded-md border border-slate bg-paper p-3 text-start text-ink outline-none`}
+      } scroll-fade flex max-h-96 w-80 flex-col gap-2 overflow-auto rounded-md border border-slate bg-paper p-3 text-start text-ink outline-none`}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();

@@ -415,7 +415,7 @@ describe("SheetViewer", () => {
 
     await user.click(cellOf("03/02", "amount"));
     dialog = await screen.findByRole("dialog");
-    await waitFor(() => expect(dialog).toHaveTextContent("quantity * rate = 4,782,060.00 ج.م."));
+    await waitFor(() => expect(dialog).toHaveTextContent("الكمية × الفئة = 4,782,060.00 ج.م.")); // in words
     expect(dialog).toHaveTextContent(texts.sheetFormula.ar);
     expect(dialog).toHaveTextContent("39,850.50 ج.م./m3");
     expect(dialog).toHaveTextContent("كميات - عينة");

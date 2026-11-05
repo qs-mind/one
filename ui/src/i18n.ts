@@ -600,6 +600,16 @@ export const texts = {
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
   sourceOpenFile: { en: "Open source", ar: "افتح المصدر" },
+  sourceNotMarked: {
+    en: "Opened at its page. The exact place on the page isn't stored, so nothing is marked.",
+    ar: "اتفتح على الصفحة. مكان الرقم بالظبط في الصفحة مش متسجّل، فمفيش حاجة متعلّمة.",
+  },
+  // A formula's terms in words (ui/src/sources/formula.ts): «الكمية × الفئة», not «quantity * rate»
+  termQuantity: { en: "Quantity", ar: "الكمية" },
+  termRate: { en: "Rate", ar: "الفئة" },
+  termAmount: { en: "Amount", ar: "الإجمالي" },
+  termTotal: { en: "Total", ar: "الإجمالي العام" },
+  termSum: { en: "sum of {x}", ar: "مجموع {x}" },
   // A number's source, shown (decision 16.3): the card a number opens into.
   sourceBackTo: { en: "Back to {value}", ar: "ارجع لـ {value}" },
   sourceSaidInChat: { en: "Said in the chat", ar: "اتقال في الشات" },
