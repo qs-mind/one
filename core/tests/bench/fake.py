@@ -40,6 +40,7 @@ USAGE = (600, 120)  # tokens in and out of every bench response: 0.0012 USD at t
 PRICE_SOURCE = "bench sample price, not real"
 SCENARIOS = (
     *("chat", "question", "boq", "deliverable", "team", "full", "understand", "lessons", "view"),
+    "weak",  # the tender day's weak model: the guards must catch each of its mistakes
 )
 _KEYWORD = re.compile(r"bench:(\w+)")
 _ARABIC = re.compile(r"[؀-ۿ]")
@@ -48,6 +49,7 @@ _LATIN = re.compile(r"[A-Za-z]")
 _FILE = re.compile(r"file:([0-9a-f]{32}) \| ([^|]+?) \| (?:in folder [^|]+ \| )?(\w+)")
 _NEXT_IMPORT = re.compile(r"Next: boq_import (\{.*\})")
 _MODEL = re.compile(r"The AI model you run on is ([\w.:/-]+?)\. ")
+_FEEDBACK = "automated feedback, not a message from the user"  # PydanticAI's retry, as a prompt
 
 
 # What the brain sees -------------------------------------------------------------------------
@@ -85,6 +87,8 @@ def read(messages: list, info: AgentInfo) -> Seen:
         if isinstance(message, ModelRequest):
             for part in message.parts:
                 if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                    if _FEEDBACK in part.content:  # ONE sent the answer back: the same Brief
+                        continue
                     start, brief = i, part.content
     steps: dict[str, str] = {}  # tool call id -> step
     done: dict[str, tuple[str, bool]] = {}
@@ -319,6 +323,22 @@ def _letter(seen: Seen) -> Step:
     return _call("letter", "deliverable_create", args)
 
 
+def _weak_letter(seen: Seen) -> Step:
+    """The tender day's weak model (gemini-3.1-flash-lite, 5 Nov 2026): a letter dated tomorrow,
+    with a blank for its total. The Deliverable tools refuse it."""
+    lines = ["القاهرة في 6 نوفمبر 2026", "نتقدم بعرضنا بقيمة [مبلغ إجمالي المقايسة] - عينة تجريبية"]
+    blocks = [{"type": "p", "children": [{"text": line}]} for line in lines]
+    args = {"kind": "document", "variant": "letter", "title": "خطاب العطاء (عينة تجريبية)",
+            "language": "ar", "blocks": blocks}  # fmt: skip
+    return _call("weakletter", "deliverable_create", args)
+
+
+WEAK_CLAIM = (
+    "(رد تجريبي يقلّد موديل ضعيف) تم الانتهاء من تسعير كافة بنود المقايسة والمخرج جاهز للمراجعة. "
+    "جاري التنفيذ…"
+)
+
+
 def _understood(seen: Seen) -> Step | None:
     """The "I understood this" card: every fact a bench sample, each with a place in the BOQ, the
     count from the BOQ import, and every file sorted."""
@@ -420,6 +440,7 @@ LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "understand": (_files_step, _preview, _import, _understood),
     "lessons": (_lesson,),
     "view": (*BOQ, _first_item_numbers, _view),
+    "weak": (*BOQ, _weak_letter),  # then it claims what the records do not show, every time
     "full": (
         _files_step,
         _read_spec,
@@ -451,6 +472,7 @@ _STEP_OF = {
     _lesson: "lesson",
     _first_item_numbers: "numbers",
     _view: "view",
+    _weak_letter: "weakletter",
 }
 
 
@@ -482,6 +504,8 @@ def lead(seen: Seen) -> Step:
         found = step(seen)
         if found is not None and found.parts[0].tool_name in seen.tools:
             return found
+    if seen.scenario == "weak":
+        return _say(WEAK_CLAIM)
     if seen.scenario == "chat":
         return _say(
             _words(

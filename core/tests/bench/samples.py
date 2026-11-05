@@ -22,24 +22,25 @@ BOQ_ROWS = [
 ]
 
 
-def write_boq(path: Path) -> Path:
+def write_boq(path: Path, *, priced: bool = True) -> Path:
+    """The sample BOQ; `priced=False` leaves out its rates and amounts, as a client's BOQ in a
+    tender comes."""
     book = openpyxl.Workbook()
     sheet = book.active
     sheet.title = "المقايسة"  # as the tender pack names it: the bench fake must read the name
     sheet.sheet_view.rightToLeft = True
     sheet.append(["جدول كميات - عينة اختبار، أرقام غير حقيقية"])
-    sheet.append(["رقم البند", "الوصف", "الوحدة", "الكمية", "الفئة", "القيمة"])
+    sheet.append(["رقم البند", "الوصف", "الوحدة", "الكمية", "الفئة", "القيمة"][: 6 if priced else 4])
     for code, description, unit, quantity, rate, amount in BOQ_ROWS:
-        sheet.append(
-            [
-                code or None,
-                description,
-                unit or None,
-                int(quantity) if quantity else None,
-                int(rate) if rate else None,
-                int(amount) if amount else None,
-            ]
-        )
+        row = [
+            code or None,
+            description,
+            unit or None,
+            int(quantity) if quantity else None,
+            int(rate) if rate else None,
+            int(amount) if amount else None,
+        ]
+        sheet.append(row[: 6 if priced else 4])
     book.save(path)
     return path
 

@@ -169,6 +169,31 @@ def test_the_tender_folder_is_understood(bench, tmp_path):
     assert f"{samples.TENDER_NAME}/02 جداول" in {f["folder"] for f in facts["files"]}
 
 
+def test_the_guards_catch_the_weak_models_mistakes(bench, tmp_path):
+    """The tender day's weak model, scripted: a letter dated tomorrow with a blank for its total,
+    then «all 325 items priced, the Deliverable is ready, work under way» over no rate at all. The
+    letter is refused, the claim goes back once, and the facts from ONE's records stand beside the
+    answer, live and read back."""
+    client, _ = bench
+    project = client.post("/projects", json={"name": "مناقصة - عينة الاختبار"}).json()["id"]
+    boq = samples.write_boq(tmp_path / samples.BOQ_NAME, priced=False)
+    params = {"name": boq.name}
+    client.post(f"/projects/{project}/files", params=params, content=boq.read_bytes())
+    _, _, events = run(client, project, "bench:weak سعّر المقايسة كلها واكتب الخطاب")
+    assert any(e["type"] == "data-redo" for e in events)  # sent back once
+    [facts] = [e["data"] for e in events if e["type"] == "data-facts"]
+    assert facts["text"]["ar"] == "من سجلات ONE: اتسعّر 0 من 4 بنود · مفيش مخرج لسه"
+    flags = " ".join(f["ar"] for f in facts["flags"])
+    assert "والسجلات فيها" in flags and "ومفيش مخرج لسه" in flags
+    assert "مفيش حاجة شغالة" in flags
+    with_letters = client.get(f"/projects/{project}/deliverables").json()
+    assert not with_letters.get("deliverables")  # the letter with a blank was never saved
+    stored = client.get(f"/chat/{project}/messages").json()["messages"][-1]["parts"]
+    said = "".join(p.get("text", "") for p in stored if p["type"] == "text")
+    assert said.count("تم الانتهاء من تسعير") == 1  # the answer sent back is not in the chat
+    assert any(p["type"] == "data-facts" for p in stored)
+
+
 def test_closing_proposes_a_lesson(bench):
     client, project = bench
     _, reply, _ = run(client, project, copy.LESSONS_BRIEF["en"])
