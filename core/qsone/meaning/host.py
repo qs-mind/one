@@ -1,5 +1,5 @@
-"""The model host: loads a search model only when it is needed, keeps the models within a RAM
-budget, unloads idle ones, and lets a search go before background work.
+"""The model host: loads the search model only when it is needed, keeps it within a RAM budget,
+unloads it when idle, and lets a search go before background work.
 
 The loaders are plain callables, so nothing here imports the model runtime.
 """
@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from qsone.meaning.manifest import ModelSpec
 
 BUDGET_SHARE = 0.25  # of the computer's memory
-IDLE_SECONDS = {"embedder": 600.0, "reranker": 120.0}
+IDLE_SECONDS = {"embedder": 600.0}
 SLICE = 4  # background work gives way to a search after each slice
 
 
@@ -148,14 +148,3 @@ class HostedEmbedder:
     def embed_query(self, text: str) -> list[float]:
         with self._host.use("embedder") as model:
             return model.embed_query(text)
-
-
-class HostedReranker:
-    """search.Reranker that loads nothing until it is used."""
-
-    def __init__(self, host: ModelHost, spec: ModelSpec):
-        self._host, self.name = host, spec.name
-
-    def rerank(self, query: str, texts: list[str]) -> list[float]:
-        with self._host.use("reranker") as model:
-            return model.rerank(query, texts)

@@ -269,11 +269,6 @@ class ProjectIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
-class RerankIn(BaseModel):
-    q: str = Field(min_length=1, max_length=1000)
-    chunk_ids: list[int] = Field(min_length=1, max_length=search.RERANK_TOP)
-
-
 def _file(info: files.FileInfo) -> dict:
     """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair; `note_key`
     keeps the name (the import report names a locked or an empty file by it)."""
@@ -352,7 +347,7 @@ def _hit(h: search.Hit) -> dict:
 def router(
     projects: Projects, meaning: Meaning | None = None, engine: "Engine | None" = None
 ) -> APIRouter:
-    """With `meaning`, search uses the search models once they are ready. With `engine`, a
+    """With `meaning`, search uses the search model once it is ready. With `engine`, a
     project whose Brief runs stays open until the Brief ends."""
     r = APIRouter()
 
@@ -440,30 +435,10 @@ def router(
             found = search.search(rec, q, also=also or (), mode=mode, k=k, embedder=embedder)
         except ModelFailed:  # the state now says why; words still work
             found = search.search(rec, q, also=also or (), mode=mode, k=k)
-        rerank = found.mode == "hybrid" and meaning is not None and meaning.reranker() is not None
         return {
             "mode": found.mode,
             "note": copy.SEARCH_WORDS_ONLY if found.mode == "words" else None,
-            "rerank": rerank,
             "results": [_hit(h) for h in found.hits],
         }
-
-    @r.post("/projects/{project_id}/rerank")
-    def rerank_project(project_id: str, body: RerankIn) -> dict:
-        """The second step of a search: these chunks, reordered by the reranker."""
-        rec = projects.get(project_id)
-        reranker = meaning.reranker() if meaning is not None else None
-        if reranker is None:
-            raise RecordsError(copy.MEANING_NOT_READY)
-        should_stop = meaning.rerank_turn(project_id)
-        try:
-            hits = search.rerank_hits(
-                rec, body.q, body.chunk_ids, reranker, should_stop=should_stop
-            )
-        except search.Superseded:
-            raise RecordsError(copy.SEARCH_SUPERSEDED) from None
-        except ModelFailed:
-            raise RecordsError(copy.MEANING_NOT_READY) from None
-        return {"results": [_hit(h) for h in hits]}
 
     return r

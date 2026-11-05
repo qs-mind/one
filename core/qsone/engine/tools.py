@@ -102,7 +102,6 @@ class ToolContext:
     host: TeamHost
     fence: str
     embedder: object | None = None
-    reranker: object | None = None
     services: "Services | None" = None  # Plan 5: the only way a tool reaches the outside world
     projects: "Projects | None" = None  # Plan 7: the General chat's tools list the projects
 

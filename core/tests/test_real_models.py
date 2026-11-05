@@ -1,7 +1,7 @@
-"""Opt-in: the real search models. Skipped unless QSONE_REAL_MODELS names a models folder.
+"""Opt-in: the real search model. Skipped unless QSONE_REAL_MODELS names a models folder.
 
-The first run downloads the 1.17 GB of pinned files from huggingface.co into that folder (free);
-later runs make no request. Run it alone, with no other heavy work: it peaks near 4 GB of RAM.
+The first run downloads the 135 MB of pinned files from huggingface.co into that folder (free);
+later runs make no request. Run it alone, with no other heavy work: it peaks under 1 GB of RAM.
 Every text here is synthetic sample data («عينة» / "sample"); no real tender file is read.
 
     QSONE_REAL_MODELS=/path/to/models node scripts/python.mjs -m pytest \
@@ -20,11 +20,11 @@ from pathlib import Path
 import pytest
 
 from qsone.meaning.download import default_client, download, folder, installed
-from qsone.meaning.host import HostedEmbedder, HostedReranker, ModelHost
-from qsone.meaning.manifest import EMBEDDER, MODELS, RERANKER
+from qsone.meaning.host import HostedEmbedder, ModelHost
+from qsone.meaning.manifest import EMBEDDER, MODELS
 from qsone.records.files import add_file
 from qsone.records.project import Records
-from qsone.records.search import index_vectors, rerank_hits, search
+from qsone.records.search import index_vectors, search
 from tests.samples import sample_pdf, sample_xlsx
 
 pytestmark = pytest.mark.skipif(
@@ -47,6 +47,13 @@ SPEC_PAGES = [
     ["Section 05 Steel - sample", "High-yield steel reinforcement bars to BS 4449 grade B500."],
     ["Section 09 Painting - sample", "Two coats of emulsion paint on plastered walls."],
 ]
+# Three Arabic and three English QS lines, each the other's translation.
+ARABIC = ["خرسانة مسلحة للأسقف", "عزل الرطوبة للأساسات بالبيتومين الساخن", "حفر للأساسات"]
+ENGLISH = [
+    "reinforced concrete for slabs",
+    "damp proofing of foundations with hot bitumen",
+    "excavation for foundations",
+]
 
 
 def _sha256(path: Path) -> str:
@@ -67,7 +74,7 @@ def models() -> Path:
         def progress(done: int, total: int) -> None:
             if time.monotonic() - shown[0] > 5 or done == total:
                 shown[0] = time.monotonic()
-                print(f"\ndownloading the search models: {done / 1e6:.0f} of {total / 1e6:.0f} MB")
+                print(f"\ndownloading the search model: {done / 1e6:.0f} of {total / 1e6:.0f} MB")
 
         with default_client() as client:
             download(MODELS, root, client=client, stop=threading.Event(), on_progress=progress)
@@ -84,84 +91,60 @@ def rec(tmp_path):
     rec.close()
 
 
-def _host(models: Path, seen: list) -> ModelHost:
-    """An 8 GB laptop's host; `seen` records what was in memory each time a model loaded."""
-    from qsone.meaning.onnx import OnnxEmbedder, OnnxReranker
+def _load(models: Path, threads: int | None = None):
+    from qsone.meaning.onnx import OnnxEmbedder
 
-    def loader(model, spec):
-        def load():
-            seen.append(host.loaded())
-            return model.load(spec, folder(spec, models))
-
-        return load
-
-    host = ModelHost(
-        {"embedder": loader(OnnxEmbedder, EMBEDDER), "reranker": loader(OnnxReranker, RERANKER)},
-        {"embedder": EMBEDDER.ram_bytes, "reranker": RERANKER.ram_bytes},
-        ram=8 * GB,
-    )
-    return host
+    return OnnxEmbedder.load(EMBEDDER, folder(EMBEDDER, models), threads=threads)
 
 
 def test_files_match_their_pins(models):
-    """The fixture rehashed all four files in full; the folder is also marked installed."""
+    """The fixture rehashed both files in full; the folder is also marked installed."""
     assert installed(MODELS, models) and not list(models.rglob("*.part"))
 
 
 def test_meaning_crosses_languages(models):
+    """A line's nearest passage in the other language is mostly its translation. e5-small crosses
+    languages weakly by vectors alone (spike §4), which is why the agents search in both: here
+    "excavation for foundations" lands nearer «خرسانة مسلحة للأسقف» than «حفر للأساسات»."""
     import numpy as np
 
-    from qsone.meaning.onnx import OnnxEmbedder
-
-    emb = OnnxEmbedder.load(EMBEDDER, folder(EMBEDDER, models))
-    docs = [
-        "عزل الرطوبة للأساسات بالبيتومين الساخن - عينة",
-        "خرسانة عادية للأرضيات - عينة",
-        "Supply and fix high-yield steel reinforcement bars - sample",
-    ]
-    d = np.array(emb.embed_documents(docs))
-    assert int(np.argmax(d @ np.array(emb.embed_query("damp proofing of foundations")))) == 0
-    assert int(np.argmax(d @ np.array(emb.embed_query("حديد التسليح")))) == 2
-
-
-def test_reranker_puts_the_answer_first(models):
-    from qsone.meaning.onnx import OnnxReranker
-
-    rr = OnnxReranker.load(RERANKER, folder(RERANKER, models))
-    texts = [
-        "Paint the steel doors with two coats of enamel - sample",
-        "Line the water tank with a waterproof membrane - sample",
-        "Lay ceramic floor tiles on cement mortar - sample",
-    ]
-    scores = rr.rerank("تبطين الخزان بغشاء عازل", texts)
-    assert len(scores) == 3 and max(range(3), key=scores.__getitem__) == 1
+    emb = _load(models)
+    nearest = {}
+    for queries, passages in ((ARABIC, ENGLISH), (ENGLISH, ARABIC)):
+        p = np.array(emb.embed_documents(passages))
+        cosines = np.array([emb.embed_query(q) for q in queries]) @ p.T
+        print("\n" + "\n".join(" ".join(f"{c:.3f}" for c in row) for row in cosines))
+        nearest[queries[0]] = list(cosines.argmax(axis=1))
+        assert p.shape == (3, 384) and np.allclose(np.linalg.norm(p, axis=1), 1.0)
+        assert np.trace(cosines) / 3 > (cosines.sum() - np.trace(cosines)) / 6  # pairs are nearer
+    assert nearest[ARABIC[0]] == [
+        0,
+        1,
+        2,
+    ]  # «خرسانة مسلحة للأسقف» → "reinforced concrete for slabs"
+    assert nearest[ENGLISH[0]][:2] == [0, 1]
 
 
 def test_hybrid_search_end_to_end(models, rec):
+    """As the agents search: the question in both languages."""
     add_file(rec, "جدول الكميات - عينة.xlsx", sample_xlsx({"BOQ": BOQ_ROWS}), actor="engineer")
     add_file(rec, "Specification - sample.pdf", sample_pdf(SPEC_PAGES), actor="engineer")
-    seen: list = []
-    host = _host(models, seen)
-    embedder, reranker = HostedEmbedder(host, EMBEDDER), HostedReranker(host, RERANKER)
+    host = ModelHost(
+        {"embedder": lambda: _load(models)}, {"embedder": EMBEDDER.ram_bytes}, ram=8 * GB
+    )
+    embedder = HostedEmbedder(host, EMBEDDER)
     try:
         assert index_vectors(rec, embedder) > 0
 
-        r = search(rec, "waterproofing for the foundations", k=30, embedder=embedder)
+        q, also = "waterproofing for the foundations", ["عزل الرطوبة للأساسات"]
+        r = search(rec, q, also=also, embedder=embedder)
         assert r.mode == "hybrid"
         row3 = next(h for h in r.hits if h.locator == {"sheet": "BOQ", "row": 3})
         assert r.hits.index(row3) < 3 and "meaning" in row3.found_by
 
-        back = search(rec, "مواصفات حديد التسليح", k=30, embedder=embedder)
-        assert {"page": 2} in [
-            h.locator for h in back.hits[:3]
-        ]  # the reverse: Arabic finds English
-
-        hits = rerank_hits(
-            rec, "waterproofing for the foundations", [h.chunk_id for h in r.hits], reranker
-        )
-        assert hits[0].locator == {"sheet": "BOQ", "row": 3}
-        assert all(len(loaded) == 0 for loaded in seen)  # each load found the other one gone
-        assert len(host.loaded()) == 1
+        q, also = "مواصفات حديد التسليح", ["steel reinforcement bars specification"]
+        back = search(rec, q, also=also, embedder=embedder)
+        assert {"page": 2} in [h.locator for h in back.hits[:3]]  # Arabic finds English
     finally:
         host.unload_all()
 
@@ -209,39 +192,28 @@ def _peak() -> int:
     return peak if sys.platform == "darwin" else peak * 1024  # bytes on macOS, KiB on Linux
 
 
-def _measure(kind: str, root: str) -> None:
-    """Runs in a child process, so each model's peak is its own. Prints one JSON line."""
+def _measure(root: str) -> None:
+    """Runs in a child process, so the model's peak is its own. Prints one JSON line."""
     baseline = _rss() or _peak()
-    from qsone.meaning import onnx
-
-    spec = EMBEDDER if kind == "embedder" else RERANKER
-    model = onnx.OnnxEmbedder if kind == "embedder" else onnx.OnnxReranker
     timings: dict[str, float] = {}
 
     def load():
         started = time.perf_counter()
-        loaded = model.load(spec, folder(spec, Path(root)), threads=4)
+        loaded = _load(Path(root), threads=4)
         timings["load_s"] = time.perf_counter() - started
         return loaded
 
-    host = ModelHost({kind: load}, {kind: spec.ram_bytes}, ram=8 * GB)
+    host = ModelHost({"embedder": load}, {"embedder": EMBEDDER.ram_bytes}, ram=8 * GB)
     chunks = sample_chunks(200)
-    if kind == "embedder":
-        hosted = HostedEmbedder(host, spec)
-        hosted.embed_query("warm up")
-        started = time.perf_counter()
-        hosted.embed_documents(chunks)
-        timings["index_s_per_1000"] = (time.perf_counter() - started) * 1000 / len(chunks)
-        started = time.perf_counter()
-        for q in ("damp proofing of foundations", "حديد التسليح", "concrete grade C30"):
-            hosted.embed_query(q)
-        timings["query_ms"] = (time.perf_counter() - started) * 1000 / 3
-    else:
-        hosted = HostedReranker(host, spec)
-        hosted.rerank("warm up", chunks[:4])
-        started = time.perf_counter()
-        hosted.rerank("عزل الرطوبة للأساسات", chunks[:30])
-        timings["rerank_30_s"] = time.perf_counter() - started
+    hosted = HostedEmbedder(host, EMBEDDER)
+    hosted.embed_query("warm up")
+    started = time.perf_counter()
+    hosted.embed_documents(chunks)
+    timings["index_s_per_1000"] = (time.perf_counter() - started) * 1000 / len(chunks)
+    started = time.perf_counter()
+    for q in ("damp proofing of foundations", "حديد التسليح", "concrete grade C30"):
+        hosted.embed_query(q)
+    timings["query_ms"] = (time.perf_counter() - started) * 1000 / 3
     loaded = _rss()
     host.unload_all()
     after = _rss()
@@ -252,12 +224,12 @@ def _measure(kind: str, root: str) -> None:
     )
 
 
-def _child(kind: str, models: Path) -> dict:
+def _child(models: Path) -> dict:
     out = subprocess.run(
         [
             sys.executable,
             "-c",
-            f"from tests.test_real_models import _measure; _measure({kind!r}, {str(models)!r})",
+            f"from tests.test_real_models import _measure; _measure({str(models)!r})",
         ],
         capture_output=True,
         text=True,
@@ -270,17 +242,15 @@ def _child(kind: str, models: Path) -> dict:
 def test_memory_and_speed(models):
     if sys.platform == "win32":
         pytest.skip("peak memory is read with the resource module")
-    limits = {"embedder": 2.3 * GB, "reranker": 2.2 * GB}
-    for kind in ("embedder", "reranker"):  # one model at a time, each in its own process
-        m = _child(kind, models)
-        over = m["peak"] - m["baseline"]
-        shown = {k: round(v, 2) for k, v in m.items() if k.endswith(("_s", "_ms", "_1000"))}
-        print(f"\n{kind}: peak {over / GB:.2f} GB over the baseline; {shown}")
-        if m["loaded"] is not None:
-            print(
-                f"{kind}: resident {m['loaded'] / GB:.2f} GB loaded, {m['after'] / GB:.2f} GB "
-                f"after unloading (baseline {m['baseline'] / GB:.2f} GB)"
-            )
-        assert over < limits[kind]
-        if m["loaded"] is not None:  # Linux: unloading gives the memory back to the system
-            assert m["after"] - m["baseline"] < 0.3 * GB < m["loaded"] - m["after"]
+    m = _child(models)
+    over = m["peak"] - m["baseline"]
+    shown = {k: round(v, 2) for k, v in m.items() if k.endswith(("_s", "_ms", "_1000"))}
+    print(f"\nembedder: peak {over / GB:.2f} GB over the baseline; {shown}")
+    if m["loaded"] is not None:
+        print(
+            f"embedder: resident {m['loaded'] / GB:.2f} GB loaded, {m['after'] / GB:.2f} GB "
+            f"after unloading (baseline {m['baseline'] / GB:.2f} GB)"
+        )
+    assert over < EMBEDDER.ram_bytes
+    if m["loaded"] is not None:  # Linux: unloading gives the memory back to the system
+        assert m["after"] - m["baseline"] < 0.15 * GB < m["loaded"] - m["after"]

@@ -1,1 +1,1 @@
-"""Search by meaning: the two search models, pinned, downloaded once and run on this computer."""
+"""Search by meaning: the search model, pinned, downloaded once and run on this computer."""

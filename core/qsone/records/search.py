@@ -1,9 +1,10 @@
 """Search in one project. Exact mode for codes and numbers; otherwise words and meaning lists,
 fused by reciprocal rank fusion (RRF) and, with a reranker, reordered at the top.
 
-The embedding model and the reranker stay behind the `Embedder` and `Reranker` interfaces; the
-real models come in Plan 2b. `arabic.normalise` runs exactly once on any text, on the index side
-and on the query side (its light stemmer is not idempotent)."""
+The embedding model stays behind the `Embedder` interface (meaning/onnx.py: multilingual-e5-small);
+One ships no reranker (5 Nov 2026), but `search` still takes one behind `Reranker`.
+`arabic.normalise` runs exactly once on any text, on the index side and on the query side (its
+light stemmer is not idempotent)."""
 
 import json
 import re
@@ -17,7 +18,6 @@ from qsone.records.project import Records
 
 LIST_SIZE = 50  # each words or meaning list
 RERANK_TOP = 30
-RERANK_SLICE = 4  # a newer rerank can stop an older one between slices
 ACTOR = "One"  # index upkeep changes no project data, so it writes no audit rows
 
 
@@ -36,10 +36,6 @@ class Reranker(Protocol):
 
 
 Mode = Literal["auto", "exact", "meaning"]
-
-
-class Superseded(Exception):
-    """A newer rerank asked this one to stop."""
 
 
 @dataclass(frozen=True)
@@ -112,6 +108,20 @@ def _vectors_ready(conn, embedder: Embedder) -> bool:
         return False
     meta = dict(conn.execute("SELECT key, value FROM meta WHERE key LIKE 'embed_%'"))
     return meta.get("embed_model") == embedder.name and meta.get("embed_dims") == str(embedder.dims)
+
+
+def drop_stale_vectors(rec: Records, embedder: Embedder) -> bool:
+    """Drops the vectors another model or size made, as the word index is rebuilt after a
+    normaliser change (decisions §14.11); `index_vectors` then embeds every chunk again. Word
+    search works all the while. True when it dropped them."""
+    with rec.read() as conn:
+        has = conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'chunk_vectors'").fetchone()
+        if has is None or _vectors_ready(conn, embedder):
+            return False
+    with rec.write(ACTOR, upkeep=True) as conn:
+        conn.execute("DROP TABLE IF EXISTS chunk_vectors")
+        conn.execute("DELETE FROM meta WHERE key IN ('embed_model', 'embed_dims')")
+    return True
 
 
 def _pack(vector: list[float], dims: int) -> bytes:
@@ -282,24 +292,3 @@ def _reorder(hits: list[Hit], scores: Sequence[float]) -> list[Hit]:
     """Best score first; the sort is stable, so ties keep the order they came in."""
     order = sorted(range(len(hits)), key=lambda i: -scores[i])
     return [replace(hits[i], score=float(scores[i])) for i in order]
-
-
-def rerank_hits(
-    rec: Records,
-    query: str,
-    chunk_ids: Sequence[int],
-    reranker: Reranker,
-    *,
-    should_stop: Callable[[], bool] = lambda: False,
-) -> list[Hit]:
-    """The given chunks of this project in reranked order; unknown ids are dropped. The reranker
-    runs on slices of `RERANK_SLICE`; `should_stop` before each slice raises `Superseded`."""
-    ids = list(dict.fromkeys(chunk_ids))
-    with rec.read() as conn:
-        hits = _hits(conn, [(i, 0.0) for i in ids], dict.fromkeys(ids, ()))
-    scores: list[float] = []
-    for start in range(0, len(hits), RERANK_SLICE):
-        if should_stop():
-            raise Superseded
-        scores += reranker.rerank(query, [h.text for h in hits[start : start + RERANK_SLICE]])
-    return _reorder(hits, scores)

@@ -1,7 +1,7 @@
 """Downloads the search models into `<root>/<model id>/<revision>/`, file by file.
 
 A file arrives as `<file>.part` and resumes over HTTP ranges; it is renamed into place only after
-its SHA-256 matches. `verified.json` per model saves rehashing 1.1 GB at every start. Paths come
+its SHA-256 matches. `verified.json` per model saves rehashing every file at every start. Paths come
 only from the manifest, never from a server answer. Logs carry model ids and byte counts only."""
 
 import hashlib
@@ -23,7 +23,7 @@ from qsone.meaning.manifest import ModelFile, ModelSpec
 
 log = logging.getLogger("qsone.meaning.download")
 
-PIECE = 1 << 20  # progress and Stop are looked at every MiB
+PIECE = 1 << 20  # progress and stop are looked at every MiB
 SPARE = 200_000_000  # free space kept beyond the bytes still to come
 VERIFIED = "verified.json"
 
@@ -35,7 +35,7 @@ class DownloadError(Exception):
 
 
 class DownloadStopped(Exception):
-    """The engineer pressed Stop; partial files are kept."""
+    """The stop event was set (the app is quitting); partial files are kept."""
 
 
 def folder(spec: ModelSpec, root: Path) -> Path:
