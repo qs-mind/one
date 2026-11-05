@@ -15,6 +15,8 @@ import { Grid, type GridHandle, type SheetColumn } from "./grid";
 import { linesHeight, makeMeasure, rowHeight, shownWidth, titleColumnOf } from "./heights";
 import { normalised, type Cell, type Range } from "./selection";
 import { SourcePopover } from "./SourcePopover";
+import { hideSourceLine, showSourceLine } from "../../sources/line";
+import { sourceKeys } from "../../sources/targets";
 
 /** A cell or row as the viewer finds it: part id and column key (Plan 7's anchor, its sheet fields). */
 export type SheetAnchor = { row?: string; column?: string };
@@ -153,11 +155,32 @@ export function SheetViewer(props: SheetViewerProps) {
     style: CSSProperties;
     from: HTMLElement;
     focus: boolean;
+    label: string;
   } | null>(null);
   function select(range: Range | null) {
     setSelection(range);
     setPopover(null); // a source belongs to the cell it was opened on
   }
+
+  // Where a number's source shows on screen: its file's frame, page or row (the sheet's own cells are not sources).
+  const keysOf = useCallback(
+    (cell: NumberCell) => {
+      const source = cell.source !== null ? view.sources[cell.source] : undefined;
+      return source ? sourceKeys({ fileId: source.file_id, locator: source.locator, sourceId: cell.source }) : [];
+    },
+    [view.sources],
+  );
+
+  // A number focused from the keyboard draws its source line, as hovering it does
+  useEffect(() => {
+    if (!selection || selection.anchor.row !== selection.focus.row || selection.anchor.col !== selection.focus.col) return;
+    const [r, c] = [rows[selection.focus.row], columns[selection.focus.col]];
+    const cell = r && c ? r.cells[c.key] : undefined;
+    const el = grid.current?.element({ row: selection.focus.row, col: selection.focus.col });
+    if (!isNumber(cell) || !el || !root.current?.contains(document.activeElement)) return;
+    showSourceLine(el, keysOf(cell));
+    return () => hideSourceLine(el);
+  }, [selection, rows, columns, keysOf]);
 
   // Reported when the range moves, not when the owner re-renders with a new callback.
   const onSelection = useRef(props.onSelection);
@@ -232,13 +255,13 @@ export function SheetViewer(props: SheetViewerProps) {
     void propose(ops);
   }
 
-  function openSource(cell: NumberCell, el: HTMLElement, focus: boolean) {
+  function openSource(cell: NumberCell, el: HTMLElement, focus: boolean, label: string) {
     const box = boxOf(el);
     const width = root.current?.offsetWidth ?? 0;
     if (!box) return;
     // Placed under the cell, lined up with its start edge (the right edge in RTL).
     const side = direction === "rtl" ? { right: Math.max(width - box.right, 0) } : { left: box.left };
-    setPopover({ cell, style: { top: box.bottom, ...side }, from: el, focus });
+    setPopover({ cell, style: { top: box.bottom, ...side }, from: el, focus, label });
   }
 
   function closeSource() {
@@ -261,11 +284,12 @@ export function SheetViewer(props: SheetViewerProps) {
           onToggle={toggle}
           onAccept={(id) => void decide(id, true)}
           onReject={(id) => void decide(id, false)}
+          sourceKeys={isNumber(row.cells[column.key]) ? keysOf(row.cells[column.key] as NumberCell) : undefined}
         />
       );
     },
     // toggle and decide read the latest state when called
-    [byKey, titleColumn, direction, pending, marks, collapsed],
+    [byKey, titleColumn, direction, pending, marks, collapsed, keysOf],
   );
   const readOnly = !!props.readOnly;
   const canEdit = useCallback(
@@ -291,7 +315,7 @@ export function SheetViewer(props: SheetViewerProps) {
         <button
           type="button"
           className="w-full text-end font-bold hover:text-copper"
-          onClick={(event) => openSource(total, event.currentTarget, event.detail === 0)}
+          onClick={(event) => openSource(total, event.currentTarget, event.detail === 0, pick(texts.sheetTotal, view.language))}
         >
           {/* the core's total, rolling to its new value when an edit changes it; another Deliverable's shows still */}
           <bdi dir="ltr">
@@ -393,7 +417,7 @@ export function SheetViewer(props: SheetViewerProps) {
           onPaste={(at, text) => !readOnly && sendBlock(at, parseTsv(text))}
           onActivate={(row, column, el, byKey) => {
             const cell = row.cells[column.key];
-            if (isNumber(cell) && !pending.has(cellKey(row.id, column.key))) openSource(cell, el, byKey);
+            if (isNumber(cell) && !pending.has(cellKey(row.id, column.key))) openSource(cell, el, byKey, column.label);
           }}
           summary={total ? summary : undefined}
           virtualize={props.virtualize}
@@ -406,6 +430,8 @@ export function SheetViewer(props: SheetViewerProps) {
           sources={view.sources}
           style={popover.style}
           focus={popover.focus}
+          from={popover.from}
+          label={popover.label}
           onClose={closeSource}
         />
       )}

@@ -17,8 +17,9 @@ import {
   type PlateLeafProps,
 } from "platejs/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
-import type { Block, RefValue } from "../../deliverables/types";
+import type { Block, RefValue, Source } from "../../deliverables/types";
 import { dir, t, type Language } from "../../i18n";
+import { sourceKeys } from "../../sources/targets";
 import { blockText, displayValue, offsetAt, pieces, refKey, spans, type PendingBlock, type SlateElement } from "./blockOps";
 import { NumberRef } from "./NumberRef";
 
@@ -41,6 +42,8 @@ export type DocEditorProps = {
   onDecide: (changeId: string, accept: boolean) => void;
   onOpenRef: (value: RefValue, el: HTMLElement, byKey: boolean) => void;
   onSelectText?: (anchor: TextAnchor | null) => void;
+  /** The view's sources, for each reference's source line. */
+  sources?: Record<string, Source>;
 };
 
 type Shared = {
@@ -50,6 +53,7 @@ type Shared = {
   marks: Map<string, DocComment[]>;
   onDecide: DocEditorProps["onDecide"];
   onOpenRef: DocEditorProps["onOpenRef"];
+  sources: Record<string, Source>;
 };
 const Doc = createContext<Shared | null>(null);
 const useDoc = () => useContext(Doc)!;
@@ -137,12 +141,15 @@ function element(tag: string) {
 }
 
 function Reference(props: PlateElementProps) {
-  const { refs, onOpenRef } = useDoc();
+  const { refs, onOpenRef, sources } = useDoc();
   const key = refKey(props.element as unknown as SlateElement);
+  const value = key ? refs[key] : undefined;
+  const source = value?.source ? sources[value.source] : undefined;
+  const keys = source ? sourceKeys({ fileId: source.file_id, locator: source.locator, sourceId: value?.source }) : [];
   return (
     <PlateElement {...props} as="span" className="inline">
       <span contentEditable={false}>
-        <NumberRef value={key ? refs[key] : undefined} onOpen={onOpenRef} />
+        <NumberRef value={value} onOpen={onOpenRef} sourceKeys={keys} />
       </span>
       {props.children}
     </PlateElement>
@@ -370,8 +377,9 @@ export function DocEditor(props: DocEditorProps) {
       marks,
       onDecide: props.onDecide,
       onOpenRef: props.onOpenRef,
+      sources: props.sources ?? {},
     }),
-    [language, props.refs, pending, marks, props.onDecide, props.onOpenRef],
+    [language, props.refs, pending, marks, props.onDecide, props.onOpenRef, props.sources],
   );
 
   // Returning true tells Plate and Slate the event is handled, so neither edits the locked block.

@@ -219,7 +219,13 @@ export type SourceCardProps = {
   label?: string;
 };
 
-export function SourceCard({ projectId, cell, sources, style, focus, onClose, from, label }: SourceCardProps) {
+/** Another number opened while one is open gets a card of its own: its levels and its glide start afresh. */
+export function SourceCard(props: SourceCardProps) {
+  const { cell } = props;
+  return <Card key={`${cell.number_id ?? ""}|${cell.source ?? ""}|${cell.value}`} {...props} />;
+}
+
+function Card({ projectId, cell, sources, style, focus, onClose, from, label }: SourceCardProps) {
   const box = useRef<HTMLDivElement>(null);
   const headValue = useRef<HTMLSpanElement>(null);
   const body = useRef<HTMLDivElement>(null);

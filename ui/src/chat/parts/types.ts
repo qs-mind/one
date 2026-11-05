@@ -1,6 +1,7 @@
 // The data parts a Brief's stream carries (Plan 4, Task 8). Each has a stable id, so the AI SDK updates it in place.
 import type { UIMessage } from "ai";
 import type { SelectionItem } from "../../canvas/types";
+import type { Source } from "../../deliverables/types";
 import type { Language, Text } from "../../i18n";
 
 export type BriefState =
@@ -27,6 +28,10 @@ export type CardPayload = {
   questions?: CardQuestion[];
   columns?: { key: string; label: Text }[];
   rows?: Record<string, string>[];
+  /** The column holding each row's number, and each row's source as the core has it (a price to keep: its quote's
+   * file and row, or the chat): the number opens into its source card. */
+  number_column?: string;
+  row_sources?: (Source | null)[];
   tick?: boolean;
   connector?: { name: string; transport: "stdio" | "http"; runs: string };
   tools?: ConnectorTool[];
@@ -72,6 +77,9 @@ export type ReviewComment = { about: string; text: string };
 export type ReviewData = { code: "A" | "B" | "C"; comments: ReviewComment[]; same_provider: boolean; round?: number };
 /** data-unsourced: numbers in the reply that no tool result gave. */
 export type UnsourcedData = { values: string[] };
+/** data-sourced, id = the Brief: numbers in the reply that exactly one ledger number in a tool result gave, by how
+ * the reply writes them, with that number's id and exact value; the reply opens each into its source card. */
+export type SourcedData = { numbers: Record<string, { id: string; value: string }> };
 /** data-status, id = the Brief. */
 export type StatusData = { state: BriefState; step: Text | null };
 /** data-deliverable, id = the Deliverable (Plan 6): the Lead QS made it; the chat shows its card. */
@@ -87,6 +95,7 @@ export type OneData = {
   cost: CostData;
   review: ReviewData;
   unsourced: UnsourcedData;
+  sourced: SourcedData;
   status: StatusData;
   deliverable: DeliverableData;
   understood: UnderstoodData;

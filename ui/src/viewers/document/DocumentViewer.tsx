@@ -235,6 +235,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
           onCommit={onCommit}
           onDecide={onDecide}
           onOpenRef={onOpenRef}
+          sources={view.sources}
           onSelectText={onSelectText}
         />
         {!props.readOnly && <p className="mx-auto max-w-[44rem] px-8 pb-6 text-xs text-slate">{t("docCommitHint")}</p>}
@@ -246,6 +247,7 @@ export function DocumentViewer(props: DocumentViewerProps) {
           sources={view.sources}
           style={popover.style}
           focus={popover.focus}
+          from={popover.from}
           onClose={closeSource}
         />
       )}

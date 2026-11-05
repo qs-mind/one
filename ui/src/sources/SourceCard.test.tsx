@@ -106,7 +106,7 @@ describe("a number opens in place into its source card", () => {
     // lined up on the inline-start edge (the right in Arabic): 400 → 400, 100 − 220 up, 20/24 the size
     expect(animate).toHaveBeenCalledWith([{ transform: `translate(0px, -120px) scale(${20 / 24})` }, { transform: "none" }], { duration: DUR.long, easing: EASE });
     expect(value.style.transformOrigin).toBe("top right");
-    expect(animate.mock.calls.flatMap(([frames]) => frames as Keyframe[]).every((f) => Object.keys(f).every((k) => ["transform", "opacity"].includes(k)))).toBe(true);
+    expect((animate.mock.calls as unknown as [Keyframe[]][]).flatMap(([frames]) => frames).every((f) => Object.keys(f).every((k) => ["transform", "opacity"].includes(k)))).toBe(true);
   });
 
   it("Escape closes it and gives the focus back to the number, wherever the focus was", async () => {
