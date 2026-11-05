@@ -373,8 +373,10 @@ def _view(seen: Seen) -> Step | None:
     numbers = [n for n in _data(result).get("numbers", []) if isinstance(n, dict)] if ok else []
     if not numbers:
         return None
-    columns = [{"label": _words(seen, "Number", "الرقم")}]
-    columns.append({"label": _words(seen, "Value", "القيمة")})
+    def label(name: str) -> str:  # the number's name in the Brief's words, never its raw key
+        found = copy.BOQ_FIELDS.get(name)
+        return found[seen.lang] if found else name
+
     note = _words(
         seen,
         "(bench reply, not a real AI) Each figure opens its source.",
@@ -384,12 +386,13 @@ def _view(seen: Seen) -> Step | None:
         {"kind": "heading", "text": _words(seen, "First BOQ item (bench)", "أول بند (تجريبي)")},
         {
             "kind": "figures",
-            "items": [{"label": n["name"], "value": {"number": n["id"]}} for n in numbers[:4]],
+            "items": [{"label": label(n["name"]), "value": {"number": n["id"]}} for n in numbers[:4]],
         },
         {
             "kind": "table",
-            "columns": columns,
-            "rows": [{"label": n["name"], "numbers": [{"number": n["id"]}]} for n in numbers],
+            "label_header": _words(seen, "Number", "الرقم"),
+            "columns": [{"label": _words(seen, "Value", "القيمة")}],
+            "rows": [{"label": label(n["name"]), "numbers": [{"number": n["id"]}]} for n in numbers],
         },
         {"kind": "prose", "text": note, "section": _words(seen, "About this view", "عن العرض ده")},
     ]

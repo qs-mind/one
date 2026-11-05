@@ -368,6 +368,7 @@ export const texts = {
   sheetDated: { en: "Dated {date}", ar: "بتاريخ {date}" },
   sheetEnteredBy: { en: "Entered by {who}", ar: "أدخله {who}" },
   sheetRecalculated: { en: "Recalculated", ar: "اتحسب تاني" },
+  calculated: { en: "Calculated", ar: "محسوب" },
   sheetSample: {
     en: "Sample data: these numbers are not real.",
     ar: "بيانات تجريبية: الأرقام دي مش حقيقية.",
