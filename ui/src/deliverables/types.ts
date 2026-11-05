@@ -28,6 +28,8 @@ export type Source = {
   kind: string; // "sample", "engineer", "calculation", "file", …
   title: string;
   file_name?: string | null;
+  /** The file in Project Records, for the jump to its frame. */
+  file_id?: string | null;
   locator: Record<string, string | number>;
   url?: string | null;
   dated?: string | null;

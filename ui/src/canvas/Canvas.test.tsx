@@ -273,6 +273,24 @@ describe("the Project Canvas", () => {
     await waitFor(() => expect(files).toHaveTextContent("جدول كميات - عينة.xlsx"));
   });
 
+  it("an imported client BOQ comes live as its own read-only frame, and is there again after a reload", async () => {
+    const boq = { file_id: "f9", name: "مقايسة العميل - عينة.xlsx", items: 2, headings: 1, at: "2026-11-05T09:00:00+00:00" };
+    const title = fill(texts.clientBoqTitle.ar, { name: boq.name });
+    const { fake, unmount } = show({});
+    await frameEl(texts.projectFiles.ar);
+    act(() => fake.emit({ type: "client_boq", client_boq: boq }));
+    const frame = await frameEl(title);
+    expect(frame).toHaveTextContent(texts.clientBoqReadOnly.ar);
+    expect(frame).toHaveTextContent(count("clientBoqItems", 2, {}, "ar"));
+    expect(screen.queryByRole("button", { name: texts.closeFrame.ar })).toBeNull(); // the client's document stays
+    await waitFor(() => expect(fake.saved.frames.flatMap((s) => s.frames.map((f) => f.key))).toContain("clientboq:f9"));
+    unmount();
+    const saved = at("clientboq:f9", 0, 0);
+    show({ clientBoqs: [boq], layout: { frames: [saved], view: zoomOne } });
+    expect(await frameEl(title)).toBeInTheDocument();
+    expect(placedOf("clientboq:f9")).toEqual(saved);
+  });
+
   it("a file that is not added says why, by name", async () => {
     const { fake, container } = show({});
     await frameEl(texts.projectFiles.ar);

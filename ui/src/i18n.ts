@@ -518,6 +518,11 @@ export const texts = {
   undoLayout: { en: "Undo the layout change", ar: "ارجع في الترتيب" },
   minimap: { en: "Map of the canvas", ar: "خريطة الكانفاس" },
   projectFiles: { en: "Project files", ar: "ملفات المشروع" },
+  // The client BOQ as imported: a read-only frame on the canvas.
+  clientBoqTitle: { en: "Client BOQ — {name}", ar: "مقايسة العميل — {name}" },
+  clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
+  clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
+  sourceOpenFile: { en: "Open the file", ar: "افتح الملف" },
   openFull: { en: "Open full screen", ar: "افتح ملء الشاشة" },
   closeFrame: { en: "Close the frame", ar: "اقفل الإطار" },
   collapse: { en: "Fold the frame", ar: "اطوي الإطار" },
@@ -985,6 +990,10 @@ export const counted = {
       few: "غرفة التنسيق، {n} رسائل",
       other: "غرفة التنسيق، {n} رسالة",
     },
+  },
+  clientBoqItems: {
+    en: { one: "{n} item", other: "{n} items" },
+    ar: { zero: "مفيش بنود", one: "بند واحد", two: "بندين", few: "{n} بنود", other: "{n} بند" },
   },
   deskSummary: {
     en: { other: "{desk}: {n} working" },

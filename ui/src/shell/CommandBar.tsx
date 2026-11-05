@@ -14,6 +14,7 @@ const actions: Record<SelectionItem["kind"], (keyof typeof texts)[]> = {
   files: [],
   desk: ["actionSaveDesk"],
   team: [],
+  clientboq: [],
   agent: ["actionWhatDoing"],
 };
 

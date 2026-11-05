@@ -105,7 +105,7 @@ export function httpSources(projectId: string): ProjectSources {
       return (await json<{ pieces: FilePiece[] }>(`${file(fileId)}/text${query}`, { pieces: [] })).pieces;
     },
     async clientBoq(fileId) {
-      const response = await fetch(`${base}/client-boq/${encodeURIComponent(fileId)}`).catch(() => undefined);
+      const response = await api(`${base}/client-boq/${encodeURIComponent(fileId)}`).catch(() => undefined);
       if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
       return (await response.json()) as SheetView;
     },

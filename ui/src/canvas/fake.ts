@@ -55,7 +55,11 @@ export function fakeSources(options: FakeOptions): FakeSources {
     deliverables: async () => [...(options.deliverables ?? [])],
     team: async () => options.team ?? { desks: [], agents: [] },
     status: async () => options.status ?? {},
-    layout: async () => ({ frames: [...frames.values()], view, client_boqs: [...(options.clientBoqs ?? [])] }),
+    layout: async () => ({
+      frames: [...frames.values()],
+      view,
+      ...(options.clientBoqs ? { client_boqs: [...options.clientBoqs] } : {}),
+    }),
     async saveFrames(changed, removed, keepalive = false) {
       saved.frames.push({ frames: changed, removed, keepalive });
       for (const key of removed) frames.delete(key);
