@@ -11,6 +11,7 @@ import type { Opened, ViewerHandle } from "../project/types";
 import { setCurrentProject } from "../records/project";
 import { workspaceApi } from "./api";
 import { DocumentView } from "./DocumentView";
+import { DocumentsContext, type Documents } from "./documents";
 
 // jsdom has no scrolling; the grid scrolls its active cell into view.
 Element.prototype.scrollIntoView ??= () => {};
@@ -184,5 +185,36 @@ describe("DocumentView", () => {
     core({});
     show({ key: "deliverable:m1", anchor: null }, { deliverables: [entry({ id: "m1", kind: "markup" })] });
     expect(await screen.findByText(texts.noViewer.ar)).toBeInTheDocument();
+  });
+
+  it("a Deliverable's kind comes from the project's documents: its list is not read again", async () => {
+    core(viewRoutes(sheet()));
+    const sources = fakeSources({ deliverables: [] });
+    const read = vi.spyOn(sources, "deliverables");
+    const docs: Documents = { deliverables: [entry()], files: [], clientBoqs: [], desks: [] };
+    render(
+      <DocumentsContext.Provider value={docs}>
+        <div style={{ width: 1200, height: 800 }}>
+          <DocumentView projectId="p1" sources={sources} opened={{ key: `deliverable:${D}`, anchor: null }} />
+        </div>
+      </DocumentsContext.Provider>,
+    );
+    await screen.findByText("03/02");
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("a Deliverable the project does not have says it could not be opened, never a blank sheet", async () => {
+    core({});
+    show({ key: "deliverable:gone", anchor: null }, { deliverables: [entry()] });
+    expect(await screen.findByRole("alert")).toHaveTextContent(texts.documentFailed.ar);
+  });
+
+  it("when the list cannot be read it says the same", async () => {
+    core({});
+    const sources = fakeSources({});
+    vi.spyOn(sources, "deliverables").mockRejectedValue(new Error("core down"));
+    render(<DocumentView projectId="p1" sources={sources} opened={{ key: "deliverable:x", anchor: null }} />);
+    expect(screen.getByText(texts.deliverableLoading.ar)).toBeInTheDocument(); // while it is looked up
+    expect(await screen.findByRole("alert")).toHaveTextContent(texts.documentFailed.ar);
   });
 });
