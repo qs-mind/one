@@ -829,6 +829,12 @@ export const texts = {
   importZips: { en: "Zips opened: {n}", ar: "ملفات مضغوطة اتفتحت: {n}" },
   importFailed: { en: "Some files were not added. Try again.", ar: "في ملفات ماتضافتش. جرّب تاني." },
   importUnderstanding: { en: "The Lead QS is reading the folder…", ar: "كبير مهندسي الكميات بيقرا الفولدر…" },
+  importUnderstoodWaits: {
+    en: "Read. The «I understood this» card waits for you in the chat.",
+    ar: "اتقرا. كارت «فهمت كده» مستنيك في المحادثة.",
+  },
+  importUnderstoodDone: { en: "Read.", ar: "اتقرا." },
+  importMissed: { en: "What did not come in", ar: "اللي ماتضافش" },
   importOldArchived: {
     en: "Added and archived, without the AI step.",
     ar: "اتضاف واتأرشف، من غير خطوة الذكاء الاصطناعي.",

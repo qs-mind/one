@@ -25,6 +25,8 @@ export type Job = {
   report?: Report;
   /** The "I understood this" Brief: started, or not started with the core's reason. */
   understanding?: "started" | Text;
+  /** The "I understood this" Brief, once started: the summary follows it (reading, waiting on its card, ended). */
+  briefId?: string;
   /** What fixes the reason it did not start, as the core says (no AI connected: AI settings). */
   understandingFix?: Fix;
   /** Old work: archived. */
@@ -88,13 +90,13 @@ async function create(name: string): Promise<{ project?: Project; line?: Text }>
   return { line: await coreLine(response, texts.projectNotCreated) };
 }
 
-async function understand(projectId: string): Promise<Pick<Job, "understanding" | "understandingFix">> {
+async function understand(projectId: string): Promise<Pick<Job, "understanding" | "understandingFix" | "briefId">> {
   const response = await send(`/projects/${encodeURIComponent(projectId)}/understand`, "POST");
   if (response?.status === 202 || response?.status === 409) {
     const body = (await response.json().catch(() => ({}))) as { brief_id?: string; error?: Text; fix?: unknown };
     if (body.brief_id) {
       briefStarted(projectId);
-      return { understanding: "started" };
+      return { understanding: "started", briefId: body.brief_id };
     }
     if (body.error) return { understanding: body.error, understandingFix: fixOf(body.fix) };
   }
