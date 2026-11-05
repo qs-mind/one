@@ -398,6 +398,18 @@ export const texts = {
   createProjectNamed: { en: "Create the project «{name}»", ar: "اعمل مشروع «{name}»" },
   pageNotShown: { en: "This page could not be shown.", ar: "مقدرناش نعرض الصفحة دي." },
   dropToAdd: { en: "Drop files here to add them to Project Records.", ar: "سيب الملفات هنا عشان تتضاف لسجلات المشروع." },
+  // Plan 7 Task 4 (the canvas frames)
+  canvasFailed: { en: "The canvas could not be loaded. Try again.", ar: "مقدرناش نفتح الكانفاس. جرّب تاني." },
+  projectTeam: { en: "Project team", ar: "فريق المشروع" },
+  progressOf: { en: "{done} of {total}", ar: "{done} من {total}" },
+  deskSummary: { en: "{desk}: {n} working", ar: "{desk}: {n} شغالين" },
+  showPageText: { en: "Show the page's text", ar: "اعرض نص الصفحة" },
+  showPageImage: { en: "Show the page", ar: "اعرض الصفحة" },
+  pageScanned: {
+    en: "This page is scanned: it has no text One could read.",
+    ar: "الصفحة دي متصوّرة سكانر: مفيهاش نص One يقدر يقراه.",
+  },
+  fileNoText: { en: "One read no text from this file.", ar: "One مقراش أي نص من الملف ده." },
   fromDesk: { en: "from the {desk}", ar: "من {desk}" },
   deskTemporary: { en: "Temporary", ar: "مؤقت" },
   deskDraft: { en: "Draft", ar: "مسودة" },
