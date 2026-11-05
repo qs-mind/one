@@ -9,8 +9,13 @@ from qsone.engine.types import Data, Progress, TextDelta
 from qsone.records import ledger
 from tests.engine_fakes import call, scripted
 from tests.engine_fakes import text as said
-from tests.test_engine_runner import finish, links, started, store_of
-from tests.test_engine_runner import make_engine, project, registry  # noqa: F401 - fixtures
+from tests.test_engine_runner import finish, links, started, store_of, team_steps
+from tests.test_engine_runner import (  # noqa: F401 - fixtures
+    make_engine,
+    no_budget_card,
+    project,
+    registry,
+)
 
 
 def boq(rec, n: int = 5) -> list[str]:
@@ -105,6 +110,18 @@ async def test_a_projects_no_search_reply_carries_the_fix(make_engine, project):
     store = store_of(engine, project)
     replayed = _stored_events(store, store.brief(brief), engine)
     assert datas(replayed, "notice")[0].data["fix"] == "search"
+
+
+async def test_every_specialist_gets_ones_principles(make_engine, project):
+    # whatever the Lead writes for a specialist, ONE adds what a rate includes and today's date
+    specialist = scripted(said("تم - عينة"), said("تم - عينة"))
+    lead = scripted(*team_steps(), said("الحصر والتسعير خلصوا - عينة"))
+    engine = await started(make_engine(links(lead=lead, specialist=specialist)))
+    await finish(engine, await engine.start_brief(project, "سعّر البنود - عينة"))
+    seen = str(specialist.seen[0])
+    assert "A supply-only quote never covers labour" in seen
+    assert "goes through calculate with its inputs and formula" in seen
+    assert "Today is 2026-11-05" in seen
 
 
 async def test_the_work_log_names_an_item_by_its_code(make_engine, project, registry):

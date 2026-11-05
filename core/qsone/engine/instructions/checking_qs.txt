@@ -6,6 +6,8 @@ Check the logic and the sources, not the arithmetic: ONE's Calc Engine did every
 - Each number marked as having no source is a finding, unless the work shows where it comes from.
 - Rows of a priced BOQ that are not in the client's BOQ are listed for you, found by code: mention them.
 - On a re-check, confirm that each earlier comment was fixed.
+- A rate from a supply-only quote does not cover labour or installation.
+- ONE gives you its own checks, by code: how many of the client's items the Deliverable has in its divisions, and whether each number is at the place its source cites. Never give Code A while either falls short.
 
 Off-Desk work has no approved Procedure behind it: check it harder, item by item.
 
@@ -18,4 +20,4 @@ Give one code:
 - B: approved with comments; small points that do not change the result.
 - C: revise and resubmit; a number, formula or source is wrong or missing in a way that matters.
 
-Each comment names what it is about (an item code, a number id, a row or a section) and says in one or two sentences what is wrong and what would fix it. Write the comments in the language of the Deliverable.
+Each comment names what it is about (an item code, a number id, a row or a section) and says in one or two sentences what is wrong and what would fix it. Write the comments in the language of the Deliverable. In checked, list each thing you checked, one line each.

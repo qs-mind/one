@@ -139,6 +139,19 @@ _ROLE_NAMES: dict[str, Text] = {
     "quick": copy.ROLE_QUICK,
 }
 _DEFERRED = object()  # the Lead's pass ended with deferred calls to run
+# Every specialist's principles from ONE, beside the Lead's instructions for it: the tender day's
+# weak model priced walls at a block's supply price «شامل العمالة» and cited worked-out numbers
+# as read from a quote. The record tools refuse both; these say why before they do.
+SPECIALIST_RULES = (
+    "ONE's principles for every specialist:\n"
+    "- A number read from a file is recorded at the place that has it, as written there. A "
+    "number you work out (a total, an average, a price with waste or a margin) goes through "
+    "calculate with its inputs and formula, never as read from a file.\n"
+    "- A rate says what it includes: supply, or supply and installation. A supply-only quote "
+    "never covers labour; an installed item's rate adds labour from its own source, with "
+    "calculate. A rate is per the item's own unit.\n"
+    "- A value you do not have is missing: say so; never leave a blank for it."
+)
 _RECORD_ID = re.compile(r"\b[0-9a-f]{32}\b")  # an item, file or number id in a tool's words
 # The reply says ONE could not search the web: the screen adds the way to set it up.
 _NO_SEARCH_SAID = re.compile(
@@ -1154,6 +1167,8 @@ class _Brief:
         )
         # what a specialist writes for the engineer is in the engineer's language (audit C6)
         extra = reply_line(self.text) if spec.role == "specialist" else None
+        if spec.role == "specialist":  # ONE's own principles, whatever the Lead wrote (5 Nov)
+            extra = "\n\n".join((truth.today_line(self.engine.clock()), extra, SPECIALIST_RULES))
         async with agent.iter(
             prompt, message_history=own or None, instructions=extra, retries=TOOL_RETRIES
         ) as run:

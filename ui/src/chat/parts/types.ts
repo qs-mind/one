@@ -97,6 +97,12 @@ export type DeliverableData = { id: string };
  * "I understood this" card, which reads the facts itself. */
 export type UnderstoodData = { project_id: string };
 
+/** data-facts, id = the Brief (core: engine/truth.py): what ONE's records hold beside the reply (null when it has
+ * no BOQ), and a line for each claim of the reply the records do not show. */
+export type FactsData = { text: Text | null; flags: Text[] };
+/** data-redo, id = the Brief: the reply's words in [from, to) went back to be fixed; the screen drops them. */
+export type RedoData = { from: number; to: number };
+
 /** One step of a Brief's work log: who, what, and its real start and end (ISO, the core's clock); `until` is null
  * while it runs. */
 export type WorkStep = { agent: Text; text: Text; at: string; until: string | null };
@@ -119,6 +125,8 @@ export type OneData = {
   /** data-view, id = the view (decision 16.1): what the Lead QS chose to show, from ONE's blocks. */
   view: ViewData;
   worklog: WorklogData;
+  facts: FactsData;
+  redo: RedoData;
 };
 
 /** A message the engineer sent while a Brief ran is marked as steering it; one sent with a canvas selection keeps
