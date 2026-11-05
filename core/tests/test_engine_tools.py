@@ -33,6 +33,7 @@ from tests.engine_fakes import FakeHost, scripted
 from tests.engine_fakes import call as tool_call
 from tests.engine_fakes import text as reply
 from tests.samples import sample_xlsx
+from tests.team_samples import quote_source
 
 LEAD = AgentSpec(
     id="lead",
@@ -111,9 +112,7 @@ def ids_of(out: str) -> dict:
 
 
 async def source_and_item(ctx) -> tuple[str, str]:
-    source = ids_of(
-        await call("add_source", {"kind": "quote", "title": "عرض سعر - عينة", "dated": DATED}, ctx)
-    )["source_id"]
+    source = ids_of(await call("add_source", quote_source(ctx.rec), ctx))["source_id"]
     item = ids_of(await call("add_item", {"kind": "boq_item", "code": "03/02"}, ctx))["item_id"]
     return source, item
 

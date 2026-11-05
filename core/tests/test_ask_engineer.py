@@ -159,16 +159,9 @@ async def test_card_answer_is_evidence(rec):
     assert f"dated {found['dated']}" in out and f"read {found['read']}" in out
     assert f'"card_id": "{card.id}"' in out  # how to cite it, so no id is asked of anyone
     source = await call(
-        "add_source",
-        {
-            "kind": "engineer",
-            "title": "سعر الأسمنت من المهندس - عينة",
-            "locator": {"card_id": card.id, "question": "q2"},
-            "dated": found["dated"],
-        },
-        ctx,
+        "add_source", {"kind": "engineer", "card_id": card.id, "question": "q2"}, ctx
     )
-    assert "source_id" in source
+    assert "source_id" in source and f'"dated": "{found["dated"]}"' in source
     assert engineer.answered(ctx.store, "no-such-card") is None
 
 

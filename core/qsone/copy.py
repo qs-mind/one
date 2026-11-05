@@ -1412,6 +1412,28 @@ KEEP_KINDS = {
     "national_id": {"en": "ID numbers", "ar": "أرقام البطاقات"},
     "whatsapp": {"en": "WhatsApp numbers", "ar": "أرقام الواتساب"},
 }
+# Task 7: the what-to-keep question's options and words, and the Engineer Records card.
+KEEP_OPTION_KEEP = {"en": "Keep", "ar": "احفظ"}
+KEEP_OPTION_NEVER = {"en": "Never keep", "ar": "ماتحفظش أبداً"}
+KEEP_DETAIL = {
+    "en": "{agent} is writing {kind} into your records. One asks once and remembers your answer "
+    "for every project.",
+    "ar": "{agent} بيكتب {kind} في سجلاتك. One بيسأل مرة واحدة وبيفتكر ردك لكل المشاريع.",
+}
+KEEP_ENGINEER_DETAIL = {
+    "en": "{agent}: {action}. It goes into your Engineer Records, which every project can use. "
+    "One asks once in this Brief.",
+    "ar": "{agent}: {action}. ده هيتحفظ في سجلات المهندس، واللي كل مشاريعك تقدر تستخدمها. "
+    "One بيسأل مرة واحدة في الطلب ده.",
+}
+ENGINEER_RECORDS_CLOSED = {
+    "en": "Engineer Records is not open, so One cannot use it now.",
+    "ar": "سجلات المهندس مش مفتوحة، فـ One مش هيقدر يستخدمها دلوقتي.",
+}
+# How a source got its date, when the evidence shows none of its own.
+DATED_RECEIVED = {"en": "date received", "ar": "تاريخ الاستلام"}
+DATED_READ = {"en": "date read", "ar": "تاريخ القراية"}
+TOOL_NOTE_LESSON = {"en": "Noting a lesson learned", "ar": "بيسجّل درس مستفاد"}
 
 # Prices.
 PRICES_ASK = {
