@@ -249,6 +249,7 @@ class PageReader:
         self.card = card
         self.model_id = card.choice.model
         self.subscription = card.subscription  # its cost is an "equivalent cost"
+        self.on_device = card.on_device  # an On-device Project may use only such a model
 
     async def transcribe(self, png: bytes, *, page: int) -> str:
         return (await transcribe(png, page=page, models=self.models))[0]

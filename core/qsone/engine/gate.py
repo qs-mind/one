@@ -3,7 +3,8 @@
 - `read` and `write` tools run without asking.
 - `outside` tools always ask: they send or delete something outside One.
 - `online` tools ask once the Brief has read file, web or email text, unless the engineer
-  allowed that tool for this Brief.
+  allowed that tool for this Brief (for `connector_call`: that Connector's one tool,
+  `Tool.allow_for`).
 - A tool whose risk depends on its arguments (`Tool.risk_for`, a Connector's tool) is gated by
   the risk of this call.
 
@@ -15,25 +16,26 @@ from uuid import uuid4
 from pydantic import BaseModel
 
 from qsone import copy
-from qsone.engine.tools import Denied, Tool, ToolContext, risk_of
+from qsone.engine.tools import Denied, Tool, ToolContext, allow_key, risk_of
 from qsone.engine.types import Card, Risk
 
 _OPTIONS = {"outside": ("yes", "no"), "online": ("yes", "brief", "no")}
 
 
-def _needs_asking(tool: Tool, risk: Risk, ctx: ToolContext) -> bool:
+def _needs_asking(key: str, risk: Risk, ctx: ToolContext) -> bool:
     if risk == "outside":
         return True
     if risk != "online":
         return False
     brief = ctx.store.brief(ctx.brief_id)
-    return bool(brief["read_untrusted"]) and tool.name not in brief["allowed"]
+    return bool(brief["read_untrusted"]) and key not in brief["allowed"]
 
 
 async def guard(tool: Tool, args: BaseModel, ctx: ToolContext) -> None:
     """Returns when the call may run; raises `Denied` when the engineer said no."""
     kind = risk_of(tool, args)
-    if not _needs_asking(tool, kind, ctx):
+    key = allow_key(tool, args)
+    if not _needs_asking(key, kind, ctx):
         return
     action = tool.activity(args)
     text = copy.ASK_OUTSIDE if kind == "outside" else copy.ASK_ONLINE
@@ -53,4 +55,4 @@ async def guard(tool: Tool, args: BaseModel, ctx: ToolContext) -> None:
     if choice == "no":
         raise Denied(tool.name)
     if choice == "brief":
-        ctx.store.allow(ctx.brief_id, tool.name)
+        ctx.store.allow(ctx.brief_id, key)

@@ -3,7 +3,9 @@
 - http and https only, a full address with a host and no user name or password in it;
 - every hop is checked after DNS: each address the host has must be public, so no loopback,
   private, link-local, CGNAT, multicast or reserved address (this keeps agents away from the
-  core's own port, the office network and cloud metadata);
+  core's own port, the office network and cloud metadata); the connection itself
+  (`guarded_transport`) checks again and connects only to the address it checked, so a name
+  that changes its answer in between (DNS rebinding) is refused too;
 - redirects are followed by hand, each one checked again, at most 5;
 - at most 10 MB, read in a stream and stopped past the limit; 20 s for the whole read;
 - robots.txt is honoured for the token `QSMindOne`, kept in memory for a day;
@@ -13,11 +15,13 @@ The world failing is never an error: `fetch` returns the `copy` text that says w
 
 import asyncio
 import ipaddress
+import ssl
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 
+import httpcore
 import httpx
 
 from qsone import copy
@@ -113,23 +117,94 @@ def _parts(url: str):
     return parts
 
 
+def _local_name(host: str) -> bool:
+    host = host.rstrip(".").lower()
+    return host == "localhost" or host.endswith(".localhost")
+
+
+async def _addresses(resolve, host: str) -> list[str]:
+    """`host`'s addresses: itself when it is one, else from DNS (raises `OSError`)."""
+    try:
+        return [str(ipaddress.ip_address(host.strip("[]")))]
+    except ValueError:
+        return list(await resolve(host.rstrip(".").lower()))
+
+
+def _all_public(addresses: list[str]) -> bool:
+    try:
+        return bool(addresses) and all(_public(a) for a in addresses)
+    except ValueError:
+        return False
+
+
 async def _refused(services, host: str) -> dict | None:
     """None when every address of `host` is public; else the text that says why not."""
-    host = host.rstrip(".").lower()
-    if host == "localhost" or host.endswith(".localhost"):
+    if _local_name(host):
         return copy.WEB_PRIVATE_ADDRESS
     try:
-        addresses = [str(ipaddress.ip_address(host))]
-    except ValueError:
+        addresses = await _addresses(services.resolve, host)
+    except OSError:
+        return copy.WEB_OFFLINE  # no answer from DNS: offline, or no such site
+    return None if _all_public(addresses) else copy.WEB_PRIVATE_ADDRESS
+
+
+# The connection itself: DNS rebinding -----------------------------------------------------------
+
+
+class PrivateAddress(httpcore.ConnectError):
+    """A host whose address is not public: no connection was made."""
+
+
+class GuardedBackend(httpcore.AsyncNetworkBackend):
+    """Connects only to an address it has just checked is public, by its own look-up, and
+    connects to that address: a name that answers a public address to the check and a private
+    one to the connection (DNS rebinding) never reaches the private one. TLS still names the
+    host (SNI) and so does the Host header: httpcore takes both from the address asked for."""
+
+    def __init__(self, resolve, inner: httpcore.AsyncNetworkBackend | None = None) -> None:
+        self._resolve = resolve
+        self._inner = inner or httpcore.AnyIOBackend()
+
+    async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        if _local_name(host):
+            raise PrivateAddress(copy.WEB_PRIVATE_ADDRESS["en"])
         try:
-            addresses = await services.resolve(host)
-        except OSError:
-            return copy.WEB_OFFLINE  # no answer from DNS: offline, or no such site
-    try:
-        public = bool(addresses) and all(_public(a) for a in addresses)
-    except ValueError:
-        public = False
-    return None if public else copy.WEB_PRIVATE_ADDRESS
+            addresses = await _addresses(self._resolve, host)
+        except OSError as e:
+            raise httpcore.ConnectError(copy.WEB_OFFLINE["en"]) from e
+        if not _all_public(addresses):
+            raise PrivateAddress(copy.WEB_PRIVATE_ADDRESS["en"])
+        return await self._inner.connect_tcp(
+            addresses[0],
+            port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+    async def connect_unix_socket(self, path, timeout=None, socket_options=None):
+        raise PrivateAddress(copy.WEB_PRIVATE_ADDRESS["en"])
+
+    async def sleep(self, seconds: float) -> None:
+        await self._inner.sleep(seconds)
+
+
+def guarded_transport(
+    resolve, *, verify: ssl.SSLContext | bool = True, backend=None
+) -> httpx.AsyncHTTPTransport:
+    """httpx's own transport, connecting through `GuardedBackend` over `backend` (default: the
+    system's sockets). It reads no proxy from the environment: a proxy would look the name up
+    again, out of One's sight."""
+    transport = httpx.AsyncHTTPTransport(verify=verify)
+    limits = httpx.Limits(max_connections=100, max_keepalive_connections=20, keepalive_expiry=5.0)
+    transport._pool = httpcore.AsyncConnectionPool(  # httpx 0.28 takes no network backend
+        ssl_context=transport._pool._ssl_context,
+        max_connections=limits.max_connections,
+        max_keepalive_connections=limits.max_keepalive_connections,
+        keepalive_expiry=limits.keepalive_expiry,
+        network_backend=GuardedBackend(resolve, backend),
+    )
+    return transport
 
 
 async def _robots_allow(services, url: str) -> bool | dict:
@@ -205,7 +280,9 @@ async def _follow(
                 )
         except httpx.TimeoutException:
             return copy.WEB_SITE_DOWN
-        except httpx.ConnectError:
+        except httpx.ConnectError as e:
+            if isinstance(e.__cause__, PrivateAddress):  # the connection's own check
+                return copy.WEB_PRIVATE_ADDRESS
             return copy.WEB_OFFLINE
         except httpx.HTTPError:  # the site broke off or answered in a way HTTP does not allow
             return copy.WEB_SITE_DOWN

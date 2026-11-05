@@ -9,6 +9,7 @@ import asyncio
 import json
 from urllib.parse import urlsplit
 
+import httpcore
 import httpx
 import pytest
 
@@ -16,7 +17,7 @@ from qsone import copy
 from qsone.web import fetch as web_fetch
 from qsone.web.fetch import Fetched, fetch
 from qsone.web.page import page
-from tests.fakes_tools import fake_services
+from tests.fakes_tools import fake_services, resolver
 from tests.samples import sample_html
 
 PUBLIC = ["93.184.216.34"]
@@ -324,3 +325,106 @@ def test_page_text_has_no_runs_of_blank_lines():
         {},
     )
     assert "\n\n\n" not in p.text and json.dumps(p.text)
+
+
+# DNS rebinding: the address connected to is the one just checked -----------------------------
+
+
+class CannedStream(httpcore.AsyncNetworkStream):
+    """One connection that answers with `reply` and keeps what was sent on it."""
+
+    def __init__(self, reply: bytes) -> None:
+        self.reply, self.sent = [reply], bytearray()
+
+    async def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        return self.reply.pop(0) if self.reply else b""
+
+    async def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self.sent += buffer
+
+    async def aclose(self) -> None:
+        pass
+
+
+class CannedBackend(httpcore.AsyncNetworkBackend):
+    """Stands in for the system's sockets, so nothing leaves the computer; keeps where it was
+    asked to connect."""
+
+    def __init__(self, reply: bytes) -> None:
+        self.reply = reply
+        self.connected: list[tuple[str, int]] = []
+        self.streams: list[CannedStream] = []
+
+    async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        self.connected.append((host, port))
+        self.streams.append(CannedStream(self.reply))
+        return self.streams[-1]
+
+    async def sleep(self, seconds: float) -> None:
+        await asyncio.sleep(seconds)
+
+
+class Rebinding:
+    """A name that is public the first time it is looked up, and private after that."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def __call__(self, host: str) -> list[str]:
+        self.calls += 1
+        return PUBLIC if self.calls == 1 else ["10.0.0.5"]
+
+
+OK_REPLY = (
+    b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n"
+    b"Connection: close\r\n\r\nok - sample!!"
+)
+
+
+def guarded(resolve, backend):
+    """Services whose client connects through the guarded backend over `backend`."""
+    s = fake_services()
+    s.resolve = resolve
+    s.http = httpx.AsyncClient(
+        transport=web_fetch.guarded_transport(resolve, backend=backend), follow_redirects=False
+    )
+    s.robots["http://steel-sample.example"] = (s.clock().timestamp(), None)  # robots.txt read
+    return s
+
+
+async def test_a_name_that_turns_private_after_the_check_is_never_connected():
+    backend = CannedBackend(OK_REPLY)
+    s = guarded(Rebinding(), backend)
+    try:
+        assert await fetch(s, "http://steel-sample.example/p") == copy.WEB_PRIVATE_ADDRESS
+    finally:
+        await s.http.aclose()
+    assert backend.connected == []  # refused before any connection
+
+
+async def test_the_vetted_address_is_connected_and_the_host_name_kept():
+    backend = CannedBackend(OK_REPLY)
+    names = resolver({"steel-sample.example": PUBLIC})
+    s = guarded(names, backend)
+    try:
+        got = await fetch(s, "http://steel-sample.example/p")
+    finally:
+        await s.http.aclose()
+    assert isinstance(got, Fetched) and got.body == b"ok - sample!!"
+    assert backend.connected == [(PUBLIC[0], 80)]  # the checked address, not the name again
+    assert b"Host: steel-sample.example\r\n" in bytes(backend.streams[0].sent)
+    # The fetch's own check, then the connection's look-up: the one that counts.
+    assert names.calls == ["steel-sample.example", "steel-sample.example"]
+
+
+@pytest.mark.parametrize("url", ["http://10.0.0.5/", "http://localhost/", "http://[::1]/"])
+async def test_the_guarded_backend_refuses_private_addresses_by_itself(url):
+    backend = CannedBackend(OK_REPLY)
+    client = httpx.AsyncClient(transport=web_fetch.guarded_transport(resolver({}), backend=backend))
+    try:
+        with pytest.raises(httpx.ConnectError) as e:
+            await client.get(url)
+    finally:
+        await client.aclose()
+    assert isinstance(e.value.__cause__, web_fetch.PrivateAddress)
+    assert backend.connected == []

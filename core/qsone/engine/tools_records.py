@@ -351,6 +351,7 @@ _COMPUTED = {"calculation", "sandbox"}  # only the QS Calc Engine writes a compu
 _UNCHECKED = {"column"}  # a place inside a row, kept as given
 _KEY = re.compile(r"^[a-z_]{1,20}$")
 _REF = re.compile(r"^(?:prices:)?([A-Z]{2})/([^@\s]+)@([0-9]{4}-[0-9]{2}-[0-9]{2})$")
+OWN_PRICE_REF = "prices:own/"  # + a rate's number id in Engineer Records (prices_lookup's own)
 _COUNTRIES = {"EG": "egypt", "SA": "saudi", "AE": "uae"}
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 
@@ -461,7 +462,29 @@ def _web_source(conn, args: SourceArgs) -> dict:
     }
 
 
+def _own_price_source(eng: Records, number_id: str) -> dict:
+    """An own price: a current rate in Engineer Records, by its number id."""
+    with eng.read() as conn:
+        row = conn.execute(
+            "SELECT i.fields, n.dated FROM numbers n JOIN items i ON i.id = n.item_id"
+            " WHERE n.id = ? AND n.name = 'rate' AND n.valid_until IS NULL",
+            (number_id,),
+        ).fetchone()
+    if row is None:
+        raise _no_evidence("ref")
+    fields, dated = json.loads(row[0]), row[1]
+    said = fields.get("description")
+    return {
+        "kind": "prices",
+        "title": (said if isinstance(said, str) and said else "The engineer's own price")[:300],
+        "locator": {"ref": f"{OWN_PRICE_REF}{number_id}"},
+        "dated": dated,
+    }
+
+
 def _prices_source(eng: Records, args: SourceArgs) -> dict:
+    if (args.ref or "").startswith(OWN_PRICE_REF):
+        return _own_price_source(eng, args.ref.removeprefix(OWN_PRICE_REF))
     found = _REF.match(args.ref or "")
     row = None
     if found:
@@ -523,8 +546,8 @@ def _connector_source(conn, args: SourceArgs) -> dict:
 
 def evidence(ctx: ToolContext, target: Records, args: SourceArgs) -> dict:
     """The source row for `args`, from its evidence: in `target` for a file, a Web Log page or
-    a Connector call; in Engineer Records for a QS Mind price; in the Brief's own file for an
-    answered card. Raises `RecordsError`: NUMBER_NEEDS_CALC for a computed kind;
+    a Connector call; in Engineer Records for a QS Mind price or an own price; in the Brief's
+    own file for an answered card. Raises `RecordsError`: NUMBER_NEEDS_CALC for a computed kind;
     SOURCE_NOT_EVIDENCE, FILE_NOT_IN_PROJECT or FILE_PAGES_OUT_OF_RANGE when it points at
     nothing; NUMBER_NEEDS_DATE for an undated file when `UNDATED_FILES` is "refuse"."""
     kind = args.kind.strip().lower()

@@ -103,6 +103,7 @@ class FakeTranscriber:
 
     text_by_page: dict[int, str] = field(default_factory=dict)
     model_id: str = "fake-vision"
+    on_device: bool = False  # a cloud model, unless a test says so
     cost: str | None = "0.01"  # USD per page, sample
     calls: list[int] = field(default_factory=list)
 

@@ -29,6 +29,7 @@ from qsone.engine.types import ModelChoice
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
 from qsone.records.project import RecordsError
+from qsone.tools import services as tool_services  # the package registers every Plan 5 tool
 from qsone.web import search as web_search
 
 Provider = Literal["anthropic"]
@@ -105,12 +106,19 @@ def create_app(
         )
         service.start()
         connector_hub.start()  # a Connector's server starts only when first used
+        # The tools' one way out (Plan 5), unless a test gave the engine its own fakes.
+        own_services = engine.services is None
+        if own_services:
+            engine.services = tool_services.services_for(app.state)
         await engine.start()  # never continues a Brief by itself
         try:
             async with mcp.running():
                 yield
                 await engine.shutdown()  # each Brief keeps its Checkpoint
         finally:
+            if own_services:
+                await engine.services.close()  # after the engine: no Brief uses it now
+                engine.services = None
             await connector_hub.close()  # stdio servers stop with the core
             stop_listening()
         service.stop()

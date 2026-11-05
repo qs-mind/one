@@ -23,7 +23,7 @@ from qsone import copy, keys, settings
 from qsone.engine.costs import CallRefused
 from qsone.engine.oneshot import OneShotFailed
 from qsone.engine.tools import ModelRetry, Tool, ToolContext, register
-from qsone.records import files
+from qsone.records import files, keep
 from qsone.records.arabic import normalise
 from qsone.records.project import Records, RecordsError
 from qsone.tools import cite
@@ -76,6 +76,13 @@ def _general_words(rec: Records | None, query: str) -> None:
         words = normalise(name or "")
         if words and f" {words} " in asked:
             raise RecordsError(copy.WEB_QUERY_NAMES_PROJECT, field="query")
+
+
+def _no_personal(query: str) -> None:
+    """Raises `RecordsError` (WEB_QUERY_PERSONAL) when `query` holds personal data that the
+    what-to-keep check spots (a phone, an email, an ID number): it would leave One."""
+    if keep.personal({"query": query}):
+        raise RecordsError(copy.WEB_QUERY_PERSONAL, field="query")
 
 
 def _country(rec: Records | None, asked: str | None) -> tuple[str | None, dict]:
@@ -135,6 +142,7 @@ async def _search(ctx: ToolContext, args: SearchArgs) -> str:
     if ctx.services.on_device(ctx.rec):
         return cite.not_done(copy.ON_DEVICE_NO_ONLINE)
     _general_words(ctx.rec, args.query)
+    _no_personal(args.query)
     provider = _provider(ctx)
     if provider is None:
         return cite.not_done(copy.WEB_NO_SEARCH)

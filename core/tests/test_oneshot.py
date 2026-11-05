@@ -181,6 +181,9 @@ def test_page_reader_and_its_expected_cost(make):
     models = make({"specialist": SONNET.choice}, [claude])
     reader = oneshot.page_reader(models)
     assert reader.model_id == SONNET.choice.model and not reader.subscription
+    assert reader.on_device is False  # a cloud model: an On-device Project may not use it
+    local = make({"specialist": SONNET.choice}, [claude], sheet=(replace(SONNET, on_device=True),))
+    assert oneshot.page_reader(local).on_device is True
     expected = oneshot.PAGE_TOKENS[0] * SONNET.price_in + oneshot.PAGE_TOKENS[1] * SONNET.price_out
     assert reader.expected_cost(30) == costs.usd_text(30 * expected / 1_000_000)
     assert oneshot.ASK_ABOVE_PAGES == 20

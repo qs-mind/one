@@ -206,6 +206,22 @@ async def test_read_only_tool_is_online_only_when_allowed(rec, general, hub, tmp
     assert asked.host.cards[0].kind == "outside"
 
 
+async def test_allow_for_this_brief_covers_that_connectors_tool_only(rec, general, hub, tmp_path):
+    await install(hub, tmp_path, read=True)
+    await install(hub, tmp_path, read=True, name="drive-sample")
+    ctx = ctx_for(rec, hub, general, untrusted=True, answers={"online": "brief"})
+    inbox = {"connector": NAME, "tool": "read_inbox"}
+    await call("connector_call", inbox, ctx)
+    await call("connector_call", inbox, ctx)
+    assert len(ctx.host.cards) == 1  # allowed for this Brief: the same tool asks once
+    await call("connector_call", {"connector": "drive-sample", "tool": "read_inbox"}, ctx)
+    assert len(ctx.host.cards) == 2  # another Connector's reading tool still asks
+    assert ctx.store.allowed(ctx.brief_id) == {
+        f"connector_call:{NAME}/read_inbox",
+        "connector_call:drive-sample/read_inbox",
+    }
+
+
 async def test_destructive_and_open_world_hints_are_always_outside(rec, general, hub, tmp_path):
     await install(hub, tmp_path, read=True, more=True)
     assert hub.risk(NAME, "archive_mail") == "outside"  # read-only and destructive

@@ -467,6 +467,31 @@ async def test_an_own_price_is_found_from_another_project(ctx, eng, tmp_path):
         other.close()
 
 
+async def test_an_own_price_is_cited_in_another_project(unsubscribed, eng, tmp_path):
+    item_id = own_price(eng, "أسمنت بورتلاندي - عينة", "طن", "3950", "EGP", "2026-11-01")
+    from qsone.records.project import Records  # a second project, same Engineer Records
+
+    other = Records.create(tmp_path / "other", name="مشروع آخر - عينة", actor="engineer")
+    try:
+        later = tool_ctx(other, services=fake_services(engineer=lambda: eng))
+        out = await call("prices_lookup", {"item": "أسمنت"}, later)
+        [own] = data_of(out)["own"]
+        assert own["ref"] == f"prices:own/{own['number_id']}" and own["item_id"] == item_id
+        assert f"- {own['ref']} |" in out  # its source line has the same ref
+        cited = json.loads(await call("add_source", {"kind": "prices", "ref": own["ref"]}, later))
+        with other.read() as c:
+            kind, title, locator, dated = c.execute(
+                "SELECT kind, title, locator, dated FROM sources WHERE id = ?",
+                (cited["source_id"],),
+            ).fetchone()
+        assert (kind, dated) == ("prices", "2026-11-01")
+        assert title == "أسمنت بورتلاندي - عينة" and json.loads(locator)["ref"] == own["ref"]
+        with pytest.raises(ModelRetry):  # an own ref that is no current rate is no evidence
+            await call("add_source", {"kind": "prices", "ref": "prices:own/nothing-here"}, later)
+    finally:
+        other.close()
+
+
 async def test_propose_refused_stores_nothing(ctx, eng):
     ctx.host.answers = {"rows": json.dumps({"choice": "no", "rows_ok": []})}
     out = await call(

@@ -37,6 +37,8 @@ CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
 
 
 def _registered(names: tuple[str, ...]) -> tuple[str, ...]:
+    import qsone.tools  # noqa: F401 - registers every Plan 5 tool; it imports the engine
+
     return tuple(name for name in names if name in REGISTRY)
 
 

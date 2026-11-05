@@ -20,9 +20,11 @@ from typing import Any, Protocol
 import httpx
 import truststore
 
+from qsone.prices import client as prices_client
 from qsone.records.project import Records
 from qsone.sandbox import runtime
 from qsone.sandbox.runner import SandboxRunner
+from qsone.web import fetch
 
 TIMEOUT = 20  # seconds, for any one web request (decision 8)
 
@@ -31,6 +33,7 @@ class Transcriber(Protocol):
     """Reads a page image as text (Task 8). In a Brief: `engine.oneshot.PageReader`."""
 
     model_id: str
+    on_device: bool  # the model runs on this computer, so an On-device Project may use it
 
     async def transcribe(self, png: bytes, *, page: int) -> str: ...
 
@@ -84,11 +87,15 @@ def utc_now() -> datetime:
 
 
 def services_for(app_state: Any) -> Services:
-    """The app's services, built once in the lifespan (Task 15); `close` them on shutdown.
-    `app_state.engine` holds the Engineer Records file. The Sandbox runner is made here once,
-    so every Brief shares it."""
+    """The app's services, built once in the lifespan; `close` them on shutdown, after the
+    engine. `app_state.engine` holds the Engineer Records file. The HTTP client connects only
+    to addresses it has just checked are public (`web.fetch.guarded_transport`). The Sandbox
+    runner is made here once, so every Brief shares it."""
     http = httpx.AsyncClient(
-        verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),  # office networks work too
+        transport=fetch.guarded_transport(
+            resolve,
+            verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),  # office networks too
+        ),
         follow_redirects=False,
         timeout=TIMEOUT,
         headers={"User-Agent": "QS Mind One (qsmind.app)"},
@@ -99,6 +106,7 @@ def services_for(app_state: Any) -> Services:
         resolve=resolve,
         clock=utc_now,
         engineer=app_state.engine.engineer_records,
+        prices=prices_client.from_key_store(http),
         sandbox=SandboxRunner(runtime.folder(base), install=partial(runtime.ensure, base)),
         connectors=getattr(app_state, "connectors", None),
     )
