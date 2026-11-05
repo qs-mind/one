@@ -184,9 +184,9 @@ async def _ask(ctx: ToolContext, args: AskArgs) -> str:
     found = answered(ctx.store, card.id)
     assert found is not None  # just settled
     cite = (
-        'To record a number from an answer: add_source with kind "engineer", a title in the '
-        f'engineer\'s words, locator {{"card_id": "{card.id}", "question": "<its id>"}}, '
-        f'dated "{found["dated"]}".'
+        "To record a number from an answer: add_source "
+        f'{{"kind": "engineer", "card_id": "{card.id}", "question": "<its id>"}}; '
+        f"it is dated {found['dated']}, the day of the answer."
     )
     return render(
         "The engineer answered.",

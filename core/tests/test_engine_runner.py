@@ -20,7 +20,7 @@ from qsone.engine.types import Asked, Progress, Reviewed, Settled, Status, TextD
 from qsone.projects import Projects
 from tests.engine_fakes import DEEPSEEK, HAIKU, OPUS, SAMPLE_SHEET, SONNET, call, calls, scripted
 from tests.engine_fakes import text as said
-from tests.team_samples import BRIEF, TeamFakeHost, lead_ctx, sample_ledger
+from tests.team_samples import BRIEF, TeamFakeHost, lead_ctx, quote_source, sample_ledger
 
 PLAN = {
     "steps": [
@@ -35,7 +35,6 @@ TAKE_OFF = {
     "tools": ["search_records", "send_message"],
 }
 PRICING = TAKE_OFF | {"name_en": "Pricing QS", "name_ar": "مهندس التسعير"}
-SOURCE = {"kind": "quote", "title": "عرض سعر - عينة", "dated": "2026-11-02"}
 
 
 @dataclass
@@ -184,8 +183,10 @@ def team_steps():
 # The happy path -------------------------------------------------------------------------------
 
 
-async def test_a_brief_streams_lead_text_and_progress(make_engine, project):
-    lead = scripted(call("add_source", SOURCE), said("تم تسجيل المصدر - عينة"))
+async def test_a_brief_streams_lead_text_and_progress(make_engine, project, registry):
+    lead = scripted(
+        call("add_source", quote_source(registry.get(project))), said("تم تسجيل المصدر - عينة")
+    )
     engine = await started(make_engine(links(lead=lead)))
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)
@@ -374,7 +375,11 @@ async def test_crash_and_continue(make_engine, data_dir, project, registry):
         entered.set()
         await asyncio.Event().wait()
 
-    lead1 = scripted(call("add_source", SOURCE), *team_steps(), said("لن يصل - عينة"))
+    lead1 = scripted(
+        call("add_source", quote_source(registry.get(project))),
+        *team_steps(),
+        said("لن يصل - عينة"),
+    )
     e1 = await started(make_engine(links(lead=lead1, specialist=scripted(blocks, blocks))))
     brief = await e1.start_brief(project, BRIEF)
     await asyncio.wait_for(entered.wait(), 5)
@@ -492,12 +497,13 @@ async def test_stop_cancels_a_thinking_lead_and_withdraws_its_card(make_engine, 
     assert withdrawn and withdrawn[-1].data == {"status": "withdrawn"}
 
 
-async def test_steer_reaches_the_running_lead(make_engine, project):
+async def test_steer_reaches_the_running_lead(make_engine, project, registry):
     go = asyncio.Event()
+    source = quote_source(registry.get(project))
 
     async def waits(messages, info):
         await asyncio.wait_for(go.wait(), 5)
-        return call("add_source", SOURCE)
+        return call("add_source", source)
 
     lead = scripted(waits, said("تمام - عينة"))
     engine = await started(make_engine(links(lead=lead)))
