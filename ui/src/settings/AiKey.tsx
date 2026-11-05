@@ -1,6 +1,6 @@
 // Add or replace the engineer's Claude key. The core keeps it in the system key store; the page never shows it again.
 // `plain`: the field alone, with no title, help or frame, inside another screen (the first launch's Connect AI, whose
-// choice already says what the key is).
+// choice already says what the key is), saying nothing once saved: that screen's check says it.
 import { useState, type FormEvent } from "react";
 import { api } from "../api";
 import { t, useLanguage } from "../i18n";
@@ -29,7 +29,8 @@ export function AiKey({ onSaved, onClose, plain = false }: { onSaved: () => void
 
   const body =
     state === "saved" ? (
-          <p role="status">{t("keyAdded")}</p>
+          // in the first launch the check that follows says how it went, in the flow's own look
+          plain ? null : <p role="status">{t("keyAdded")}</p>
         ) : (
           <form onSubmit={save} className="flex flex-col gap-3">
             {!plain && <p className="text-slate">{t("aiKeyHelp")}</p>}

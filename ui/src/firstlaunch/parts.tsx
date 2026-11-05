@@ -45,26 +45,65 @@ export function closeSetup() {
   changed(null);
 }
 
-export const primary =
-  "rounded-md bg-ink px-5 py-2.5 text-paper hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40";
-export const secondary =
-  "rounded-md bg-stone px-5 py-2.5 text-ink hover:bg-ink/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40";
-export const quiet =
-  "rounded-md px-3 py-2.5 text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-40";
-export const field = "h-11 w-full rounded-md border border-slate/40 bg-paper px-3 outline-none focus:border-ink";
+// Colour changes ease over 150 ms, so a hover or a choice never snaps.
+const ease = "transition-colors duration-150 ease-out";
+export const primary = `rounded-md bg-ink px-5 py-2.5 text-paper hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40 ${ease}`;
+export const secondary = `rounded-md bg-stone px-5 py-2.5 text-ink hover:bg-ink/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40 ${ease}`;
+export const quiet = `rounded-md px-3 py-2.5 text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-40 ${ease}`;
+export const field = `h-11 w-full rounded-md border border-slate/40 bg-paper px-3 outline-none focus:border-ink ${ease}`;
 /** A choice the engineer picks among a few: a quiet frame on Paper at rest, Ink once chosen. Its text aligns to the
  * start unless the caller says otherwise. */
 export const option = (chosen: boolean) =>
-  `rounded-lg border px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40 ${
+  `rounded-lg border px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40 ${ease} ${
     chosen ? "border-ink bg-ink text-paper" : "border-ink/15 bg-paper text-ink hover:bg-stone"
   }`;
 
-export function Alert({ children }: { children: ReactNode }) {
-  return children ? (
-    <p role="alert" className="text-copper">
-      {children}
+export type Progress = "busy" | "done" | "failed";
+
+/** How a check, a sign-in or a save is going, in the same look on every step, without a colour of its own: a quiet
+ * Slate ring turning while it runs (shown after 300 ms, so a quick one never flashes); a filled Ink circle whose check
+ * draws itself once it worked, the line in Ink; Copper with a ring and "!" when it did not, the line saying what to do
+ * next. Each line rises into place, and scrolls into view when it lands below the window's edge. */
+export function Feedback({ state, children }: { state: Progress; children: ReactNode }) {
+  const line = useRef<HTMLParagraphElement>(null);
+  const shown = Boolean(children);
+  useEffect(() => {
+    if (!shown) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    line.current?.scrollIntoView?.({ block: "nearest", behavior: still ? "auto" : "smooth" });
+  }, [state, shown]);
+  if (!shown) return null;
+  const look = state === "done" ? "font-medium text-ink" : state === "failed" ? "text-copper" : "text-slate";
+  return (
+    <p
+      ref={line}
+      role={state === "failed" ? "alert" : "status"}
+      data-feedback={state}
+      className={`${state === "busy" ? "fl-rise-late" : "fl-rise"} flex items-start gap-2.5 ${look}`}
+    >
+      <span aria-hidden="true" className="flex h-[1lh] shrink-0 items-center">
+        {state === "busy" && <span className="fl-spin block size-4 rounded-full border-2 border-slate/25 border-t-slate" />}
+        {state === "done" && (
+          <svg viewBox="0 0 20 20" className="size-5">
+            <circle cx="10" cy="10" r="10" className="fill-ink" />
+            <path d="M5.8 10.4l2.8 2.8 5.6-5.8" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="fl-check stroke-paper" />
+          </svg>
+        )}
+        {state === "failed" && (
+          <svg viewBox="0 0 20 20" className="size-5">
+            <circle cx="10" cy="10" r="9" fill="none" strokeWidth="1.5" className="stroke-copper" />
+            <path d="M10 5.5v5.5" strokeWidth="2" strokeLinecap="round" className="stroke-copper" />
+            <circle cx="10" cy="14.3" r="1.15" className="fill-copper" />
+          </svg>
+        )}
+      </span>
+      <span className="min-w-0">{children}</span>
     </p>
-  ) : null;
+  );
+}
+
+export function Alert({ children }: { children: ReactNode }) {
+  return <Feedback state="failed">{children}</Feedback>;
 }
 
 /** One screen of the flow. Its heading takes focus when it opens, so a screen reader hears each new step. */

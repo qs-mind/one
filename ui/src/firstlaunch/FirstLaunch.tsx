@@ -108,6 +108,7 @@ export function FirstLaunch({
     return next === -1 ? SCREENS.length - 1 : next;
   });
   const [notSaved, setNotSaved] = useState(false);
+  const [way, setWay] = useState<"forward" | "back">("forward"); // which side the next screen slides in from
   const screen = SCREENS[at]!;
 
   useEffect(() => {
@@ -126,17 +127,24 @@ export function FirstLaunch({
     }
     setSetup(answer);
     if (only) onDone(answer);
-    else setAt((now) => now + 1);
+    else {
+      setWay("forward");
+      setAt((now) => now + 1);
+    }
     return true;
   }
 
+  const back = () => {
+    setWay("back");
+    setAt(at - 1);
+  };
   const nav = (step: Step): Nav => ({
-    back: at > 0 && !only ? () => setAt(at - 1) : undefined,
+    back: at > 0 && !only ? back : undefined,
     pass: (state) => pass(step, state),
   });
 
   return (
-    <div dir={dir()} className="flex min-h-dvh flex-col overflow-y-auto bg-paper text-ink">
+    <div dir={dir()} data-firstlaunch="" className="flex min-h-dvh flex-col overflow-y-auto bg-paper text-ink">
       <header className="flex items-center gap-3 px-6 py-4 text-slate">
         <Mark />
         <span className="font-semibold text-ink">{t("appName")}</span>
@@ -146,20 +154,22 @@ export function FirstLaunch({
       <main className="flex flex-1 justify-center px-4 pt-6 pb-12 sm:pt-16">
         <div className="flex w-full max-w-[36rem] flex-col gap-8">
           {!only && <Dots at={at} />}
-          {screen === "language" && <Language nav={nav("language")} />}
-          {screen === "account" && <Account nav={nav("account")} />}
-          {screen === "ai" && <ConnectAi nav={nav("ai")} />}
-          {screen === "card" && <IntroCard nav={nav("card")} />}
-          {screen === "usage" && <UsageStats nav={nav("usage")} />}
-          {screen === "ready" && (
-            <Ready
-              aiSkipped={setup.steps.ai === "skipped"}
-              back={() => setAt(at - 1)}
-              onStart={() => onDone(setup)}
-              // the import goes on in the app: the folder is taken first, then the flow ends
-              onImport={onImport && ((from, old) => (onImport(from, old), onDone(setup)))}
-            />
-          )}
+          <div key={screen} data-way={way} className="fl-step">
+            {screen === "language" && <Language nav={nav("language")} />}
+            {screen === "account" && <Account nav={nav("account")} />}
+            {screen === "ai" && <ConnectAi nav={nav("ai")} />}
+            {screen === "card" && <IntroCard nav={nav("card")} />}
+            {screen === "usage" && <UsageStats nav={nav("usage")} />}
+            {screen === "ready" && (
+              <Ready
+                aiSkipped={setup.steps.ai === "skipped"}
+                back={back}
+                onStart={() => onDone(setup)}
+                // the import goes on in the app: the folder is taken first, then the flow ends
+                onImport={onImport && ((from, old) => (onImport(from, old), onDone(setup)))}
+              />
+            )}
+          </div>
           {notSaved && <Alert>{t("setupNotSaved")}</Alert>}
         </div>
       </main>
@@ -167,7 +177,9 @@ export function FirstLaunch({
   );
 }
 
-/** One dot for each step: passed ones in Ink, the current one a longer Ink pill, those to come in Stone. */
+/** One dot for each step: passed ones in Ink, the current one a longer Ink pill, those to come in a light Ink tint
+ * (Stone is hardly seen on Paper). A dot grows
+ * into the pill and takes its colour over 200 ms (a width on an 8 px dot: scaling it would squash its round ends). */
 function Dots({ at }: { at: number }) {
   const n = Math.min(at + 1, STEPS.length);
   return (
@@ -176,7 +188,7 @@ function Dots({ at }: { at: number }) {
         {STEPS.map((step, index) => (
           <li
             key={step}
-            className={`h-2 rounded-full ${index === at ? "w-6 bg-ink" : index < at ? "w-2 bg-ink" : "w-2 bg-stone"}`}
+            className={`h-2 rounded-full transition-[width,background-color] duration-200 ease-out ${index === at ? "w-6 bg-ink" : index < at ? "w-2 bg-ink" : "w-2 bg-ink/15"}`}
           />
         ))}
       </ol>

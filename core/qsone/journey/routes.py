@@ -18,8 +18,8 @@ from qsone.journey import claude_code, closing, engineer, setup_state, understan
 from qsone.journey.setup_state import Language, State
 
 LINKS = {
-    "terms": "https://qsmind.app/{lang}/one/terms",
-    "privacy": "https://qsmind.app/{lang}/one/privacy",
+    "terms": "https://qsmind.app/{lang}/terms",  # the website's own pages, both languages
+    "privacy": "https://qsmind.app/{lang}/privacy",
     "releases": "https://github.com/qs-mind/one/releases",
     "sign_in": "https://auth.qsmind.app/{lang}/account",
 }

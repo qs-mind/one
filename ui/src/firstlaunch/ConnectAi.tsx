@@ -1,13 +1,13 @@
-// Connect AI: first the consent (where the engineer's text goes, with the terms and the privacy policy), then how One
+// Connect AI: first the consent (where the engineer's text goes, with the terms and the privacy policy), then how ONE
 // reaches AI: the engineer's own Claude Code, or an API key (the key field AI settings use). Neither choice can be
 // made before "I understand"; the core refuses every AI call until then as well (AI_CONSENT_NEEDED). The same step
 // opens alone from the chat's "Connect AI" when the consent is missing.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { api } from "../api";
+import { api, inInstalledApp } from "../api";
 import { coreLine, send } from "../core";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AiKey } from "../settings/AiKey";
-import { Alert, type Nav, openSetup, option, primary, quiet, secondary, StepScreen } from "./parts";
+import { Feedback, type Nav, openSetup, option, primary, quiet, secondary, StepScreen } from "./parts";
 
 // The consent, as GET /settings/ai-consent says: `at` is null until the engineer said yes to `text_version`.
 type Consent = { at: string | null; text_version: number };
@@ -74,6 +74,7 @@ export function ConnectAi({ nav }: { nav: Nav }) {
   const [via, setVia] = useState<Via>();
   const [found, setFound] = useState<{ found: boolean; version: string | null }>();
   const [check, setCheck] = useState<Check>("idle");
+  const [keyField, setKeyField] = useState(0);
   const agreed = given?.at != null;
 
   async function agree() {
@@ -93,9 +94,10 @@ export function ConnectAi({ nav }: { nav: Nav }) {
 
   async function run(chosen: Via) {
     setCheck("checking");
-    if (chosen === "claude_code" && !(await findClaudeCode())?.found) return setCheck("idle");
+    if (chosen === "claude_code" && !(await findClaudeCode())?.found) return setCheck(texts.aiLinkClaudeCodeMissing);
     const response = await send("/settings/ai/check", "POST", { via: chosen });
     setCheck(response?.ok ? "works" : await coreLine(response, texts.claudeCodeCheckFailed));
+    if (!response?.ok && chosen === "api_key") setKeyField((n) => n + 1); // the field again, for another key
   }
 
   function choose(chosen: Via) {
@@ -112,7 +114,7 @@ export function ConnectAi({ nav }: { nav: Nav }) {
       failed={failed && pick(failed)}
       next={
         check === "works" && (
-          <button type="button" onClick={() => void nav.pass("done")} className={primary}>
+          <button type="button" onClick={() => void nav.pass("done")} className={`${primary} fl-rise`}>
             {t("setupNext")}
           </button>
         )
@@ -130,6 +132,7 @@ export function ConnectAi({ nav }: { nav: Nav }) {
             </button>
           )}
         </div>
+        {agreed && <Feedback state="done">{t("consentGiven")}</Feedback>}
       </div>
 
       <fieldset disabled={!agreed} className="flex min-w-0 flex-col gap-4">
@@ -150,9 +153,9 @@ export function ConnectAi({ nav }: { nav: Nav }) {
           <div className="flex flex-col gap-3">
             {found &&
               (found.found ? (
-                <p>{fill(t("aiLinkClaudeCodeFound"), { version: found.version ?? "" })}</p>
+                <p className="fl-rise">{fill(t("aiLinkClaudeCodeFound"), { version: found.version ?? "" })}</p>
               ) : (
-                <p className="text-slate">{t("aiLinkClaudeCodeMissing")}</p>
+                typeof check !== "object" && <p className="fl-rise text-slate">{t("aiLinkClaudeCodeMissing")}</p>
               ))}
             <div>
               <button type="button" disabled={checking} onClick={() => void run("claude_code")} className={secondary}>
@@ -161,24 +164,31 @@ export function ConnectAi({ nav }: { nav: Nav }) {
             </div>
           </div>
         )}
-        {via === "api_key" && <AiKey plain onSaved={() => void run("api_key")} />}
+        {via === "api_key" && <AiKey key={keyField} plain onSaved={() => void run("api_key")} />}
 
-        {checking && <p className="text-slate">{t("aiLinkChecking")}</p>}
-        {check === "works" && <p role="status">{t("aiLinkWorks")}</p>}
-        {typeof check === "object" && <Alert>{pick(check)}</Alert>}
+        {checking && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
+        {check === "works" && <Feedback state="done">{t("aiLinkWorks")}</Feedback>}
+        {typeof check === "object" && <Feedback state="failed">{pick(check)}</Feedback>}
       </fieldset>
     </StepScreen>
   );
 }
 
-/** A fixed outside link, opened by the core in the browser (POST /app/open), never by the page. */
+/** A fixed outside page, in the page's language: the same addresses as the core's (journey/routes.py LINKS). */
+const linkUrl = (link: "terms" | "privacy") => `https://qsmind.app/${language()}/${link}`;
+
+/** A fixed outside link. In the installed app the core opens it in the browser (POST /app/open), never the page; in a
+ * plain browser, which may be on another computer than the core, it is a real link, in a new tab. */
 function OpenLink({ link, label, first = false }: { link: "terms" | "privacy"; label: string; first?: boolean }) {
+  const look = `${quiet} ${first ? "-ms-3" : ""} underline decoration-slate/40 underline-offset-4`;
+  if (!inInstalledApp())
+    return (
+      <a href={linkUrl(link)} target="_blank" rel="noopener" className={look}>
+        {label}
+      </a>
+    );
   return (
-    <button
-      type="button"
-      onClick={() => void send("/app/open", "POST", { link, lang: language() })}
-      className={`${quiet} ${first ? "-ms-3" : ""} underline decoration-slate/40 underline-offset-4`}
-    >
+    <button type="button" onClick={() => void send("/app/open", "POST", { link, lang: language() })} className={look}>
       {label}
     </button>
   );

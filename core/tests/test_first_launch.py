@@ -217,10 +217,25 @@ def test_no_card_adds_nothing_to_the_lead(client, lead):
             "The engineer works in procurement in Doha; currency QAR.",
         ),
         ({"country": "other", "city": ""}, "The engineer is a contractor QS; currency EGP."),
+        (
+            {"country": "other", "city": "Doha", "currency": None},
+            "The engineer is a contractor QS in Doha.",
+        ),
     ],
 )
 def test_card_line_says_only_what_is_there(changed, line):
     assert engineer.card_line(CARD | changed) == line
+
+
+def test_a_card_for_another_country_needs_no_currency(client, lead):
+    other = {"role": "consultant", "country": "other", "city": "Doha"}
+    r = client.put("/engineer/card", json=other, headers=AUTH)
+    assert r.status_code == 200 and r.json() == other
+    assert client.get("/engineer/card", headers=AUTH).json() == other  # no currency kept
+    send(client, "سؤال - عينة")
+    [instructions] = lead.instructions
+    assert "The engineer is a consultant QS in Doha." in instructions
+    assert "currency" not in instructions.split("The engineer is", 1)[1].split("\n", 1)[0]
 
 
 @pytest.mark.parametrize(
@@ -343,8 +358,8 @@ def test_open_link_only_opens_fixed_urls(client, no_browser):
     client.post("/app/open", json={"link": "sign_in"}, headers=AUTH)
     client.post("/app/open", json={"link": "releases"}, headers=AUTH)
     assert no_browser == [
-        "https://qsmind.app/ar/one/terms",
-        "https://qsmind.app/en/one/privacy",
+        "https://qsmind.app/ar/terms",
+        "https://qsmind.app/en/privacy",
         "https://auth.qsmind.app/en/account",
         "https://github.com/qs-mind/one/releases",
     ]
