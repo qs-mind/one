@@ -168,7 +168,11 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
 
   return (
     <div ref={root} className="relative flex h-full w-full min-h-0 flex-col bg-paper text-ink">
-      <div ref={body} className={mode === "full" ? "min-h-0 flex-[3_1_0%]" : "min-h-0 flex-1"}>
+      {/* full: a Sheet is as tall as its rows, up to 60%, and the review panels take the rest; a Document keeps 3/5 */}
+      <div
+        ref={body}
+        className={mode !== "full" ? "min-h-0 flex-1" : view.kind === "sheet" ? "flex min-h-0 max-h-[60%] flex-[0_1_auto] flex-col" : "min-h-0 flex-[3_1_0%]"}
+      >
         {viewer}
       </div>
       {mode === "full" && (

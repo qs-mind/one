@@ -49,7 +49,7 @@ export function ProjectIndex({ projectId, onOpen, onClose, subscribe = subscribe
     };
   }, [projectId, subscribe]);
 
-  // the title takes the room the other columns leave, at least 14 rem; the others keep to one line
+  // the title takes the room the other columns leave, at least 14 rem; the short values keep to one line
   const cell = "border-b border-stone px-3 py-2 text-start align-baseline";
   const small = `${cell} whitespace-nowrap`;
   return (
@@ -76,11 +76,11 @@ export function ProjectIndex({ projectId, onOpen, onClose, subscribe = subscribe
             <thead>
               <tr className="text-slate">
                 <th className={`${cell} min-w-56 font-normal`}>{t("deliverableTitle")}</th>
-                <th className={`${small} font-normal`}>{t("deliverableType")}</th>
-                <th className={`${small} font-normal`}>{t("reviewRevisions")}</th>
-                <th className={`${small} font-normal`}>{t("deliverableStatus")}</th>
-                <th className={`${small} font-normal`}>{t("reviewChanges")}</th>
-                <th className={`${small} font-normal`}>{t("reviewComments")}</th>
+                <th className={`${cell} font-normal`}>{t("deliverableType")}</th>
+                <th className={`${cell} font-normal`}>{t("reviewRevisions")}</th>
+                <th className={`${cell} font-normal`}>{t("deliverableStatus")}</th>
+                <th className={`${cell} font-normal`}>{t("reviewChanges")}</th>
+                <th className={`${cell} font-normal`}>{t("reviewComments")}</th>
               </tr>
             </thead>
             <tbody>
@@ -99,8 +99,8 @@ export function ProjectIndex({ projectId, onOpen, onClose, subscribe = subscribe
                   </td>
                   <td className={small}>{kindName(d.kind)}</td>
                   <td className={small}>{d.revision !== null ? fill(t("reviewRev"), { n: d.revision }) : "—"}</td>
-                  <td className={small}>
-                    <span className="flex gap-1">
+                  <td className={cell}>
+                    <span className="flex flex-wrap gap-1">
                       <StatusChips view={d} />
                     </span>
                   </td>
