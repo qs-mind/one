@@ -90,6 +90,19 @@ for (const language of ["ar", "en"] as const) {
     });
   }
 
+  test(`at 1440 px the top bar shows two status items, the submission and the items left, ${language}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockCore(page, small(), { language });
+    await page.goto("/");
+    await workspaceReady(page);
+    const shown = page.locator('[data-region="topbar"] [data-status]:not([data-status="more"]):not([aria-hidden="true"])');
+    await expect(shown).toHaveCount(2);
+    await expect(shown.nth(0)).toHaveAttribute("data-status", "submission");
+    await expect(shown.nth(1)).toHaveAttribute("data-status", "left");
+    await expect(shown.nth(1)).toHaveText(count("itemsLeft", 240, {}, language));
+    for (const item of await shown.all()) expect(await shownWhole(item)).toBe(true);
+  });
+
   const names = {
     short: { ar: "مبنى إداري - عينة", en: "Office building (sample)" },
     long: { ar: "برج إداري بالعاصمة الإدارية الجديدة - عينة", en: "Administrative tower, New Capital (sample)" },

@@ -1,8 +1,8 @@
-// The project's status in the top bar: its stage, the submission date and the days left, the BOQ so far (with the
-// Deliverable and Revision it comes from), the open comments. Each shows only when the core sends it; nothing is
-// guessed. Two at most show in the bar, so it stays calm; the rest, and any with no room, fold into a "More status"
-// button rather than being cut: the stage first, then the open comments, the BOQ so far; the submission date stays
-// longest.
+// The project's status in the top bar: its stage, the submission date and the days left, the items left to price,
+// the BOQ so far (with the Deliverable and Revision it comes from), the open comments. Each shows only when the core
+// sends it; nothing is guessed. Two at most show in the bar, so it stays calm: the submission and the items left
+// first, then the BOQ so far, the open comments, the stage; one too wide for the room is passed over for the next
+// that fits. The rest fold into a "More status" button rather than being cut.
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../project/types";
 import { count, fill, language, pick, t, useLanguage } from "../i18n";
@@ -39,20 +39,22 @@ const GAP = 8; // gap-2
 /** At most this many status items show in the bar; the rest are in More status. */
 export const SHOWN_MOST = 2;
 /** Which item stays longest when the bar is short: lower stays longer. */
-const PRIORITY: Record<string, number> = { submission: 0, boq: 1, comments: 2, stage: 3 };
+const PRIORITY: Record<string, number> = { submission: 0, left: 1, boq: 2, comments: 3, stage: 4 };
 
-/** How many of `widths` (in priority order) fit in `room` px, with a `more` px button when some do not. */
-export function fitting(widths: readonly number[], room: number, more: number): number {
+/** Which of `widths` (in priority order) show in `room` px: all of them when they are two at most and fit; else at
+ * most two that fit beside a `more` px button, in order, passing over one too wide for what is left. */
+export function fitting(widths: readonly number[], room: number, more: number): number[] {
   const total = widths.reduce((sum, w) => sum + w, 0) + GAP * Math.max(0, widths.length - 1);
-  if (total <= room) return widths.length;
+  if (widths.length <= SHOWN_MOST && total <= room) return widths.map((_, i) => i);
+  const shown: number[] = [];
   let used = more;
-  let n = 0;
-  for (const w of widths) {
-    if (used + GAP + w > room) break;
+  for (const [i, w] of widths.entries()) {
+    if (shown.length === SHOWN_MOST) break;
+    if (used + GAP + w > room) continue;
     used += GAP + w;
-    n++;
+    shown.push(i);
   }
-  return n;
+  return shown;
 }
 
 export function StatusStrip({
@@ -84,6 +86,8 @@ export function StatusStrip({
         </span>
       ),
     });
+  if (boq?.items !== undefined && boq.priced !== undefined && boq.priced < boq.items)
+    items.push({ key: "left", node: <span className={chip}>{count("itemsLeft", boq.items - boq.priced)}</span> });
   if (boq)
     items.push({
       key: "boq",
@@ -150,9 +154,10 @@ export function StatusStrip({
       const widths = order.map((item) => width(item.key));
       if (!widths.some(Boolean)) return setShown(null); // nothing laid out (no layout engine): show them all
       const more = width("more");
-      const n = widths.length > SHOWN_MOST ? fitting(widths.slice(0, SHOWN_MOST), room - more - GAP, 0) : fitting(widths, room, more);
-      setShown(n >= items.length ? null : new Set(order.slice(0, n).map((item) => item.key)));
-      setFloor(n >= items.length ? 0 : more);
+      const fit = fitting(widths, room, more);
+      const all = fit.length >= items.length;
+      setShown(all ? null : new Set(fit.map((i) => order[i]!.key)));
+      setFloor(all ? 0 : more);
     };
     update();
     const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(update);

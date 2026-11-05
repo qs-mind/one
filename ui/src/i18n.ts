@@ -1142,6 +1142,10 @@ export const counted = {
     en: { one: "{n} item", other: "{n} items" },
     ar: { one: "بند واحد", two: "بندين", few: "{n} بنود", other: "{n} بند" },
   },
+  itemsLeft: {
+    en: { one: "{n} item left", other: "{n} items left" },
+    ar: { one: "فاضل بند واحد", two: "فاضل بندين", few: "فاضل {n} بنود", other: "فاضل {n} بند" },
+  },
   boqItemsOf: {
     en: { one: "{done} of {n} item", other: "{done} of {n} items" },
     ar: { one: "{done} من بند واحد", two: "{done} من بندين", few: "{done} من {n} بنود", other: "{done} من {n} بند" },

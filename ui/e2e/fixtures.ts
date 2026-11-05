@@ -100,7 +100,7 @@ export function small(): Scene {
       stage: { en: "Tender (sample)", ar: "مناقصة - عينة" },
       submission_date: "2026-11-18",
       days_left: 13,
-      boq_value: { value: "48200000.00", currency: "EGP", deliverable_id: "pricing", revision: null, status: "checked", sample: true },
+      boq_value: { value: "48200000.00", currency: "EGP", deliverable_id: "pricing", revision: null, status: "checked", sample: true, items: 420, priced: 180 },
       open_comments: 1,
     },
     workspace: { open: "deliverable:pricing", anchor: null },

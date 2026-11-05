@@ -84,6 +84,8 @@ export type ProjectStatus = {
     /** What the total covers: the Sheet's items, of the client BOQ's items (when one was imported). */
     items?: number;
     of?: number;
+    /** How many of the Sheet's items have every number they need: the top bar says how many are left. */
+    priced?: number;
   };
   open_comments?: number;
   waiting?: number;
