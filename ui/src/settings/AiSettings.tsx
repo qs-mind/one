@@ -77,9 +77,11 @@ export function useAiSettings() {
     setLoaded((now) => (now.state === "ready" ? { state: "ready", settings: { ...now.settings, roles } } : now));
   }, []);
 
-  /** The message box's pick for the next Brief: the Lead QS's model and effort. Shown here at once; the core saves
-   * them when a message goes with them. */
+  /** The message box's pick for the next Brief: the Lead QS's model and effort. Shown here at once (`picked` is what
+   * the box sends); the core saves them when a message goes with them. Until then the core's own choice stands. */
+  const [picked, setPicked] = useState<{ lead?: Choice; effort?: Effort }>({});
   const pick = useCallback((next: { lead?: Choice; effort?: Effort }) => {
+    setPicked((now) => ({ ...now, ...next }));
     setLoaded((now) => {
       if (now.state !== "ready") return now;
       const { roles, effort } = now.settings;
@@ -89,7 +91,7 @@ export function useAiSettings() {
   }, []);
 
   const connected = loaded.state === "ready" ? anyConnected(loaded.settings.connectors) : undefined;
-  return { loaded, load, setRoles, pick, connected };
+  return { loaded, load, setRoles, pick, picked, connected };
 }
 
 export type Ai = ReturnType<typeof useAiSettings>;

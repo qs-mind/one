@@ -154,6 +154,9 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     setPanel(kind);
   }
 
+  /** The message box has no model to pick: the AI settings open, to connect one. */
+  const connectAi = (from: HTMLElement) => togglePanel("ai", from);
+
   const projectsButton = () => document.querySelector<HTMLElement>('[data-region="topbar"] [data-region-start]');
 
   /** "Waiting for you": the chat opens at the first waiting card, scrolled to it, its first button focused. The chat
@@ -256,7 +259,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               </div>
               <ChatPanel
                 {...body}
-                composer={ai.connected !== false && <CommandBar chat={chat} inPanel />}
+                composer={ai.connected !== false && <CommandBar chat={chat} ai={ai} onConnectAi={connectAi} inPanel />}
                 projectId={project.id}
                 onOpenDeliverable={openDeliverable}
                 open={chatShown}
@@ -272,6 +275,8 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               {ai.connected !== false && !chatShown && (
                 <CommandBar
                   chat={chat}
+                  ai={ai}
+                  onConnectAi={connectAi}
                   onSent={() => setChatShown(true)}
                   floating={narrow ? { start: 8, end: 8, bottom: 64 } : { start: ZOOM_SPACE, end: CHAT_BUTTON_SPACE, bottom: 16 }}
                 />
@@ -281,7 +286,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
             </main>
           ) : (
             <>
-              <GeneralChat {...body} />
+              <GeneralChat {...body} onConnectAi={connectAi} />
               {floatingPanel}
             </>
           )}

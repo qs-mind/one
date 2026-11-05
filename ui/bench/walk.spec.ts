@@ -50,3 +50,25 @@ test("plain replies in the General chat and a project, in Arabic", async ({ walk
   await expect.soft(walk.chat.getByText("عامل إيه؟"), "the project chat is kept after a reload").toBeVisible();
   await walk.shot("chat-after-reload");
 });
+
+test("the message box's model and effort reach the Lead QS, in English", async ({ walk }) => {
+  await walk.start("en");
+  const page = walk.page;
+  const box = page.getByRole("textbox", { name: walk.w.message });
+  await box.click();
+  // the card lists every bench model; the specialist one takes an effort with no known default
+  await page.getByRole("button", { name: "Model: Bench lead (fake AI). Choose another" }).click();
+  await page.getByRole("menuitemradio", { name: "Bench specialist (fake AI)" }).click();
+  await page.getByRole("button", { name: "Effort: Auto. Click for Low" }).click();
+  await page.getByRole("button", { name: "Effort: Low. Click for Medium" }).click();
+  await walk.shot("model-and-effort-picked");
+  await walk.brief("bench:chat Which model?");
+  await expect.soft(walk.chat.getByText(/Model: bench-specialist\. Effort: medium\./)).toBeVisible();
+  // remembered by the core, also after a reload
+  await page.reload();
+  await box.click();
+  await expect.soft(page.getByRole("button", { name: "Effort: Medium. Click for High" })).toBeVisible();
+  await page.getByRole("button", { name: "Model: Bench specialist (fake AI). Choose another" }).click();
+  await page.getByRole("menuitemradio", { name: "Bench checker (fake AI)" }).click();
+  await expect.soft(page.getByRole("button", { name: /^Effort:/ }), "a model with no effort shows none").toHaveCount(0);
+});

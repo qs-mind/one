@@ -26,6 +26,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models.function import AgentInfo
+from pydantic_ai.profiles import ModelProfile
 
 from qsone import copy
 from qsone.engine.types import ModelCard, ModelChoice
@@ -99,7 +100,7 @@ def read(messages: list, info: AgentInfo) -> Seen:
     scenario = found.group(1) if found and found.group(1) in SCENARIOS else "full"
     tools = {t.name for t in info.function_tools}
     model = _MODEL.search(info.instructions or "")
-    effort = (info.model_settings or {}).get("thinking")
+    effort = info.model_request_parameters.thinking  # PydanticAI moves `thinking` here
     seen = Seen(tools, brief, language(brief), scenario, done, used)
     seen.model = model.group(1) if model else ""
     seen.effort = effort if isinstance(effort, str) else None
@@ -464,6 +465,7 @@ class BenchModel(Scripted):
 
     def __init__(self, model_name: str) -> None:
         super().__init__([], model_name=model_name)
+        self._profile = ModelProfile(supports_thinking=True)  # else PydanticAI drops `thinking`
 
     async def _next(self, messages: list, info: AgentInfo) -> Step:
         self.calls += 1

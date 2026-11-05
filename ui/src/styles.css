@@ -70,6 +70,38 @@
   }
 }
 
+/* The message box's model card: it rises 4 px into place and fades in, from the chip it belongs to; it leaves
+   quicker than it came. No bounce. With reduced motion nothing in the box moves. */
+@keyframes composer-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes composer-pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+.composer-pop {
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.composer-pop[data-state="open"] {
+  animation: composer-pop-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.composer-pop[data-state="closed"] {
+  animation: composer-pop-out 120ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-composer],
+  [data-composer] *,
+  .composer-pop {
+    transition-duration: 0ms !important;
+    animation: none !important;
+  }
+}
+
 /* The sheet grid (react-data-grid, in its own cascade layer: unlayered rules win): rows divided by a quiet line
    only, no rule between columns, roomier cells, figures in tabular digits. */
 .rdg-cell {
