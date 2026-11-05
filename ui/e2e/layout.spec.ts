@@ -143,7 +143,7 @@ for (const language of ["ar", "en"] as const) {
     await page.waitForTimeout(700); // the glide
     const zoom = Number(await page.evaluate(() => /scale\(([\d.]+)\)/.exec(document.querySelector<HTMLElement>(".react-flow__viewport")!.style.transform)?.[1]));
     expect(zoom).toBeGreaterThanOrEqual(0.6); // lod.ts: from 0.6 a frame shows its live viewer
-    const strip = await box(frame(page, "deliverable:letter").locator("header"));
+    const strip = await box(frame(page, "deliverable:letter").locator("header").first());
     const pane = await box(page.locator(".react-flow"));
     expect(strip.y).toBeGreaterThanOrEqual(pane.y); // its top in view: a tall one opens at its start
     for (const cover of await covers(page)) expect(overlaps(strip, cover)).toBe(false);

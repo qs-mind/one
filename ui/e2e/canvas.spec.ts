@@ -74,11 +74,11 @@ test("a dragged frame is saved to the core and is where it was after a reload", 
   const moved = (await saved).frames.find((f) => f.key === key)!;
   expect(moved.x).toBeGreaterThan(before.x);
   expect(moved.y).toBeGreaterThan(before.y);
-  expect(await positionOf(page, key)).toEqual({ x: moved.x, y: moved.y });
+  expect(await positionOf(page, key)).toEqual({ x: expect.closeTo(moved.x, 1), y: expect.closeTo(moved.y, 1) }); // the DOM rounds
 
   await page.reload();
   await canvasReady(page);
-  expect(await positionOf(page, key)).toEqual({ x: moved.x, y: moved.y });
+  expect(await positionOf(page, key)).toEqual({ x: expect.closeTo(moved.x, 1), y: expect.closeTo(moved.y, 1) }); // the DOM rounds
   expect(core.unknown).toEqual([]);
 });
 

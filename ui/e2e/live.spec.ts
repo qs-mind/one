@@ -91,11 +91,15 @@ async function centred(page: Page, key: "deliverable:pricing" | "deliverable:let
   return Math.abs(fx - cx) < c.width / 4 && Math.abs(fy - cy) < c.height / 4;
 }
 
-test("Follow keeps the agent's frame in view; a pan by hand stops it", async ({ page }) => {
+test("Follow keeps the agent's frame in view; a zoom by hand stops it", async ({ page }) => {
   const core = await mockCore(page, quiet());
   await page.goto("/");
   await canvasReady(page);
-  await showAll(page); // every frame on screen, not only the readable first view
+  // the team frame up close, its buttons shown
+  const mod = await page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "Meta" : "Control"));
+  await page.keyboard.press(`${mod}+KeyK`);
+  await page.keyboard.type("فريق المشروع");
+  await page.keyboard.press("Enter");
   core.emit([{ type: "agent", agent: checker }]);
   await frame(page, "team:core").locator('li[data-agent="chk"]').getByRole("button", { name: /تابع/ }).click();
   const following = page.getByRole("banner").getByText("متابع مهندس المراجعة - عينة");
@@ -106,7 +110,7 @@ test("Follow keeps the agent's frame in view; a pan by hand stops it", async ({ 
   await expect.poll(() => centred(page, "deliverable:letter")).toBe(true);
 
   await page.waitForTimeout(400); // a pan within 100 ms of a follow move is the camera's own, not the engineer's
-  await page.mouse.move(900, 400);
-  await page.mouse.wheel(0, 300);
+  // a zoom by hand (the frame under the pointer may scroll its own page on a wheel, at a readable zoom)
+  await page.getByRole("toolbar", { name: "أدوات التكبير" }).getByRole("button", { name: "صغّر" }).click();
   await expect(following).toBeHidden();
 });

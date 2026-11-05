@@ -91,6 +91,8 @@ export function ApprovalCard({ id, card, lang: given }: { id: string; card: Card
   return (
     <section
       ref={box}
+      data-approval-card
+      data-answered={done || undefined}
       lang={lang}
       dir={dir(lang)}
       className={`flex min-w-0 flex-col gap-2 rounded-md border px-3 py-2 ${done ? "border-ink/10" : "border-copper"}`}
