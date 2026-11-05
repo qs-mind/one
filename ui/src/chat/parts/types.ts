@@ -16,14 +16,39 @@ export type BriefState =
 export type ProgressData = { agent: Text; text: Text };
 /** data-team, id = the message: one message between agents, for the Coordination Room. */
 export type TeamData = { sender: Text; recipient: Text; text: string };
+/** One question on a card, written by the agent in the engineer's language. */
+export type CardQuestion = { id: string; text: string; options?: string[]; free_text?: boolean };
+/** What a card shows beyond its words (Plan 5): questions to answer, and a table whose rows may be ticked. */
+export type CardPayload = {
+  questions?: CardQuestion[];
+  columns?: { key: string; label: Text }[];
+  rows?: Record<string, string>[];
+  tick?: boolean;
+};
 /** data-card, id = the card: anything the engineer must answer. */
 export type CardData = {
-  kind: "outside" | "online" | "cap" | "budget" | "fallback" | "desk" | "disagreement";
+  kind:
+    | "outside"
+    | "online"
+    | "cap"
+    | "budget"
+    | "fallback"
+    | "desk"
+    | "disagreement"
+    | "question"
+    | "keep"
+    | "rows"
+    | "cost"
+    | "connector";
   title: Text;
   detail: Text;
   options: string[];
+  payload?: CardPayload;
   status?: "pending" | "settled" | "withdrawn";
   choice?: string | null;
+  /** A settled card with a payload: the answers by question id, and the rows ticked, by index. */
+  answers?: Record<string, string>;
+  rows_ok?: number[];
 };
 /** data-cost, id = the scope. */
 export type CostData = {

@@ -7,7 +7,9 @@ engine, QS Mind Prices, an AI model or a real MCP server.
 - `FakeSearch(hits)`: a search provider that returns `hits` and records `.calls`.
 - `FakeTranscriber(text_by_page)`: reads a page image as the text given for that page.
 - `prices_transport(country_lists)`: QS Mind Prices' `GET /api/prices/sources` (Task 13).
-- `tool_ctx(rec, ...)`: a Brief in `rec` with the Lead QS's run, a `FakeHost` and a fence.
+- `fake_services(...)`: `Services` of these fakes.
+- `tool_ctx(rec, ...)`: a Brief in `rec` with the Lead QS's run, a `FakeHost`, a fence and
+  `fake_services()`.
 """
 
 import json
@@ -23,7 +25,8 @@ from qsone.engine.data_text import new_fence
 from qsone.engine.store import Store
 from qsone.engine.tools import ToolContext
 from qsone.engine.types import AgentSpec
-from tests.engine_fakes import OPUS, FakeHost
+from qsone.tools.services import Services
+from tests.engine_fakes import OPUS, FakeClock, FakeHost
 
 Route = tuple[int, Mapping[str, str], bytes | str] | BaseException
 
@@ -148,6 +151,31 @@ def prices_transport(
     return RecordingTransport(answer)
 
 
+def _no_engineer_records():
+    raise AssertionError("this test gave no Engineer Records: fake_services(engineer=…)")
+
+
+def fake_services(
+    *,
+    routes: Mapping[str, Route] | None = None,
+    names: Mapping[str, Sequence[str]] | None = None,
+    engineer=None,
+    **others,
+) -> Services:
+    """`Services` of fakes: the web answers from `routes` (`web`, so nothing leaves the
+    computer), DNS from `names` (`resolver`), the clock is `FakeClock`'s start, and
+    `engineer` gives the Engineer Records file (a test that needs one passes it). `others` set
+    the remaining services (`search`, `prices`, `transcriber`, …); unset ones are None."""
+    clock = FakeClock()
+    return Services(
+        http=httpx.AsyncClient(transport=web(routes or {}), follow_redirects=False),
+        resolve=resolver(names or {}),
+        clock=clock,
+        engineer=engineer or _no_engineer_records,
+        **others,
+    )
+
+
 def tool_ctx(
     rec,
     *,
@@ -155,12 +183,14 @@ def tool_ctx(
     answers: Mapping[str, str] | None = None,
     on_device: bool = False,
     agent: AgentSpec | None = None,
+    services: Services | None = None,
 ) -> ToolContext:
     """A new Brief in `rec` with one run of `agent` (the Lead QS by default), a `FakeHost`
-    that answers cards from `answers` (by card id or kind), and a new fence.
+    that answers cards from `answers` (by card id or kind), a new fence, and `services`
+    (default: `fake_services()`).
 
     `untrusted` marks the Brief as having read file text; `on_device` sets the project's meta
-    `on_device` to "1". Task 2 adds the `Services` of fakes."""
+    `on_device` to "1"."""
     store = Store(rec, project_id=rec.id)
     brief = store.new_brief(rec.id, "سعّر البنود - عينة")
     host = FakeHost(brief_id=brief, answers=dict(answers or {}))
@@ -172,5 +202,12 @@ def tool_ctx(
         with rec.write("engineer") as conn:
             rec.set_meta(conn, "on_device", "1")
     return ToolContext(
-        brief_id=brief, run_id=run, agent=spec, rec=rec, store=store, host=host, fence=new_fence()
+        brief_id=brief,
+        run_id=run,
+        agent=spec,
+        rec=rec,
+        store=store,
+        host=host,
+        fence=new_fence(),
+        services=services if services is not None else fake_services(),
     )

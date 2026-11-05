@@ -20,6 +20,30 @@ LEAD_WORDS, CHECKER_WORDS, SPECIALIST_WORDS = 600, 400, 300
 TRIM_TOKENS = 60_000
 _INSTRUCTIONS = Path(__file__).parent / "instructions"
 
+# Plan 5's tools by default (its decision 7), each once it is registered. Web work, price
+# proposals, the Sandbox and Connector calls go to specialists the Lead builds, which keeps the
+# Lead's context small; the Checking QS reads only, and never goes online.
+LEAD_TOOLS = (
+    "files_list",
+    "files_read",
+    "boq_preview",
+    "boq_import",
+    "ask_engineer",
+    "prices_lookup",
+    "note_lesson",
+    "connector_tools",
+)
+CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
+
+
+def _registered(names: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(name for name in names if name in REGISTRY)
+
+
+def _checker_may(name: str) -> bool:
+    tool = REGISTRY[name]
+    return tool.risk == "read" and tool.risk_for is None and "checker" in tool.roles
+
 
 def words(text: str) -> int:
     return len(text.split())
@@ -31,7 +55,7 @@ def _instructions(name: str) -> str:
 
 
 def lead_spec() -> AgentSpec:
-    """The Lead QS: the Project Records tools and every team tool."""
+    """The Lead QS: the Project Records tools, every team tool, and Plan 5's Lead tools."""
     from qsone.engine import team  # registers the team tools; team imports this module
 
     return AgentSpec(
@@ -39,23 +63,20 @@ def lead_spec() -> AgentSpec:
         name=copy.ROLE_LEAD,
         role="lead",
         instructions=_instructions("lead_qs.txt"),
-        tools=(*RECORDS_TOOLS, *team.TEAM_TOOLS),
+        tools=(*RECORDS_TOOLS, *team.TEAM_TOOLS, *_registered(LEAD_TOOLS)),
         tier="lead",
     )
 
 
 def checker_spec() -> AgentSpec:
-    """The Checking QS: read tools only. The Lead never builds it."""
+    """The Checking QS: read tools only, never online. The Lead never builds it."""
+    found = (*RECORDS_TOOLS, *_registered(CHECKER_TOOLS))
     return AgentSpec(
         id="checking-qs",
         name=copy.ROLE_CHECKER,
         role="checker",
         instructions=_instructions("checking_qs.txt"),
-        tools=tuple(
-            name
-            for name in RECORDS_TOOLS
-            if REGISTRY[name].risk == "read" and "checker" in REGISTRY[name].roles
-        ),
+        tools=tuple(name for name in found if _checker_may(name)),
         tier="checker",
     )
 

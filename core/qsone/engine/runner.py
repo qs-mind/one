@@ -64,7 +64,18 @@ from pydantic_ai.messages import (
 )
 
 from qsone import activity, copy
-from qsone.engine import agents, cards, checker, desks, general, numbers_guard, roles, team, tools
+from qsone.engine import (
+    agents,
+    cards,
+    checker,
+    desks,
+    general,
+    numbers_guard,
+    oneshot,
+    roles,
+    team,
+    tools,
+)
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.costs import CallRefused, CapReached, CostedModel, Spending
 from qsone.engine.data_text import new_fence
@@ -92,6 +103,7 @@ from qsone.engine.types import (
     Text,
     TextDelta,
     Unsourced,
+    choice_of,
 )
 from qsone.projects import Projects
 from qsone.records.project import Records, RecordsError
@@ -462,8 +474,9 @@ class _Brief:
                     self._agent(self.lead_run_id, state="working")
 
     def answer(self, card_id: str, choice: str) -> None:
+        """`choice` is the settled value: an option, or a payload card's `answer_value`."""
         card, future = self.waiting[card_id]
-        if choice not in card.options:
+        if choice_of(card, choice) not in card.options:
             raise ValueError(choice)
         try:
             self.store.settle(card_id, choice)
@@ -571,8 +584,25 @@ class _Brief:
             card=self.card(choice),
         )
 
+    def models(self, run_id: str) -> oneshot.Models:
+        """This Brief's models, for the one-shot calls of a tool in run `run_id`."""
+        return oneshot.Models(
+            sheet=tuple(self.sheet),
+            roles=dict(self.setup.roles) if self.setup is not None else {},
+            connectors=dict(self.found),
+            spending=self.engine.spending,
+            host=self,
+            brief_id=self.brief_id,
+            project_id=self.place.project_id,
+            run_id=run_id,
+            work=self.engine.data_dir / WORK,
+        )
+
     def _ctx(self, run_id: str, spec: AgentSpec) -> ToolContext:
         meaning = self.engine.meaning
+        services = self.engine.services
+        if services is not None:
+            services = oneshot.for_run(services, self.models(run_id))
         return ToolContext(
             brief_id=self.brief_id,
             run_id=run_id,
@@ -583,6 +613,7 @@ class _Brief:
             fence=new_fence(),
             embedder=meaning.embedder() if meaning is not None else None,
             reranker=meaning.reranker() if meaning is not None else None,
+            services=services,
         )
 
     def _toolset(self, spec: AgentSpec, ctx: ToolContext):
@@ -1097,6 +1128,7 @@ class Engine:
         max_agents: int = 3,
         mcp: McpGate | None = None,
         meaning: Any = None,
+        services: Any = None,
     ) -> None:
         self.projects = projects
         self.data_dir = Path(data_dir)
@@ -1105,6 +1137,7 @@ class Engine:
         self.sleep = sleep
         self.mcp = mcp or McpGate()
         self.meaning = meaning
+        self.services = services  # Plan 5's `tools.services.Services`, set by the app (Task 15)
         self.base_url: str | None = None  # the core's own address, for the MCP config
         self._brief_slots = asyncio.Semaphore(max_briefs)
         self._agent_slots = asyncio.Semaphore(max_agents)
@@ -1121,6 +1154,13 @@ class Engine:
             self._general = general.open_engineer_records(self.data_dir)
             self.book = CostBook(self._general)
             self.spending = Spending(self.book, clock=self.clock)
+
+    def engineer_records(self) -> Records:
+        """The open Engineer Records file (Plan 5's tools use it). Raises `RecordsError` when
+        it does not open."""
+        self._ready()
+        assert self._general is not None
+        return self._general
 
     def cost_book(self) -> CostBook | None:
         """The open cost book, or None before `start` or while the file is not open."""
@@ -1308,10 +1348,15 @@ class Engine:
         raise LookupError(card_id)
 
     def options(self, card_id: str) -> list[str]:
+        card = self.card(card_id)
+        return [] if card is None else list(card.options)
+
+    def card(self, card_id: str) -> Card | None:
+        """The card a running Brief waits on, or None."""
         for brief in self._briefs.values():
             if card_id in brief.waiting:
-                return list(brief.waiting[card_id][0].options)
-        return []
+                return brief.waiting[card_id][0]
+        return None
 
     def unfinished(self) -> list[dict]:
         """Every unfinished Brief that is not running now, in every project and General."""

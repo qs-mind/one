@@ -21,7 +21,7 @@ from starlette.responses import Response, StreamingResponse
 from qsone import copy, keys
 from qsone.engine import cards, connectors, costs, roles
 from qsone.engine.connectors import claude_code, standard
-from qsone.engine.types import ModelCard, ModelChoice, Role, Text
+from qsone.engine.types import BadAnswer, ModelCard, ModelChoice, Role, Text, answer_value
 
 
 class ChoiceIn(BaseModel):
@@ -230,7 +230,12 @@ class SteerIn(BaseModel):
 
 
 class CardChoiceIn(BaseModel):
+    """The engineer's answer. A card with a payload (Plan 5) also takes its answers, by
+    question id, and the rows ticked, by index."""
+
     choice: str = Field(min_length=1, max_length=200)
+    answers: dict[str, str] | None = Field(default=None, max_length=50)
+    rows_ok: list[int] | None = Field(default=None, max_length=1000)
 
 
 def briefs_router(engine: Any) -> APIRouter:
@@ -288,9 +293,15 @@ def briefs_router(engine: Any) -> APIRouter:
 
     @router.post("/cards/{card_id}")
     async def answer(card_id: str, body: CardChoiceIn) -> Response:
-        options = engine.options(card_id)
+        card = engine.card(card_id)
+        if card is None:
+            return refused(copy.CARD_GONE, 404)
+        options = list(card.options)
         try:
-            await engine.answer(card_id, body.choice)
+            value = answer_value(card, body.choice, answers=body.answers, rows_ok=body.rows_ok)
+            await engine.answer(card_id, value)
+        except BadAnswer as bad:
+            return JSONResponse({"error": copy.CARD_BAD_ANSWER, "field": bad.field}, 422)
         except ValueError:
             return JSONResponse({"error": copy.CARD_CHOICE, "options": options}, status_code=422)
         except LookupError:

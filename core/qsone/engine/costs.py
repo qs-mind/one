@@ -281,6 +281,33 @@ class Spending:
         )
         return usd
 
+    def add_fee(
+        self,
+        *,
+        brief_id: str,
+        project_id: str | None,
+        run_id: str,
+        role: Role,
+        choice: ModelChoice,
+        usd: Decimal,
+        basis: str,
+    ) -> None:
+        """Records a provider's fee beyond tokens (Anthropic's per-search fee), with its source,
+        so the caps count it like any cost."""
+        self.book.add(
+            brief_id=brief_id,
+            project_id=project_id,
+            run_id=run_id,
+            role=role,
+            choice=choice,
+            input_tokens=0,
+            output_tokens=0,
+            usd=usd,
+            equivalent=False,
+            basis=basis,
+            at=self.clock(),
+        )
+
 
 class CostedModel(WrapperModel):
     """Calls `Spending.before_request` before each request and `after_response` after it, so

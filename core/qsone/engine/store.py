@@ -25,6 +25,7 @@ from qsone.engine.types import (
     Role,
     TeamMessage,
     Text,
+    choice_of,
 )
 from qsone.records import audit
 from qsone.records.project import Records
@@ -314,7 +315,8 @@ class Store:
 
     def settle(self, card_id: str, choice: str) -> None:
         """The engineer's answer. Raises `LookupError` when no such card is pending (it was
-        settled or withdrawn) and `ValueError` when `choice` is not one of its options."""
+        settled or withdrawn) and `ValueError` when `choice` is not one of its options. A card
+        with a payload settles with `types.answer_value`'s JSON text, kept as it is."""
         at = self.rec.clock()
         with self.rec.write(ENGINEER) as c:
             row = c.execute(
@@ -322,7 +324,8 @@ class Store:
             ).fetchone()
             if row is None:
                 raise LookupError(card_id)
-            if choice not in _card(row[0]).options:
+            card = _card(row[0])
+            if choice_of(card, choice) not in card.options:
                 raise ValueError(choice)
             c.execute(
                 "UPDATE approvals SET status = 'settled', choice = ?, settled_at = ? WHERE id = ?",
@@ -336,7 +339,7 @@ class Store:
                 table="approvals",
                 row_id=card_id,
                 before={"status": "pending"},
-                after={"status": "settled", "choice": choice},
+                after={"status": "settled", "choice": choice_of(card, choice)},
             )
 
     def pending(self, brief_id: str) -> list[Card]:

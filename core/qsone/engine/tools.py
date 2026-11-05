@@ -30,7 +30,7 @@ import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, get_type_hints
+from typing import TYPE_CHECKING, Any, get_type_hints
 
 from pydantic import BaseModel, ValidationError, create_model
 from pydantic_ai import ModelRetry
@@ -40,6 +40,9 @@ from qsone.engine import data_text
 from qsone.engine.store import Store
 from qsone.engine.types import AgentSpec, Risk, TeamHost, Text
 from qsone.records.project import Records, RecordsError
+
+if TYPE_CHECKING:
+    from qsone.tools.services import Services
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +70,13 @@ class Tool:
     # validate, for a tool that words its own refusals (the Plan 3 calc tools)
     roles: frozenset[str] = ROLES  # who may be given it: "lead", "specialist", "checker"
     group: str = ""
+    risk_for: Callable[[BaseModel], Risk] | None = None  # a risk that depends on the arguments
+    # (a Connector's tool); the gate uses it in place of `risk` when set
+
+
+def risk_of(tool: Tool, args: BaseModel) -> Risk:
+    """The risk of this call: `tool.risk_for(args)` when the tool has one, else `tool.risk`."""
+    return tool.risk if tool.risk_for is None else tool.risk_for(args)
 
 
 @dataclass
@@ -83,6 +93,7 @@ class ToolContext:
     fence: str
     embedder: object | None = None
     reranker: object | None = None
+    services: "Services | None" = None  # Plan 5: the only way a tool reaches the outside world
 
 
 class Denied(Exception):

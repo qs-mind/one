@@ -811,24 +811,34 @@ class ClaudeCodeConnector:
             raise _Refused(f"the run folder: {type(error).__name__}") from None
         stream = _Stream(job, sink, usage)
         try:
+            await self._drive(argv, job.cwd, _user_line(task), stream, job.run_id)
+        finally:
+            self._remove_files(job.cwd)
+        return stream
+
+    async def _drive(
+        self, argv: list[str], cwd: Path, first: dict, stream: _Stream, key: str
+    ) -> None:
+        """Starts the process, sends `first`, and reads its lines into `stream` until it ends.
+        A refused tool, the limit or signed out ends it early (`stream.verdict`)."""
+        try:
             process = subprocess.Popen(
                 argv,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 env=_env(),
-                cwd=job.cwd,
+                cwd=cwd,
                 creationflags=_NO_WINDOW,
             )
         except OSError:
-            self._remove_files(job.cwd)
             raise _Refused("it did not start") from None
-        running = self._runs[job.run_id] = _Process(process)
+        running = self._runs[key] = _Process(process)
         lines: asyncio.Queue = asyncio.Queue()
         loop = asyncio.get_running_loop()
         threading.Thread(target=_read, args=(process, lines, loop), daemon=True).start()
         try:
-            running.send(_user_line(task))
+            running.send(first)
             verdict: Ended | None = None
             while True:
                 line = await lines.get()
@@ -855,9 +865,80 @@ class ClaudeCodeConnector:
             await asyncio.shield(asyncio.to_thread(running.halt))
             raise
         finally:
-            self._runs.pop(job.run_id, None)
-            self._remove_files(job.cwd)
-        return stream
+            self._runs.pop(key, None)
+
+    async def oneshot(
+        self,
+        content: list[dict],
+        *,
+        instructions: str,
+        model: str | None,
+        tools: tuple[str, ...],
+        cwd: Path,
+    ) -> AgentOutcome:
+        """One answer to one user message (`content`: stream-json blocks, e.g. an image), for a
+        tool (Plan 5's `oneshot`): no MCP server, Claude Code's built-in `tools` only (none, or
+        WebSearch), and nothing kept: `--no-session-persistence` must be listed, or it does not
+        run. `cwd` is its own new folder, which holds only the instructions while it runs."""
+        run_id = f"oneshot-{uuid.uuid4().hex}"
+        spec = AgentSpec(run_id, {"en": "One", "ar": "One"}, "quick", instructions, (), "quick")
+        job = AgentJob(run_id, run_id, spec, "", model, "", "", (), cwd, None)
+        failed = AgentOutcome("", None, "failed", (), None)
+        ready = await self._ready()
+        if ready is None or not has(ready[1], "--no-session-persistence"):
+            log.warning("Claude Code cannot run a one-shot call: not found, too old or keeps it")
+            return failed
+        command, help_text = ready
+        if model is not None and not _OPTION.fullmatch(model):
+            return failed
+        prompt = next(f for f in PROMPT_FLAGS if has(help_text, f))
+        argv = [
+            *command,
+            "-p",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--tools",
+            ",".join(tools),
+            "--strict-mcp-config",
+            "--mcp-config",
+            '{"mcpServers":{}}',
+            "--setting-sources",
+            "",
+            "--settings",
+            '{"disableAllHooks":true}',
+            "--permission-mode",
+            "dontAsk",
+            *(("--allowedTools", ",".join(tools)) if tools else ()),
+            "--disallowedTools",
+            ",".join(t for t in BUILT_IN.split(",") if t not in tools),
+            prompt,
+            str(cwd / INSTRUCTIONS_FILE),
+            "--no-session-persistence",
+            *(("--model", model) if model is not None else ()),
+        ]
+        usage: dict[str, tuple[int, int]] = {}
+        stream = _Stream(job, lambda event: None, usage)  # its text is never shown as progress
+        stream.allowed = set(tools)
+        try:
+            _prepare(cwd)
+            _private_file(cwd / INSTRUCTIONS_FILE, instructions)
+            first = {"type": "user", "message": {"role": "user", "content": content}}
+            await self._drive(argv, cwd, first, stream, run_id)
+        except (OSError, _Refused) as error:
+            log.warning("Claude Code one-shot call refused: %s", type(error).__name__)
+            return failed
+        finally:
+            self._remove_files(cwd)
+        return AgentOutcome(
+            text=stream.answer(),
+            session_id=None,
+            ended=stream.ended(False),
+            usage=tuple((i, n_in, n_out) for i, (n_in, n_out) in usage.items()),
+            reported_usd=stream.cost(),
+        )
 
     @staticmethod
     def _remove_files(cwd: Path) -> None:
