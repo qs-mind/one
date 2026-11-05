@@ -58,9 +58,13 @@ export function TopBar(props: TopBarProps) {
   useOpenChat(chatId);
   const other = elsewhere(useActivity(), chatId);
 
+  // in More: the word, and the keys as a hint at the line's end, not run together
   const search = (
-    <button type="button" className={button} onClick={() => props.onPalette()}>
-      {fill(t("searchKeys"), { keys })}
+    <button type="button" aria-label={fill(t("searchKeys"), { keys })} className={`${button} flex items-baseline justify-between gap-6`} onClick={() => props.onPalette()}>
+      <span>{t("searchField")}</span>
+      <kbd dir="ltr" className="font-sans text-xs text-slate">
+        {keys}
+      </kbd>
     </button>
   );
   // A field to look at, a button to use: the palette grows from it and closes back into it, and focus comes back here.
@@ -203,6 +207,7 @@ export function TopBar(props: TopBarProps) {
               <>
                 {search}
                 {projectPanels(more.current)}
+                <hr className="mx-3 my-1 border-ink/[0.06]" />
               </>
             )}
             {project && (

@@ -97,18 +97,20 @@ export function DeliverablePanel({
       ? [{ clipPath: clipTo(el.getBoundingClientRect(), origin), opacity: 0 }, { opacity: 1, offset: 0.4 }, { clipPath: WHOLE, opacity: 1 }]
       : [{ opacity: 0 }, { opacity: 1 }];
     void play(el, keyframes, DUR.long);
-    // full screen has no Close of its own (Leave full screen is its one way out): focus comes into the board, so
-    // Esc still closes it
-    if (!el.contains(document.activeElement)) el.focus({ preventScroll: true });
   }, [open, origin, board]);
+
+  // going full screen takes away the button that did it: focus moves to Close, the one way out, so Esc still works
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (panel.full && !board.current?.contains(document.activeElement)) closeButton.current?.focus();
+  }, [panel.full, board]);
 
   if (!open) return null;
   return (
     <div
       ref={board}
       data-deliverable-panel
-      tabIndex={-1}
-      className={`absolute inset-y-0 end-0 z-30 flex flex-col border-ink/10 bg-paper outline-none ${
+      className={`absolute inset-y-0 end-0 z-30 flex flex-col border-ink/10 bg-paper ${
         panel.full ? "start-0" : "w-[min(60vw,1100px)] border-s shadow-[0_2px_10px_rgb(14_15_18/0.12)] max-[899px]:w-full"
       }`}
       onKeyDown={(event) => {
@@ -119,14 +121,12 @@ export function DeliverablePanel({
         void panel.close();
       }}
     >
-      {!panel.full && (
-        <div className="flex justify-end px-3 pt-2">
-          {/* focus moves into the panel, so Esc there closes it and gives focus back to the opener */}
-          <button type="button" autoFocus className="rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink" onClick={() => void panel.close()}>
-            {t("close")}
-          </button>
-        </div>
-      )}
+      <div className="flex justify-end px-3 pt-2">
+        {/* focus moves into the panel, so Esc there closes it and gives focus back to the opener */}
+        <button ref={closeButton} type="button" autoFocus className="rounded-lg px-3 py-1.5 hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink" onClick={() => void panel.close()}>
+          {t("close")}
+        </button>
+      </div>
       <div className="min-h-0 flex-1">
         <DeliverableViewer
           key={open}
@@ -134,7 +134,8 @@ export function DeliverablePanel({
           deliverableId={open}
           mode="full"
           onSend={onSend}
-          onToggleFullScreen={panel.toggleFull}
+          // full screen has one way out, Close: no second "Leave full screen" stacked under it
+          onToggleFullScreen={panel.full ? undefined : panel.toggleFull}
           fullScreen={panel.full}
         />
       </div>

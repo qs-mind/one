@@ -102,7 +102,8 @@ export function ChatPanel({
       className={
         narrow
           ? "fixed inset-x-0 bottom-0 top-14 z-30 flex flex-col bg-paper"
-          : "absolute bottom-4 end-4 top-3 z-20 flex flex-col rounded-[16px] border border-ink/[0.08] bg-paper shadow-[0_2px_12px_rgb(14_15_18/0.08)]"
+          : // never more than a third of the window (at 1000 px the canvas keeps two thirds), never under 320 px
+            "absolute bottom-4 end-4 top-3 z-20 flex max-w-[max(320px,33.333vw)] flex-col rounded-[16px] border border-ink/[0.08] bg-paper shadow-[0_2px_12px_rgb(14_15_18/0.08)]"
       }
     >
       {!narrow && (
@@ -131,7 +132,7 @@ export function ChatPanel({
             onWidth(clamp(from.width + moved));
           }}
           onPointerUp={() => (drag.current = null)}
-          className="absolute inset-y-4 start-0 w-1.5 -translate-x-1/2 cursor-col-resize rounded-full hover:bg-ink/10 focus-visible:bg-ink/20 focus-visible:outline-none rtl:translate-x-1/2"
+          className="absolute inset-y-4 start-0 w-1.5 -translate-x-1/2 cursor-col-resize rounded-full hover:bg-ink/10 focus-visible:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink rtl:translate-x-1/2"
         />
       )}
       <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-3">

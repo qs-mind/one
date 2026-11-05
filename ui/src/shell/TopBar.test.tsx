@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { language, setLanguage, texts } from "../i18n";
 import { setCurrentProject } from "../records/project";
 import { App } from "./App";
-import { core } from "./testing";
+import { core, P1 } from "./testing";
 
 vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
 
@@ -120,5 +120,29 @@ describe("the search field", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(animate).not.toHaveBeenCalled();
     expect(field()).toHaveFocus();
+  });
+});
+
+describe("at 1000 px", () => {
+  it("More holds Search as a word with its keys as a hint, the overflow set apart from the rest", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(max-width: 1279px)",
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App />);
+    await box();
+    await user.click(within(topBar()).getByRole("button", { name: texts.more.ar }));
+    const search = await screen.findByRole("button", { name: `${texts.searchField.ar} Ctrl K` });
+    expect(search.querySelector("span")).toHaveTextContent(new RegExp(`^${texts.searchField.ar}$`));
+    expect(search.querySelector("kbd")).toHaveTextContent(/^Ctrl K$/);
+    // Search and the project's panels, then a line, then the rest of More
+    const order = [...search.parentElement!.children].map((el) => (el.tagName === "HR" ? "—" : (el.textContent ?? "")));
+    expect(order.slice(0, 4)).toEqual([`${texts.searchField.ar}Ctrl K`, texts.deliverablesButton.ar, texts.records.ar, "—"]);
+    vi.unstubAllGlobals();
   });
 });

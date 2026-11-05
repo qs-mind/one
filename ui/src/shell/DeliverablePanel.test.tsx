@@ -130,10 +130,13 @@ describe("a Deliverable opening from its card", () => {
     });
     const { user, panel } = await openFromCard();
     expect(screen.getByRole("button", { name: texts.close.ar })).toBeInTheDocument();
+    // beside the canvas it says Full screen (never Leave full screen while it is not)
+    expect(screen.queryByRole("button", { name: texts.sheetLeaveFullScreen.ar })).toBeNull();
     await user.click(screen.getByRole("button", { name: texts.sheetFullScreen.ar }));
-    // one exit: Leave full screen; no Close beside it
-    expect(screen.queryByRole("button", { name: texts.close.ar })).toBeNull();
-    const leave = screen.getByRole("button", { name: texts.sheetLeaveFullScreen.ar });
+    // one exit: Close; no Leave full screen stacked under it
+    expect(screen.queryByRole("button", { name: texts.sheetLeaveFullScreen.ar })).toBeNull();
+    expect(screen.queryByRole("button", { name: texts.sheetFullScreen.ar })).toBeNull();
+    const leave = screen.getByRole("button", { name: texts.close.ar });
     const tab = screen.getByRole("tab", { name: new RegExp(`^${texts.reviewComments.ar}`) });
     expect(tab.textContent).toBe(`${texts.reviewComments.ar} 1`);
     expect(tab.querySelector("[data-count]")).toHaveTextContent(/^1$/);
