@@ -10,6 +10,8 @@ import { Segmented } from "../../ui/Segmented";
 /** Page images come in two widths: enough for the file on screen, never more (decision 13). */
 export const SMALL = 600;
 export const LARGE = 1400;
+/** How long the file's room must stay the same before its width is measured again, in ms. */
+const RESIZE_SETTLE_MS = 150;
 
 function where(locator: FilePiece["locator"]): string | undefined {
   const { page, sheet, row, line } = locator;
@@ -58,8 +60,21 @@ export function useFilePage(sources: ProjectSources, fileId: string, asked?: num
 
 type Image = { url: string } | "failed" | null;
 
-/** The file's live body: the page buttons and the image, or the text ONE read. */
-export function FilePages({ sources, fileId, state, width }: { sources: ProjectSources; fileId: string; state: FilePage; width: number }) {
+/** The file's live body: the page buttons and the image, or the text ONE read. `inFrame`: on the canvas, where the
+ * switch must not drag the frame. */
+export function FilePages({
+  sources,
+  fileId,
+  state,
+  width,
+  inFrame = false,
+}: {
+  sources: ProjectSources;
+  fileId: string;
+  state: FilePage;
+  width: number;
+  inFrame?: boolean;
+}) {
   useLanguage();
   const { pages, page, setPage, mode, setMode, pageOf } = state;
   const [image, setImage] = useState<Image>(null);
@@ -115,7 +130,7 @@ export function FilePages({ sources, fileId, state, width }: { sources: ProjectS
             ]}
             value={mode}
             onChange={setMode}
-            className="nodrag ms-auto"
+            className={inFrame ? "nodrag ms-auto" : "ms-auto"}
           />
         </div>
       )}
@@ -162,9 +177,23 @@ export function FileDoc({ sources, fileId, page }: { sources: ProjectSources; fi
   const state = useFilePage(sources, fileId, page);
   const root = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(SMALL);
+  // measured again when the room changes (the chat folds, the window resizes), settled for 150 ms before a reload
   useLayoutEffect(() => {
-    const shown = (root.current?.clientWidth ?? 0) * (globalThis.devicePixelRatio || 1);
-    setWidth(shown > SMALL ? LARGE : SMALL);
+    const el = root.current;
+    if (!el) return;
+    const measure = () => setWidth(el.clientWidth * (globalThis.devicePixelRatio || 1) > SMALL ? LARGE : SMALL);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const sizes = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(measure, RESIZE_SETTLE_MS);
+    });
+    sizes.observe(el);
+    return () => {
+      clearTimeout(timer);
+      sizes.disconnect();
+    };
   }, []);
   return (
     <div ref={root} dir={dir()} className="h-full overflow-auto bg-paper text-ink">

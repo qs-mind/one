@@ -34,7 +34,7 @@ function FileFrameView(props: NodeProps<Node<FileData, "file">>) {
           {pageOf && <span className="text-slate">{pageOf}</span>}
         </div>
       ) : (
-        <FilePages sources={sources} fileId={file.id} state={state} width={width} />
+        <FilePages sources={sources} fileId={file.id} state={state} width={width} inFrame />
       )}
     </Frame>
   );

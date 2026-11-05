@@ -259,7 +259,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
   return (
     <section
       aria-labelledby={asDocument ? undefined : title}
-      aria-label={asDocument ? t("records") : undefined}
+      aria-label={asDocument ? t("projectFiles") : undefined}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault(); // the window must not open the file itself

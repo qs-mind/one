@@ -192,9 +192,10 @@ export function DocumentViewer(props: DocumentViewerProps) {
         <h2 dir="auto" className={props.mode === "full" ? "text-lg font-semibold" : "sr-only"}>
           {view.title}
         </h2>
-        <StatusChips view={view} status={props.mode !== "frame"} />
+        {/* in the workspace, its head line already says the status and the Revision */}
+        <StatusChips view={view} status={props.mode !== "frame" && props.mode !== "workspace"} />
         <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
-        {view.revision && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
+        {view.revision && props.mode !== "workspace" && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
         {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
         {props.onToggleFullScreen && (
           <button

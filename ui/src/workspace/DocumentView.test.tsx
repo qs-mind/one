@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { createRef, type Ref } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { columns, core, D, entry, json, sheet, viewRoutes } from "../deliverables/fixtures";
+import { columns, core, D, DOC, entry, json, letter, sheet, viewRoutes } from "../deliverables/fixtures";
 import { fill, setLanguage, texts } from "../i18n";
 import { fakeSources, type FakeOptions } from "../project/fake";
 import type { Opened, ViewerHandle } from "../project/types";
@@ -51,6 +51,52 @@ describe("DocumentView", () => {
     await waitFor(() => expect(ref.current!.locate({ row: "p3", column: "rate" })).toBeInstanceOf(DOMRect));
   });
 
+  it("the workspace's head line says the status and the Revision: the viewer does not say them again", async () => {
+    const revision = { no: 2, version: 3, signed_off: false };
+    core({ ...viewRoutes(sheet({ revision })), ...viewRoutes(letter({ revision })) });
+    const sources = fakeSources({ deliverables: [entry({ revision: 2 }), entry({ id: DOC, kind: "document", revision: 2 })] });
+    const { rerender } = render(<DocumentView projectId="p1" sources={sources} opened={{ key: `deliverable:${D}`, anchor: null }} />);
+    await screen.findByText("03/02");
+    const header = () => screen.getByRole("heading", { level: 2, hidden: true }).closest("header")!;
+    expect(header()).toHaveTextContent(fill(texts.reviewVersion.ar, { n: 3 })); // the version stays
+    expect(header()).not.toHaveTextContent(texts.statusDraft.ar);
+    expect(header()).not.toHaveTextContent(fill(texts.reviewRev.ar, { n: 2 }));
+    rerender(<DocumentView projectId="p1" sources={sources} opened={{ key: `deliverable:${DOC}`, anchor: null }} />);
+    await screen.findByRole("heading", { name: letter().title });
+    expect(header()).toHaveTextContent(fill(texts.reviewVersion.ar, { n: letter().version }));
+    expect(header()).not.toHaveTextContent(texts.statusDraft.ar);
+    expect(header()).not.toHaveTextContent(fill(texts.reviewRev.ar, { n: 2 }));
+  });
+
+  it("a file loads the wider page image when its room grows", async () => {
+    const observers = new Set<() => void>(); // the page switch watches its own size too
+    const resized = () => observers.forEach((callback) => callback());
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private callback: () => void) {}
+        observe() {
+          observers.add(this.callback);
+        }
+        unobserve() {}
+        disconnect() {
+          observers.delete(this.callback);
+        }
+      },
+    );
+    let width = 400;
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => width);
+    vi.stubGlobal("devicePixelRatio", 1);
+    const sources = show({ key: "file:f1", anchor: null }, { pages: { f1: 2 } });
+    const image = vi.spyOn(sources, "pageImage");
+    expect(await screen.findByRole("img")).toHaveAttribute("src", "data:image/png;fake,f1/1/600");
+    width = 1000; // the chat folded
+    resized();
+    await waitFor(() => expect(screen.getByRole("img")).toHaveAttribute("src", "data:image/png;fake,f1/1/1400"));
+    expect(image).toHaveBeenLastCalledWith("f1", 1, 1400);
+    vi.unstubAllGlobals();
+  });
+
   it("a file opens at the anchor's page, with its page buttons", async () => {
     const ref = createRef<ViewerHandle>();
     const sources = show({ key: "file:f1", anchor: { page: 3 } }, { pages: { f1: 18 } }, ref);
@@ -87,6 +133,8 @@ describe("DocumentView", () => {
     setCurrentProject({ id: "p1", name: "مدرسة - عينة", created_at: "2026-11-04T08:00:00.000000+00:00" });
     const open = vi.spyOn(workspaceApi, "open").mockImplementation(() => {});
     show({ key: "files:all", anchor: null });
+    // named as the switcher names it
+    expect(await screen.findByRole("region", { name: texts.projectFiles.ar })).toBeInTheDocument();
     const spec = await screen.findByRole("button", { name: new RegExp(files[0]!.name) });
     expect(screen.getByRole("button", { name: new RegExp(files[1]!.name) })).toBeInTheDocument();
     // the document has no panel chrome: no Close
