@@ -1728,6 +1728,28 @@ CONNECTOR_TOOL_UNKNOWN = {
     "en": "This Connector has no tool by that name; connector_tools lists them.",
     "ar": "الموصّل ده مفيهوش أداة بالاسم ده؛ connector_tools بيعرضهم.",
 }
+CONNECTOR_RUNS = {
+    "en": "It runs on this computer: {command}",
+    "ar": "بيشتغل على الجهاز ده: {command}",
+}
+CONNECTOR_REACHES = {
+    "en": "It reaches a server over the internet: {url}",
+    "ar": "بيوصل لسيرفر على النت: {url}",
+}
+CONNECTOR_NAME_TAKEN = {
+    "en": "A Connector with this name is already added. Choose another name.",
+    "ar": "في موصّل بالاسم ده متضاف قبل كده. اختار اسم تاني.",
+}
+CONNECTOR_BAD = {
+    "en": "Give the Connector a name of 2 to 40 small letters, digits or dashes, and either "
+    "the command that runs it or its https:// address.",
+    "ar": "سمّي الموصّل باسم من 2 لـ 40 حرف إنجليزي صغير أو رقم أو شرطة، واكتب يا الأمر اللي "
+    "بيشغّله يا عنوانه اللي بيبدأ بـ https://.",
+}
+CONNECTOR_CARD_GONE = {
+    "en": "This Connector card is no longer waiting. Add the Connector again.",
+    "ar": "كارت الموصّل ده مبقاش مستني. ضيف الموصّل تاني.",
+}
 
 CARD_BAD_ANSWER = {
     "en": "Answer every question: choose an option or write a reply.",

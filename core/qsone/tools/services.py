@@ -100,4 +100,5 @@ def services_for(app_state: Any) -> Services:
         clock=utc_now,
         engineer=app_state.engine.engineer_records,
         sandbox=SandboxRunner(runtime.folder(base), install=partial(runtime.ensure, base)),
+        connectors=getattr(app_state, "connectors", None),
     )
