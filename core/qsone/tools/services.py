@@ -93,4 +93,5 @@ def services_for(app_state: Any) -> Services:
         resolve=resolve,
         clock=utc_now,
         engineer=app_state.engine.engineer_records,
+        connectors=getattr(app_state, "connectors", None),
     )

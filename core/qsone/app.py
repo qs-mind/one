@@ -16,6 +16,8 @@ from starlette.responses import Response
 
 from qsone import activity, chat, copy, keys, models, projects, settings
 from qsone.calc import routes as calc_routes
+from qsone.connectors import routes as connector_routes
+from qsone.connectors.hub import ConnectorHub
 from qsone.deliverables import api as deliverables_api
 from qsone.deliverables import events as deliverable_events
 from qsone.engine import connectors as engine_connectors
@@ -84,6 +86,7 @@ def create_app(
     registry = projects.Projects(folder)
     service = meaning(registry) if meaning else Meaning(registry, Path(folder) / "models")
     mcp = mcp_server.McpGate()
+    connector_hub = ConnectorHub()  # the engineer's MCP Connectors (Plan 5)
     engine = Engine(
         projects=registry,
         data_dir=Path(folder),
@@ -101,12 +104,14 @@ def create_app(
             lambda project_id, event: loop.call_soon_threadsafe(activity.publish, project_id, event)
         )
         service.start()
+        connector_hub.start()  # a Connector's server starts only when first used
         await engine.start()  # never continues a Brief by itself
         try:
             async with mcp.running():
                 yield
                 await engine.shutdown()  # each Brief keeps its Checkpoint
         finally:
+            await connector_hub.close()  # stdio servers stop with the core
             stop_listening()
         service.stop()
         registry.close_all()
@@ -122,6 +127,7 @@ def create_app(
     app.state.meaning = service
     app.state.mcp = mcp
     app.state.engine = engine
+    app.state.connectors = connector_hub
     app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
@@ -129,6 +135,7 @@ def create_app(
     app.include_router(deliverables_api.router(registry))
     app.include_router(engine_routes.settings_router(ai_http))
     app.include_router(engine_routes.briefs_router(engine))
+    app.include_router(connector_routes.router(connector_hub))
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):
@@ -172,7 +179,10 @@ def create_app(
         own_key = keys.get_key(web_search.KEY_USER) is not None
         native = keys.get_key("anthropic") is not None or bool(claude_code.saved()["on"])
         setting = settings.load().get("search_provider")
-        provider = web_search.provider_name(setting=setting, own_key=own_key, native=native)
+        connector = connector_hub.search_provider() is not None
+        provider = web_search.provider_name(
+            setting=setting, own_key=own_key, native=native, connector=connector
+        )
         return {"provider": provider, "own_key": own_key}
 
     @app.put("/settings/search-key")
