@@ -1,46 +1,29 @@
-"""POST /chat: the Lead QS, served the official PydanticAI way (AI SDK UI message stream)."""
+"""POST /chat: the engineer's message becomes a Brief of the Brief Runner, streamed as the AI SDK
+UI message stream. The Brief runs on without the request: a dropped stream reattaches with
+GET /chat/{id}/stream."""
 
 import json
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
+from uuid import uuid4
 
 import pydantic_ai
-from pydantic_ai import Agent
-from pydantic_ai.exceptions import (
-    ModelAuthenticationError,
-    ModelConnectionError,
-    ModelRateLimitError,
-    ModelRequestTimeout,
-    ModelUnavailableError,
-)
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.models.function import AgentInfo, FunctionModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
-from pydantic_ai.ui.vercel_ai import VercelAIAdapter, VercelAIEventStream
-from pydantic_ai.ui.vercel_ai.response_types import BaseChunk
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response, StreamingResponse
 
 from qsone import copy, keys
 from qsone.engine import roles
+from qsone.engine.runner import BriefBusy, Engine, NoAI, reply_id
+from qsone.engine.stream import HEADERS, ui_stream
+from qsone.engine.types import TextDelta
 
 # The default; the engineer picks another from the header (PUT /settings/model).
 LEAD_MODEL = roles.LEAD_MODEL
 
-LEAD_INSTRUCTIONS = (
-    "You are the Lead QS in QS Mind One: a senior quantity surveyor for construction cost work "
-    "in Egypt and the Gulf (BOQs, estimates, tenders, procurement). Reply in the engineer's "
-    "language; in Arabic, use plain Egyptian-friendly Arabic. Be short and plain. You cannot yet "
-    "open files, look up prices, calculate or use tools: when asked, say so plainly. Never "
-    "invent a number; every number needs a source."
-)
-
-ModelFactory = Callable[[], Model | None]
-
 pydantic_ai.BANNER_ENABLED = False  # keep core.log to our own lines
-
-lead_agent = Agent(name="lead-qs", instructions=LEAD_INSTRUCTIONS)
 
 log = logging.getLogger("qsone.chat")
 
@@ -51,12 +34,6 @@ def lead_model_id() -> str:
     return lead.model if lead is not None and lead.connector == "anthropic" else LEAD_MODEL
 
 
-@lead_agent.instructions
-def _model_in_use() -> str:
-    """Read at each request, so the Lead QS can say which model the engineer chose."""
-    return f"You run on the model {lead_model_id()}; say so when asked which model you are."
-
-
 def default_model() -> Model | None:
     """The Lead QS model with the engineer's own key, or None when no key is saved."""
     key = keys.get_key("anthropic")
@@ -65,42 +42,43 @@ def default_model() -> Model | None:
     return AnthropicModel(lead_model_id(), provider=AnthropicProvider(api_key=key))
 
 
-async def _say_no_key(messages, info: AgentInfo):
-    yield f"{copy.NO_KEY['ar']}\n\n{copy.NO_KEY['en']}"
+def stream(events: AsyncIterator, message_id: str) -> StreamingResponse:
+    return StreamingResponse(
+        ui_stream(events, message_id=message_id), media_type="text/event-stream", headers=HEADERS
+    )
 
 
-def plain_error(error: Exception) -> dict[str, str]:
-    """The {en, ar} text the engineer sees for a model error."""
-    if isinstance(error, ModelAuthenticationError):
-        return copy.KEY_REFUSED
-    if isinstance(error, ModelConnectionError | ModelRequestTimeout):
-        return copy.NO_CONNECTION
-    if isinstance(error, ModelRateLimitError | ModelUnavailableError):
-        return copy.CLAUDE_BUSY
-    return copy.MODEL_FAILED
+async def _say(text: dict[str, str]) -> AsyncIterator:
+    yield TextDelta("", f"{text['ar']}\n\n{text['en']}")
 
 
-class _PlainErrorStream(VercelAIEventStream):
-    async def on_error(self, error: Exception) -> AsyncIterator[BaseChunk]:
-        # The provider's own words go to core.log; the stream carries a plain {en, ar} pair as JSON.
-        log.warning("The model failed: %s", error, exc_info=error)
-        plain = Exception(json.dumps(plain_error(error), ensure_ascii=False))
-        async for chunk in super().on_error(plain):
-            yield chunk
+def _last_text(body: dict) -> str:
+    messages = body.get("messages") or []
+    for message in reversed(messages if isinstance(messages, list) else []):
+        if isinstance(message, dict) and message.get("role") == "user":
+            parts = message.get("parts") or []
+            return "".join(
+                p.get("text", "") for p in parts if isinstance(p, dict) and p.get("type") == "text"
+            ).strip()
+    return ""
 
 
-class _Adapter(VercelAIAdapter):
-    def build_event_stream(self) -> _PlainErrorStream:
-        return _PlainErrorStream(
-            self.run_input,
-            accept=self.accept,
-            sdk_version=self.sdk_version,
-            server_message_id=self.server_message_id,
-            manage_system_prompt=self.manage_system_prompt,
-        )
-
-
-async def respond(request: Request, model_factory: ModelFactory) -> Response:
-    # Without a key, answer in plain words through the same stream, so the screen shows a reply.
-    model = model_factory() or FunctionModel(stream_function=_say_no_key)
-    return await _Adapter.dispatch_request(request, agent=lead_agent, model=model, sdk_version=6)
+async def respond(request: Request, engine: Engine) -> Response:
+    """The AI SDK body `{id: chat id, messages}`: only the last user message is used. The chat
+    id is a project id or "general". 409 with `{"brief_id"}` while the chat has a Brief."""
+    try:
+        body = json.loads(await request.body())
+    except ValueError:
+        body = None
+    text = _last_text(body) if isinstance(body, dict) else ""
+    chat_id = body.get("id") if isinstance(body, dict) else None
+    if not text or not isinstance(chat_id, str):
+        return JSONResponse({"error": copy.CHAT_EMPTY}, status_code=422)
+    try:
+        brief_id = await engine.start_brief(chat_id, text)
+    except BriefBusy as busy:
+        return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
+    except NoAI as none:
+        # No Brief: the plain reply comes through the same stream, so the screen shows it.
+        return stream(_say(none.text), uuid4().hex)
+    return stream(engine.events(brief_id), reply_id(brief_id))

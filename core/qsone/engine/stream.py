@@ -1,0 +1,161 @@
+"""A Brief's events as the AI SDK UI message stream (sdk_version 6, `ai` 6.0.x), and as the parts
+of a stored UI message.
+
+The Lead's words are one text part. One's own events are `data-*` parts with a stable id, so the
+screen updates each in place: `data-progress` (id: the agent run), `data-team` (the message),
+`data-card` (the card; status pending, settled with the choice, or withdrawn), `data-cost` (the
+scope), `data-review` (the Deliverable), `data-unsourced` (the Brief), `data-status` (the Brief),
+and any `Data` event as `data-<name>`. A failed Brief also ends with an `error` chunk whose text
+is its plain {en, ar} words as JSON, as the screen reads it.
+
+No PydanticAI here: the chunks are written as the protocol defines them."""
+
+import json
+from collections.abc import AsyncIterator, Iterable
+
+from qsone.engine.types import (
+    Asked,
+    CostNotice,
+    Data,
+    Event,
+    Progress,
+    Reviewed,
+    Settled,
+    Status,
+    TeamMessage,
+    TextDelta,
+    Unsourced,
+)
+
+HEADERS = {"x-vercel-ai-ui-message-stream": "v1", "cache-control": "no-cache"}
+
+
+def _card(card) -> dict:
+    return {
+        "kind": card.kind,
+        "title": card.title,
+        "detail": card.detail,
+        "options": list(card.options),
+    }
+
+
+class _Parts:
+    """Turns events into data parts; remembers each card, so a settled one is sent whole."""
+
+    def __init__(self) -> None:
+        self.cards: dict[str, dict] = {}
+
+    def data(self, event: Event) -> tuple[str, str, dict] | None:
+        """(part type, id, data) for a data event; None for text."""
+        if isinstance(event, Progress):
+            return "data-progress", event.run_id, {"agent": event.agent, "text": event.text}
+        if isinstance(event, TeamMessage):
+            data = {"sender": event.sender, "recipient": event.recipient, "text": event.text}
+            return "data-team", event.id, data
+        if isinstance(event, Asked):
+            self.cards[event.card.id] = _card(event.card)
+            return "data-card", event.card.id, self.cards[event.card.id] | {"status": "pending"}
+        if isinstance(event, Settled):
+            card = self.cards.get(event.card_id, {})
+            data = card | {"status": "settled", "choice": event.choice}
+            return "data-card", event.card_id, data
+        if isinstance(event, CostNotice):
+            data = {
+                "level": event.level,
+                "scope": event.scope,
+                "spent": event.spent,
+                "cap": event.cap,
+                "equivalent": event.equivalent,
+                "text": event.text,
+            }
+            return "data-cost", event.scope, data
+        if isinstance(event, Reviewed):
+            review = event.review
+            data = {
+                "code": review.code,
+                "comments": [dict(c) for c in review.comments],
+                "same_provider": review.same_provider,
+                "round": review.round,
+            }
+            return "data-review", event.deliverable_id, data
+        if isinstance(event, Unsourced):
+            return "data-unsourced", event.brief_id, {"values": list(event.values)}
+        if isinstance(event, Status):
+            return "data-status", event.brief_id, {"state": event.state, "step": event.step}
+        if isinstance(event, Data):
+            if event.name == "card" and event.id in self.cards:  # e.g. withdrawn
+                return "data-card", event.id, self.cards[event.id] | event.data
+            return f"data-{event.name}", event.id, event.data
+        return None
+
+
+def _sse(chunk: dict | str) -> str:
+    body = (
+        chunk
+        if isinstance(chunk, str)
+        else json.dumps(chunk, ensure_ascii=False, separators=(",", ":"))
+    )
+    return f"data: {body}\n\n"
+
+
+def text_id(message_id: str) -> str:
+    return f"{message_id}-text"
+
+
+async def ui_stream(events: AsyncIterator[Event], *, message_id: str) -> AsyncIterator[str]:
+    """SSE lines, from `start` (with `message_id`, the stored id of the Brief's reply) to
+    `data: [DONE]`. Ends when `events` ends."""
+    parts = _Parts()
+    yield _sse({"type": "start", "messageId": message_id})
+    yield _sse({"type": "start-step"})
+    text_open = False
+    failed: dict | None = None
+    async for event in events:
+        if isinstance(event, TextDelta):
+            if not text_open:
+                text_open = True
+                yield _sse({"type": "text-start", "id": text_id(message_id)})
+            yield _sse({"type": "text-delta", "id": text_id(message_id), "delta": event.text})
+            continue
+        found = parts.data(event)
+        if found is None:
+            continue
+        kind, part_id, data = found
+        yield _sse({"type": kind, "id": part_id, "data": data})
+        if isinstance(event, Status) and event.state == "failed":
+            failed = event.step
+    if text_open:
+        yield _sse({"type": "text-end", "id": text_id(message_id)})
+    if failed is not None:
+        yield _sse({"type": "error", "errorText": json.dumps(failed, ensure_ascii=False)})
+    yield _sse({"type": "finish-step"})
+    yield _sse({"type": "finish"})
+    yield _sse("[DONE]")
+
+
+def message_parts(events: Iterable[Event], *, with_status: bool = True) -> list[dict]:
+    """The parts of the UI message that `events` stream: one text part, then each data part
+    once, at its first place, with its latest data. `with_status=False` leaves out the Brief's
+    status, for a Brief that waits for Continue (the screen must not steer it)."""
+    parts = _Parts()
+    found: list[dict] = []
+    index: dict[tuple[str, str], int] = {}
+    text: list[str] = []
+    for event in events:
+        if isinstance(event, TextDelta):
+            text.append(event.text)
+            continue
+        data = parts.data(event)
+        if data is None:
+            continue
+        kind, part_id, value = data
+        if kind == "data-status" and not with_status:
+            continue
+        key = (kind, part_id)
+        if key in index:
+            found[index[key]]["data"] = value
+        else:
+            index[key] = len(found)
+            found.append({"type": kind, "id": part_id, "data": value})
+    head = [{"type": "text", "text": "".join(text), "state": "done"}] if text else []
+    return head + found

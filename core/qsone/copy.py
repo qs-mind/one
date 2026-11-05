@@ -215,8 +215,8 @@ MODEL_NOT_SAVED = {
 # Money is shown in USD with 2 decimals and Western digits.
 # ---------------------------------------------------------------------------------------------
 
-# "AI" / «الذكاء الاصطناعي» is the header button that opens AI settings (Task 9 of Plan 4 adds
-# it to ui/src/i18n.ts). Until then the reply without a key stays NO_KEY.
+# "AI" / «الذكاء الاصطناعي» is the header button that opens AI settings (`ai` in ui/src/i18n.ts):
+# the reply when no AI is connected at all.
 NO_AI = {
     "en": (
         "No AI is connected yet. Press “AI” at the top and add a Claude key, another AI "
@@ -572,6 +572,62 @@ ROLE_CHECKER = {"en": "Checking QS", "ar": "مهندس المراجعة"}
 ROLE_SPECIALIST = {"en": "Specialists", "ar": "المهندسين المتخصصين"}
 
 ROLE_QUICK = {"en": "Quick answers", "ar": "الإجابات السريعة"}
+
+# The Brief Runner (Plan 4, Task 8): the step a Brief is at, shown in "Continue Brief?".
+STEP_QUEUED = {
+    "en": "waiting for another Brief to finish",
+    "ar": "مستني تكليف تاني يخلص",
+}
+
+STEP_STARTED = {"en": "the Lead QS started", "ar": "كبير مهندسي الكميات بدأ"}
+
+STEP_WAITING = {"en": "waiting for your answer: {title}", "ar": "مستني ردّك: {title}"}
+
+STEP_CHECKING = {
+    "en": "the Checking QS is checking the work",
+    "ar": "مهندس المراجعة بيراجع الشغل",
+}
+
+STEP_DONE = {"en": "done", "ar": "خلص"}
+
+DESK_TEMPORARY = {"en": "Temporary Desk", "ar": "قسم مؤقت"}
+
+CONTINUE_AFTER_RESTART = "One restarted. Continue from your last step."  # the model reads it
+
+REPORT_NOW = (  # the model reads it: the last request after the engineer chose "stop with a report"
+    "The Spending Cap stops the work now. Without calling any tool, reply with a short report: "
+    "what is done, with its sources, and what is left."
+)
+
+BRIEF_BUSY = {
+    "en": "This chat already has a Brief running. Your message steers it.",
+    "ar": "في تكليف شغال في الشات ده. رسالتك هتوجّهه.",
+}
+
+BRIEF_NOT_RUNNING = {
+    "en": "This Brief is not running now.",
+    "ar": "التكليف ده مش شغال دلوقتي.",
+}
+
+BRIEF_NOT_FOUND = {
+    "en": "This Brief is not on this computer, or it is already finished.",
+    "ar": "التكليف ده مش على الجهاز ده، أو خلص خلاص.",
+}
+
+CHAT_EMPTY = {
+    "en": "The message is empty. Write what you need, then send it.",
+    "ar": "الرسالة فاضية. اكتب اللي محتاجه وابعتها.",
+}
+
+CARD_GONE = {
+    "en": "This question was already answered or withdrawn.",
+    "ar": "السؤال ده اتجاوب عليه أو اتسحب.",
+}
+
+CARD_CHOICE = {
+    "en": "That is not one of this card's choices.",
+    "ar": "ده مش من اختيارات الكارت ده.",
+}
 
 
 # ---------------------------------------------------------------------------------------------
