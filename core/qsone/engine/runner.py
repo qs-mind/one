@@ -146,6 +146,16 @@ _NO_SEARCH_SAID = re.compile(
 )
 
 
+def _descriptions(rec: Records) -> list[str]:
+    """The project's item descriptions, as its records have them."""
+    with rec.read() as c:
+        rows = c.execute(
+            "SELECT json_extract(fields, '$.description') FROM items"
+            " WHERE json_extract(fields, '$.description') IS NOT NULL"
+        ).fetchall()
+    return [str(d) for (d,) in rows]
+
+
 def _no_search_notice(brief_id: str) -> Data:
     """The notice the web tools give when no search is set up, with its fix (audit B8)."""
     data = {"text": copy.WEB_NO_SEARCH, "fix": "search"}
@@ -1333,6 +1343,9 @@ class _Brief:
         if isinstance(output, str):
             results = self.results()
             marked = numbers_guard.unsourced(output, numbers_guard.known_values(results))
+            if marked and self.place.rec is not None:  # a size in an item's own words is no price
+                found = await asyncio.to_thread(_descriptions, self.place.rec)
+                marked = numbers_guard.described(output, marked, found)
             if marked:
                 self.emit(Unsourced(self.brief_id, tuple(marked)))
             named = numbers_guard.sourced(output, results)

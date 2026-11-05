@@ -266,6 +266,22 @@ async def test_a_letter_takes_its_date_and_terms_from_the_files(ctx):
     assert json.loads(await call("deliverable_create", right, ctx))["version"] == 1
 
 
+# The numbers guard: a size in an item's own words is not a price -----------------------------
+
+
+def test_a_size_from_an_items_description_is_not_marked():
+    from qsone.engine import numbers_guard as guard
+
+    reply = "بند مباني طوب 25 سم لسه مالوش فئة، والطوب بـ 25 جنيه في السوق."
+    marked = guard.unsourced(reply, set())
+    assert marked == ["25"]
+    items = ["مباني طوب أسمنتي مصمت 25 سم بالمونة - عينة"]
+    assert guard.described(reply, marked, items) == ["25"]  # «25 جنيه» is still a price
+    only_size = "بند مباني طوب 25 سم لسه مالوش فئة."
+    assert guard.described(only_size, guard.unsourced(only_size, set()), items) == []
+    assert guard.numbers_in("مدة صلاحية العرض 60 يوماً") == ["60"]
+
+
 # The Checking QS under ONE's own checks -------------------------------------------------------
 
 
