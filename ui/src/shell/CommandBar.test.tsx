@@ -12,6 +12,8 @@ import { bodyOf, calls, core, P1, reply, running, streamed } from "./testing";
 vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
+/** Matches the element whose whole text is `text` (the name inside it is its own <bdi>). */
+const whole = (text: string) => (_: string, el: Element | null) => el?.textContent === text && el.tagName === "SPAN";
 const pricing = { kind: "deliverable" as const, id: "d1", title: "تسعير المقايسة - عينة", label: "البنود 3/01–3/04" };
 
 beforeEach(() => {
@@ -29,7 +31,7 @@ describe("CommandBar", () => {
     act(() => select([pricing]));
     const bar = screen.getByRole("region", { name: texts.commandBar.ar });
     const chip = fill(texts.selected.ar, { name: "تسعير المقايسة - عينة، البنود 3/01–3/04" });
-    expect(within(bar).getByText(chip)).toBeInTheDocument();
+    expect(within(bar).getByText(whole(chip))).toBeInTheDocument();
     expect(await box()).toHaveAttribute("placeholder", texts.commandBox.ar);
 
     await user.type(await box(), "سعّرها{enter}");
@@ -43,7 +45,7 @@ describe("CommandBar", () => {
     expect(body.selection).toEqual([pricing]);
     expect(body.messages[0]!.metadata?.selection).toEqual([pricing]);
     const bubble = (await screen.findByText("سعّرها")).closest("li")!;
-    expect(within(bubble).getByText(chip)).toBeInTheDocument();
+    expect(within(bubble).getByText(whole(chip))).toBeInTheDocument();
   });
 
   it("several frames selected say how many, and ✕ clears the selection", async () => {

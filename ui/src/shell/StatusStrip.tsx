@@ -48,7 +48,7 @@ export function StatusStrip({
   const boq = status.boq_value;
 
   return (
-    <div className={`flex min-w-0 gap-2 text-slate ${stacked ? "flex-col items-start" : "items-center"}`}>
+    <div className={`flex min-w-0 gap-2 overflow-hidden text-slate ${stacked ? "flex-col items-start" : "items-center"}`}>
       {status.stage && <span className={`${chip} bg-stone text-ink`}>{pick(status.stage)}</span>}
       {status.submission_date && (
         <span className={chip}>

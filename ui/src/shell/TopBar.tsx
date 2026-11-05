@@ -136,10 +136,10 @@ export function TopBar(props: TopBarProps) {
         </Popover>
       )}
       {props.sample && (
-        <span className="whitespace-nowrap rounded-md border border-copper px-2 py-0.5 text-copper">{t("sampleData")}</span>
+        <span className="shrink-0 whitespace-nowrap rounded-md border border-copper px-2 py-0.5 text-copper">{t("sampleData")}</span>
       )}
 
-      <div className="ms-auto flex items-center gap-1">
+      <div className="ms-auto flex shrink-0 items-center gap-1">
         {project && props.waiting > 0 && (
           <button type="button" className={`${button} text-copper`} onClick={props.onWaiting}>
             {fill(t("waitingForYou"), { n: props.waiting })}

@@ -28,12 +28,20 @@ function errorLine(error: Error): string {
   return t("chatError");
 }
 
-/** "Selected: BOQ pricing, rows 3/01–3/04", or "3 selected". */
-export function selectionLabel(items: readonly SelectionItem[]): string {
-  if (items.length !== 1) return fill(t("selectedMany"), { n: items.length });
+/** "Selected: BOQ pricing, rows 3/01–3/04", or "3 selected". The name keeps its own direction (an Arabic title on
+ * an English page). */
+export function SelectionText({ items }: { items: readonly SelectionItem[] }) {
+  if (items.length !== 1) return <span>{fill(t("selectedMany"), { n: items.length })}</span>;
   const [item] = items;
   const name = item!.label ? fill(t("selectedRange"), { title: item!.title, label: item!.label }) : item!.title;
-  return fill(t("selected"), { name });
+  const [before, after] = t("selected").split("{name}");
+  return (
+    <span>
+      {before}
+      <bdi dir="auto">{name}</bdi>
+      {after}
+    </span>
+  );
 }
 
 function BriefReply({ parts, projectId, onOpenDeliverable }: { parts: OnePart[] } & Omit<ChatLogProps, "chat" | "label">) {
@@ -102,8 +110,8 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
               <li key={message.id} className="max-w-[85%] self-end rounded-lg bg-stone px-3 py-2">
                 {message.metadata?.steering && <p className="text-slate">{t("steering")}</p>}
                 {message.metadata?.selection?.length ? (
-                  <p dir="auto" className="mb-1 w-fit rounded-md border border-ink/10 bg-paper px-2 text-slate">
-                    {selectionLabel(message.metadata.selection)}
+                  <p className="mb-1 w-fit rounded-md border border-ink/10 bg-paper px-2 text-slate">
+                    <SelectionText items={message.metadata.selection} />
                   </p>
                 ) : null}
                 <p dir="auto" className="whitespace-pre-wrap">

@@ -86,7 +86,7 @@ export function ChatPanel({
       style={narrow ? undefined : { width }}
       className={
         narrow
-          ? "fixed inset-x-0 bottom-0 top-12 z-30 flex flex-col bg-paper pb-28" // room for the command bar over it
+          ? "fixed inset-x-0 bottom-0 top-12 z-30 flex flex-col bg-paper pb-36" // room for the command bar over it
           : "absolute bottom-5 end-4 top-2 z-20 flex flex-col rounded-[14px] border border-ink/10 bg-paper shadow-[0_2px_10px_rgb(14_15_18/0.12)]"
       }
     >

@@ -230,7 +230,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
                 <CommandBar
                   chat={chat}
                   onSent={() => setChatShown(true)}
-                  floating={narrow ? { start: 8, end: 8 } : { start: ZOOM_SPACE, end: chatShown ? width + 32 : 16 }}
+                  floating={narrow ? { start: 8, end: 8, bottom: 64 } : { start: ZOOM_SPACE, end: chatShown ? width + 32 : 16, bottom: 16 }}
                 />
               )}
               {floatingPanel}

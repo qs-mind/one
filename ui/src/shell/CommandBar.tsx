@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { select, useSelection } from "../canvas/selection";
 import type { SelectionItem } from "../canvas/types";
-import { selectionLabel } from "../chat/Chat";
+import { SelectionText } from "../chat/Chat";
 import { t, type texts, useLanguage } from "../i18n";
 import type { ChatState } from "./useChats";
 
@@ -27,7 +27,7 @@ export function CommandBar({
   onSent?: () => void;
   /** Over the canvas, between the zoom controls (start) and the chat (end), in px from each side; without it the
    * bar sits under the General chat's conversation. */
-  floating?: { start: number; end: number };
+  floating?: { start: number; end: number; bottom: number };
 }) {
   useLanguage();
   const selection = useSelection();
@@ -63,8 +63,8 @@ export function CommandBar({
       >
         {selection.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span dir="auto" className="flex items-center gap-1 rounded-md bg-stone px-2 py-0.5">
-              {selectionLabel(selection)}
+            <span className="flex items-center gap-1 rounded-md bg-stone px-2 py-0.5">
+              <SelectionText items={selection} />
               <button
                 type="button"
                 aria-label={t("clearSelection")}
@@ -125,8 +125,8 @@ export function CommandBar({
 
   return floating ? (
     <div
-      className="pointer-events-none absolute bottom-4 z-20 flex justify-center"
-      style={{ insetInlineStart: floating.start, insetInlineEnd: floating.end }}
+      className="pointer-events-none absolute z-30 flex justify-center"
+      style={{ insetInlineStart: floating.start, insetInlineEnd: floating.end, bottom: floating.bottom }}
     >
       {bar}
     </div>
