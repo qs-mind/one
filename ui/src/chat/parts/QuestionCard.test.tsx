@@ -60,7 +60,7 @@ describe("QuestionCard", () => {
       { choice: "sent", answers: { q1: "موقع", q2: "3950 جنيه" } },
     ]);
     expect(await screen.findByText("3950 جنيه")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
     expect(screen.queryByText("q1")).not.toBeInTheDocument(); // never the raw id
   });
 
@@ -91,7 +91,7 @@ describe("QuestionCard", () => {
     expect(screen.getByText("جاهزة")).toBeInTheDocument();
     expect(screen.getByText("4100")).toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
   });
 
   it("a refused answer says so and keeps the answers", async () => {
@@ -112,7 +112,7 @@ describe("QuestionCard", () => {
     expect(screen.getByText(texts.withdrawn.ar)).toBeInTheDocument();
     expect(screen.getByText("الخرسانة جاهزة ولا موقع؟ - عينة")).toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
   });
 
   it("an unknown card kind falls back to the plain approval buttons", async () => {

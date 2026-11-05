@@ -13,6 +13,8 @@ import { bodyOf, calls, core, P1, reply, running, streamed } from "./testing";
 vi.mock("../canvas/Canvas", async () => ({ Canvas: (await import("./testing")).CanvasStandIn }));
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
+/** A reply's paragraph by its whole text (its English runs sit in their own <bdi>). */
+const findReply = (text: RegExp) => screen.findByText((_, el) => el?.tagName === "P" && text.test(el.textContent ?? ""));
 
 beforeEach(() => {
   setLanguage("ar");
@@ -26,7 +28,7 @@ describe("the chat in the shell", () => {
     render(<App />);
     await user.type(await box(), "سعّر البند ده{enter}");
 
-    const answer = await screen.findByText(/مرحبا Hello/);
+    const answer = await findReply(/مرحبا Hello/);
     expect(answer.closest("[dir]")).toHaveAttribute("dir", "auto"); // mixed Arabic and English lines render right
     expect(screen.getByText("سعّر البند ده")).toBeInTheDocument();
     const [, init] = calls(fetch, "POST", "/api/chat")[0]!;
@@ -125,7 +127,7 @@ describe("the chat in the shell", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(await box(), "كمان بند 04/01{enter}");
-    expect(await screen.findByText(/مرحبا Hello/)).toBeInTheDocument();
+    expect(await findReply(/مرحبا Hello/)).toBeInTheDocument();
     const [, init] = calls(fetch, "POST", "/api/briefs/b9/steer")[0]!;
     expect(bodyOf(init)).toEqual({ text: "كمان بند 04/01" });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -153,7 +155,7 @@ describe("the chat in the shell", () => {
     await user.type(await box(), "سعّر{enter}");
     const line = await screen.findByRole("list", { name: texts.progressLine.ar });
     expect(within(line).getByRole("listitem")).toHaveTextContent("بيقرا صفحة 12");
-    expect(await screen.findByText("غرفة التنسيق، 1 رسالة")).toBeInTheDocument();
+    expect(await screen.findByText("غرفة التنسيق، رسالة واحدة")).toBeInTheDocument();
     expect(screen.getByText("كبير مهندسي الكميات: بيبعت المقايسة بالإيميل.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: texts.allowOnce.ar })).toBeInTheDocument();
     expect(screen.getByText("1.20 من 3.00 دولار")).toBeInTheDocument();
@@ -195,7 +197,7 @@ describe("the chat in the shell", () => {
     render(<App />);
     expect(await screen.findByText("سعّر بند الخرسانة - عينة")).toBeInTheDocument();
     expect(screen.getByText(texts.codeA.ar)).toBeInTheDocument();
-    expect(await screen.findByText(/مرحبا Hello/)).toBeInTheDocument();
+    expect(await findReply(/مرحبا Hello/)).toBeInTheDocument();
     const items = screen.getAllByRole("listitem").map((item) => item.textContent);
     expect(items.findIndex((text) => text?.includes("والحديد؟"))).toBeLessThan(
       items.findIndex((text) => text?.includes("مرحبا Hello")),
@@ -228,7 +230,7 @@ describe("the chat in the shell", () => {
     expect(calls(fetch, "POST", "/api/briefs/b1/continue")).toHaveLength(0); // never by itself
 
     await user.click(screen.getByRole("button", { name: texts.continue.ar }));
-    expect(await screen.findByText(/مرحبا Hello/)).toBeInTheDocument(); // its stream joined
+    expect(await findReply(/مرحبا Hello/)).toBeInTheDocument(); // its stream joined
     expect(calls(fetch, "POST", "/api/briefs/b1/continue")).toHaveLength(1);
   });
 
@@ -382,5 +384,23 @@ describe("the chat in the shell", () => {
     expect(screen.queryByRole("log")).toBeNull();
     await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));
     expect(screen.getByRole("log", { name: texts.projectChat.ar })).toBeInTheDocument();
+  });
+
+  it("one message box: at the open chat's foot, floating over the canvas only while the chat is folded", async () => {
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
+    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(1);
+    expect(chat).toContainElement(await box()); // below the conversation, in the chat itself
+    expect(chat).toHaveAttribute("data-canvas-cover"); // the canvas keeps its frames out from under it
+    await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
+    expect(container.querySelectorAll("[data-command-box]")).toHaveLength(1);
+    const floating = screen.getByRole("region", { name: texts.commandBar.ar });
+    expect(floating).toContainElement(await box());
+    expect(floating).toHaveAttribute("data-canvas-cover");
+    await user.click(screen.getByRole("button", { name: texts.projectChat.ar }));
+    expect(screen.getByRole("complementary", { name: texts.projectChat.ar })).toContainElement(await box());
   });
 });

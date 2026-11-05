@@ -373,3 +373,14 @@ export async function canvasReady(page: Page, key: FrameKey = "files:all") {
   await frame(page, key).waitFor();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
+
+/** "Show everything" from the palette: every frame in view. A first open shows only what can be read at once (the
+ * Project files first), so a test that needs all of them on screen asks for them, as the engineer would. */
+export async function showAll(page: Page, language: "ar" | "en" = "ar") {
+  const mod = await page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "Meta" : "Control"));
+  await page.keyboard.press(`${mod}+KeyK`);
+  await page.keyboard.type(language === "ar" ? "اعرض كل حاجة" : "Show everything");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(500); // the view's glide
+}
+

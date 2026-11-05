@@ -124,7 +124,7 @@ export function AgentCard({ agent }: { agent: LiveAgent }) {
       {agent.noNews && <span className="text-slate">{t("noNews")}</span>}
       {agent.line && (
         <span dir="auto" className="text-slate">
-          {pick(agent.line)}
+          {pick(agent.line, agent.lang)}
         </span>
       )}
       {frame && title && (

@@ -1,8 +1,10 @@
 // The project chat, floating at the inline end of the canvas (left in Arabic, right in English): 340 px, resizable
-// from 280 to 560 for this session, from under the top bar to 20 px from the bottom. It shows the conversation; the
-// command bar is its composer. It folds to a "Project chat" button. Below 900 px it is a full-height sheet the top
-// bar opens. With no AI connected, AI settings take the chat's place (Plan 4).
-import { useRef } from "react";
+// from 280 to 560 for this session, from under the top bar to 20 px from the bottom. It shows the conversation, and
+// the command bar, its composer, sits at its foot: one message box (it floats over the canvas only while the chat is
+// folded). It folds to a "Project chat" button. Below 900 px it is a full-height sheet the top bar opens. With no AI
+// connected, AI settings take the chat's place (Plan 4). The open chat marks itself as covering the canvas
+// (data-canvas-cover), so the canvas shows its frames beside it, never under it.
+import { type ReactNode, useRef } from "react";
 import { ChatLog } from "../chat/Chat";
 import { dir, t, useLanguage } from "../i18n";
 import { type Ai, AiSettings } from "../settings/AiSettings";
@@ -46,6 +48,7 @@ export function ChatPanel({
   narrow,
   width,
   onWidth,
+  composer,
   ...body
 }: Omit<ChatBodyProps, "label"> & {
   open: boolean;
@@ -54,6 +57,8 @@ export function ChatPanel({
   narrow: boolean;
   width: number;
   onWidth(width: number): void;
+  /** The command bar, at the chat's foot. */
+  composer?: ReactNode;
 }) {
   useLanguage();
   const drag = useRef<{ x: number; width: number } | null>(null);
@@ -61,7 +66,7 @@ export function ChatPanel({
 
   if (!open) {
     return narrow ? null : (
-      <div data-region="chat" className="absolute end-4 top-2 z-20">
+      <div data-region="chat" data-canvas-cover className="absolute end-4 top-2 z-20">
         <button
           type="button"
           data-region-start
@@ -82,11 +87,12 @@ export function ChatPanel({
     <aside
       aria-label={t("projectChat")}
       data-region="chat"
+      data-canvas-cover
       tabIndex={-1}
       style={narrow ? undefined : { width }}
       className={
         narrow
-          ? "fixed inset-x-0 bottom-0 top-12 z-30 flex flex-col bg-paper pb-36" // room for the command bar over it
+          ? "fixed inset-x-0 bottom-0 top-12 z-30 flex flex-col bg-paper"
           : "absolute bottom-5 end-4 top-2 z-20 flex flex-col rounded-[14px] border border-ink/10 bg-paper shadow-[0_2px_10px_rgb(14_15_18/0.12)]"
       }
     >
@@ -132,6 +138,7 @@ export function ChatPanel({
       <div className="flex min-h-0 flex-1 flex-col">
         <ChatBody {...body} label={t("projectChat")} />
       </div>
+      {composer}
     </aside>
   );
 }

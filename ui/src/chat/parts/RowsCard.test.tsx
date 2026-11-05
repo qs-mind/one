@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../../i18n";
@@ -63,7 +63,7 @@ describe("RowsCard", () => {
     await user.click(screen.getByRole("checkbox", { name: "احفظ الصف 1" }));
     await user.click(keep);
     expect(bodyOf(fetch, "POST", "/api/cards/c2")).toEqual([{ choice: "keep", rows_ok: [0, 2] }]);
-    expect(await screen.findByText("اتحفظ 2 من 3 صف.")).toBeInTheDocument();
+    expect(await screen.findByText("اتحفظ 2 من 3 صفوف.")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.getByText("رمل - عينة").closest("tr")).toHaveClass("line-through"); // left out
   });
@@ -76,16 +76,31 @@ describe("RowsCard", () => {
     await user.click(screen.getByRole("button", { name: texts.keepNone.ar }));
     expect(bodyOf(fetch, "POST", "/api/cards/c2")).toEqual([{ choice: "no" }]);
     expect(await screen.findByText(`ردّك: ${texts.keepNone.ar}`)).toBeInTheDocument();
-    expect(screen.getByText("اتحفظ 0 من 3 صف.")).toBeInTheDocument();
+  });
+
+  it("answered, it stops waiting and folds to one line, which opens again on a click", async () => {
+    core({ "POST /api/cards/c2": () => new Response(null, { status: 204 }) });
+    const user = userEvent.setup();
+    const { container } = render(<ApprovalCard id="c2" card={rows} />);
+    expect(container.querySelector("section")).toHaveClass("border-copper");
+    for (const n of [1, 2, 3]) await user.click(screen.getByRole("checkbox", { name: `احفظ الصف ${n}` }));
+    await user.click(screen.getByRole("button", { name: texts.keepTicked.ar }));
+    const line = await screen.findByRole("button", { name: /أحفظ الأسعار دي؟.*اتحفظ 3 من 3 صفوف\./ });
+    expect(container.querySelector("section")).not.toHaveClass("border-copper");
+    expect(screen.queryByRole("table")).toBeNull(); // folded: the next card is in sight
+    await user.click(line);
+    expect(line).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("table")).toBeInTheDocument();
   });
 
   it("a card settled in the stream shows what was kept, in English too", () => {
     setLanguage("en");
     render(<ApprovalCard id="c2" card={{ ...rows, status: "settled", choice: "keep", rows_ok: [1] }} />);
     expect(screen.getByText("1 of 3 rows kept.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
     expect(screen.getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "true"); // only its line, opened
   });
 
   it("a withdrawn card shows its table with nothing to tick or press", () => {
@@ -93,7 +108,38 @@ describe("RowsCard", () => {
     expect(screen.getByText(texts.withdrawn.ar)).toBeInTheDocument();
     expect(screen.getByText("أسمنت - عينة")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
+  });
+
+  it("each cell finds its own direction; a long value shows two lines, all of it in the title; narrow, the rows stack", () => {
+    const long = "بالمتر المكعب حفر لزوم الأساسات وخلافة طبقاً للأبعاد والبيانات بالرسومات والمناسيب في boq-priced.xls";
+    const boq = { ...rows, payload: { ...rows.payload, rows: [{ description: long, rate: "1-1, 1-3, 1-4" }] } };
+    const { container } = render(<ApprovalCard id="c2" card={boq} />);
+    const cell = screen.getByTitle(long);
+    expect(cell.tagName).toBe("TD");
+    expect(cell).toHaveAttribute("dir", "auto");
+    expect(cell.firstElementChild).toHaveClass("line-clamp-2");
+    expect(cell.querySelector("bdi")).toHaveTextContent("boq-priced.xls"); // the English run stays whole
+    expect(cell).toHaveTextContent(long);
+    expect(screen.getByTitle("1-1, 1-3, 1-4")).toHaveAttribute("dir", "auto");
+    // narrower than 32rem the rows stack, every column whole as "label: value"; wider, a table
+    const scroller = container.querySelector("[data-rows-scroll]")!;
+    expect(scroller).toHaveClass("@container");
+    expect(scroller.querySelector("table")).toHaveClass("block", "@lg:table");
+    expect(screen.getByTitle("1-1, 1-3, 1-4")).toHaveAttribute("data-label", "السعر: ");
+    expect(cell).not.toHaveAttribute("data-label"); // the first column heads its row
+    expect(screen.getByRole("columnheader", { name: "السعر" })).toBeInTheDocument(); // still a table to a reader
+  });
+
+  it("speaks the Brief's language: an Arabic Brief's card in the English page", () => {
+    setLanguage("en");
+    render(<ApprovalCard id="c2" card={rows} lang="ar" />);
+    expect(screen.getByRole("heading", { name: rows.title.ar })).toBeInTheDocument();
+    expect(screen.getByText(rows.detail.ar)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "البند" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.keepTicked.ar })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "احفظ الصف 1" })).toBeInTheDocument();
+    expect(screen.getByRole("heading").closest("section")).toHaveAttribute("dir", "rtl");
   });
 
   it("a table to read, with no ticks, is answered with the plain choice", async () => {

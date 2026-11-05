@@ -1,5 +1,5 @@
 // The Coordination Room: the agents' messages to each other, folded until the engineer opens it.
-import { fill, pick, t, useLanguage } from "../../i18n";
+import { count, fill, pick, t, useLanguage } from "../../i18n";
 import type { TeamData } from "./types";
 
 export function CoordinationRoom({ messages }: { messages: { id: string; data: TeamData }[] }) {
@@ -7,7 +7,7 @@ export function CoordinationRoom({ messages }: { messages: { id: string; data: T
   if (messages.length === 0) return null;
   return (
     <details className="rounded-md border border-stone px-3 py-2">
-      <summary className="text-slate hover:text-ink">{fill(t("coordinationRoom"), { n: messages.length })}</summary>
+      <summary className="text-slate hover:text-ink">{count("coordinationRoom", messages.length)}</summary>
       <ol className="mt-2 flex flex-col gap-2">
         {messages.map(({ id, data }) => (
           <li key={id}>

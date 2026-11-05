@@ -49,6 +49,20 @@ describe("ProgressLine", () => {
     expect(lines[1]).toHaveTextContent(estimator.ar);
   });
 
+  it("speaks the Brief's language, not the page's: an Arabic Brief in the English page", () => {
+    setLanguage("en");
+    const text = { en: "Look at the BOQ columns in boq-priced.xls", ar: "يبص على أعمدة المقايسة في boq-priced.xls" };
+    const { rerender } = render(<ProgressLine items={[{ id: "r1", data: { agent: lead, text, lang: "ar" } }]} />);
+    const line = screen.getByRole("listitem");
+    expect(line).toHaveTextContent(`${lead.ar} ${text.ar}`);
+    expect(line).toHaveAttribute("dir", "rtl");
+    // an older part with no language follows the Brief's from the chat; the page's only with neither
+    rerender(<ProgressLine items={[{ id: "r1", data: { agent: lead, text } }]} lang="ar" />);
+    expect(screen.getByRole("listitem")).toHaveTextContent(text.ar);
+    rerender(<ProgressLine items={[{ id: "r1", data: { agent: lead, text } }]} />);
+    expect(screen.getByRole("listitem")).toHaveTextContent(text.en);
+  });
+
   it("shows nothing with no agent at work", () => {
     const { container } = render(<ProgressLine items={[]} />);
     expect(container).toBeEmptyDOMElement();
@@ -66,7 +80,7 @@ describe("CoordinationRoom", () => {
         ]}
       />,
     );
-    const summary = screen.getByText("غرفة التنسيق، 2 رسالة");
+    const summary = screen.getByText("غرفة التنسيق، رسالتين");
     const first = screen.getByText("سعّر بند 03/02 - عينة");
     expect(first).not.toBeVisible();
     expect(first).toHaveAttribute("dir", "auto");
@@ -101,7 +115,7 @@ describe("ApprovalCard", () => {
   it("a card settled in the stream shows its choice, with no buttons", () => {
     render(<ApprovalCard id="c1" card={{ ...online, status: "settled", choice: "no" }} />);
     expect(screen.getByText(`ردّك: ${texts.dontAllow.ar}`)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-expanded", "false"); // only its folded line
   });
 
   it("a refused answer keeps the buttons and says so", async () => {

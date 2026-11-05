@@ -5,7 +5,7 @@
 // passes, so CI stays green before the first baselines are in.
 import { existsSync } from "node:fs";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { canvasReady, frame, mockCore, small } from "./fixtures";
+import { canvasReady, frame, mockCore, small, showAll } from "./fixtures";
 
 test.skip(({ browserName }) => browserName !== "chromium", "screenshots are taken on Chromium only (their reference)");
 
@@ -36,6 +36,7 @@ for (const language of ["ar", "en"] as const) {
       await mockCore(page, small(), { language });
       await page.goto("/");
       await canvasReady(page);
+      await showAll(page, language); // every frame on screen, not only the readable first view
       await expect(page.locator(".react-flow__node")).toHaveCount(8);
       await expect(frame(page, "file:spec").locator("header")).toContainText("18"); // its page count came
       await shot(page, `canvas-${language}-${size.width}`, info);

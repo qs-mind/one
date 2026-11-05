@@ -4,10 +4,12 @@ import { createElement, useMemo, type ReactNode } from "react";
 import Markdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { t, useLanguage } from "../i18n";
+import { isolateOtherScript } from "./bidi";
 
 type BlockProps = ExtraProps & { className?: string; children?: ReactNode };
 
-// Each block takes the direction of its own first letters, so English reads left to right inside the Arabic page.
+// Each block takes the direction of its own first letters, so English reads left to right inside the Arabic page; the
+// runs in the other script inside a block are isolated (./bidi).
 function block(tag: string, className?: string) {
   return function Block({ node: _node, className: given, ...props }: BlockProps) {
     return createElement(tag, { ...props, dir: "auto", className: [given, className].filter(Boolean).join(" ") });
@@ -22,9 +24,10 @@ const components: Components = {
   h4: block("h4", "font-semibold"),
   h5: block("h5", "font-semibold"),
   h6: block("h6", "font-semibold"),
-  ul: block("ul", "list-disc ps-5"),
-  ol: block("ol", "list-decimal ps-5"),
-  li: block("li"),
+  // the room for the marker is on each item's own start side, so an English item in an Arabic list has it on the left
+  ul: block("ul", "list-disc"),
+  ol: block("ol", "list-decimal"),
+  li: block("li", "ms-5"),
   blockquote: block("blockquote", "border-s-2 border-slate ps-3 text-slate"),
   table: block("table", "border-collapse"),
   th: block("th", "border border-stone px-2 py-1 text-start font-semibold"),
@@ -92,7 +95,9 @@ export function Reply({ text, unsourced = [] }: { text: string; unsourced?: stri
   const key = unsourced.join("\n");
   const plugins = useMemo(() => {
     const values = key ? key.split("\n") : [];
-    return values.length ? [remarkGfm, markUnsourced(values, t("noSource"))] : [remarkGfm];
+    return values.length
+      ? [remarkGfm, markUnsourced(values, t("noSource")), isolateOtherScript()]
+      : [remarkGfm, isolateOtherScript()];
   }, [key, lang]);
   return (
     <div className="flex flex-col gap-2">

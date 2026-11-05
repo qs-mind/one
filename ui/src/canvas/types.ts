@@ -2,7 +2,7 @@
 // project's files, Deliverables, Desks and agents. `sources.ts` is the only file that knows the routes behind them.
 import type { Ref } from "react";
 import type { DeliverableInfo } from "../deliverables/types";
-import type { Text } from "../i18n";
+import type { Language, Text } from "../i18n";
 
 export type { DeliverableInfo }; // Plan 6 declares it (plus pending, total, sample): never redeclared
 
@@ -40,6 +40,8 @@ export type AgentInfo = {
   model: string;
   state: "idle" | "thinking" | "working" | "waiting" | "done" | "failed";
   line: Text | null;
+  /** The language of its Brief: the line is in it. */
+  lang?: Language;
   brief_id: string | null;
   focus: Focus | null;
   at: string;

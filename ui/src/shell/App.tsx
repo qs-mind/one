@@ -31,7 +31,7 @@ import { GeneralChat } from "./GeneralChat";
 import { Palette } from "./Palette";
 import { moveRegion, useNarrow } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
-import { useChats } from "./useChats";
+import { showsWaitingCard, useChats } from "./useChats";
 
 /** The dev-only sample mode (?sample=1): the canvas shows sample data, labelled. Release builds drop it. */
 function sampleMode(): boolean {
@@ -43,9 +43,13 @@ const projectSources = (projectId: string) => (sampleMode() ? sampleSources() : 
 // the chat's width lasts for the session only (decision 4: nothing in web storage)
 let sessionWidth = CHAT_WIDTH.start;
 
-/** The zoom controls take the bottom inline start; the command bar sits between them and the chat. */
+/** The zoom controls take the bottom inline start; with the chat folded, the command bar floats between them and the
+ * window's end. With the chat open it sits at the chat's foot instead: one message box. */
 const ZOOM_SPACE = 272;
+const CHAT_BUTTON_SPACE = 16;
 const STATUS_RELOAD_MS = 1000;
+const WAITING_SYNC_MS = 1500;
+const WAITING_FRAMES = 30;
 
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
@@ -82,6 +86,20 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   useEffect(() => {
     leadFromChat(chat.running); // before Plan 4 sends a Lead QS, the team shows the chat's own
   }, [chat.running]);
+
+  // "Waiting for you" never points at a card the chat cannot show: when the core counts a waiting card that the
+  // chat's messages lack for a moment, the chat is read again from the core (once per count).
+  const synced = useRef<number>(0);
+  const lacksCard = project !== undefined && waiting > 0 && !showsWaitingCard(chat.messages);
+  useEffect(() => {
+    if (waiting === 0) synced.current = 0;
+    if (!lacksCard || synced.current === waiting) return;
+    const timer = setTimeout(() => {
+      synced.current = waiting;
+      void chat.resync();
+    }, WAITING_SYNC_MS);
+    return () => clearTimeout(timer);
+  }, [lacksCard, waiting, chat.resync]);
 
   useEffect(() => {
     // a remembered project that no longer opens is forgotten, and the projects show
@@ -138,9 +156,18 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
 
   const projectsButton = () => document.querySelector<HTMLElement>('[data-region="topbar"] [data-region-start]');
 
+  /** "Waiting for you": the chat opens at the first waiting card, scrolled to it, its first button focused. The chat
+   * may still be opening, or reading the card from the core: a few frames are given for it to show. */
   function showWaiting() {
     setChatShown(true);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-waiting] button")?.focus());
+    let frames = WAITING_FRAMES;
+    const go = () => {
+      const card = document.querySelector<HTMLElement>("[data-waiting]");
+      if (!card) return void (frames-- > 0 && requestAnimationFrame(go));
+      card.scrollIntoView?.({ block: "center" });
+      card.querySelector<HTMLElement>("button, input, textarea, select")?.focus({ preventScroll: true });
+    };
+    requestAnimationFrame(go);
   }
 
   function openDeliverable(id: string) {
@@ -229,6 +256,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               </div>
               <ChatPanel
                 {...body}
+                composer={ai.connected !== false && <CommandBar chat={chat} inPanel />}
                 projectId={project.id}
                 onOpenDeliverable={openDeliverable}
                 open={chatShown}
@@ -241,11 +269,11 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
                   setWidth(next);
                 }}
               />
-              {ai.connected !== false && (
+              {ai.connected !== false && !chatShown && (
                 <CommandBar
                   chat={chat}
                   onSent={() => setChatShown(true)}
-                  floating={narrow ? { start: 8, end: 8, bottom: 64 } : { start: ZOOM_SPACE, end: chatShown ? width + 32 : 16, bottom: 16 }}
+                  floating={narrow ? { start: 8, end: 8, bottom: 64 } : { start: ZOOM_SPACE, end: CHAT_BUTTON_SPACE, bottom: 16 }}
                 />
               )}
               {floatingPanel}

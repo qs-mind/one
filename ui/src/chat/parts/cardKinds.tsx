@@ -3,6 +3,7 @@
 // with no renderer here gets the plain approval buttons. This plan fills question, rows and connector (Tasks 3, 10,
 // 12); Plan 8 adds understood.
 import type { JSX } from "react";
+import type { Language } from "../../i18n";
 import { ConnectorCard } from "./ConnectorCard";
 import { QuestionCard } from "./QuestionCard";
 import { RowsCard } from "./RowsCard";
@@ -19,6 +20,8 @@ export type CardKindProps = {
   sending: boolean;
   /** The words for one of the card's options. */
   label: (option: string) => string;
+  /** The Brief's language, the card's words' (optional: the page's). */
+  lang?: Language;
 };
 
 export const cardKinds: Partial<Record<string, (p: CardKindProps) => JSX.Element>> = {

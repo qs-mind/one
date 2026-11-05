@@ -1,7 +1,7 @@
 // The live layer end to end (Plan 7 Task 5): agent cursors on the canvas, from the project's live events only.
 // A cursor is // `data-testid="cursor-<agent id>"`, labelled with the role name in the page language, inside an aria-hidden wrapper.
 import { expect, test, type Page } from "@playwright/test";
-import { canvasReady, checker, estimator, frame, mockCore, small } from "./fixtures";
+import { canvasReady, checker, estimator, frame, mockCore, small, showAll } from "./fixtures";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -16,6 +16,7 @@ test("no event, no cursor", async ({ page }) => {
   await mockCore(page, quiet());
   await page.goto("/");
   await canvasReady(page);
+  await showAll(page); // every frame on screen, not only the readable first view
   await expect(frame(page, "deliverable:pricing")).toBeVisible();
   await expect(page.locator('[data-testid^="cursor-"]')).toHaveCount(0);
 });
@@ -24,6 +25,7 @@ test("an agent's cursor sits over its frame with its role name, hidden from scre
   const core = await mockCore(page, quiet());
   await page.goto("/");
   await canvasReady(page);
+  await showAll(page); // every frame on screen, not only the readable first view
   core.emit([{ type: "agent", agent: estimator }]);
 
   const cursor = page.getByTestId("cursor-est");
@@ -89,10 +91,15 @@ async function centred(page: Page, key: "deliverable:pricing" | "deliverable:let
   return Math.abs(fx - cx) < c.width / 4 && Math.abs(fy - cy) < c.height / 4;
 }
 
-test("Follow keeps the agent's frame in view; a pan by hand stops it", async ({ page }) => {
+test("Follow keeps the agent's frame in view; a zoom by hand stops it", async ({ page }) => {
   const core = await mockCore(page, quiet());
   await page.goto("/");
   await canvasReady(page);
+  // the team frame up close, its buttons shown
+  const mod = await page.evaluate(() => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "Meta" : "Control"));
+  await page.keyboard.press(`${mod}+KeyK`);
+  await page.keyboard.type("فريق المشروع");
+  await page.keyboard.press("Enter");
   core.emit([{ type: "agent", agent: checker }]);
   await frame(page, "team:core").locator('li[data-agent="chk"]').getByRole("button", { name: /تابع/ }).click();
   const following = page.getByRole("banner").getByText("متابع مهندس المراجعة - عينة");
@@ -103,7 +110,7 @@ test("Follow keeps the agent's frame in view; a pan by hand stops it", async ({ 
   await expect.poll(() => centred(page, "deliverable:letter")).toBe(true);
 
   await page.waitForTimeout(400); // a pan within 100 ms of a follow move is the camera's own, not the engineer's
-  await page.mouse.move(900, 400);
-  await page.mouse.wheel(0, 300);
+  // a zoom by hand (the frame under the pointer may scroll its own page on a wheel, at a readable zoom)
+  await page.getByRole("toolbar", { name: "أدوات التكبير" }).getByRole("button", { name: "صغّر" }).click();
   await expect(following).toBeHidden();
 });

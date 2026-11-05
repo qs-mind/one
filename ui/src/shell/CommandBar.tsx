@@ -21,6 +21,7 @@ export function CommandBar({
   chat,
   onSent,
   floating,
+  inPanel = false,
 }: {
   chat: ChatState;
   /** After a message went: the shell opens the chat. */
@@ -28,12 +29,15 @@ export function CommandBar({
   /** Over the canvas, between the zoom controls (start) and the chat (end), in px from each side; without it the
    * bar sits under the General chat's conversation. */
   floating?: { start: number; end: number; bottom: number };
+  /** At the foot of the open project chat. */
+  inPanel?: boolean;
 }) {
   useLanguage();
   const selection = useSelection();
   const [draft, setDraft] = useState("");
   const kinds = new Set(selection.map((item) => item.kind));
   const quick = kinds.size === 1 ? actions[selection[0]!.kind] : [];
+  const placeholder = t(selection.length ? "commandBox" : "commandBoxEmpty");
 
   async function submit(text: string, typed: boolean) {
     if (!text.trim() || !chat.canSend) return;
@@ -48,10 +52,13 @@ export function CommandBar({
       aria-label={t("commandBar")}
       data-region="command"
       tabIndex={-1}
+      data-canvas-cover={floating ? true : undefined}
       className={
         floating
           ? "pointer-events-auto w-full max-w-[560px] rounded-[14px] border border-ink/10 bg-paper p-2 shadow-[0_2px_10px_rgb(14_15_18/0.12)]"
-          : "mx-auto w-full max-w-[42rem] px-4 pb-4"
+          : inPanel
+            ? "shrink-0 border-t border-ink/10 p-2"
+            : "mx-auto w-full max-w-[42rem] px-4 pb-4"
       }
     >
       <form
@@ -89,9 +96,20 @@ export function CommandBar({
           </div>
         )}
         <div className="flex items-end gap-2">
+          {/* The box grows with its words, or its placeholder while empty, so neither is ever cut: an invisible copy
+              of the text in the same grid cell sets its height (up to max-h-40, then it scrolls). */}
+          <div className="grid min-w-0 flex-1">
+            <div
+              aria-hidden="true"
+              dir="auto"
+              data-command-mirror
+              className="invisible col-start-1 row-start-1 max-h-40 min-h-9 overflow-hidden whitespace-pre-wrap break-words rounded-md border border-transparent px-3 py-1.5"
+            >
+              {(draft || placeholder) + " "}
+            </div>
           <textarea
             aria-label={t("message")}
-            placeholder={t(selection.length ? "commandBox" : "commandBoxEmpty")}
+            placeholder={placeholder}
             dir="auto"
             rows={1}
             data-region-start
@@ -104,17 +122,18 @@ export function CommandBar({
                 void submit(draft, true);
               }
             }}
-            className="max-h-40 min-h-9 flex-1 resize-none rounded-md border border-ink/10 bg-paper px-3 py-1.5 outline-none focus:border-ink"
+            className="col-start-1 row-start-1 max-h-40 min-h-9 w-full resize-none overflow-y-auto rounded-md border border-ink/10 bg-paper px-3 py-1.5 outline-none focus:border-ink"
           />
+          </div>
           <button
             type="submit"
             disabled={!draft.trim() || !chat.canSend}
-            className="rounded-md bg-ink px-4 py-1.5 text-paper disabled:opacity-40"
+            className="shrink-0 rounded-md bg-ink px-4 py-1.5 text-paper disabled:opacity-40"
           >
             {t("send")}
           </button>
           {chat.running && (
-            <button type="button" onClick={() => void chat.halt()} className="rounded-md border border-ink px-4 py-1.5">
+            <button type="button" onClick={() => void chat.halt()} className="shrink-0 rounded-md border border-ink px-4 py-1.5">
               {t("stop")}
             </button>
           )}

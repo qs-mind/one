@@ -75,6 +75,38 @@ export function place(existing: readonly Placed[], incoming: readonly Incoming[]
   return out;
 }
 
+/** A spot for one new frame inside `view` (the part of the canvas the engineer sees, free of the chat and the other
+ * overlays, in world coordinates), clear of every frame: the first in reading order from the view's top start corner.
+ * Null when none fits there at this zoom; the caller then places it with `place` and brings it into view. */
+export function placeInView(existing: readonly Placed[], item: Incoming, view: Box, opts: PlaceOptions): Placed | null {
+  const { dir, gap } = opts;
+  const { w, h } = item;
+  const boxes: Box[] = existing.map((f) => ({ x: f.x, y: f.y, w: f.w, h: f.collapsed ? STRIP_H : f.h }));
+  const lo = view.x + gap;
+  const hi = view.x + view.w - gap;
+  const bottom = view.y + view.h - gap;
+  if (hi - lo < w || bottom - (view.y + gap) < h) return null;
+  const ys = [view.y + gap, ...boxes.map((b) => b.y + b.h + gap)].filter((y) => y >= view.y + gap && y + h <= bottom);
+  const xs =
+    dir === "ltr"
+      ? [lo, ...boxes.map((b) => b.x + b.w + gap)].filter((x) => x >= lo && x + w <= hi)
+      : [hi - w, ...boxes.map((b) => b.x - gap - w)].filter((x) => x >= lo && x + w <= hi);
+  const clear = (c: Box) =>
+    boxes.every((b) => c.x + c.w + gap <= b.x || b.x + b.w + gap <= c.x || c.y + c.h + gap <= b.y || b.y + b.h + gap <= c.y);
+  for (const y of [...new Set(ys)].sort((a, b) => a - b)) {
+    for (const x of [...new Set(xs)].sort((a, b) => (dir === "ltr" ? a - b : b - a))) {
+      const c = { x, y, w, h };
+      if (clear(c)) return { key: item.key, x, y, w, h, z: 0, collapsed: item.collapsed ?? false };
+    }
+  }
+  return null;
+}
+
+/** Whether `frame` is wholly inside `view`. */
+export function inView(frame: Box, view: Box): boolean {
+  return frame.x >= view.x && frame.y >= view.y && frame.x + frame.w <= view.x + view.w && frame.y + frame.h <= view.y + view.h;
+}
+
 function band(boxes: readonly Box[], y: number, h: number, gap: number): Box[] {
   return boxes.filter((b) => b.y < y + h + gap && b.y + b.h + gap > y);
 }
