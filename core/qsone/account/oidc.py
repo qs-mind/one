@@ -37,7 +37,7 @@ import truststore
 from qsone import copy
 
 ISSUER = "https://auth.qsmind.app"  # QSONE_AUTH_ISSUER overrides it (tests)
-CLIENT_ID = ""  # One's native client id, registered by O1 in the auth repo; QSONE_AUTH_CLIENT_ID
+CLIENT_ID = "qs-mind-one"  # One's native client at auth.qsmind.app; QSONE_AUTH_CLIENT_ID overrides
 SCOPE = "openid profile email offline_access vault"
 DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 TIMEOUT = httpx.Timeout(15.0, connect=5.0)
