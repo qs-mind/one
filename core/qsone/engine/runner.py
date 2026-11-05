@@ -1570,7 +1570,8 @@ class Engine:
 
 def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
     """A Brief as events again, from what is stored: the Lead's words, the Coordination Room,
-    the cards and their answers, the Reviews, the unsourced marks and the state."""
+    the cards and their answers, the Deliverable cards, the Reviews, the unsourced marks and the
+    state."""
     brief_id = brief["id"]
     events: list[Event] = []
     runs = store.runs(brief_id)
@@ -1582,6 +1583,9 @@ def _stored_events(store: Store, brief: dict, engine: Engine) -> list[Event]:
         returns = agents.tool_returns(lead["history"])
         events += general.stored_cards(brief_id, returns)
         events += understand.stored_cards(brief_id, returns)  # Plan 8's card
+    for run in runs:  # the Deliverable cards, from whichever agent made them (Plan 6)
+        if run["history"]:
+            events += outputs.stored_cards(brief_id, agents.tool_returns(run["history"]))
     for m in store.team(brief_id):
         events.append(TeamMessage(brief_id, m["id"], m["sender"], m["recipient"], m["text"]))
     with store.rec.read() as c:

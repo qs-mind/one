@@ -295,6 +295,22 @@ def check_draft(
     return draft, v["version"], [u["text"] for u in v["untraced"]] if "untraced" in v else []
 
 
+def stored_cards(brief_id: str, returns: list[tuple[str, str]]) -> list[Data]:
+    """The Deliverable cards in the chat again, from a run's stored tool results `(tool name,
+    result text)`: one for each Deliverable it made, as `deliverable_create` showed it."""
+    found = []
+    for name, text in returns:
+        if name != "deliverable_create":
+            continue
+        try:
+            out = json.loads(text)
+        except ValueError:
+            continue
+        if isinstance(out, dict) and isinstance(out.get("id"), str):
+            found.append(Data(brief_id, "deliverable", out["id"], {"id": out["id"]}))
+    return found
+
+
 def unchecked(rec: Records, returns: list[tuple[str, str]]) -> list[DeliverableDraft]:
     """The Deliverables a Brief made or proposed changes to, read from its tool results `(tool
     name, result text)`, whose Saved version has no check yet, as the Checking QS reads them.
