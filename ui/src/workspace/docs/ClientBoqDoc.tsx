@@ -7,6 +7,7 @@ import { pick, t, texts, useLanguage, type Text } from "../../i18n";
 import { SourceError } from "../../project/sources";
 import type { ProjectSources } from "../../project/types";
 import { SheetViewer } from "../../viewers/sheet/SheetViewer";
+import { setClientBoqSample } from "../clientBoqSample";
 
 export type ClientBoqLoaded = { view: SheetView } | { failed: Text } | null;
 
@@ -39,6 +40,10 @@ export function ClientBoqDoc({ projectId, sources, fileId }: { projectId: string
     return () => stop.abort();
   }, [sources, fileId]);
   const loaded = useClientBoq(sources, fileId, at);
+  const sample = loaded && "view" in loaded ? loaded.view.sample : null;
+  useEffect(() => {
+    if (sample !== null) setClientBoqSample(fileId, sample); // the top bar's facts say «الأرقام عينة»
+  }, [fileId, sample]);
 
   if (loaded && "view" in loaded) return <SheetViewer projectId={projectId} view={loaded.view} mode="workspace" readOnly />;
   return (

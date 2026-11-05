@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { entry } from "../deliverables/fixtures";
+import { entry, sheet } from "../deliverables/fixtures";
 import { fill, setLanguage, texts } from "../i18n";
 import { fakeSources } from "../project/fake";
 import { currentSelection, select } from "../project/selection";
@@ -436,5 +436,36 @@ describe("a file replaced by its new version", () => {
     act(() => sources.emit({ type: "file", file: { ...file, id: "f3", replaces: "f2" } }));
     act(() => void workspaceApi.back());
     expect(workspaceApi.current()).toEqual({ key: "file:f3", anchor: { page: 4 } });
+  });
+});
+
+describe("a sample client BOQ", () => {
+  const boq = { file_id: "f1", name: "مقايسة العميل - عينة.xlsx", items: 3, headings: 1, at: "2026-11-05T09:00:00+00:00" };
+  const boqView = (sample: boolean) => sheet({ variant: "client_boq", sample, total: null });
+
+  it("the top bar's facts say «الأرقام عينة» once its view says its numbers are sample data", async () => {
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({
+      files: [file], clientBoqs: [boq], clientBoqViews: { f1: boqView(true) },
+      workspace: { key: "clientboq:f1", anchor: null },
+    });
+    render(<App sourcesFor={() => sources} />);
+    const bar = () => document.querySelector('[data-region="topbar"]')!;
+    await waitFor(() => expect(bar().querySelector("[data-sample-label]")).toHaveTextContent(texts.sampleNumbers.ar));
+    act(() => workspaceApi.open("files:all"));
+    await waitFor(() => expect(bar().querySelector("[data-sample-label]")).toBeNull());
+  });
+
+  it("a client BOQ of real numbers says nothing of samples", async () => {
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({
+      files: [file], clientBoqs: [boq], clientBoqViews: { f1: boqView(false) },
+      workspace: { key: "clientboq:f1", anchor: null },
+    });
+    render(<App sourcesFor={() => sources} />);
+    await screen.findByText("03/02");
+    expect(document.querySelector("[data-sample-label]")).toBeNull();
   });
 });

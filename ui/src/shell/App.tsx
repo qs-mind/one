@@ -39,6 +39,7 @@ import { Palette } from "./Palette";
 import { moveRegion, useNarrow, useSmall } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
 import { showsWaitingCard, useChats } from "./useChats";
+import { useClientBoqSample } from "../workspace/clientBoqSample";
 
 /** The dev-only sample mode (?sample=1): the screen shows sample data, labelled. Release builds drop it. */
 function sampleMode(): boolean {
@@ -67,8 +68,9 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const documents = useDocuments(sources);
   // sample numbers are said once: in the open Deliverable's facts («الأرقام عينة»), else by the top bar
   const opened = useOpened();
+  const boqSample = useClientBoqSample(opened?.key.startsWith("clientboq:") ? opened.key.slice("clientboq:".length) : null);
   const factsSaySample =
-    !!project && !!documents?.deliverables.some((d) => d.sample && opened?.key === `deliverable:${d.id}`);
+    !!project && (boqSample || !!documents?.deliverables.some((d) => d.sample && opened?.key === `deliverable:${d.id}`));
 
   // AI settings in place of the chat: nothing connected yet, or the first AI just connected (it stays open to say so)
   const [aiMainOpen, setAiMainOpen] = useState(false);
