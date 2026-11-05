@@ -28,7 +28,7 @@ const NO_BODY = new Set([204, 205, 304]);
 const aborted = (signal: AbortSignal) => signal.reason ?? new DOMException("The call was stopped.", "AbortError");
 
 // Like fetch when the network fails: the caller's own fallback line says it in words.
-const unreachable = (why: string) => new TypeError(`One could not reach its core (${why}).`);
+const unreachable = (why: string) => new TypeError(`ONE could not reach its core (${why}).`);
 
 function pairs(headers: HeadersInit | undefined): [string, string][] {
   return [...new Headers(headers).entries()];

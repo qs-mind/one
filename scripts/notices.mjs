@@ -184,8 +184,8 @@ export function notices({ python, target }) {
     `It links in, among others: ${runtime.openssl} (Apache-2.0), SQLite ${runtime.sqlite} (public domain), ` +
     `zlib ${runtime.zlib} (Zlib) and ${runtime.expat} (MIT); that project's full release archives carry each licence.`;
   return [
-    "QS Mind One: third-party notices\n",
-    "One itself is under the FSL-1.1-ALv2 licence (LICENSE.md). It ships the software below, each under its own licence.\n\n",
+    "QS Mind ONE: third-party notices\n",
+    "ONE itself is under the FSL-1.1-ALv2 licence (LICENSE.md). It ships the software below, each under its own licence.\n\n",
     section("Python runtime", gate([cpython])),
     `\n${linked}\n\n`,
     section("Python packages", gate(packages)),

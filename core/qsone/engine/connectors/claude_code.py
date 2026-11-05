@@ -903,7 +903,7 @@ class ClaudeCodeConnector:
         WebSearch), and nothing kept: `--no-session-persistence` must be listed, or it does not
         run. `cwd` is its own new folder, which holds only the instructions while it runs."""
         run_id = f"oneshot-{uuid.uuid4().hex}"
-        spec = AgentSpec(run_id, {"en": "One", "ar": "One"}, "quick", instructions, (), "quick")
+        spec = AgentSpec(run_id, {"en": "ONE", "ar": "ONE"}, "quick", instructions, (), "quick")
         job = AgentJob(run_id, run_id, spec, "", model, "", "", (), cwd, None)
         failed = AgentOutcome("", None, "failed", (), None)
         ready = await self._ready()

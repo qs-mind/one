@@ -60,11 +60,11 @@ PROJECT_KEY_MISSING = {
 
 PROJECT_KEY_STORE_DOWN = {
     "en": (
-        "The system key store is not available, so One cannot use the project's key. "
+        "The system key store is not available, so ONE cannot use the project's key. "
         "Unlock it or turn it on, then try again."
     ),
     "ar": (
-        "مخزن المفاتيح في الجهاز مش متاح، فـ One مش قادر يوصل لمفتاح المشروع. "
+        "مخزن المفاتيح في الجهاز مش متاح، فـ ONE مش قادر يوصل لمفتاح المشروع. "
         "افتحه أو شغّله وجرّب تاني."
     ),
 }
@@ -78,8 +78,8 @@ PROJECT_DAMAGED = {
 }
 
 PROJECT_TOO_NEW = {
-    "en": "A newer version of One saved this project. Update One, then open it.",
-    "ar": "المشروع ده اتحفظ بنسخة أحدث من One. حدّث One وبعدين افتحه.",
+    "en": "A newer version of ONE saved this project. Update ONE, then open it.",
+    "ar": "المشروع ده اتحفظ بنسخة أحدث من ONE. حدّث ONE وبعدين افتحه.",
 }
 
 # Project Records: files.
@@ -94,8 +94,8 @@ FILE_EMPTY = {
 }
 
 FILE_NOT_READ_YET = {
-    "en": "Kept in Project Records. One cannot read this kind of file yet.",
-    "ar": "اتحفظ في سجلات المشروع. One لسه مش بيقرا النوع ده من الملفات.",
+    "en": "Kept in Project Records. ONE cannot read this kind of file yet.",
+    "ar": "اتحفظ في سجلات المشروع. ONE لسه مش بيقرا النوع ده من الملفات.",
 }
 
 FILE_SCANNED_PAGES = {
@@ -104,8 +104,8 @@ FILE_SCANNED_PAGES = {
 }
 
 FILE_UNREADABLE = {
-    "en": "Kept, but One could not read it (it is damaged, or locked with a password).",
-    "ar": "اتحفظ، بس One مقدرش يقراه (يا إما بايظ، يا إما مقفول بباسورد).",
+    "en": "Kept, but ONE could not read it (it is damaged, or locked with a password).",
+    "ar": "اتحفظ، بس ONE مقدرش يقراه (يا إما بايظ، يا إما مقفول بباسورد).",
 }
 
 FILE_NOT_FOUND = {
@@ -316,11 +316,11 @@ WAITING_INTERNET = {
 # Spending Caps. {scope_name} is a SCOPE_* pair; {spent} and {cap} are USD amounts.
 CAP_PAUSED = {
     "en": (
-        "One paused at 80% of the Spending Cap for {scope_name}: {spent} of {cap} USD spent. "
+        "ONE paused at 80% of the Spending Cap for {scope_name}: {spent} of {cap} USD spent. "
         "Continue up to the cap, raise the cap, or stop with a report?"
     ),
     "ar": (
-        "One وقّف عند 80% من سقف الصرف بتاع {scope_name}: اتصرف {spent} من {cap} دولار. "
+        "ONE وقّف عند 80% من سقف الصرف بتاع {scope_name}: اتصرف {spent} من {cap} دولار. "
         "نكمّل لحد السقف، ولا نرفع السقف، ولا نقف بتقرير؟"
     ),
 }
@@ -348,11 +348,11 @@ CAPS_NOT_SAVED = {
 CAP_EQUIVALENT = {
     "en": (
         "Equivalent cost on your Claude subscription has reached {spent} of the Spending Cap "
-        "for {scope_name}, {cap} USD. It is not billed per use, so One carries on."
+        "for {scope_name}, {cap} USD. It is not billed per use, so ONE carries on."
     ),
     "ar": (
         "التكلفة المكافئة على اشتراك Claude بتاعك وصلت {spent} من سقف الصرف بتاع {scope_name}، "
-        "{cap} دولار. الاشتراك مش بيتحاسب على كل استخدام، فـOne هيكمّل."
+        "{cap} دولار. الاشتراك مش بيتحاسب على كل استخدام، فـONE هيكمّل."
     ),
 }
 
@@ -369,12 +369,12 @@ EQUIVALENT_COST = {
 
 PRICE_UNKNOWN = {
     "en": (
-        "One does not know the price of {model}, so the Spending Cap cannot protect you. "
+        "ONE does not know the price of {model}, so the Spending Cap cannot protect you. "
         "Enter its price in “AI” at the top, or mark it as running on this computer. "
         "Use it anyway in this Brief?"
     ),
     "ar": (
-        "One مش عارف سعر {model}، فسقف الصرف مش هيقدر يحميك. "
+        "ONE مش عارف سعر {model}، فسقف الصرف مش هيقدر يحميك. "
         "اكتب سعره في «الذكاء الاصطناعي» فوق، أو علّم عليه إنه شغال على الجهاز ده. "
         "نستخدمه برضه في التكليف ده؟"
     ),
@@ -574,11 +574,11 @@ BUDGET_TITLE = {"en": "Brief Budget", "ar": "ميزانية التكليف"}
 
 BUDGET_UNKNOWN = {
     "en": (
-        "One cannot tell what this Brief will cost: a model in its plan has no known price. "
+        "ONE cannot tell what this Brief will cost: a model in its plan has no known price. "
         "It should take about {minutes} minutes. Start?"
     ),
     "ar": (
-        "One مش عارف التكليف ده هيكلّف كام: في نموذج في الخطة سعره مش معروف. "
+        "ONE مش عارف التكليف ده هيكلّف كام: في نموذج في الخطة سعره مش معروف. "
         "متوقع ياخد حوالي {minutes} دقيقة. نبدأ؟"
     ),
 }
@@ -643,17 +643,17 @@ CLAUDE_CODE_MISSING = {
 }
 
 CLAUDE_CODE_TOO_OLD = {
-    "en": "Your Claude Code lacks options One needs. Update it, then check again.",
-    "ar": "Claude Code اللي عندك ناقصه اختيارات One محتاجها. حدّثه وبعدين افحص تاني.",
+    "en": "Your Claude Code lacks options ONE needs. Update it, then check again.",
+    "ar": "Claude Code اللي عندك ناقصه اختيارات ONE محتاجها. حدّثه وبعدين افحص تاني.",
 }
 
 CLAUDE_CODE_SHIM = {
     "en": (
-        "This is the npm claude.cmd, which One cannot run safely. "
+        "This is the npm claude.cmd, which ONE cannot run safely. "
         "Install the native Claude Code, then pick it."
     ),
     "ar": (
-        "ده claude.cmd بتاع npm، وOne مش هيقدر يشغّله بأمان. نزّل Claude Code الأصلي وبعدين اختاره."
+        "ده claude.cmd بتاع npm، وONE مش هيقدر يشغّله بأمان. نزّل Claude Code الأصلي وبعدين اختاره."
     ),
 }
 
@@ -665,17 +665,17 @@ CLAUDE_CODE_SIGNED_OUT = {
 CLAUDE_CODE_LIMIT = {
     "en": (
         "Your Claude subscription's limit is reached for now. "
-        "One waits, or moves the role to another model you have."
+        "ONE waits, or moves the role to another model you have."
     ),
-    "ar": "اشتراك Claude بتاعك وصل لحدّه دلوقتي. One هيستنى، أو هينقل الدور لنموذج تاني عندك.",
+    "ar": "اشتراك Claude بتاعك وصل لحدّه دلوقتي. ONE هيستنى، أو هينقل الدور لنموذج تاني عندك.",
 }
 
 CLAUDE_CODE_COPY = {
     "en": (
         "Claude Code keeps its own copy of each conversation on this computer, "
-        "outside One's encrypted files."
+        "outside ONE's encrypted files."
     ),
-    "ar": "Claude Code بيحتفظ بنسخة خاصة بيه من كل محادثة على الجهاز ده، برّه ملفات One المتشفّرة.",
+    "ar": "Claude Code بيحتفظ بنسخة خاصة بيه من كل محادثة على الجهاز ده، برّه ملفات ONE المتشفّرة.",
 }
 
 # The roles whose model the engineer picks (glossary names).
@@ -706,7 +706,7 @@ STEP_DONE = {"en": "done", "ar": "خلص"}
 
 DESK_TEMPORARY = {"en": "Temporary Desk", "ar": "قسم مؤقت"}
 
-CONTINUE_AFTER_RESTART = "One restarted. Continue from your last step."  # the model reads it
+CONTINUE_AFTER_RESTART = "ONE restarted. Continue from your last step."  # the model reads it
 
 REPORT_NOW = (  # the model reads it: the last request after the engineer chose "stop with a report"
     "The Spending Cap stops the work now. Without calling any tool, reply with a short report: "
@@ -782,11 +782,11 @@ def fill(text: dict[str, str], /, **values) -> dict[str, str]:
 # The formula.
 CALC_UNEXPECTED = {
     "en": (
-        "At character {at}, «{found}» was not expected; One expected {expected}. "
+        "At character {at}, «{found}» was not expected; ONE expected {expected}. "
         "Numbers have no thousands separators."
     ),
     "ar": (
-        "عند الحرف {at}، «{found}» مش مكانه هنا؛ One كان مستني {expected}. "
+        "عند الحرف {at}، «{found}» مش مكانه هنا؛ ONE كان مستني {expected}. "
         "الأرقام من غير فواصل آلاف."
     ),
 }
@@ -880,7 +880,7 @@ CALC_UNIT_UNREADABLE = {
 
 CALC_UNIT_BUILT_IN = {
     "en": "«{symbol}» is a built-in unit; it cannot be defined again.",
-    "ar": "«{symbol}» وحدة أساسية في One؛ مينفعش تتعرّف تاني.",
+    "ar": "«{symbol}» وحدة أساسية في ONE؛ مينفعش تتعرّف تاني.",
 }
 
 CALC_UNIT_CURRENCY = {
@@ -1147,8 +1147,8 @@ AMOUNT_IS_COMPUTED = {
 
 # Suggested changes.
 CHANGE_STALE = {
-    "en": "This cell changed after the change was suggested. Ask One again, or edit it yourself.",
-    "ar": "الخلية دي اتغيرت بعد ما التعديل اتقترح. اطلب من One تاني، أو عدّلها بنفسك.",
+    "en": "This cell changed after the change was suggested. Ask ONE again, or edit it yourself.",
+    "ar": "الخلية دي اتغيرت بعد ما التعديل اتقترح. اطلب من ONE تاني، أو عدّلها بنفسك.",
 }
 
 CHANGE_NOT_PENDING = {
@@ -1174,11 +1174,11 @@ ANCHOR_NOT_FOUND = {
 
 COMMENT_KIND_NOT_ALLOWED = {
     "en": (
-        "One's team writes notes, with no code. Review comments come from you or the "
+        "ONE's team writes notes, with no code. Review comments come from you or the "
         "Checking QS, with Code B or C."
     ),
     "ar": (
-        "فريق One بيكتب ملاحظات بس، من غير كود. ملاحظات المراجعة بتيجي منك أو من مهندس "
+        "فريق ONE بيكتب ملاحظات بس، من غير كود. ملاحظات المراجعة بتيجي منك أو من مهندس "
         "المراجعة، بكود B أو C."
     ),
 }
@@ -1326,7 +1326,7 @@ EXPORT_LABELS = {
         "ar": "التعديلات: {accepted} مقبول، {rejected} مرفوض",
     },
     "comments": {"en": "Comments", "ar": "الملاحظات"},
-    "note": {"en": "One's note", "ar": "ملاحظة One"},
+    "note": {"en": "ONE's note", "ar": "ملاحظة ONE"},
     "review": {"en": "Review comment", "ar": "ملاحظة مراجعة"},
     "open": {"en": "Open", "ar": "مفتوحة"},
     "closed": {"en": "Closed", "ar": "مقفولة"},
@@ -1375,8 +1375,8 @@ FILL_COLUMN_LETTER = {
 }
 
 FILL_PLAN_NOT_FOUND = {
-    "en": "This Fill Plan is not in the project. Ask One to map the client's file again.",
-    "ar": "خطة التعبئة دي مش موجودة في المشروع. اطلب من One يربط ملف العميل تاني.",
+    "en": "This Fill Plan is not in the project. Ask ONE to map the client's file again.",
+    "ar": "خطة التعبئة دي مش موجودة في المشروع. اطلب من ONE يربط ملف العميل تاني.",
 }
 
 # Accepting while Project Records moved.
@@ -1418,18 +1418,18 @@ QUESTION_DETAIL = {
 
 ON_DEVICE_NO_ONLINE = {
     "en": (
-        "This is an On-device Project: nothing leaves this computer, so One cannot do this here."
+        "This is an On-device Project: nothing leaves this computer, so ONE cannot do this here."
     ),
-    "ar": "ده مشروع على الجهاز: مفيش حاجة بتخرج من الجهاز، فـ One مش هيقدر يعمل ده هنا.",
+    "ar": "ده مشروع على الجهاز: مفيش حاجة بتخرج من الجهاز، فـ ONE مش هيقدر يعمل ده هنا.",
 }
 
 # The web.
 WEB_OFFLINE = {
     "en": (
-        "No internet connection, so One could not reach the web. "
+        "No internet connection, so ONE could not reach the web. "
         "It will try again when the connection is back."
     ),
-    "ar": "مفيش نت، فـ One مقدرش يوصل للويب. هيحاول تاني لما النت يرجع.",
+    "ar": "مفيش نت، فـ ONE مقدرش يوصل للويب. هيحاول تاني لما النت يرجع.",
 }
 WEB_NO_SEARCH = {
     "en": (
@@ -1460,8 +1460,8 @@ WEB_BAD_URL = {
     "ar": "ابعت عنوان ويب كامل بيبدأ بـ https:// أو http://.",
 }
 WEB_PRIVATE_ADDRESS = {
-    "en": "This address points inside this computer or its local network, so One will not open it.",
-    "ar": "العنوان ده بيشاور على حاجة جوه الجهاز أو الشبكة المحلية، فـ One مش هيفتحه.",
+    "en": "This address points inside this computer or its local network, so ONE will not open it.",
+    "ar": "العنوان ده بيشاور على حاجة جوه الجهاز أو الشبكة المحلية، فـ ONE مش هيفتحه.",
 }
 WEB_PAGE_REFUSED = {
     "en": "The site refused the page, or it does not exist.",
@@ -1472,16 +1472,16 @@ WEB_SITE_DOWN = {
     "ar": "الموقع مارَدّش في الوقت. جرّب تاني بعدين.",
 }
 WEB_TOO_BIG = {
-    "en": "The page is larger than 10 MB, so One did not read it.",
-    "ar": "الصفحة أكبر من 10 ميجا، فـ One ماقراهاش.",
+    "en": "The page is larger than 10 MB, so ONE did not read it.",
+    "ar": "الصفحة أكبر من 10 ميجا، فـ ONE ماقراهاش.",
 }
 WEB_KIND_NOT_READ = {
-    "en": "One cannot read this kind of web file yet.",
-    "ar": "One لسه مش بيقرا النوع ده من ملفات الويب.",
+    "en": "ONE cannot read this kind of web file yet.",
+    "ar": "ONE لسه مش بيقرا النوع ده من ملفات الويب.",
 }
 WEB_ROBOTS = {
-    "en": "The site asks programs not to read this page, so One did not.",
-    "ar": "الموقع طالب من البرامج ماتقراش الصفحة دي، فـ One ماقراهاش.",
+    "en": "The site asks programs not to read this page, so ONE did not.",
+    "ar": "الموقع طالب من البرامج ماتقراش الصفحة دي، فـ ONE ماقراهاش.",
 }
 WEB_QUERY_NAMES_PROJECT = {
     "en": "Search in general words, without the project's or the client's name.",
@@ -1507,30 +1507,30 @@ FILE_PAGES_OUT_OF_RANGE = {
 }
 FILE_OLD_WORD = {
     "en": (
-        "Kept. One reads Word files saved as .docx: open this one in Word, save it as .docx, "
+        "Kept. ONE reads Word files saved as .docx: open this one in Word, save it as .docx, "
         "then drop it again."
     ),
     "ar": (
-        "اتحفظ. One بيقرا ملفات Word المحفوظة .docx: افتح الملف ده في Word واحفظه .docx "
+        "اتحفظ. ONE بيقرا ملفات Word المحفوظة .docx: افتح الملف ده في Word واحفظه .docx "
         "وبعدين ارميه تاني."
     ),
 }
 FILE_DWG_NOT_YET = {
-    "en": "Kept. One cannot read DWG drawings yet: save a DXF copy, or use the Qiyas Connector.",
-    "ar": "اتحفظ. One لسه مش بيقرا رسومات DWG: احفظ نسخة DXF، أو استخدم موصّل قياس.",
+    "en": "Kept. ONE cannot read DWG drawings yet: save a DXF copy, or use the Qiyas Connector.",
+    "ar": "اتحفظ. ONE لسه مش بيقرا رسومات DWG: احفظ نسخة DXF، أو استخدم موصّل قياس.",
 }
 FILE_IMAGE_STORED = {
-    "en": "Kept. One reads the image when it is asked to.",
-    "ar": "اتحفظت. One هيقرا الصورة لما يتطلب منه.",
+    "en": "Kept. ONE reads the image when it is asked to.",
+    "ar": "اتحفظت. ONE هيقرا الصورة لما يتطلب منه.",
 }
 FILE_HIDDEN_TEXT = {
     "en": (
         "This file has hidden text (white, tiny or invisible) or lines that look like orders to "
-        "an AI. One treats them as data only and shows them to you and the Checking QS."
+        "an AI. ONE treats them as data only and shows them to you and the Checking QS."
     ),
     "ar": (
         "الملف ده فيه نص مخفي (أبيض أو صغير جداً أو مش ظاهر) أو سطور شكلها أوامر لذكاء اصطناعي. "
-        "One بيتعامل معاها كبيانات بس وبيوريها ليك ولمهندس المراجعة."
+        "ONE بيتعامل معاها كبيانات بس وبيوريها ليك ولمهندس المراجعة."
     ),
 }
 
@@ -1551,9 +1551,9 @@ OCR_ASK = {
 }
 OCR_ASK_UNKNOWN = {
     "en": (
-        "Read {pages} scanned pages with {model}? One cannot tell the cost: it has no known price."
+        "Read {pages} scanned pages with {model}? ONE cannot tell the cost: it has no known price."
     ),
-    "ar": "أقرا {pages} صفحة متصورة بـ {model}؟ One مش عارف التكلفة: النموذج ملوش سعر معروف.",
+    "ar": "أقرا {pages} صفحة متصورة بـ {model}؟ ONE مش عارف التكلفة: النموذج ملوش سعر معروف.",
 }
 OCR_COST = {"en": "{usd} USD", "ar": "{usd} دولار"}
 OCR_COST_EQUIVALENT = {
@@ -1561,8 +1561,8 @@ OCR_COST_EQUIVALENT = {
     "ar": "{usd} دولار تكلفة مكافئة على اشتراك Claude بتاعك",
 }
 OCR_IMAGE_KIND = {
-    "en": "One reads PNG and JPEG images. Save this image as PNG or JPEG, then drop it again.",
-    "ar": "One بيقرا صور PNG و JPEG. احفظ الصورة دي PNG أو JPEG وارميها تاني.",
+    "en": "ONE reads PNG and JPEG images. Save this image as PNG or JPEG, then drop it again.",
+    "ar": "ONE بيقرا صور PNG و JPEG. احفظ الصورة دي PNG أو JPEG وارميها تاني.",
 }
 A_FILE = {"en": "a file", "ar": "ملف"}  # DOING_FILES_READ's {name} before the file is known
 
@@ -1667,11 +1667,11 @@ BOQ_REQUIRED_UNTICKED = {
 # Evidence for numbers.
 SOURCE_NOT_EVIDENCE = {
     "en": (
-        "A source must point to real evidence: a file and its page or row, a web page One read, "
+        "A source must point to real evidence: a file and its page or row, a web page ONE read, "
         "a QS Mind price, or the engineer's answer."
     ),
     "ar": (
-        "المصدر لازم يشاور على دليل حقيقي: ملف وصفحته أو صفه، أو صفحة ويب One قراها، "
+        "المصدر لازم يشاور على دليل حقيقي: ملف وصفحته أو صفه، أو صفحة ويب ONE قراها، "
         "أو سعر من QS Mind، أو رد المهندس."
     ),
 }
@@ -1705,19 +1705,19 @@ KEEP_KINDS = {
 KEEP_OPTION_KEEP = {"en": "Keep", "ar": "احفظ"}
 KEEP_OPTION_NEVER = {"en": "Never keep", "ar": "ماتحفظش أبداً"}
 KEEP_DETAIL = {
-    "en": "{agent} is writing {kind} into your records. One asks once and remembers your answer "
+    "en": "{agent} is writing {kind} into your records. ONE asks once and remembers your answer "
     "for every project.",
-    "ar": "{agent} بيكتب {kind} في سجلاتك. One بيسأل مرة واحدة وبيفتكر ردك لكل المشاريع.",
+    "ar": "{agent} بيكتب {kind} في سجلاتك. ONE بيسأل مرة واحدة وبيفتكر ردك لكل المشاريع.",
 }
 KEEP_ENGINEER_DETAIL = {
     "en": "{agent}: {action}. It goes into your Engineer Records, which every project can use. "
-    "One asks once in this Brief.",
+    "ONE asks once in this Brief.",
     "ar": "{agent}: {action}. ده هيتحفظ في سجلات المهندس، واللي كل مشاريعك تقدر تستخدمها. "
-    "One بيسأل مرة واحدة في الطلب ده.",
+    "ONE بيسأل مرة واحدة في الطلب ده.",
 }
 ENGINEER_RECORDS_CLOSED = {
-    "en": "Engineer Records is not open, so One cannot use it now.",
-    "ar": "سجلات المهندس مش مفتوحة، فـ One مش هيقدر يستخدمها دلوقتي.",
+    "en": "Engineer Records is not open, so ONE cannot use it now.",
+    "ar": "سجلات المهندس مش مفتوحة، فـ ONE مش هيقدر يستخدمها دلوقتي.",
 }
 # How a source got its date, when the evidence shows none of its own.
 DATED_RECEIVED = {"en": "date received", "ar": "تاريخ الاستلام"}
@@ -1753,14 +1753,14 @@ PRICES_COUNTRY = {
     "ar": "الأسعار لمصر والسعودية والإمارات: ابعت EG أو SA أو AE.",
 }
 PRICES_ON_DEVICE = {
-    "en": "This is an On-device Project, so One did not fetch QS Mind Prices: showing the "
+    "en": "This is an On-device Project, so ONE did not fetch QS Mind Prices: showing the "
     "prices saved on {date}.",
-    "ar": "ده مشروع على الجهاز، فـ One ماجابش أسعار QS Mind: بنعرض الأسعار المحفوظة يوم {date}.",
+    "ar": "ده مشروع على الجهاز، فـ ONE ماجابش أسعار QS Mind: بنعرض الأسعار المحفوظة يوم {date}.",
 }
 PRICES_NONE_SAVED = {
-    "en": "No QS Mind prices are saved on this computer yet, and One could not get them now. "
+    "en": "No QS Mind prices are saved on this computer yet, and ONE could not get them now. "
     "Showing your own prices and this project's.",
-    "ar": "مفيش أسعار QS Mind محفوظة على الجهاز لسه، و One مقدرش يجيبها دلوقتي. "
+    "ar": "مفيش أسعار QS Mind محفوظة على الجهاز لسه، و ONE مقدرش يجيبها دلوقتي. "
     "بنعرض أسعارك وأسعار المشروع ده.",
 }
 PRICES_FOR_ALL = {
@@ -1799,11 +1799,11 @@ TOOL_PRICES_PROPOSE = {
 SANDBOX_NOT_READY = {
     "en": (
         "The Sandbox's Python is missing or damaged, so no code ran. "
-        "One downloads it again (about 16 MB) the next time a script runs."
+        "ONE downloads it again (about 16 MB) the next time a script runs."
     ),
     "ar": (
         "بايثون الصندوق المعزول ناقص أو بايظ، فمفيش كود اشتغل. "
-        "One هينزّله تاني (حوالي 16 ميجا) أول ما سكريبت يشتغل."
+        "ONE هينزّله تاني (حوالي 16 ميجا) أول ما سكريبت يشتغل."
     ),
 }
 SANDBOX_DOWNLOAD_FAILED = {
@@ -1926,9 +1926,9 @@ ARCHIVE_BACKUP_FAILED = {
     "ar": "المشروع اتأرشف، بس آخر نسخة احتياطية ليه ماتعملتش. اعمله نسخة من «النسخة الاحتياطية».",
 }
 AI_CONSENT_NEEDED = {
-    "en": "Before One uses AI, say yes to the note on where your text goes. Open “Connect AI”.",
+    "en": "Before ONE uses AI, say yes to the note on where your text goes. Open “Connect AI”.",
     "ar": (
-        "قبل ما One يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين. "
+        "قبل ما ONE يستخدم الذكاء الاصطناعي، وافق على الملاحظة اللي بتوضح نصك بيروح فين. "
         "افتح «وصّل الذكاء الاصطناعي»."
     ),
 }
@@ -1991,8 +1991,8 @@ BACKUP_FOLDER_UNREACHABLE = {
     ),
 }
 BACKUP_FOLDER_NOT_WRITABLE = {
-    "en": "One cannot save files in this folder. Pick an existing folder you can write in.",
-    "ar": "One مش قادر يحفظ ملفات في الفولدر ده. اختار فولدر موجود تقدر تكتب فيه.",
+    "en": "ONE cannot save files in this folder. Pick an existing folder you can write in.",
+    "ar": "ONE مش قادر يحفظ ملفات في الفولدر ده. اختار فولدر موجود تقدر تكتب فيه.",
 }
 BACKUP_KEY_WRONG = {
     "en": "This backup was made with another Backup key, so this key cannot open it.",
@@ -2024,11 +2024,11 @@ RECOVERY_LAST_GROUP_WRONG = {
 }
 PROJECT_KEY_RESTORED = {
     "en": (
-        "The project's key was missing from the system key store, so One put it back from "
+        "The project's key was missing from the system key store, so ONE put it back from "
         "the project's own key file."
     ),
     "ar": (
-        "مفتاح المشروع ماكانش في مخزن المفاتيح في الجهاز، فـ One رجّعه من ملف المفتاح "
+        "مفتاح المشروع ماكانش في مخزن المفاتيح في الجهاز، فـ ONE رجّعه من ملف المفتاح "
         "بتاع المشروع نفسه."
     ),
 }
@@ -2037,21 +2037,21 @@ PROJECT_KEY_RESTORED = {
 # QS from the card's check, so they say exactly what to send.
 ZIP_TOO_BIG = {
     "en": (
-        "This zip holds more than 2 GB once opened, so One kept it as a file and did not "
+        "This zip holds more than 2 GB once opened, so ONE kept it as a file and did not "
         "open it. Unzip it and add the folder instead."
     ),
     "ar": (
-        "الملف المضغوط ده بعد ما يتفك أكبر من 2 جيجا، فـ One حفظه زي ما هو ومافتحهوش. "
+        "الملف المضغوط ده بعد ما يتفك أكبر من 2 جيجا، فـ ONE حفظه زي ما هو ومافتحهوش. "
         "فكّه وضيف الفولدر بداله."
     ),
 }
 ZIP_UNSAFE = {
     "en": (
-        "This zip looks unsafe to open (too many files, or packed far too tightly), so One "
+        "This zip looks unsafe to open (too many files, or packed far too tightly), so ONE "
         "kept it as a file and did not open it."
     ),
     "ar": (
-        "الملف المضغوط ده شكله مش أمان يتفتح (ملفات كتير قوي، أو مضغوط بزيادة)، فـ One "
+        "الملف المضغوط ده شكله مش أمان يتفتح (ملفات كتير قوي، أو مضغوط بزيادة)، فـ ONE "
         "حفظه زي ما هو ومافتحهوش."
     ),
 }
@@ -2118,10 +2118,10 @@ ARCHIVE_WAITS_FOR_BRIEF = {
 # The updater.
 UPDATE_FAILED = {
     "en": (
-        "The update did not install, so One is still on this version and your projects are "
+        "The update did not install, so ONE is still on this version and your projects are "
         "as they were. Try again later."
     ),
-    "ar": "التحديث ماتسطبش، فـ One لسه على النسخة دي ومشاريعك زي ما هي. جرّب تاني بعدين.",
+    "ar": "التحديث ماتسطبش، فـ ONE لسه على النسخة دي ومشاريعك زي ما هي. جرّب تاني بعدين.",
 }
 UPDATE_OFFLINE = {
     "en": "Could not check for updates. Check the internet connection, then try again.",

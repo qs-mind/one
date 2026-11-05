@@ -255,7 +255,7 @@ describe("DocumentViewer", () => {
   });
 
   it("a refused edit stays on screen and says why in plain words", async () => {
-    const error = { en: "This paragraph changed after you started. Ask One again, or edit it yourself.", ar: "الفقرة دي اتغيّرت. - عينة" };
+    const error = { en: "This paragraph changed after you started. Ask ONE again, or edit it yourself.", ar: "الفقرة دي اتغيّرت. - عينة" };
     core({ [`POST ${base}/deliverables/${D}/changes`]: () => Response.json({ error, field: "ops[0].expect" }, { status: 422 }) });
     render(<DocumentViewer projectId={P} view={letter()} />);
     await typeIn("b4", "!");

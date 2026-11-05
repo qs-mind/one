@@ -452,7 +452,7 @@ def test_fill_end_to_end_from_a_signed_off_revision(rec):
         actor="estimator",
     )
     data, name, report = fill(rec, plan, actor="engineer")
-    assert name == "جدول كميات العميل - عينة - QS Mind One.xlsx"
+    assert name == "جدول كميات العميل - عينة - QS Mind ONE.xlsx"
     assert report["revision"] == rev
     assert report["written"] == ["E12", "E13", "E14", "E15", "E16", "E17"]
     assert report["skipped"] == [{"cell": f"F{n}", "reason": "formula"} for n in range(12, 17)]
@@ -474,7 +474,7 @@ def test_an_xlsm_comes_back_as_xlsm(rec):
     sign_off(rec, d)
     data, name, _ = fill(rec, plan, actor="engineer")
     assert (
-        name == "boq - عينة - QS Mind One.xlsm" and part(data, "xl/vbaProject.bin") == VBA_PROJECT
+        name == "boq - عينة - QS Mind ONE.xlsm" and part(data, "xl/vbaProject.bin") == VBA_PROJECT
     )
 
 

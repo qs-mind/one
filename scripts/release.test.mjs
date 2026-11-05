@@ -40,12 +40,12 @@ const NOTES = "# 0.1.1\n\n<!-- en -->\nFixes for the import.\n\n<!-- ar -->\nØ¥Ø
 
 // What the four build jobs upload, as the signing job downloads them (one folder per job).
 const BUILT = {
-  "bundle-x86_64-pc-windows-msvc/nsis/QS Mind One_{v}_x64-setup.exe": "windows installer",
-  "bundle-x86_64-unknown-linux-gnu/appimage/QS Mind One_{v}_amd64.AppImage": "linux appimage",
-  "bundle-aarch64-apple-darwin/QS Mind One_{v}_aarch64.app.tar.gz": "mac arm app",
-  "bundle-aarch64-apple-darwin/dmg/QS Mind One_{v}_aarch64.dmg": "mac arm dmg",
-  "bundle-x86_64-apple-darwin/QS Mind One_{v}_x64.app.tar.gz": "mac intel app",
-  "bundle-x86_64-apple-darwin/dmg/QS Mind One_{v}_x64.dmg": "mac intel dmg",
+  "bundle-x86_64-pc-windows-msvc/nsis/QS Mind ONE_{v}_x64-setup.exe": "windows installer",
+  "bundle-x86_64-unknown-linux-gnu/appimage/QS Mind ONE_{v}_amd64.AppImage": "linux appimage",
+  "bundle-aarch64-apple-darwin/QS Mind ONE_{v}_aarch64.app.tar.gz": "mac arm app",
+  "bundle-aarch64-apple-darwin/dmg/QS Mind ONE_{v}_aarch64.dmg": "mac arm dmg",
+  "bundle-x86_64-apple-darwin/QS Mind ONE_{v}_x64.app.tar.gz": "mac intel app",
+  "bundle-x86_64-apple-darwin/dmg/QS Mind ONE_{v}_x64.dmg": "mac intel dmg",
 };
 const UPDATES = Object.keys(BUILT).filter((name) => !name.endsWith(".dmg"));
 
@@ -92,7 +92,7 @@ describe("release.mjs", () => {
     expect(latest.version).toBe("0.1.1");
     expect(latest.pub_date).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
     expect(latest.platforms["windows-x86_64"].url).toBe(
-      "https://github.com/qs-mind/one/releases/download/v0.1.1/QS-Mind-One_x64-setup.exe",
+      "https://github.com/qs-mind/one/releases/download/v0.1.1/QS-Mind-ONE_x64-setup.exe",
     );
     expect(latest.platforms["darwin-x86_64"].signature).toBe(
       readFileSync(good.file(UPDATES[3]) + ".sig", "utf8").trim(),
@@ -115,8 +115,8 @@ describe("release.mjs", () => {
     expect(readdirSync(tampered.bundle)).not.toContain("upload"); // nothing is written
 
     const missing = built();
-    rmSync(missing.file("bundle-x86_64-apple-darwin/dmg/QS Mind One_{v}_x64.dmg"));
-    await expect(missing.run()).rejects.toThrow(/QS-Mind-One_x64\.dmg: no build file/);
+    rmSync(missing.file("bundle-x86_64-apple-darwin/dmg/QS Mind ONE_{v}_x64.dmg"));
+    await expect(missing.run()).rejects.toThrow(/QS-Mind-ONE_x64\.dmg: no build file/);
   });
 
   test("a build of another version is refused", async () => {
@@ -124,8 +124,8 @@ describe("release.mjs", () => {
     const wrong = path.join(good.bundle, "bundle-x86_64-pc-windows-msvc/nsis");
     rmSync(wrong, { recursive: true });
     mkdirSync(wrong);
-    writeFileSync(path.join(wrong, "QS Mind One_0.1.0_x64-setup.exe"), "old");
-    await expect(good.run()).rejects.toThrow(/QS Mind One_0\.1\.0_x64-setup\.exe was built for another version/);
+    writeFileSync(path.join(wrong, "QS Mind ONE_0.1.0_x64-setup.exe"), "old");
+    await expect(good.run()).rejects.toThrow(/QS Mind ONE_0\.1\.0_x64-setup\.exe was built for another version/);
   });
 
   test("assets get versionless names and checksums match the bytes", async () => {
@@ -139,7 +139,7 @@ describe("release.mjs", () => {
       const [hex, name] = line.split("  ");
       expect(createHash("sha256").update(readFileSync(path.join(out, name))).digest("hex")).toBe(hex);
     }
-    expect(readFileSync(path.join(out, "QS-Mind-One_aarch64.dmg"), "utf8")).toBe("mac arm dmg");
+    expect(readFileSync(path.join(out, "QS-Mind-ONE_aarch64.dmg"), "utf8")).toBe("mac arm dmg");
     await good.run(); // a second run starts the upload folder afresh and never reads it as a build
     expect(readdirSync(out)).toHaveLength(8);
   });

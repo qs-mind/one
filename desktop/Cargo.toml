@@ -1,7 +1,7 @@
 [package]
 name = "qs-mind-one"
 version = "0.1.0"
-description = "QS Mind One desktop window"
+description = "QS Mind ONE desktop window"
 edition = "2024"
 license-file = "../LICENSE.md"
 publish = false

@@ -84,7 +84,7 @@ async def _call_tool(ctx, params: types.CallToolRequestParams) -> types.CallTool
         return _result(DENIED.format(tool=name), error=True)
     except Exception:
         log.exception("MCP tool %s failed in run %s", name, scope.ctx.run_id)
-        return _result(f"{name} failed inside One. Tell the engineer; do not retry it.", error=True)
+        return _result(f"{name} failed inside ONE. Tell the engineer; do not retry it.", error=True)
     if scope.on_result is not None:
         scope.on_result(name, args, text)
     return _result(text)
@@ -128,7 +128,7 @@ class McpGate:
 
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         if self._manager is None:
-            await _plain(send, 503, "One's MCP server is not running.")
+            await _plain(send, 503, "ONE's MCP server is not running.")
             return
         await self._manager.handle_request(scope, receive, send)
 

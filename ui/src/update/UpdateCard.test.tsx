@@ -47,7 +47,7 @@ describe("UpdateCard", () => {
       return new Promise(() => undefined); // One starts again before the install answers
     });
     render(<UpdateCard />);
-    expect(await screen.findByText("One 0.1.1 جاهز")).toBeInTheDocument();
+    expect(await screen.findByText("ONE 0.1.1 جاهز")).toBeInTheDocument();
     await user.click(screen.getByText(texts.updateNotes.ar));
     expect(screen.getByText(found.notes_ar)).toBeVisible();
     expect(screen.queryByText(found.notes_en)).not.toBeInTheDocument();
@@ -67,7 +67,7 @@ describe("UpdateCard", () => {
     setLanguage("en");
     installed(() => undefined);
     render(<UpdateCard />);
-    expect(await screen.findByText("One 0.1.1 is ready")).toBeInTheDocument();
+    expect(await screen.findByText("ONE 0.1.1 is ready")).toBeInTheDocument();
     expect(screen.getByText(found.notes_en)).toBeInTheDocument(); // in the folded "What changed"
     expect(screen.queryByText(found.notes_ar)).not.toBeInTheDocument();
   });
@@ -78,11 +78,11 @@ describe("UpdateCard", () => {
     const shell = installed(() => undefined);
     render(<UpdateCard />);
     await user.click(await screen.findByRole("button", { name: texts.updateLater.ar }));
-    expect(screen.queryByText("One 0.1.1 جاهز")).not.toBeInTheDocument();
+    expect(screen.queryByText("ONE 0.1.1 جاهز")).not.toBeInTheDocument();
     expect(shell.checks).toBe(1);
 
     await act(async () => void vi.advanceTimersByTime(EVERY_MS));
-    expect(await screen.findByText("One 0.1.1 جاهز")).toBeInTheDocument();
+    expect(await screen.findByText("ONE 0.1.1 جاهز")).toBeInTheDocument();
     expect(shell.checks).toBe(2);
     expect(shell.installs).toBe(0); // never by itself
   });

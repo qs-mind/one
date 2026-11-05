@@ -181,8 +181,8 @@ describe("ApprovalCard", () => {
       kind: "cap",
       title: { en: "Spending Cap", ar: "سقف الصرف" },
       detail: {
-        en: "One paused at 80% of the Spending Cap for this Brief: 2.41 of 3.00 USD spent.",
-        ar: "One وقّف عند 80% من سقف الصرف بتاع التكليف ده: اتصرف 2.41 من 3.00 دولار.",
+        en: "ONE paused at 80% of the Spending Cap for this Brief: 2.41 of 3.00 USD spent.",
+        ar: "ONE وقّف عند 80% من سقف الصرف بتاع التكليف ده: اتصرف 2.41 من 3.00 دولار.",
       },
       options: ["continue", "raise", "report"],
     };

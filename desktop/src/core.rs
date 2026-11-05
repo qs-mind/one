@@ -110,7 +110,7 @@ pub fn open_log(path: &Path, port: u16) -> Result<File, String> {
         .map_or(0, |d| d.as_secs());
     writeln!(
         log,
-        "---- QS Mind One {} starts the core on port {port} (unix time {now}) ----",
+        "---- QS Mind ONE {} starts the core on port {port} (unix time {now}) ----",
         env!("CARGO_PKG_VERSION")
     )
     .map_err(|e| e.to_string())?;
@@ -432,7 +432,7 @@ pub fn start(app: &AppHandle) -> CoreState {
                 let _ = fs::create_dir_all(folder);
             }
             if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log) {
-                let _ = writeln!(file, "QS Mind One could not start its core: {why}");
+                let _ = writeln!(file, "QS Mind ONE could not start its core: {why}");
             }
             CoreState::Failed { log }
         }
@@ -787,7 +787,7 @@ pub mod tests {
         );
         let text = fs::read_to_string(&log).unwrap();
         assert!(
-            text.starts_with("---- QS Mind One ") && text.contains("port 4242"),
+            text.starts_with("---- QS Mind ONE ") && text.contains("port 4242"),
             "{text}"
         );
 

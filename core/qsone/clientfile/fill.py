@@ -25,7 +25,7 @@ from qsone.deliverables import events, store
 from qsone.records import arabic, audit, files
 from qsone.records.project import Records, RecordsError
 
-OUT_SUFFIX = " - QS Mind One"
+OUT_SUFFIX = " - QS Mind ONE"
 
 
 def _refused(text: dict, field: str | None = None, status: int = 422) -> RecordsError:

@@ -5,7 +5,7 @@ import logging
 import keyring
 from keyring.errors import KeyringError, PasswordDeleteError
 
-SERVICE = "QS Mind One"
+SERVICE = "QS Mind One"  # not "ONE": the saved keys are stored under this name; renaming loses them
 log = logging.getLogger(__name__)
 
 

@@ -346,7 +346,7 @@ def test_fill_preview_mismatches_and_file(client, project, sheet):
     assert all(m["accepted"] for m in out["mismatches"])
     r = get(client, f"{base}/file")
     assert r.status_code == 200 and r.content[:2] == b"PK"
-    assert disposition_name(r) == quote("مقايسة العميل - عينة - QS Mind One.xlsx", safe="")
+    assert disposition_name(r) == quote("مقايسة العميل - عينة - QS Mind ONE.xlsx", safe="")
     r = get(client, f"/projects/{project}/fill-plans/{NOWHERE}/preview")
     assert r.status_code == 404 and r.json()["error"] == copy.FILL_PLAN_NOT_FOUND
 

@@ -179,7 +179,7 @@ def deliverable_propose(
 
 
 def deliverable_comment(ctx: ToolContext, id: Id, anchor: dict, body: str) -> dict:
-    """Leave One's note on a Deliverable for the engineer (it never blocks Sign-off). anchor is
+    """Leave ONE's note on a Deliverable for the engineer (it never blocks Sign-off). anchor is
     {"type": "cell", "row": "<row id>", "column": "rate"}, {"type": "range", "from": {"row",
     "column"}, "to": {"row", "column"}}, {"type": "row", "row": "<row or block id>"}, {"type":
     "text", "block": "<block id>", "start": 0, "end": 7, "quote": "the exact words"} or
