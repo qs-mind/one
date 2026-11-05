@@ -6,7 +6,6 @@ import socket
 import threading
 import time
 from dataclasses import replace
-from pathlib import Path
 
 import httpx
 import httpx2
@@ -80,21 +79,64 @@ def test_chat_without_ai_explains_how_to_add_one():
     r = client.post("/chat", json=message("hello"), headers=AUTH)
     body = r.text
     assert r.status_code == 200
-    assert '"type":"text-delta"' in body
-    assert copy.NO_AI["ar"] in body and copy.NO_AI["en"] in body
-    assert "Traceback" not in body and '"type":"error"' not in body
+    # the chat's error line, with the action that fixes it: Open AI settings
+    assert error_chunk(body) == copy.NO_AI and chunk_fix(body) == "ai"
+    assert "Traceback" not in body and '"type":"text-delta"' not in body
     assert body.rstrip().endswith("[DONE]")
     assert client.get("/chat/general/messages", headers=AUTH).json() == {"messages": []}
 
 
-def test_no_ai_reply_names_the_ai_button():
-    # The reply must send the engineer to the button the screen really shows.
-    i18n = (Path(__file__).parents[2] / "ui" / "src" / "i18n.ts").read_text(encoding="utf-8")
-    label = re.search(r'\bai: \{ en: "([^"]+)", ar: "([^"]+)" \}', i18n)
-    assert label, "ai label not found in ui/src/i18n.ts"
-    en, ar = label.groups()
-    assert f"“{en}”" in copy.NO_AI["en"] and f"«{ar}»" in copy.NO_AI["ar"]
-    assert "Settings" not in copy.NO_AI["en"] and "الإعدادات" not in copy.NO_AI["ar"]
+# Words that send the engineer to a place on the screen. The same text shows in the chat, in AI
+# settings and in the first launch (which has no top bar), so a text names no place: the screen
+# adds the action that fits where it shows (copy.fix_of).
+PLACE_WORDS = re.compile(
+    r"at the top|from the top|top bar|\babove\b|\bbelow\b|\bpress\b|in settings|from settings"
+    r"|فوق|تحت|دوس|اضغط|الإعدادات|من «|في «|افتح «",
+    re.IGNORECASE,
+)
+
+
+def _texts():
+    for name, value in vars(copy).items():
+        if name.isupper() and isinstance(value, dict) and set(value) == {"en", "ar"}:
+            yield name, value
+
+
+# What these point to is in the same card or answer, wherever it shows.
+IN_PLACE = {
+    "DISAGREEMENT",  # both views are under it, in its card
+    "QUESTION_DETAIL",  # Send is its card's own button
+    "BOQ_NO_ROWS",  # to the agent: the rows under the header row of the sheet
+    "SANDBOX_FAILED",  # the script's last lines follow it
+}
+
+
+def test_no_core_text_points_to_a_place_on_the_screen():
+    pointing = [name for name, text in _texts() if PLACE_WORDS.search(text["en"] + text["ar"])]
+    # TOOL_UPDATE_DESK & co. quote a Desk's or a file's name in «»; they point nowhere
+    quoting = {name for name, text in _texts() if re.search(r"«\{[a-z_]+\}»", text["ar"])}
+    assert [name for name in pointing if name not in quoting | IN_PLACE] == []
+
+
+def test_every_text_the_screen_offers_a_fix_for_is_matched():
+    for fix, found in copy.FIXES.items():
+        for text in found:
+            filled = copy.fill(text, provider="Claude", model="Sample model", date="2026-11-05")
+            assert copy.fix_of(text) == fix and copy.fix_of(filled) == fix
+    assert copy.fix_of(copy.fill(copy.AI_FAILED, provider="Claude")) is None
+    assert copy.error(copy.KEY_REFUSED) == {"error": copy.KEY_REFUSED, "fix": "ai"}
+    assert copy.error(copy.PROJECT_NOT_FOUND) == {"error": copy.PROJECT_NOT_FOUND}
+
+
+def test_a_card_carries_the_fix_of_its_detail():
+    from qsone.engine.stream import _card
+    from qsone.engine.types import Card
+
+    detail = copy.fill(copy.PRICE_UNKNOWN, model="Sample model")
+    unpriced = Card("c1", "cap", copy.CAP_TITLE, detail, ("yes", "no"))
+    assert _card(unpriced)["fix"] == "ai"  # the card adds Open AI settings, to enter the price
+    plain = Card("c2", "budget", copy.CAP_TITLE, copy.SCOPE_BRIEF, ("yes", "no"))
+    assert "fix" not in _card(plain)
 
 
 def test_lead_model_is_one_constant():
@@ -207,11 +249,21 @@ def raising(error: Exception):
     return stream
 
 
-def error_chunk(body: str) -> dict:
-    """The one `error` chunk in a UI message stream, with its text read as an {en, ar} pair."""
+def _error_said(body: str) -> dict:
     errors = [c for c in chunks(body) if c["type"] == "error"]
     assert len(errors) == 1, chunks(body)
     return json.loads(errors[0]["errorText"])
+
+
+def error_chunk(body: str) -> dict:
+    """The one `error` chunk in a UI message stream, with its text read as an {en, ar} pair."""
+    said = _error_said(body)
+    return {"en": said["en"], "ar": said["ar"]}
+
+
+def chunk_fix(body: str) -> str | None:
+    """The `fix` the one `error` chunk carries for the screen, if any."""
+    return _error_said(body).get("fix")
 
 
 def anthropic_body(kind: str, message: str) -> dict:
@@ -228,7 +280,7 @@ def anthropic_body(kind: str, message: str) -> dict:
                 model_name=chat.LEAD_MODEL,
                 body=anthropic_body("authentication_error", "invalid x-api-key"),
             ),
-            copy.fill(copy.AI_KEY_REFUSED, provider="Claude"),
+            copy.KEY_REFUSED,  # the Claude key: Anthropic's own words
         ),
         (
             ModelHTTPError.for_category(
@@ -303,6 +355,7 @@ def test_refused_key_from_anthropic_is_plain_and_never_shows_the_key(caplog):
     r = client.post("/chat", json=message("سعّر البند ده"), headers=AUTH)
 
     assert sent and KEY in sent[0]  # the request really went out with the key
-    assert error_chunk(r.text) == copy.fill(copy.AI_KEY_REFUSED, provider="Claude")
+    assert error_chunk(r.text) == copy.KEY_REFUSED
+    assert chunk_fix(r.text) == "ai"  # the chat adds Open AI settings
     assert "invalid x-api-key" not in r.text and "authentication_error" not in r.text
     assert KEY not in r.text and KEY not in caplog.text

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api } from "../api";
 import { coreLine, send } from "../core";
-import { Feedback } from "../firstlaunch/parts";
+import { Feedback, secondary } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AutoHeight } from "../ui/AutoHeight";
 import { looksLikeAmount, SaveNote, useSaving } from "../ui/live";
@@ -361,7 +361,7 @@ function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; on
         {failed ? (
           <Feedback state="failed">{pick(failed)}</Feedback>
         ) : (
-          status && <StatusLine status={status} />
+          status && <StatusLine status={status} onAgain={() => void check()} />
         )}
       </div>
       {(on || switchedOn) && <p className="text-slate">{t("claudeCodeCopy")}</p>}
@@ -369,11 +369,20 @@ function ClaudeCode({ connectors, onChanged }: { connectors: ConnectorInfo[]; on
   );
 }
 
-function StatusLine({ status }: { status: "checking" | ClaudeCodeStatus | Text }) {
+/** How Claude Code is now. A failed line ends "then try again" (or "pick it", the file field above): its Try again
+ * checks once more, as no timer does. */
+function StatusLine({ status, onAgain }: { status: "checking" | ClaudeCodeStatus | Text; onAgain: () => void }) {
   if (status === "checking") return <Feedback state="busy">{t("claudeCodeChecking")}</Feedback>;
-  if ("en" in status) return <Feedback state="failed">{pick(status)}</Feedback>;
-  const ready = !status.code && status.signed_in !== false;
-  return <Feedback state={ready ? "done" : "failed"}>{statusLine(status)}</Feedback>;
+  const ready = !("en" in status) && !status.code && status.signed_in !== false;
+  if (ready) return <Feedback state="done">{statusLine(status)}</Feedback>;
+  return (
+    <div className="flex flex-col gap-2">
+      <Feedback state="failed">{"en" in status ? pick(status) : statusLine(status)}</Feedback>
+      <button type="button" onClick={onAgain} className={`${secondary} self-start`}>
+        {t("tryAgain")}
+      </button>
+    </div>
+  );
 }
 
 function priceText(card: ModelCard): string {

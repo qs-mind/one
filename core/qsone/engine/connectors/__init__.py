@@ -145,8 +145,20 @@ async def check(via: str, *, among: Sequence[Connector] | None = None) -> Text |
         return copy.NO_AI
     except PROVIDER_ERRORS as error:
         log.warning("The check through %s failed: %s", connector.id, error)
-        return plain_error(error, connector.name)
+        said = plain_error(error, connector.name)
+        # a check has no work to save: its own words, not AI_FAILED's
+        failed = copy.fill(copy.AI_FAILED, provider=connector.name)
+        return copy.fill(copy.AI_CHECK_FAILED, provider=connector.name) if said == failed else said
     return None
+
+
+def key_refused(provider: str) -> Text:
+    """A refused key, in plain words: Anthropic's own for the Claude key (the Native Link)."""
+    from qsone.engine.connectors.native_anthropic import NativeLink
+
+    if provider == NativeLink.name:
+        return copy.KEY_REFUSED
+    return copy.fill(copy.AI_KEY_REFUSED, provider=provider)
 
 
 def plain_error(error: Exception, provider: str) -> Text:
@@ -159,8 +171,8 @@ def plain_error(error: Exception, provider: str) -> Text:
         | openai.AuthenticationError
         | openai.PermissionDeniedError,
     ):
-        text = copy.AI_KEY_REFUSED
-    elif isinstance(
+        return key_refused(provider)
+    if isinstance(
         error,
         ModelConnectionError
         | ModelRequestTimeout
@@ -180,8 +192,8 @@ def plain_error(error: Exception, provider: str) -> Text:
     else:  # a plain HTTP error: ModelHTTPError, or the SDKs' APIStatusError
         status = getattr(error, "status_code", None)
         if status in (401, 403):
-            text = copy.AI_KEY_REFUSED
-        elif isinstance(status, int) and (status == 429 or status >= 500):  # also overloaded
+            return key_refused(provider)
+        if isinstance(status, int) and (status == 429 or status >= 500):  # also overloaded
             text = copy.AI_BUSY
         else:
             text = copy.AI_FAILED

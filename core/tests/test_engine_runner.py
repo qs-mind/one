@@ -718,7 +718,7 @@ async def test_a_refused_key_fails_with_plain_words(make_engine, project):
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)
     assert states(events)[-1] == "failed"
-    assert events[-1].step == copy.fill(copy.AI_KEY_REFUSED, provider="Claude")
+    assert events[-1].step == copy.KEY_REFUSED  # the Claude key: Anthropic's own words
 
 
 async def test_cap_pause_then_continue(make_engine, project, fake_clock):

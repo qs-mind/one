@@ -3,9 +3,11 @@
 // cards. The shell owns the chat itself (ui/src/shell/useChats.ts) and its composer, the command bar.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SelectionItem } from "../canvas/types";
+import { type Fix, fixOf } from "../core";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
 import { dir, fill, type Language, language, languageOf, pick, t, type Text, useLanguage } from "../i18n";
 import { UnderstoodCard } from "../import/UnderstoodCard";
+import { FixAction } from "../shell/FixAction";
 import { HandOffCards } from "../shell/HandOffCard";
 import type { ChatState } from "../shell/useChats";
 import { textOf } from "../shell/useChats";
@@ -22,15 +24,31 @@ import { Reply } from "./Reply";
 import { takeSentFrom } from "./sent";
 import { useScrollEdges } from "../ui/useScrollEdges";
 
-// The core sends a model error as an {en, ar} pair in the error text; any other failure gets the plain line.
-function errorLine(error: Error): string {
+// The core sends a model error as an {en, ar} pair in the error text, with the `fix` the chat can offer (a refused
+// key: Open AI settings); any other failure gets the plain line.
+function errorLine(error: Error): { line: string; fix?: Fix } {
   try {
-    const text = JSON.parse(error.message) as Partial<Text>;
-    if (typeof text.en === "string" && typeof text.ar === "string") return pick(text as Text);
+    // the stream's error chunk ({en, ar, fix}), or a refused request's body ({error: {en, ar}, fix})
+    const said = JSON.parse(error.message) as Partial<Text> & { error?: Partial<Text>; fix?: unknown };
+    const text = said.error ?? said;
+    if (typeof text.en === "string" && typeof text.ar === "string") {
+      return { line: pick({ en: text.en, ar: text.ar }), fix: fixOf(said.fix) };
+    }
   } catch {
     // not from the core
   }
-  return t("chatError");
+  return { line: t("chatError") };
+}
+
+/** The chat's error line, and the button to where it is fixed. */
+function ErrorLine({ error }: { error: Error }) {
+  const { line, fix } = errorLine(error);
+  return (
+    <li role="alert" className="flex flex-col gap-2 text-copper">
+      <p>{line}</p>
+      <FixAction fix={fix} />
+    </li>
+  );
 }
 
 /** "Selected: BOQ pricing, rows 3/01–3/04", or "3 selected". The name keeps its own direction (an Arabic title on
@@ -238,11 +256,7 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
               <span className={reduced ? "text-slate" : "shimmer"}>{t("thinking")}</span>
             </li>
           )}
-          {error && (
-            <li role="alert" className="text-copper">
-              {errorLine(error)}
-            </li>
-          )}
+          {error && <ErrorLine error={error} />}
           {failed && (
             <li role="alert" className="text-copper">
               {pick(failed)}

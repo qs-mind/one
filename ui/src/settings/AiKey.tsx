@@ -4,10 +4,13 @@
 // again. One that fails stays, to be fixed.
 // `plain`: the field alone, with no title, help or frame, inside another screen (the first launch's Connect AI, whose
 // choice already says what the key is).
-import { useId } from "react";
-import { coreLine, send } from "../core";
-import { Feedback } from "../firstlaunch/parts";
+// A failed line never sends the engineer elsewhere: this field is where the key is fixed. After no internet or a busy
+// provider (fix "retry") a Try again checks the same key once more; before the consent (fix "consent"), Connect AI.
+import { useId, useRef } from "react";
+import { coreAnswer, type Fix, send } from "../core";
+import { Feedback, secondary } from "../firstlaunch/parts";
 import { pick, t, texts, useLanguage } from "../i18n";
+import { FixAction } from "../shell/FixAction";
 import { KEY_MIN, useLiveKey } from "../ui/live";
 
 export function AiKey({
@@ -25,15 +28,24 @@ export function AiKey({
 }) {
   useLanguage();
   const id = useId();
-  const { field, live } = useLiveKey(KEY_MIN.claude, async (value, signal) => {
+  const fix = useRef<Fix>(undefined); // what fixes the line shown, as the core says
+  const { field, live, again } = useLiveKey(KEY_MIN.claude, async (value, signal) => {
     onChecking?.();
+    fix.current = undefined;
     const saved = await send("/settings/ai-key", "PUT", { provider: "anthropic", value }, signal);
     if (signal.aborted) return null;
-    if (!saved?.ok) return coreLine(saved, texts.keyFailed);
+    if (!saved?.ok) {
+      const answer = await coreAnswer(saved, texts.keyFailed);
+      fix.current = answer.fix;
+      return answer.line;
+    }
     const checked = await send("/settings/ai/check", "POST", { via: "api_key" }, signal);
     if (signal.aborted) return null;
     onChecked?.(checked?.ok === true);
-    return checked?.ok ? null : coreLine(checked, texts.claudeCodeCheckFailed);
+    if (checked?.ok) return null;
+    const answer = await coreAnswer(checked, texts.claudeCodeCheckFailed);
+    fix.current = answer.fix;
+    return answer.line;
   });
 
   const body = (
@@ -57,7 +69,17 @@ export function AiKey({
         {live.state === "short" && <p className="fl-rise text-slate">{t("keyTooShort")}</p>}
         {live.state === "busy" && <Feedback state="busy">{t("aiLinkChecking")}</Feedback>}
         {live.state === "done" && <Feedback state="done">{t("aiLinkWorks")}</Feedback>}
-        {live.state === "failed" && <Feedback state="failed">{pick(live.line)}</Feedback>}
+        {live.state === "failed" && (
+          <div className="flex flex-col gap-2">
+            <Feedback state="failed">{pick(live.line)}</Feedback>
+            {fix.current === "retry" && (
+              <button type="button" onClick={again} className={`${secondary} self-start`}>
+                {t("tryAgain")}
+              </button>
+            )}
+            {fix.current === "consent" && <FixAction fix="consent" />}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -511,4 +511,4 @@ def test_search_shows_native_when_an_ai_can_search(memory_keyring):
 def test_search_key_store_down(failing_keyring):
     client = TestClient(create_app(SECRET))
     r = client.put("/settings/search-key", json={"value": "brave-key-sample"}, headers=AUTH)
-    assert r.status_code == 503 and r.json() == {"error": copy.KEY_STORE_DOWN}
+    assert r.status_code == 503 and r.json() == {"error": copy.KEY_STORE_DOWN, "fix": "retry"}

@@ -196,6 +196,25 @@ describe("ApprovalCard", () => {
     expect(screen.getByText(/2\.41 of 3\.00 USD/)).toBeInTheDocument();
   });
 
+  it("a model of unknown price: the card offers Open AI settings, where its price is entered, until answered", async () => {
+    const unpriced: CardData = {
+      kind: "cap",
+      title: { en: "Spending Cap", ar: "سقف الصرف" },
+      detail: {
+        en: "ONE does not know the price of Sample model, so the Spending Cap cannot protect you until you enter its price. Use it anyway in this Brief?",
+        ar: "ONE مش عارف سعر Sample model، فسقف الصرف مش هيقدر يحميك لحد ما تكتب سعره. نستخدمه برضه في التكليف ده؟",
+      },
+      options: ["yes", "no"],
+      fix: "ai",
+      status: "pending",
+    };
+    const { rerender } = render(<ApprovalCard id="p1" card={unpriced} />);
+    expect(screen.getByText(unpriced.detail.ar).textContent).not.toMatch(/فوق|«الذكاء الاصطناعي»/);
+    expect(screen.getByRole("button", { name: texts.openAiSettings.ar })).toBeInTheDocument();
+    rerender(<ApprovalCard id="p1" card={{ ...unpriced, status: "settled", choice: "yes" }} />);
+    expect(screen.queryByRole("button", { name: texts.openAiSettings.ar })).toBeNull();
+  });
+
   it("raising the cap saves the new caps as typed; going on waits for the last save, then answers", async () => {
     const amounts = { brief: "3.00", day: "15.00", month: "150.00", budget_above: "0.50" };
     const caps = { ...amounts, subscription_stops: false };

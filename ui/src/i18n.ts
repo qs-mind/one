@@ -43,6 +43,10 @@ export const texts = {
   // Plan 4 (agent engine). Arabic in plain Egyptian colloquial, as in core/qsone/copy.py, until the founder picks.
   ai: { en: "AI", ar: "الذكاء الاصطناعي" },
   aiTitle: { en: "AI settings", ar: "إعدادات الذكاء الاصطناعي" },
+  // the action a core text gets where it shows away from its fix (shell/FixAction.tsx), and a check's own retry
+  openAiSettings: { en: "Open AI settings", ar: "افتح إعدادات الذكاء الاصطناعي" },
+  openBackup: { en: "Open Backup", ar: "افتح النسخة الاحتياطية" },
+  tryAgain: { en: "Try again", ar: "جرّب تاني" },
   aiLoading: { en: "Loading AI settings…", ar: "بنحمّل إعدادات الذكاء الاصطناعي…" },
   aiFailed: { en: "AI settings could not be loaded. Try again.", ar: "مقدرناش نجيب إعدادات الذكاء الاصطناعي. جرّب تاني." },
   noAiYet: {
@@ -87,16 +91,16 @@ export const texts = {
     ar: "Claude Code مش موجود على الجهاز ده. نزّله من https://code.claude.com/docs/en/setup، أو اختار الملف بتاعه.",
   },
   claudeCodeTooOld: {
-    en: "Your Claude Code lacks options ONE needs. Update it, then check again.",
-    ar: "Claude Code اللي عندك ناقصه اختيارات ONE محتاجها. حدّثه وبعدين افحص تاني.",
+    en: "Your Claude Code lacks options ONE needs. Update it to the newest version, then try again.",
+    ar: "Claude Code اللي عندك ناقصه اختيارات ONE محتاجها. حدّثه لآخر نسخة، وبعدين جرّب تاني.",
   },
   claudeCodeShim: {
     en: "This is the npm claude.cmd, which ONE cannot run safely. Install the native Claude Code, then pick it.",
     ar: "ده claude.cmd بتاع npm، وONE مش هيقدر يشغّله بأمان. نزّل Claude Code الأصلي وبعدين اختاره.",
   },
   claudeCodeSignedOut: {
-    en: "Claude Code is signed out. Open Claude Code once and sign in, then try again.",
-    ar: "Claude Code مش مسجّل دخول. افتح Claude Code مرة وسجّل دخول، وبعدين جرّب تاني.",
+    en: "Claude Code is signed out. Sign in to it once in a terminal, then try again.",
+    ar: "Claude Code مش مسجّل دخول. سجّل دخولك فيه مرة من الـ terminal، وبعدين جرّب تاني.",
   },
   claudeCodeCheckFailed: { en: "The check did not run. Try again.", ar: "الفحص ماشتغلش. جرّب تاني." },
   useClaudeCode: { en: "Use Claude Code", ar: "استخدم Claude Code" },
@@ -111,7 +115,10 @@ export const texts = {
   roleSpecialist: { en: "Specialists", ar: "المهندسين المتخصصين" },
   roleQuick: { en: "Quick answers", ar: "الإجابات السريعة" },
   recommended: { en: "Recommended", ar: "الموصى بيه" },
-  noModels: { en: "No models yet. Connect an AI above first.", ar: "لسه مفيش نماذج. وصّل ذكاء اصطناعي من فوق الأول." },
+  noModels: {
+    en: "No models yet. They show here once a connected AI answers.",
+    ar: "لسه مفيش نماذج. هتظهر هنا أول ما ذكاء اصطناعي متوصّل يرد.",
+  },
   roleNotSaved: { en: "The choice was not saved. Try again.", ar: "الاختيار ماتحفظش. جرّب تاني." },
   pricePerMillion: {
     en: "{in} USD in, {out} USD out per million tokens",
@@ -641,7 +648,11 @@ export const texts = {
   setupAgainHelp: { en: "Go through the first steps again.", ar: "امشي على خطوات البداية تاني." },
   setupNotSaved: { en: "This step was not saved. Try again.", ar: "الخطوة دي ماتحفظتش. جرّب تاني." },
   languageTitle: { en: "Choose your language", ar: "اختار لغتك" },
-  languageHelp: { en: "You can change it any time from the top bar.", ar: "تقدر تغيّرها في أي وقت من الشريط اللي فوق." },
+  // the other language is in the top bar's More menu (shell/TopBar.tsx), on every screen of the app
+  languageHelp: {
+    en: "You can change it any time from “More” in ONE's top bar.",
+    ar: "تقدر تغيّرها في أي وقت من «أكتر» في الشريط اللي فوق في ONE.",
+  },
   languageArabic: { en: "العربية", ar: "العربية" },
   languageEnglish: { en: "English", ar: "English" },
   accountTitle: { en: "Your QS Mind account", ar: "حساب QS Mind بتاعك" },
@@ -699,8 +710,8 @@ export const texts = {
   },
   aiLinkClaudeCodeFound: { en: "Found: Claude Code {version}", ar: "لقيناه: Claude Code {version}" },
   aiLinkClaudeCodeMissing: {
-    en: "Claude Code is not on this computer yet. Install it from claude.com/claude-code, sign in to it once in a terminal, then press Check.",
-    ar: "Claude Code لسه مش على الجهاز ده. نزّله من claude.com/claude-code، وسجّل دخولك فيه مرة من الـ terminal، وبعدين دوس «اتأكد».",
+    en: "Claude Code is not on this computer yet. Install it from claude.com/claude-code, sign in to it once in a terminal, then try again.",
+    ar: "Claude Code لسه مش على الجهاز ده. نزّله من claude.com/claude-code، وسجّل دخولك فيه مرة من الـ terminal، وبعدين جرّب تاني.",
   },
   aiLinkApiKey: { en: "An API key", ar: "مفتاح API" },
   aiLinkApiKeyHelp: {
@@ -710,8 +721,8 @@ export const texts = {
   aiLinkChecking: { en: "Checking…", ar: "بنتأكد…" },
   aiLinkWorks: { en: "It works. ONE is connected to AI.", ar: "شغال. ONE اتوصّل بالذكاء الاصطناعي." },
   aiLinkLater: {
-    en: "No AI is connected. You can connect it later from AI settings.",
-    ar: "مفيش ذكاء اصطناعي متوصّل. تقدر توصّله بعدين من إعدادات الذكاء الاصطناعي.",
+    en: "No AI is connected. You can connect it later from “AI” in “More”.",
+    ar: "مفيش ذكاء اصطناعي متوصّل. تقدر توصّله بعدين من «الذكاء الاصطناعي» في «أكتر».",
   },
   cardTitle: { en: "Introduction card", ar: "بطاقة التعريف" },
   cardHelp: {
@@ -733,8 +744,8 @@ export const texts = {
   cardNotSavedRetry: { en: "The card was not saved. Try again.", ar: "البطاقة ماتحفظتش. جرّب تاني." },
   usageTitle: { en: "Usage Stats", ar: "إحصائيات الاستخدام" },
   usageHelp: {
-    en: "Share a few numbers about how ONE is used, so QS Mind can make it better. You can change this any time in Settings.",
-    ar: "شارك شوية أرقام عن استخدامك لـ ONE، عشان QS Mind يحسّنه. تقدر تغيّر ده في أي وقت من الإعدادات.",
+    en: "Share a few numbers about how ONE is used, so QS Mind can make it better. You can change this any time from “Setup” in “More”.",
+    ar: "شارك شوية أرقام عن استخدامك لـ ONE، عشان QS Mind يحسّنه. تقدر تغيّر ده في أي وقت من «الإعداد» في «أكتر».",
   },
   usageSentTitle: { en: "What is sent", ar: "اللي بيتبعت" },
   usageSent: {

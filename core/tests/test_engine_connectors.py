@@ -426,7 +426,7 @@ def test_a_failed_list_is_plain_and_the_rest_still_shows():
     )
     body = client.get("/settings/ai", headers=AUTH).json()
     claude, ds = body["connectors"]
-    assert claude["error"] == copy.fill(copy.AI_KEY_REFUSED, provider="Claude")
+    assert claude["error"] == copy.KEY_REFUSED  # the Claude key: Anthropic's own words
     assert ds["error"] is None and not ds["key_set"]
     assert {c["connector"] for c in body["sheet"]} == {ds["id"]}
 
@@ -512,10 +512,18 @@ async def test_check_says_ok_or_why_in_plain_words():
 
     keys.set_key("anthropic", CLAUDE_KEY)
     refused = NativeLink(http_client=providers_refusing_messages())
-    assert await connectors.check("anthropic/claude-haiku-5-5", among=[refused]) == copy.fill(
-        copy.AI_KEY_REFUSED, provider="Claude"
-    )
+    said = await connectors.check("anthropic/claude-haiku-5-5", among=[refused])
+    assert said == copy.KEY_REFUSED  # the Claude key: Anthropic's own words
     assert await connectors.check("standard:gone/x", among=[ok]) == copy.NO_AI
+
+    def broken(messages, info: AgentInfo) -> ModelResponse:
+        raise ModelHTTPError(400, "any-model")
+
+    # a check has no work to save: never AI_FAILED's "the work so far is saved"
+    failing = StubConnector(FunctionModel(broken))
+    assert await connectors.check("standard:stub/any-model", among=[failing]) == copy.fill(
+        copy.AI_CHECK_FAILED, provider=failing.name
+    )
 
 
 def providers_refusing_messages() -> httpx2.AsyncClient:
@@ -553,3 +561,9 @@ def _status(cls, status: int):
 )
 def test_provider_errors_are_plain_words(error, plain):
     assert connectors.plain_error(error, "DeepSeek") == copy.fill(plain, provider="DeepSeek")
+
+
+def test_a_refused_claude_key_says_where_to_make_one():
+    refused = _status(anthropic.AuthenticationError, 401)
+    assert connectors.plain_error(refused, NativeLink.name) == copy.KEY_REFUSED
+    assert "console.anthropic.com" in copy.KEY_REFUSED["en"] + copy.KEY_REFUSED["ar"]

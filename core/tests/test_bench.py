@@ -195,7 +195,7 @@ def test_the_bench_checks_a_claude_key_itself(data_dir, monkeypatch):
         assert works.status_code == 200 and works.json() == {"ok": True}
         refused = check("sk-ant-sample-not-a-real-key-0000000000000000")
         assert refused.status_code == 409
-        assert refused.json() == {"error": copy.fill(copy.AI_KEY_REFUSED, provider="Anthropic")}
+        assert refused.json() == {"error": copy.KEY_REFUSED, "fix": "ai"}
 
         client.post("/bench/forget-claude-key", headers=AUTH)
         assert client.get("/settings/ai-key", headers=AUTH).json() == {"set": False}

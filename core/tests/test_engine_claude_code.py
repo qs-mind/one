@@ -172,7 +172,8 @@ async def test_a_claude_that_will_not_answer_is_plain():
     broken = ClaudeCodeConnector(None, command_prefix=[sys.executable, "-c", "raise SystemExit(1)"])
     found = await status(None, command_prefix=broken._prefix)
     assert found.installed and not found.compatible and found.code == "AI_FAILED"
-    assert await broken.check() == copy.fill(copy.AI_FAILED, provider="Claude Code")
+    # a check has no work to save: its own words
+    assert await broken.check() == copy.fill(copy.AI_CHECK_FAILED, provider="Claude Code")
     assert await broken.cards() == []
 
 

@@ -77,7 +77,9 @@ export function useLiveKey(min: number, run: (key: string, signal: AbortSignal) 
     onChange: (event: { target: { value: string } }) => change(event.target.value),
     onPaste: () => void (pasted.current = true),
   };
-  return { field, live };
+  /** The same key checked once more (after no internet, a busy provider): the field keeps it. */
+  const again = useCallback(() => void (looksLikeKey(value, min) && start(value)), [value, min, start]);
+  return { field, live, again };
 }
 
 export type Saving = { state: "idle" | "busy" | "done" } | { state: "failed"; line: Text };

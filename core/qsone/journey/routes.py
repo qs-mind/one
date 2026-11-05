@@ -131,7 +131,7 @@ def router(engine: Any) -> APIRouter:
         if body.via == "api_key":
             failed = await engine_connectors.check(f"anthropic/{chat.lead_model_id()}", among=found)
             if failed:
-                return JSONResponse({"error": failed}, 409)
+                return JSONResponse(copy.error(failed), 409)
             usage.track("ai_link", via="api_key")
             return JSONResponse({"ok": True})
         saved = claude_link.saved()["path"]
@@ -143,7 +143,7 @@ def router(engine: Any) -> APIRouter:
             found.append(claude_link.ClaudeCodeConnector(saved or picked))
         failed = await engine_connectors.check(claude_link.ID, among=found)
         if failed:
-            return JSONResponse({"error": failed}, 409)
+            return JSONResponse(copy.error(failed), 409)
         try:
             claude_link.save(path=saved or picked, on=True)
         except OSError:
@@ -170,7 +170,7 @@ def router(engine: Any) -> APIRouter:
         except BriefBusy as busy:
             return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
         except NoAI as none:
-            return JSONResponse({"error": none.text}, status_code=409)
+            return JSONResponse(copy.error(none.text), status_code=409)
         return JSONResponse({"brief_id": brief_id}, status_code=202)
 
     @r.get("/projects/{project_id}/closing")
@@ -189,7 +189,7 @@ def router(engine: Any) -> APIRouter:
         except BriefBusy as busy:
             return JSONResponse({"brief_id": busy.brief_id}, status_code=409)
         except NoAI as none:
-            return JSONResponse({"error": none.text}, status_code=409)
+            return JSONResponse(copy.error(none.text), status_code=409)
         if brief_id is None:
             return JSONResponse({"error": copy.LESSON_STAYS_CONFIDENTIAL}, status_code=409)
         return JSONResponse({"brief_id": brief_id}, status_code=202)

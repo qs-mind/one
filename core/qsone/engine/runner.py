@@ -701,7 +701,7 @@ class _Brief:
                 provider = self._provider(choice)
                 log.warning("run %s on %s: %s %s", run_id, choice.connector, kind, error)
                 if kind == "auth":
-                    raise _Fail(copy.fill(copy.AI_KEY_REFUSED, provider=provider)) from None
+                    raise _Fail(connectors_mod.key_refused(provider)) from None
                 if kind == "other":
                     raise _Fail(copy.fill(copy.AI_FAILED, provider=provider)) from None
                 if kind == "offline":

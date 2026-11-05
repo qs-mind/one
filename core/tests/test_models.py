@@ -97,7 +97,7 @@ def test_no_key_says_how_to_add_one():
 
     r = client_with(never).get("/settings/models", headers=AUTH)
     assert r.status_code == 409
-    assert r.json() == {"error": copy.NO_KEY}
+    assert r.json() == {"error": copy.NO_KEY, "fix": "ai"}
     assert called == []
 
 
@@ -118,7 +118,7 @@ def test_provider_errors_reach_the_screen_in_plain_words(status, kind, message, 
     keys.set_key("anthropic", KEY)
     r = client_with(lister(refusing(status, kind, message))).get("/settings/models", headers=AUTH)
     assert r.status_code == 502
-    assert r.json() == {"error": plain}
+    assert r.json() == copy.error(plain)
     assert message not in r.text and kind not in r.text  # the provider's own words stay out
     assert message in caplog.text  # and go to core.log
     assert KEY not in r.text and KEY not in caplog.text
@@ -132,7 +132,7 @@ def test_no_connection_is_plain():
 
     keys.set_key("anthropic", KEY)
     r = client_with(offline).get("/settings/models", headers=AUTH)
-    assert r.status_code == 502 and r.json() == {"error": copy.NO_CONNECTION}
+    assert r.status_code == 502 and r.json() == {"error": copy.NO_CONNECTION, "fix": "retry"}
 
 
 # GET and PUT /settings/model

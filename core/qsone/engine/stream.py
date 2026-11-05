@@ -6,7 +6,8 @@ screen updates each in place: `data-progress` (id: the agent run), `data-team` (
 `data-card` (the card; status pending, settled with the choice, or withdrawn), `data-cost` (the
 scope), `data-review` (the Deliverable), `data-unsourced` (the Brief), `data-status` (the Brief),
 and any `Data` event as `data-<name>`. A failed Brief also ends with an `error` chunk whose text
-is its plain {en, ar} words as JSON, as the screen reads it.
+is its plain {en, ar} words as JSON, as the screen reads it, with the `fix` the screen can offer
+(`copy.fix_of`); a card carries its detail's `fix` too.
 
 No PydanticAI here: the chunks are written as the protocol defines them."""
 
@@ -14,6 +15,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator, Iterable
 
+from qsone import copy
 from qsone.engine.types import (
     Asked,
     CostNotice,
@@ -45,6 +47,9 @@ def _card(card) -> dict:
         "detail": card.detail,
         "options": list(card.options),
     }
+    fix = copy.fix_of(card.detail)
+    if fix is not None:
+        found["fix"] = fix
     if card.payload is not None:
         found["payload"] = card.payload
     return found
@@ -123,6 +128,13 @@ def _sse(chunk: dict | str) -> str:
     return f"data: {body}\n\n"
 
 
+def error_chunk(text: dict) -> str:
+    """The `error` chunk: `text` as JSON, with its `fix` when the screen can offer one."""
+    fix = copy.fix_of(text)
+    said = text if fix is None else text | {"fix": fix}
+    return _sse({"type": "error", "errorText": json.dumps(said, ensure_ascii=False)})
+
+
 def text_id(message_id: str) -> str:
     return f"{message_id}-text"
 
@@ -184,7 +196,7 @@ async def ui_stream(events: AsyncIterator[Event], *, message_id: str) -> AsyncIt
     if text_open:
         yield _sse({"type": "text-end", "id": text_id(message_id)})
     if failed is not None:
-        yield _sse({"type": "error", "errorText": json.dumps(failed, ensure_ascii=False)})
+        yield error_chunk(failed)
     yield _sse({"type": "finish-step"})
     yield _sse({"type": "finish"})
     yield _sse("[DONE]")

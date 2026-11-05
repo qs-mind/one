@@ -282,6 +282,107 @@ describe("FirstLaunch", () => {
     expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeDisabled();
   });
 
+  // The core's own words for each failure of the check (core/qsone/copy.py), with the fix it sends. In the first launch
+  // there is no top bar and the key field is where the key is fixed: a line here never sends the engineer elsewhere.
+  const PLACE = /at the top|top bar|\babove\b|in settings|\bpress\b|open ai settings|فوق|الإعدادات|دوس|افتح/i;
+  const failures = [
+    {
+      name: "a refused key",
+      fix: "ai",
+      error: {
+        en: "Anthropic refused this Claude key. Check that you copied all of it, or make a new key at console.anthropic.com.",
+        ar: "Anthropic رفض مفتاح Claude ده. اتأكد إنك نسخته كله، أو اعمل مفتاح جديد من console.anthropic.com.",
+      },
+      retry: false,
+    },
+    {
+      name: "no internet",
+      fix: "retry",
+      error: {
+        en: "Could not reach Claude. Check the internet connection, then try again.",
+        ar: "مقدرناش نوصل لـ Claude. اتأكد إن النت شغال وجرّب تاني.",
+      },
+      retry: true,
+    },
+    {
+      name: "a busy provider",
+      fix: "retry",
+      error: { en: "Claude is busy right now. Try again in a minute.", ar: "في ضغط على Claude دلوقتي. جرّب تاني كمان دقيقة." },
+      retry: true,
+    },
+    {
+      name: "a check the provider did not answer",
+      fix: "retry",
+      error: { en: "Claude did not answer the check. Try again in a few minutes.", ar: "Claude مارَدّش على الفحص. جرّب تاني كمان كام دقيقة." },
+      retry: true,
+    },
+  ];
+  for (const failure of failures) {
+    it(`the key's check fails (${failure.name}): what to do, in place, and Try again only where it helps`, async () => {
+      const fetch = mockCore({
+        "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+        "PUT /settings/ai-key": () => Response.json({ set: true }),
+        "POST /settings/ai/check": () => Response.json({ error: failure.error, fix: failure.fix }, { status: 409 }),
+      });
+      const user = userEvent.setup();
+      for (const lang of ["en", "ar"] as const) {
+        setLanguage(lang);
+        const { unmount } = render(<FirstLaunch initial={{ ...fresh(), steps: { ...fresh().steps, language: "done", account: "skipped" } }} onDone={vi.fn()} />);
+        await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkApiKey[lang]) }));
+        await user.click(screen.getByLabelText(texts.aiKeyLabel[lang]));
+        await user.paste(KEY);
+        const alert = await screen.findByRole("alert");
+        expect(alert).toHaveTextContent(failure.error[lang]);
+        const line = alert.closest("[data-key-line]") as HTMLElement;
+        expect(line.textContent).not.toMatch(PLACE);
+        expect(within(line).queryByRole("button", { name: texts.openAiSettings[lang] })).toBeNull();
+        const again = within(line).queryByRole("button", { name: texts.tryAgain[lang] });
+        expect(again !== null).toBe(failure.retry);
+        if (again) {
+          const before = calls(fetch, "POST /settings/ai/check").length;
+          await user.click(again); // the same key, checked once more
+          await waitFor(() => expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(before + 1));
+          expect(screen.getByLabelText(texts.aiKeyLabel[lang])).toHaveValue(KEY);
+        }
+        unmount();
+      }
+    });
+  }
+
+  it("Claude Code that fails its check says what to do, and Try again checks it once more", async () => {
+    const signedOut = {
+      en: "Claude Code is signed out. Sign in to it once in a terminal, then try again.",
+      ar: "Claude Code مش مسجّل دخول. سجّل دخولك فيه مرة من الـ terminal، وبعدين جرّب تاني.",
+    };
+    const fetch = mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "GET /settings/claude-code": () => Response.json({ found: true, version: "2.3.1" }),
+      "POST /settings/ai/check": () => Response.json({ error: signedOut, fix: "retry" }, { status: 409 }),
+    });
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkClaudeCode.en) }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(signedOut.en);
+    expect(alert.textContent).not.toMatch(PLACE);
+    await user.click(screen.getByRole("button", { name: texts.tryAgain.en }));
+    await waitFor(() => expect(calls(fetch, "POST /settings/ai/check")).toHaveLength(2));
+  });
+
+  it("Claude Code not found: what to do names no button the step lacks", async () => {
+    mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "GET /settings/claude-code": () => Response.json({ found: false, version: null }),
+    });
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkClaudeCode.en) }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(texts.aiLinkClaudeCodeMissing.en);
+    expect(alert.textContent).not.toMatch(PLACE);
+    expect(screen.getByRole("button", { name: texts.tryAgain.en })).toBeInTheDocument(); // "then try again": here
+  });
+
   it("Claude Code is checked as soon as it is chosen; not found says how to get it, and coming back checks again", async () => {
     let found = false;
     const refused = { en: "Claude Code is signed out (sample).", ar: "Claude Code مش داخل (عينة)." };
