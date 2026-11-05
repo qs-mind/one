@@ -225,6 +225,17 @@ async def test_the_lead_names_its_model_only_when_asked(make_engine, project):
     assert "never mention it otherwise" in seen
 
 
+async def test_with_no_web_search_the_lead_is_told_to_say_so(make_engine, project):
+    # audit B8: with a Standard Link and no search key there is no search at all, and the Lead
+    # gave remembered prices as today's; it is told there is none, and never to do that
+    lead = scripted(said("تمام - عينة"))
+    engine = await started(make_engine(links(lead=lead)))
+    await finish(engine, await engine.start_brief(project, BRIEF))
+    seen = str(lead.seen[0])
+    assert "No web search is set up in ONE" in seen
+    assert "never say ONE cannot search" not in seen
+
+
 @pytest.mark.parametrize(
     ("text", "wanted"),
     [

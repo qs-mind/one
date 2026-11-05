@@ -45,3 +45,22 @@ describe("a failed Brief's line", () => {
     expect(screen.getByText(gone.ar)).toBeInTheDocument();
   });
 });
+
+// What web_search sends when ONE has no search at all (core: tools/web._no_search; audit B8).
+const noSearch = {
+  en: "No web search is set up. Add a search key, connect an AI that can search (Claude), or subscribe to QS Mind.",
+  ar: "مفيش بحث على الويب متظبط. ضيف مفتاح بحث، أو وصّل ذكاء اصطناعي بيعرف يدوّر (Claude)، أو اشترك في QS Mind.",
+};
+
+describe("the no-search notice", () => {
+  it("says search is not set up, with the way to the search setting in AI settings", async () => {
+    const notice = { type: "data-notice", id: "b1-no-search", data: { text: noSearch, fix: "search" } };
+    core({ routes: { "POST /api/chat": (init) => streamed([...reply.slice(0, 2), notice, ...reply.slice(2)], init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await box(), "دوّر على سعر الحديد النهارده{enter}");
+    const line = (await screen.findByText(noSearch.ar)).closest("[role=status]") as HTMLElement;
+    await user.click(within(line).getByRole("button", { name: texts.setUpSearch.ar }));
+    expect(await screen.findByRole("heading", { name: texts.searchTitle.ar })).toBeInTheDocument();
+  });
+});

@@ -111,6 +111,12 @@ function BriefReply({
       {partsOf(parts, "understood").map((part) => (
         <UnderstoodCard key={part.id} projectId={part.data.project_id} />
       ))}
+      {partsOf(parts, "notice").map((notice) => (
+        <div key={notice.id} role="status" className="flex flex-col gap-2 text-copper">
+          <p dir="auto">{pick(notice.data.text, said)}</p>
+          <FixAction fix={fixOf(notice.data.fix)} lang={said} />
+        </div>
+      ))}
       {partsOf(parts, "cost").map((cost) => (
         <CostNotice key={cost.id} cost={cost.data} />
       ))}

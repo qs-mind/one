@@ -112,6 +112,8 @@ export type OneData = {
   unsourced: UnsourcedData;
   sourced: SourcedData;
   status: StatusData;
+  /** data-notice: a line from a tool for the engineer, with its fix (no web search: "search"). */
+  notice: { text: Text; fix?: string };
   deliverable: DeliverableData;
   understood: UnderstoodData;
   /** data-view, id = the view (decision 16.1): what the Lead QS chose to show, from ONE's blocks. */

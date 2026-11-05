@@ -804,8 +804,30 @@ class _Brief:
             f"The AI model you run on is {choice.model}. Say it only if the engineer asks which "
             "model answers; never mention it otherwise."
         )
-        found = (said, reply_line(self.text), self.instruction, selection.line(self.selection))
+        found = (
+            said,
+            reply_line(self.text),
+            self._search_line(),
+            self.instruction,
+            selection.line(self.selection),
+        )
         return "\n\n".join(part for part in found if part)
+
+    def _search_line(self) -> str | None:
+        """With no web search at all (a Standard Link, no search key), the Lead is told so
+        (audit B8): it said nothing and gave remembered prices as today's."""
+        from qsone.tools import web as web_tools
+
+        services = self.engine.services
+        if services is not None and self.lead_run_id is not None:
+            services = oneshot.for_run(services, self.models(self.lead_run_id))
+        if web_tools.searchable(services):
+            return None
+        return (
+            "No web search is set up in ONE. When the engineer asks for something from the web "
+            "or today's price, call web_search once (ONE shows them how to set search up), say "
+            "in one line that you could not search, and give no remembered price as today's."
+        )
 
     async def _lead(self, *, report: bool = False) -> Any:
         assert self.lead_run_id is not None

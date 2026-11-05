@@ -168,6 +168,7 @@ export const texts = {
   useIt: { en: "Use it", ar: "استخدمه" },
   dontUseIt: { en: "Don't use it", ar: "ماتستخدموش" },
   enterItsPrice: { en: "Enter its price", ar: "اكتب سعره" },
+  setUpSearch: { en: "Set up web search", ar: "اظبط البحث في الويب" },
   useWithoutPrice: { en: "Use it without a price", ar: "استخدمه من غير سعر" },
   useThisPrice: { en: "Use it at this price", ar: "استخدمه بالسعر ده" },
   startBrief: { en: "Start", ar: "ابدأ" },

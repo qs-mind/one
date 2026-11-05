@@ -8,6 +8,7 @@ import { api } from "../api";
 import { coreLine, send } from "../core";
 import { Feedback } from "../firstlaunch/parts";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
+import { SEARCH_SETTING } from "../shell/FixAction";
 import { KEY_MIN, useLiveKey } from "../ui/live";
 
 /** GET /settings/search (core/qsone/app.py). */
@@ -47,7 +48,7 @@ export function SearchKey() {
   const { live } = key;
 
   return (
-    <section aria-labelledby={title} className="border-b border-stone px-4 py-4">
+    <section id={SEARCH_SETTING} aria-labelledby={title} className="border-b border-stone px-4 py-4">
       <div className="mx-auto flex max-w-2xl flex-col gap-3">
         <h2 id={title} className="font-semibold">
           {t("searchTitle")}

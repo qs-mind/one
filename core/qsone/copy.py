@@ -2216,10 +2216,9 @@ FIXES = {
         PRICE_UNKNOWN,
         MODEL_GONE_TRY,
         MODEL_GONE,
-        WEB_NO_SEARCH,
-        WEB_SEARCH_KEY_REFUSED,
-        WEB_SEARCH_LIMIT,
     ),
+    # the web search setting, in AI settings (audit B8)
+    "search": (WEB_NO_SEARCH, WEB_SEARCH_KEY_REFUSED, WEB_SEARCH_LIMIT),
     "consent": (AI_CONSENT_NEEDED,),
     "retry": (
         KEY_STORE_DOWN,
