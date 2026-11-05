@@ -1132,6 +1132,14 @@ export const counted = {
       other: "{n} ملاحظة مفتوحة",
     },
   },
+  boqItems: {
+    en: { one: "{n} item", other: "{n} items" },
+    ar: { one: "بند واحد", two: "بندين", few: "{n} بنود", other: "{n} بند" },
+  },
+  boqItemsOf: {
+    en: { one: "{done} of {n} item", other: "{done} of {n} items" },
+    ar: { one: "{done} من بند واحد", two: "{done} من بندين", few: "{done} من {n} بنود", other: "{done} من {n} بند" },
+  },
   connectorTools: {
     en: { one: "{n} tool", other: "{n} tools" },
     ar: { one: "أداة واحدة", two: "أداتين", few: "{n} أدوات", other: "{n} أداة" },

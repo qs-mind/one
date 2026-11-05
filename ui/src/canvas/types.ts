@@ -70,7 +70,17 @@ export type ProjectStatus = {
   submission_date?: string;
   days_left?: number;
   /** `sample`: a number behind it is sample data; the screen labels it. */
-  boq_value?: { value: string; currency: string; deliverable_id: string; revision: number | null; status: string; sample?: boolean };
+  boq_value?: {
+    value: string;
+    currency: string;
+    deliverable_id: string;
+    revision: number | null;
+    status: string;
+    sample?: boolean;
+    /** What the total covers: the Sheet's items, of the client BOQ's items (when one was imported). */
+    items?: number;
+    of?: number;
+  };
   open_comments?: number;
   waiting?: number;
 };
