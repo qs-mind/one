@@ -7,6 +7,7 @@ import { api } from "../api";
 import { coreLine, send } from "../core";
 import { Feedback } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
+import { AutoHeight } from "../ui/AutoHeight";
 import { looksLikeAmount, SaveNote, useSaving } from "../ui/live";
 import { AiKey } from "./AiKey";
 
@@ -115,7 +116,8 @@ export function AiSettings({ ai, onClose }: { ai: Ai; onClose?: () => void }) {
 
   return (
     <section aria-labelledby={title} className="border-b border-stone px-4 py-4">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      {/* eases to its new height (loading, then the settings; a link added or taken out), so nothing under it jumps */}
+      <AutoHeight className="mx-auto flex max-w-2xl flex-col gap-6">
         <div className="flex items-center justify-between gap-4">
           <h2 id={title} className="font-semibold">
             {t("aiTitle")}
@@ -156,7 +158,7 @@ export function AiSettings({ ai, onClose }: { ai: Ai; onClose?: () => void }) {
             )}
           </>
         )}
-      </div>
+      </AutoHeight>
     </section>
   );
 }
