@@ -1,10 +1,12 @@
 // The QS Mind One window. In development it loads the Vite server (`npm run dev`), which also starts
 // the Python core and forwards `/api` to it with the secret, so the page never holds it. Installed, it
-// starts the packaged core itself (core.rs) and carries every call from the page to it (shim.rs).
+// starts the packaged core itself (core.rs) and carries every call from the page to it (shim.rs). Signed updates
+// install only on the engineer's say-so (update.rs).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod core;
 mod shim;
+mod update;
 
 use tauri::{Manager, RunEvent, Url};
 use tauri_plugin_dialog::DialogExt;
@@ -73,6 +75,10 @@ fn main() {
     #[cfg(target_os = "linux")]
     work_around_nvidia();
 
+    let mut context = tauri::generate_context!();
+    let test_feed = update::test_feed(std::env::var(update::TEST_FEED).ok().as_deref());
+    update::allow_test_feed(context.config_mut(), test_feed.as_ref());
+
     tauri::Builder::default()
         // First, so that a second One hands over to the first before it starts anything.
         .plugin(tauri_plugin_single_instance::init(
@@ -101,6 +107,7 @@ fn main() {
                 .build(),
         )
         .manage(shim::Calls::default())
+        .manage(update::Updates::default())
         .invoke_handler(tauri::generate_handler![
             save_export,
             shim::core_fetch,
@@ -108,6 +115,8 @@ fn main() {
             shim::core_upload,
             core::core_log_path,
             core::core_status,
+            update::update_check,
+            update::update_install,
         ])
         // Debug builds leave the core to `npm run dev`. The installed app starts its own, and the window
         // opens even if it cannot: the screen then says so, with the log's path.
@@ -115,9 +124,14 @@ fn main() {
             if !tauri::is_dev() {
                 app.manage(core::start(app.handle()));
             }
+            // Only with a public key to check signatures against; without one the plugin is not even loaded.
+            if update::signed_updates(app.config()) {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+            }
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("QS Mind One could not open its window")
         .run(|app, event| {
             // Stop the core and everything it started, so no Python is left running.

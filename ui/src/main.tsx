@@ -10,6 +10,7 @@ import { ScreenError } from "./app/ScreenError";
 import { SetupGate } from "./firstlaunch/FirstLaunch";
 import { language, setLanguage } from "./i18n";
 import { App } from "./shell/App";
+import { UpdateCard } from "./update/UpdateCard";
 
 setLanguage(language()); // put the remembered language and its direction on <html>
 installCrashReports(); // an error the screen does not catch: its class and our file:line, to Usage Stats
@@ -20,6 +21,7 @@ createRoot(document.getElementById("root")!).render(
       <HealthGate>
         <SetupGate>
           <App />
+          <UpdateCard />
         </SetupGate>
       </HealthGate>
     </ScreenError>

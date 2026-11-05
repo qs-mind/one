@@ -7,6 +7,8 @@ fn main() {
         "core_upload",
         "core_log_path",
         "core_status",
+        "update_check",
+        "update_install",
     ];
     tauri_build::try_build(
         tauri_build::Attributes::new()

@@ -2,7 +2,8 @@
   "plugins": {
     "updater": {
       "endpoints": ["https://github.com/qs-mind/one/releases/latest/download/latest.json"],
-      "pubkey": ""
+      "pubkey": "",
+      "requireSignedVersion": true
     }
   },
   "bundle": {

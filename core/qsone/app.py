@@ -1,7 +1,7 @@
 import asyncio
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Literal
 
@@ -69,6 +69,14 @@ class CrashIn(BaseModel):
     kind: str = Field(max_length=80)
     where: str = Field(max_length=80)
     version: str = Field(max_length=80)
+
+
+class PrepareUpdateIn(BaseModel):
+    """The version the shell is about to install, so the next start can tell whether it did."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    to: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.:-]{1,80}$")
 
 
 class ModelIn(BaseModel):
@@ -227,6 +235,24 @@ def create_app(
     @app.get("/about/native")
     def about_native() -> dict:
         return about.native()  # the packaging smoke test: every native library loads
+
+    @app.post("/app/prepare-update")
+    async def prepare_update(body: PrepareUpdateIn | None = None) -> dict:
+        """Before the shell installs an update: every running Brief stops at its Checkpoint,
+        the projects are backed up, then every open project is closed. The shell stops the core
+        next, installs, and starts One again (or, if the install fails, the core)."""
+        paused = await engine.pause_all()
+        backed_up = await asyncio.to_thread(backups.run, reason="update")
+
+        def close_open() -> None:
+            for project_id, _ in registry.opened():
+                registry.close(project_id, back_up=False)  # backed up just now
+
+        await asyncio.to_thread(close_open)
+        if body is not None and body.to is not None:
+            with suppress(OSError):  # only the Usage Stats event after the restart needs it
+                settings.save(usage.UPDATE_SETTING, body.to)
+        return {"paused_briefs": paused, "backed_up": backed_up}
 
     @app.post("/chat")
     async def chat_stream(request: Request) -> Response:
