@@ -138,7 +138,7 @@ check, count or reshape a client's Excel.
 - script: Python's own modules plus openpyxl and xlrd. one_io.open_input("<file name>") opens \
 an input by its name in files_list; one_io.params; one_io.save(name, data) keeps an output \
 file; one_io.result(value) answers.
-- inputs: file ids from files_list. urls: pages One opens for the script, as inputs url-1, \
+- inputs: file ids from files_list. urls: pages ONE opens for the script, as inputs url-1, \
 url-2, ….
 - timeout: 1 to 600 seconds.
 Outputs are kept as files "… (sandbox)". A number a script finds is evidence only: \
@@ -190,7 +190,7 @@ async def _pages(ctx: ToolContext, rec: Records, urls: list[str], data: dict, ke
         said = await call("web_read", {"url": url}, ctx)
         row = await asyncio.to_thread(log.last_read, rec, brief_id=ctx.brief_id, url=url)
         if row is None or (before is not None and row["id"] == before["id"]):
-            return f"not done: One could not read {url} for the script, so nothing ran.\n{said}"
+            return f"not done: ONE could not read {url} for the script, so nothing ran.\n{said}"
         page = await asyncio.to_thread(files.read_original, rec, row["file_id"])
         name = f"url-{n}"
         data[name] = page

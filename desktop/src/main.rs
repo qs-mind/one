@@ -132,7 +132,7 @@ fn main() {
             Ok(())
         })
         .build(context)
-        .expect("QS Mind One could not open its window")
+        .expect("QS Mind ONE could not open its window")
         .run(|app, event| {
             // Stop the core and everything it started, so no Python is left running.
             if let RunEvent::Exit = event

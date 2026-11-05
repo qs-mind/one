@@ -120,7 +120,7 @@ for (const lang of ["ar", "en"] as const) {
     if (await ask.isVisible()) {
       await shot(walk, "backup-ask");
       await ask.getByRole("button", { name: say(walk, "backupLater"), exact: true }).click();
-    } else await walk.problem("One did not ask where to keep backups after the first project", "backup-ask-missing");
+    } else await walk.problem("ONE did not ask where to keep backups after the first project", "backup-ask-missing");
     await report.getByRole("button", { name: say(walk, "close"), exact: true }).click();
 
     // old work: each folder inside the one chosen is an archived project

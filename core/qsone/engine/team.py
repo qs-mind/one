@@ -204,7 +204,7 @@ _PLAN_DOC = f"""Plan the Brief before you build any specialist: its steps and th
 line, tier "specialist" (the default) or "quick" for simple lookups, requests about how many \
 model requests it needs.
 - deliverables: the Deliverables you will make.
-When the plan is large, One shows the engineer its expected cost and time and waits for their \
+When the plan is large, ONE shows the engineer its expected cost and time and waits for their \
 yes; a "no" means stop and tell the engineer. Planning again replaces nothing already built.
 Example:
 {_json(_PLAN_EXAMPLE)}"""
@@ -270,7 +270,7 @@ def _build(
     if _is_checker(name):
         raise ModelRetry(
             f"{tool}: «{name['en']}» / «{name['ar']}» is a checker. The Checking QS is part of "
-            "One's fixed team and checks every Deliverable on its own; you never build it. Name "
+            "ONE's fixed team and checks every Deliverable on its own; you never build it. Name "
             "the specialist for its own work, e.g. Take-off QS / مهندس الحصر."
         )
     count = agents.words(instructions)

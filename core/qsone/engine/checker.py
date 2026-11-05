@@ -214,12 +214,12 @@ def packet_text(packet: CheckPacket, fence: str) -> str:
         data(list(packet.formulas), "calc-engine"),
         "The sources:",
         data(list(packet.sources), "source-ledger"),
-        "Numbers in it with no source, marked by One: "
+        "Numbers in it with no source, marked by ONE: "
         + (_json(list(packet.unsourced)) if packet.unsourced else "none."),
     ]
     if packet.not_in_client_boq:
         parts += [
-            "Rows not in the client's imported BOQ, found by One's code. One has put a comment on "
+            "Rows not in the client's imported BOQ, found by ONE's code. ONE has put a comment on "
             "each for the engineer to keep it or remove it; mention them in your review:",
             data(list(packet.not_in_client_boq), "client-boq"),
         ]

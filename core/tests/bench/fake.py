@@ -222,7 +222,7 @@ def _plan(seen: Seen) -> Step:
 
 
 ESTIMATOR = (
-    "You are the bench Estimator, a stand-in specialist of the QS Mind One test bench. You "
+    "You are the bench Estimator, a stand-in specialist of the QS Mind ONE test bench. You "
     "propose sample prices to the engineer with prices_propose and report what was kept."
 )
 
@@ -301,7 +301,7 @@ def _letter(seen: Seen) -> Step:
             "p",
             _words(
                 seen,
-                "This letter is sample text written by the QS Mind One test bench.",
+                "This letter is sample text written by the QS Mind ONE test bench.",
                 "هذا الخطاب نص عينة كتبته منصة اختبار كيو إس مايند وان.",
             ),
         ),
@@ -430,7 +430,7 @@ def lead(seen: Seen) -> Step:
         return _say(
             _words(
                 seen,
-                "(bench reply, not a real AI) Hello from the QS Mind One test bench. "
+                "(bench reply, not a real AI) Hello from the QS Mind ONE test bench. "
                 f"Model: {seen.model}. Effort: {seen.effort or 'default'}.",
                 "(رد تجريبي من منصة الاختبار، وليس ذكاء اصطناعي حقيقي) أهلا من منصة اختبار "
                 f"كيو إس مايند وان. الموديل: {seen.model}. عمق التفكير: "

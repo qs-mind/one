@@ -22,7 +22,7 @@ from qsone.records.project import FILE_NAME, Records
 
 log = logging.getLogger(__name__)
 
-BACKUP_DIR = "QS Mind One Backup"
+BACKUP_DIR = "QS Mind One Backup"  # not "ONE": Linux would no longer find the backups made before
 ENGINEER = engineer.FOLDER  # the Engineer Records folder, backed up as one more id
 _ID = re.compile(r"[0-9a-f]{32}")
 _STAMP = "%Y-%m-%dT%H%M%SZ"  # no colons: a valid file name on every system

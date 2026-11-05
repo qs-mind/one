@@ -120,7 +120,7 @@ _LIST_EXAMPLE = {"include_old": False}
 _LIST_DOC = f"""List the files in Project Records (in the General chat, Engineer Records): \
 file:<id>, name, the folder it came in (from a tender folder or a zip), kind, status (read, \
 partly_read, stored, unreadable), pages, a note on what \
-One could not read, hidden-text flags, and when it was added.
+ONE could not read, hidden-text flags, and when it was added.
 - include_old: true also lists older versions, with "valid until".
 - page: a long list comes in pages.
 Open a file with files_read and its id. Ids are yours: never show the engineer an id or ask for \

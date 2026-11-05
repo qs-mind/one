@@ -1,4 +1,4 @@
-# QS Mind One
+# QS Mind ONE
 
 An agentic desktop app for the whole quantity surveying profession, in Arabic and English.
 Every number has a source.
@@ -12,7 +12,7 @@ License: [FSL-1.1-ALv2](LICENSE.md). Each version becomes Apache-2.0 two years a
 
 ## Search models
 
-Search by meaning uses two free models that One downloads once, when the engineer presses Download
+Search by meaning uses two free models that ONE downloads once, when the engineer presses Download
 in Project Records (1.17 GB from huggingface.co). They then run on the computer, on the CPU, without
 internet. They are never in the installer or the repo.
 

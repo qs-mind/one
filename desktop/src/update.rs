@@ -483,7 +483,7 @@ mod tests {
             "stopped on purpose"
         );
         let text = std::fs::read_to_string(&log).unwrap();
-        assert_eq!(text.matches("---- QS Mind One").count(), 2, "{text}");
+        assert_eq!(text.matches("---- QS Mind ONE").count(), 2, "{text}");
         core.stop().unwrap();
         core.stop().unwrap(); // a second stop (the window closing) does nothing more
         let _ = std::fs::remove_dir_all(dir);

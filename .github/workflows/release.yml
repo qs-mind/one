@@ -146,14 +146,14 @@ jobs:
           COPYFILE_DISABLE: "1" # no ._ files in the archive
         run: |
           bundle=desktop/target/release/bundle/macos
-          codesign --verify --deep --strict --verbose=2 "$bundle/QS Mind One.app"
-          archive="$bundle/QS Mind One_${VERSION}_${ARCH}.app.tar.gz"
-          tar -C "$bundle" -czf "$archive" "QS Mind One.app"
+          codesign --verify --deep --strict --verbose=2 "$bundle/QS Mind ONE.app"
+          archive="$bundle/QS Mind ONE_${VERSION}_${ARCH}.app.tar.gz"
+          tar -C "$bundle" -czf "$archive" "QS Mind ONE.app"
           unpacked="$RUNNER_TEMP/unpacked"
           mkdir -p "$unpacked"
           tar -C "$unpacked" -xzf "$archive"
-          codesign --verify --deep --strict "$unpacked/QS Mind One.app"
-          node scripts/smoke-core.mjs "$unpacked/QS Mind One.app/Contents/Resources/core/bin/python3"
+          codesign --verify --deep --strict "$unpacked/QS Mind ONE.app"
+          node scripts/smoke-core.mjs "$unpacked/QS Mind ONE.app/Contents/Resources/core/bin/python3"
 
       - name: Installer sizes
         run: ls -l desktop/target/release/bundle/*/
@@ -229,4 +229,4 @@ jobs:
         run: |
           if [ "$PUBLISH" = latest ]; then kind=--latest; else kind=--draft; fi
           gh release create "v$VERSION" bundles/upload/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "QS Mind One $VERSION" --notes-file "releases/$VERSION.md" "$kind"
+            --title "QS Mind ONE $VERSION" --notes-file "releases/$VERSION.md" "$kind"

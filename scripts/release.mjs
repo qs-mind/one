@@ -23,12 +23,12 @@ const OUT = "upload";
 /** The six installers: what each build makes (with the version in its name), the asset it becomes, and, for the
  * four the updater installs, the updater's platform. */
 export const ASSETS = [
-  { name: "QS-Mind-One_x64-setup.exe", end: "_x64-setup.exe", platform: "windows-x86_64" },
-  { name: "QS-Mind-One_amd64.AppImage", end: "_amd64.AppImage", platform: "linux-x86_64" },
-  { name: "QS-Mind-One_aarch64.app.tar.gz", end: "_aarch64.app.tar.gz", platform: "darwin-aarch64" },
-  { name: "QS-Mind-One_x64.app.tar.gz", end: "_x64.app.tar.gz", platform: "darwin-x86_64" },
-  { name: "QS-Mind-One_aarch64.dmg", end: "_aarch64.dmg" },
-  { name: "QS-Mind-One_x64.dmg", end: "_x64.dmg" },
+  { name: "QS-Mind-ONE_x64-setup.exe", end: "_x64-setup.exe", platform: "windows-x86_64" },
+  { name: "QS-Mind-ONE_amd64.AppImage", end: "_amd64.AppImage", platform: "linux-x86_64" },
+  { name: "QS-Mind-ONE_aarch64.app.tar.gz", end: "_aarch64.app.tar.gz", platform: "darwin-aarch64" },
+  { name: "QS-Mind-ONE_x64.app.tar.gz", end: "_x64.app.tar.gz", platform: "darwin-x86_64" },
+  { name: "QS-Mind-ONE_aarch64.dmg", end: "_aarch64.dmg" },
+  { name: "QS-Mind-ONE_x64.dmg", end: "_x64.dmg" },
 ];
 
 // Release notes -------------------------------------------------------------------------------------------------
