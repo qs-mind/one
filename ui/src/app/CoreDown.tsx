@@ -1,9 +1,11 @@
-// Before the chat opens, check that the core answers. If it does not, say so in both languages, show where its log
-// is, and offer Retry, so the window is never just blank.
+// Before the chat opens, check that the core answers, behind the start screen. If it does not, say so in both
+// languages on that screen, show where its log is, and offer Retry, so the window is never just blank.
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, inInstalledApp } from "../api";
-import { t, texts, useLanguage } from "../i18n";
+import { systemLanguage } from "../firstlaunch/FirstLaunch";
+import { type Language, savedLanguage, t, texts } from "../i18n";
+import { SLOW_MS, StartScreen } from "./StartScreen";
 
 // Set by the dev server (scripts/core-dev.ts); the installed app asks the shell, which started the core.
 const coreLog: string = import.meta.env.VITE_CORE_LOG ?? "core.log";
@@ -23,53 +25,72 @@ async function started(): Promise<boolean> {
 }
 
 export function HealthGate({ children, logPath }: { children: ReactNode; logPath?: string }) {
-  const [state, setState] = useState<"checking" | "up" | "down">("checking");
+  const [state, setState] = useState<"checking" | "slow" | "up" | "down">("checking");
   const [log, setLog] = useState(logPath ?? coreLog);
+  const [shown, setShown] = useState(false);
+  const [done, setDone] = useState(false);
+  const [lang] = useState<Language>(() => savedLanguage() ?? systemLanguage());
+  const slow = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const check = useCallback(async () => {
     setState("checking");
+    clearTimeout(slow.current);
+    // still starting after SLOW_MS: the shell still says "starting", or the core has not answered yet
+    slow.current = setTimeout(() => setState((now) => (now === "checking" ? "slow" : now)), SLOW_MS);
+    let up = true;
     if (inInstalledApp()) {
       if (logPath === undefined) setLog(await invoke<string>("core_log_path").catch(() => coreLog));
-      if (!(await started())) return setState("down");
+      up = await started();
     }
-    const up = await api("/health")
-      .then((response) => response.ok)
-      .catch(() => false);
+    if (up) {
+      up = await api("/health")
+        .then((response) => response.ok)
+        .catch(() => false);
+    }
+    clearTimeout(slow.current);
     setState(up ? "up" : "down");
   }, [logPath]);
 
   useEffect(() => {
     void check();
+    return () => clearTimeout(slow.current);
   }, [check]);
 
-  if (state === "up") return children;
-  if (state === "down") return <CoreDown logPath={log} onRetry={() => void check()} />;
-  return <Checking />;
-}
-
-function Checking() {
-  useLanguage();
-  return <p className="p-4 text-slate">{t("checking")}</p>;
-}
-
-export function CoreDown({ logPath, onRetry }: { logPath: string; onRetry: () => void }) {
-  useLanguage();
+  const show = useCallback(() => setShown(true), []);
+  const finish = useCallback(() => setDone(true), []);
   return (
-    <main className="flex h-dvh items-center justify-center px-4">
-      <div className="flex w-full max-w-xl flex-col gap-3">
-        <p lang="ar" dir="rtl">
-          {texts.coreDown.ar}
-        </p>
-        <p lang="en" dir="ltr">
-          {texts.coreDown.en}
-        </p>
-        <code dir="ltr" className="rounded-md bg-stone px-3 py-2 break-all">
-          {logPath}
-        </code>
-        <button type="button" onClick={onRetry} className="self-start rounded-md bg-ink px-4 py-2 text-paper">
-          {t("retry")}
-        </button>
-      </div>
-    </main>
+    <>
+      {shown && children}
+      {!done && (
+        <StartScreen
+          state={state === "up" ? "ready" : state === "checking" ? "starting" : state}
+          log={log}
+          lang={lang}
+          onRetry={() => void check()}
+          onShow={show}
+          onDone={finish}
+        />
+      )}
+    </>
+  );
+}
+
+/** The core is down: why, in both languages, where its log is, and Retry (in the start screen's language). */
+export function CoreDown({ logPath, onRetry, lang }: { logPath: string; onRetry: () => void; lang: Language }) {
+  return (
+    <div className="start-rise mt-6 flex w-full max-w-xl flex-col gap-3">
+      <p lang="ar" dir="rtl">
+        {texts.coreDown.ar}
+      </p>
+      <p lang="en" dir="ltr">
+        {texts.coreDown.en}
+      </p>
+      <code dir="ltr" className="rounded-md bg-stone px-3 py-2 break-all">
+        {logPath}
+      </code>
+      <button type="button" onClick={onRetry} className="self-start rounded-md bg-ink px-4 py-2 text-paper">
+        {t("retry", lang)}
+      </button>
+    </div>
   );
 }

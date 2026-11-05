@@ -24,7 +24,7 @@ describe("HealthGate", () => {
   it("shows the chat when the core answers", async () => {
     health(Response.json({ ok: true }));
     render(<HealthGate logPath={logPath}>chat</HealthGate>);
-    expect(await screen.findByText("chat")).toBeInTheDocument();
+    expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
   });
 
   it("when the core is down, says so in both languages with the path to core.log", async () => {
@@ -47,8 +47,9 @@ describe("HealthGate", () => {
     const fetch = health(new TypeError("Failed to fetch"), Response.json({ ok: true }));
     const user = userEvent.setup();
     render(<HealthGate logPath={logPath}>chat</HealthGate>);
-    await user.click(await screen.findByRole("button", { name: texts.retry.ar }));
-    expect(await screen.findByText("chat")).toBeInTheDocument();
+    // the start screen speaks the saved language, else the system's (jsdom's is English)
+    await user.click(await screen.findByRole("button", { name: texts.retry.en }));
+    expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 });
@@ -80,10 +81,10 @@ describe("HealthGate in the installed app", () => {
     return calls;
   }
 
-  it("says Starting… while the core starts, then opens the chat", async () => {
+  it("shows the start screen while the core starts, then opens the chat", async () => {
     const calls = shell(["starting", "starting", "up"]);
     render(<HealthGate>chat</HealthGate>);
-    expect(screen.getByText(texts.checking.ar)).toBeInTheDocument();
+    expect(screen.getByText(texts.checking.en)).toBeInTheDocument();
     expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(calls.filter((cmd) => cmd === "core_status")).toHaveLength(3);
     expect(calls).toContain("core_fetch");

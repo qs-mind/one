@@ -4,6 +4,7 @@
 // set once, not used every hour, and so is Setup, the first launch's steps again. Below 900 px the status folds into one Status button and the rest into More; below
 // 1280 px search and the panels fold into More too: the project's name is never cut. The chrome mirrors in Arabic.
 import { useRef } from "react";
+import { Mark } from "../brand/Mark";
 import type { ProjectSources, ProjectStatus } from "../canvas/types";
 import { isMac } from "../canvas/keys";
 import { Following, TeamNow } from "../canvas/live/TeamNow";
@@ -18,24 +19,7 @@ import { StatusStrip } from "./StatusStrip";
 
 export type PanelKind = "ai" | "projects" | "records" | "deliverables" | "backup" | "close" | "confidential";
 
-const MARK = 
-  "M18 109.32L31.22 171.34M18 109.32L31.63 138.83M18 109.32L41.86 84.2M18 109.32L43.74 51.39M31.22 171.34L31.63 138.83M31.22 171.34L63.25 184.55M31.22 171.34L78.35 213.75M31.63 138.83L41.86 84.2M31.63 138.83L63.25 184.55M31.63 138.83L69.83 130.69M41.86 84.2L43.74 51.39M41.86 84.2L69.83 130.69M41.86 84.2L75.43 40.26M41.86 84.2L95.57 72.76M43.74 51.39L75.43 40.26M43.74 51.39L98.61 19.66M63.25 184.55L69.83 130.69M63.25 184.55L78.35 213.75M63.25 184.55L111.82 210.98M63.25 184.55L116.96 173.1M69.83 130.69L95.57 72.76M69.83 130.69L116.96 173.1M69.83 130.69L123.01 119.36M75.43 40.26L95.57 72.76M75.43 40.26L98.61 19.66M75.43 40.26L130.64 32.86M78.35 213.75L111.82 210.98M78.35 213.75L141.39 220.34M95.57 72.76L123.01 119.36M95.57 72.76L130.64 32.86M95.57 72.76L158.61 79.35M98.61 19.66L130.64 32.86M98.61 19.66L161.65 26.25M111.82 210.98L116.96 173.1M111.82 210.98L141.39 220.34M111.82 210.98L165.25 195.22M116.96 173.1L123.01 119.36M116.96 173.1L165.25 195.22M116.96 173.1L171.83 141.37M123.01 119.36L158.61 79.35M123.01 119.36L171.83 141.37M130.64 32.86L158.61 79.35M130.64 32.86L161.65 26.25M130.64 32.86L182.68 51.49M141.39 220.34L165.25 195.22M141.39 220.34L196.26 188.61M158.61 79.35L171.83 141.37M158.61 79.35L182.68 51.49M158.61 79.35L206.9 101.48M161.65 26.25L182.68 51.49M161.65 26.25L208.78 68.66M165.25 195.22L171.83 141.37M165.25 195.22L196.26 188.61M165.25 195.22L205.17 157M171.83 141.37L205.17 157M171.83 141.37L206.9 101.48M182.68 51.49L206.9 101.48M182.68 51.49L208.78 68.66M196.26 188.61L205.17 157M196.26 188.61L222 130.68M205.17 157L206.9 101.48M205.17 157L222 130.68M206.9 101.48L208.78 68.66M206.9 101.48L222 130.68M208.78 68.66L222 130.68";
-
-/** The QS Mind mark, static: it never rotates, glows or sits on a tile. */
-export function Mark() {
-  return (
-    <svg viewBox="0 0 240 240" width="24" height="24" aria-hidden="true" className="shrink-0">
-      <defs>
-        <linearGradient id="qs-mind-face" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#F0A35A" />
-          <stop offset="1" stopColor="#C0582A" />
-        </linearGradient>
-      </defs>
-      <polygon points="182.68,51.49 206.9,101.48 158.61,79.35" fill="url(#qs-mind-face)" />
-      <path d={MARK} fill="none" stroke="#0E0F12" strokeWidth="4.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+export { Mark }; // the first launch's header takes it from here
 
 const button = "whitespace-nowrap rounded-lg px-3 py-1.5 hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
 

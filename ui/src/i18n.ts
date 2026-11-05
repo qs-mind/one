@@ -913,11 +913,22 @@ export const texts = {
     en: "The update did not install, so ONE is still on this version and your projects are as they were. Try again later.",
     ar: "التحديث ماتسطبش، فـ ONE لسه على النسخة دي ومشاريعك زي ما هي. جرّب تاني بعدين.",
   },
+  // Motion, group A: the start screen and the search field.
+  startSlogan: { en: "Every number has a source", ar: "كل رقم له مصدر" },
+  startEngine: { en: "Starting ONE's engine…", ar: "بيشغّل محرّك ONE…" },
+  searchField: { en: "Search", ar: "بحث" },
 } satisfies Record<string, Text>;
 
 const storageKey = "qsone.language";
 const listeners = new Set<() => void>();
 let current: Language = stored() ?? "ar";
+// Read once, as the page loads and before main.tsx writes the language back: none on the very first launch.
+const savedAtLoad = stored();
+
+/** The language an earlier run saved, if any: the start screen speaks it, else the system's. */
+export function savedLanguage(): Language | undefined {
+  return savedAtLoad;
+}
 
 function stored(): Language | undefined {
   try {
