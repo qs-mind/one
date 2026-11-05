@@ -101,7 +101,7 @@ def ensure_index(rec: Records) -> None:
     version = str(arabic.NORMALISER_VERSION)
     if rec.meta().get("normaliser_version") == version:
         return
-    with rec.write(ACTOR) as conn:
+    with rec.write(ACTOR, upkeep=True) as conn:
         conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES ('delete-all')")
         index_words(conn, conn.execute("SELECT id, text FROM chunks").fetchall())
         rec.set_meta(conn, "normaliser_version", version)
@@ -130,7 +130,7 @@ def index_vectors(
     run resumes where it left off. A new model or size rebuilds the table. `should_stop` is asked
     before each batch, `progress(done)` told after each commit. Returns how many."""
     dims = int(embedder.dims)
-    with rec.write(ACTOR) as conn:
+    with rec.write(ACTOR, upkeep=True) as conn:
         if not _vectors_ready(conn, embedder):
             conn.execute("DROP TABLE IF EXISTS chunk_vectors")
             conn.execute(
@@ -150,7 +150,7 @@ def index_vectors(
         if not todo:
             return done
         vectors = embedder.embed_documents([arabic.clean(text) for _, text in todo])
-        with rec.write(ACTOR) as conn:
+        with rec.write(ACTOR, upkeep=True) as conn:
             conn.executemany(
                 "INSERT INTO chunk_vectors(chunk_id, embedding) VALUES (?, ?)",
                 [(i, _pack(v, dims)) for (i, _), v in zip(todo, vectors, strict=True)],

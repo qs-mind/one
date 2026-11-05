@@ -335,4 +335,8 @@ CREATE TABLE canvas_view (id INTEGER PRIMARY KEY CHECK (id = 1),
 ALTER TABLE briefs ADD COLUMN selection TEXT CHECK (selection IS NULL OR json_valid(selection))
 """
 
-MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4, TOOLS_SQL, CANVAS_SQL]
+# A tender folder (Plan 8): the path inside the dropped folder a file came from, display text
+# only, as its name is. NULL for a file added on its own.
+FOLDERS_SQL = "ALTER TABLE files ADD COLUMN folder TEXT"
+
+MIGRATIONS: list[str] = [SCHEMA_1, SCHEMA_2, SCHEMA_3, SCHEMA_4, TOOLS_SQL, CANVAS_SQL, FOLDERS_SQL]

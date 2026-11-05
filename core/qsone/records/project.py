@@ -44,6 +44,7 @@ class Records:
         self._conn: db.Connection | None = conn
         self._lock = threading.RLock()
         self._depth = 0  # how many `write` blocks are open; only the lock's holder changes it
+        self.archived_at: str | None = None  # meta.archived_at, read at open (Plan 8)
 
     @classmethod
     def create(cls, folder: Path, *, name: str, actor: str) -> "Records":
@@ -102,7 +103,7 @@ class Records:
             raise RecordsError(copy.PROJECT_DAMAGED) from e
         try:
             rec._migrate()
-            rec.meta()
+            rec.archived_at = rec.meta().get("archived_at")
         except db.DatabaseError as e:
             rec.close()
             raise RecordsError(copy.PROJECT_DAMAGED) from e
@@ -167,13 +168,19 @@ class Records:
                 raise self._damaged() from e
 
     @contextmanager
-    def write(self, actor: str) -> Iterator[db.Connection]:
+    def write(
+        self, actor: str, *, archive_change: bool = False, upkeep: bool = False
+    ) -> Iterator[db.Connection]:
         """One transaction: commits when the block ends, rolls back if it raises.
 
         Write the audit rows for the change inside the same block, with this actor. A `write`
         inside another on the same thread joins it through `SAVEPOINT w<depth>`: when the inner
         block raises, only its own work is rolled back; nothing is kept until the outer block
-        commits. The inner block's audit rows carry its own actor."""
+        commits. The inner block's audit rows carry its own actor.
+
+        While the project is archived, an outer `write` is refused with PROJECT_ARCHIVED (423),
+        except the archive change itself (`archive_change`) and `upkeep` that changes no project
+        data: the search index and the canvas layout, so reading and searching still work."""
         if not actor.strip():
             raise ValueError("every change needs an actor")
         with self._lock:
@@ -181,6 +188,8 @@ class Records:
             if self._depth:
                 yield from self._savepoint(conn)
                 return
+            if self.archived_at is not None and not (archive_change or upkeep):
+                raise RecordsError(copy.PROJECT_ARCHIVED, status=423)
             conn.execute("BEGIN IMMEDIATE")
             self._depth = 1
             try:

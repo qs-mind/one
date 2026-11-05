@@ -746,3 +746,30 @@ def sample_html(
         f'<meta charset="utf-8"><title>{saxutils.escape(title)}</title>{tags}</head>'
         f"<body>{body}</body></html>"
     )
+
+
+def sample_zip(
+    members: Mapping[str, bytes],
+    *,
+    encoding: str | None = None,
+    compression: int = zipfile.ZIP_DEFLATED,
+) -> bytes:
+    """A zip of `members` ({path inside the zip: bytes}). With `encoding` (cp720, cp1256) the
+    names are written in it with no UTF-8 flag, as old Windows tools write them: each is first
+    written as an ASCII stand-in of the same length, then the stand-in's bytes are swapped."""
+    out = io.BytesIO()
+    swaps: list[tuple[bytes, bytes]] = []
+    with zipfile.ZipFile(out, "w", compression) as z:
+        for i, (path, data) in enumerate(members.items()):
+            if encoding is None:
+                z.writestr(path, data)
+                continue
+            raw = path.encode(encoding)
+            stand_in = f"~{i}~".ljust(len(raw), "q").encode()
+            assert len(stand_in) == len(raw), "name too short for its stand-in"
+            z.writestr(stand_in.decode(), data)
+            swaps.append((stand_in, raw))
+    data = out.getvalue()
+    for stand_in, raw in swaps:
+        data = data.replace(stand_in, raw)
+    return data

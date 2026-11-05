@@ -118,7 +118,8 @@ class ListArgs(_Args):
 _LIST_EXAMPLE = {"include_old": False}
 
 _LIST_DOC = f"""List the files in Project Records (in the General chat, Engineer Records): \
-file:<id>, name, kind, status (read, partly_read, stored, unreadable), pages, a note on what \
+file:<id>, name, the folder it came in (from a tender folder or a zip), kind, status (read, \
+partly_read, stored, unreadable), pages, a note on what \
 One could not read, hidden-text flags, and when it was added.
 - include_old: true also lists older versions, with "valid until".
 - page: a long list comes in pages.
@@ -150,6 +151,8 @@ def _list(rec: Records, include_old: bool) -> str:
     lines = [f"{len(found)} files, newest first." if found else "No files yet."]
     for f in found:
         parts = [f"file:{f.id}", _shown(f.name, f.kind), f.kind, f.status]
+        if f.folder:  # the folder of the engineer's tender folder it came from
+            parts.insert(2, f"in folder {_shown(f.folder, 'folder')}")
         if f.pages:
             parts.append(f"{f.pages} page" + ("" if f.pages == 1 else "s"))
         parts.append(f"added {_when(f.added_at)}")

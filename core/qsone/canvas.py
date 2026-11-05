@@ -102,7 +102,7 @@ def read_layout(rec: Records) -> dict:
 def save_frames(rec: Records, frames: list[FrameIn], removed: list[str]) -> None:
     """One transaction: the frames given are put (one row per key), the removed ones go."""
     at = rec.clock()
-    with rec.write("engineer") as conn:  # screen layout: no audit row (decision 3)
+    with rec.write("engineer", upkeep=True) as conn:  # screen layout: no audit row (decision 3)
         conn.executemany("DELETE FROM canvas_frames WHERE key = ?", ((k,) for k in removed))
         conn.executemany(
             "INSERT INTO canvas_frames(key, x, y, w, h, z, collapsed, updated_at)"
@@ -126,7 +126,7 @@ def save_frames(rec: Records, frames: list[FrameIn], removed: list[str]) -> None
 
 
 def save_view(rec: Records, view: ViewIn) -> None:
-    with rec.write("engineer") as conn:
+    with rec.write("engineer", upkeep=True) as conn:
         conn.execute(
             "INSERT INTO canvas_view(id, x, y, zoom, updated_at) VALUES (1, ?, ?, ?, ?)"
             " ON CONFLICT(id) DO UPDATE SET x = excluded.x, y = excluded.y,"

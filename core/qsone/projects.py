@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from qsone import activity, copy, settings
 from qsone.backup import keys as backup_keys
 from qsone.meaning.service import Meaning, ModelFailed
-from qsone.records import audit, files, search, vault
+from qsone.records import audit, files, search, unzip, vault
 from qsone.records.project import FILE_NAME, Records, RecordsError
 
 if TYPE_CHECKING:
@@ -121,6 +121,7 @@ class Projects:
             "name": meta["name"],
             "created_at": meta["created_at"],
             "confidential": meta.get("confidential") == "1",  # a Confidential Project
+            "archived_at": meta.get("archived_at"),  # read-only while set (Plan 8)
         }
         return self._known[rec.id]
 
@@ -273,6 +274,63 @@ def _file(info: files.FileInfo) -> dict:
     return asdict(info) | {"note": getattr(copy, info.note) if info.note else None}
 
 
+def _zip_note(text: dict) -> str:
+    """The copy.py name of a zip refusal, kept as the zip's note."""
+    return "ZIP_TOO_BIG" if text is copy.ZIP_TOO_BIG else "ZIP_UNSAFE"
+
+
+def add_upload(rec: Records, name: str, data: bytes, *, folder: str | None) -> tuple[dict, int]:
+    """One uploaded file, or a zip opened in memory (Plan 8): (answer, status). A zip answers
+    {"zip": true, "files": [FileInfo], "skipped": [{"name", "folder", "error"}]}, its members
+    under `<folder>/<zip name>/<their folder>`; a member over 256 MB or empty is skipped and
+    named. A zip that is refused (too big, unsafe) is kept as one file, not opened, with that
+    note. Each added file reaches the canvas live. Raises what `files.add_file` raises."""
+    if not unzip.is_zip(name, data):
+        info = files.add_file(rec, name, data, actor=ACTOR, folder=folder)
+        found = _file(info)
+        activity.publish(rec.id, {"type": "file", "file": found})  # the canvas, live
+        return found, 200 if info.duplicate else 201
+    added: list[dict] = []
+    skipped: list[dict] = []
+    kept = None
+    try:
+        for inner, member, body in unzip.members(name, data):
+            where = files.clean_folder(f"{folder or ''}/{inner}")
+            if body is None:
+                skipped.append({"name": member, "folder": where, "error": copy.FILE_TOO_BIG})
+                continue
+            try:
+                info = files.add_file(rec, member, body, actor=ACTOR, folder=where)
+            except RecordsError as e:
+                if e.text is not copy.FILE_EMPTY:
+                    raise
+                skipped.append({"name": member, "folder": where, "error": e.text})
+                continue
+            added.append(_file(info))
+            activity.publish(rec.id, {"type": "file", "file": added[-1]})
+    except RecordsError as refused:  # kept as it came, not opened
+        if refused.text not in (copy.ZIP_TOO_BIG, copy.ZIP_UNSAFE):
+            raise  # e.g. an archived project
+        note = _zip_note(refused.text)
+        kept = files.add_file(rec, name, data, actor=ACTOR, folder=folder, note=note)
+        activity.publish(rec.id, {"type": "file", "file": _file(kept)})
+        if not added:
+            return _file(kept), 200 if kept.duplicate else 201
+        added.append(_file(kept))
+    with rec.write(ACTOR) as conn:  # counts only, for Usage Stats' `zips`
+        audit.record(
+            conn,
+            at=rec.clock(),
+            actor=ACTOR,
+            action="unzip",
+            table="zips",
+            row_id=uuid.uuid4().hex,
+            before=None,
+            after={"files": len(added), "skipped": len(skipped), "opened": kept is None},
+        )
+    return {"zip": True, "files": added, "skipped": skipped}, 201
+
+
 def _hit(h: search.Hit) -> dict:
     return {
         "chunk_id": h.chunk_id,
@@ -329,8 +387,10 @@ def router(projects: Projects, meaning: Meaning | None = None) -> APIRouter:
         project_id: str,
         request: Request,
         name: Annotated[str, Query(min_length=1, max_length=1000)],
+        folder: Annotated[str | None, Query(max_length=files.MAX_FOLDER)] = None,
     ) -> JSONResponse:
-        """The raw file is the body; its name comes URL-encoded in `?name=`."""
+        """The raw file is the body; its name comes URL-encoded in `?name=`, and the path inside
+        a dropped folder in `?folder=` (display text only). A zip is opened (`add_upload`)."""
         rec = await run_in_threadpool(projects.get, project_id)
         limit = files.MAX_FILE_BYTES
         length = request.headers.get("content-length", "")
@@ -342,11 +402,11 @@ def router(projects: Projects, meaning: Meaning | None = None) -> APIRouter:
             if size > limit:
                 raise RecordsError(copy.FILE_TOO_BIG, status=413)
             parts.append(part)
-        info = await run_in_threadpool(files.add_file, rec, name, b"".join(parts), actor=ACTOR)
+        found, status = await run_in_threadpool(
+            add_upload, rec, name, b"".join(parts), folder=folder
+        )
         wake()  # embedding happens in the background; the upload never waits for it
-        found = _file(info)
-        activity.publish(project_id, {"type": "file", "file": found})  # the canvas, live
-        return JSONResponse(found, status_code=200 if info.duplicate else 201)
+        return JSONResponse(found, status_code=status)
 
     @r.get("/projects/{project_id}/search")
     def search_project(

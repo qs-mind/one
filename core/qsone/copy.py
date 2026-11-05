@@ -475,6 +475,10 @@ TOOL_WORDS = {
         "en": "Sending work to the Checking QS",
         "ar": "بيبعت الشغل لمهندس المراجعة",
     },
+    "understood": {
+        "en": "Filling in the “I understood this” card",
+        "ar": "بيملا بطاقة «فهمت كده»",
+    },
     "use_desk": {"en": "Calling on a Desk", "ar": "بيستعين بقسم"},
     "web_read": {"en": "Reading a web page", "ar": "بيقرا صفحة ويب"},
     "web_search": {"en": "Searching the web", "ar": "بيدوّر على الويب"},
@@ -2076,13 +2080,34 @@ FACT_DATE_BAD = {
 }
 COUNT_NEEDS_TRACE = {
     "en": (
-        "items_count must come from code, never be typed: count the items with a tool such as "
-        "find_items and send the trace_id of that result."
+        "items_count must come from code, never be typed: import the BOQ with boq_import and "
+        "send its import_id as the trace_id (or the id of a calculation that counts them)."
     ),
     "ar": (
-        "items_count لازم ييجي من الكود، ومايتكتبش باليد: اعدّ البنود بأداة زي find_items "
-        "وابعت الـ trace_id بتاع النتيجة دي."
+        "items_count لازم ييجي من الكود، ومايتكتبش باليد: استورد جدول الكميات بـ boq_import "
+        "وابعت الـ import_id بتاعه كـ trace_id (أو id حساب بيعدّهم)."
     ),
+}
+FACT_SUBMISSION_DATE = {"en": "The submission date", "ar": "ميعاد التقديم"}
+UNDERSTAND_BRIEF = {
+    "en": "Read the tender folder I just added and fill in the “I understood this” card.",
+    "ar": "اقرا فولدر المناقصة اللي لسه ضايفه واملا بطاقة «فهمت كده».",
+}
+LESSONS_BRIEF = {
+    "en": "Before I close this project, propose the lessons learned from how we worked on it.",
+    "ar": "قبل ما أقفل المشروع ده، اقترح الدروس المستفادة من طريقة شغلنا فيه.",
+}
+LESSON_STAYS_CONFIDENTIAL = {
+    "en": "This is a Confidential Project, so its lessons stay in it.",
+    "ar": "ده مشروع سري، فدروسه بتفضل جوّاه.",
+}
+LESSON_NOT_FOUND = {
+    "en": "This lesson is not in the project.",
+    "ar": "الدرس ده مش موجود في المشروع.",
+}
+ARCHIVE_WAITS_FOR_BRIEF = {
+    "en": "A Brief is still running in this project. Let it finish or stop it, then archive.",
+    "ar": "فيه تكليف لسه شغال في المشروع ده. استنى لما يخلص أو وقّفه، وبعدين أرشف.",
 }
 
 # The updater.
