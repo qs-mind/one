@@ -64,7 +64,7 @@ export function ImportReport({ job }: { job: Job }) {
     <section
       aria-label={title}
       data-import-report
-      className="flex w-[min(400px,calc(100vw-32px))] flex-col gap-4 rounded-[14px] bg-paper px-5 py-4 shadow-[0_2px_12px_rgb(14_15_18/0.12)]"
+      className="flex w-full flex-col gap-4 rounded-[14px] border border-ink/[0.08] bg-paper px-5 py-4"
     >
       <div className="flex items-start justify-between gap-3">
         <h2 dir="auto" className="min-w-0 font-semibold break-words">

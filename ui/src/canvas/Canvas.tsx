@@ -46,6 +46,8 @@ import { importInto } from "../import/importer";
 import { holdsFolder } from "../import/walk";
 import { select } from "./selection";
 import { SourceError } from "./sources";
+import { markFrame } from "./mark";
+import { ease } from "../ui/motion";
 import type {
   ActivityEvent,
   Anchor,
@@ -319,7 +321,7 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
             ? area.x + area.w * (1 - ex) - (minX + w) * zoom
             : area.x + area.w * ex - minX * zoom;
       const y = !down && !atStart ? area.y + area.h / 2 - (minY + h / 2) * zoom : area.y + area.h * ey - minY * zoom;
-      void flow.setViewport({ x, y, zoom }, { duration: animate ? duration() : 0 });
+      void flow.setViewport({ x, y, zoom }, { duration: animate ? duration() : 0, ease }); // the calm ease of ONE's motion
     },
     [flow, store, free],
   );
@@ -469,13 +471,14 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
   );
 
   const focusFrame = useCallback(
-    (key: FrameKey, opts?: { anchor?: Anchor; zoom?: number }) => {
+    (key: FrameKey, opts?: { anchor?: Anchor; zoom?: number; mark?: boolean }) => {
       const node = nodesRef.current.find((n) => n.id === key);
       if (!node) return;
       setNodes(nodesRef.current.map((n) => (n.selected === (n.id === key) ? n : { ...n, selected: n.id === key })));
       // at 100% when its width fits with a margin round it, else as large as fits; a tall one (a Document) from its
       // top, to be read; never on its poster (lod.ts)
       fitTo([placedOf(node)], { margin: MARGIN, byWidth: true, maxZoom: Math.max(opts?.zoom ?? PREFERRED, READABLE), minZoom: READABLE });
+      if (opts?.mark) void markFrame(key, duration());
       requestAnimationFrame(() => {
         document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
       });

@@ -8,6 +8,7 @@ import { fakeSources } from "../canvas/fake";
 import { entry } from "../deliverables/fixtures";
 import { fill, setLanguage, texts } from "../i18n";
 import { currentProject, setCurrentProject } from "../records/project";
+import { askForBackupFolder, stopAsking } from "../backup/ask";
 import { App } from "./App";
 import { bodyOf, calls, core, P1, P2, reply, shown, streamed } from "./testing";
 
@@ -328,5 +329,30 @@ describe("keyboard and layout", () => {
     expect(screen.getByRole("region", { name: "canvas stand-in" }).closest("[inert]")).not.toBeNull();
     await user.click(close);
     expect(screen.getByRole("region", { name: "canvas stand-in" }).closest("[inert]")).toBeNull();
+  });
+});
+
+describe("the import reports and the backup question", () => {
+  afterEach(() => stopAsking());
+
+  it("are cards at the chat's foot, never over the canvas, and a new one opens a folded chat", async () => {
+    setCurrentProject(P1);
+    core({
+      routes: {
+        "GET /api/projects": () => Response.json({ projects: [{ ...P1, open: true }] }),
+        "GET /api/backup": () => Response.json({ folder: null }),
+      },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await box();
+    await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
+    expect(screen.queryByRole("complementary", { name: texts.projectChat.ar })).toBeNull();
+    await act(() => askForBackupFolder()); // after the first project
+    const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
+    const question = within(chat).getByRole("region", { name: texts.backupTitle.ar });
+    expect(question.closest("[data-notices]")).not.toBeNull();
+    await user.click(within(question).getByRole("button", { name: texts.backupLater.ar }));
+    expect(within(chat).queryByRole("region", { name: texts.backupTitle.ar })).toBeNull();
   });
 });

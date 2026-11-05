@@ -333,7 +333,7 @@ describe("the chat in the shell", () => {
     await user.type(await box(), "اعمل المقايسة{enter}");
     const card = await screen.findByRole("article", { name: "جدول الكميات - عينة" });
     await user.click(within(card).getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) }));
-    expect(focus).toHaveBeenCalledWith(`deliverable:${D}`);
+    expect(focus).toHaveBeenCalledWith(`deliverable:${D}`, { mark: true });
     expect(screen.queryByRole("tablist", { name: texts.reviewPanels.ar })).toBeNull();
   });
 

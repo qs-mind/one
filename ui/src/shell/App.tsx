@@ -15,13 +15,11 @@ import { Cursors } from "../canvas/live/Cursors";
 import { select } from "../canvas/selection";
 import { httpSources } from "../canvas/sources";
 import type { FrameKey, ProjectSources, ProjectStatus } from "../canvas/types";
-import { useBackupAsk } from "../backup/ask";
-import { BackupAsk, BackupPanel } from "../backup/BackupPanel";
+import { BackupPanel } from "../backup/BackupPanel";
 import { Confidential } from "../backup/Confidential";
 import { ProjectIndex } from "../deliverables/ProjectIndex";
 import { FolderChooser, FolderDrop } from "../import/FolderDrop";
 import { onBriefStarted } from "../import/importer";
-import { ImportReports } from "../import/ImportReport";
 import { CloseProject } from "../journey/CloseProject";
 import { dir, useLanguage } from "../i18n";
 import { restoreProject, useProject } from "../records/project";
@@ -35,6 +33,7 @@ import { CommandBar } from "./CommandBar";
 import { DeliverablePanel, useDeliverablePanel } from "./DeliverablePanel";
 import { FloatingPanel } from "./FloatingPanel";
 import { GeneralChat } from "./GeneralChat";
+import { useNoticeCount } from "./Notices";
 import { Palette } from "./Palette";
 import { moveRegion, useNarrow } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
@@ -92,7 +91,14 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const liveWaiting = useWaiting(); // the live stream's count, once it has said one; until then the status's
   const waiting = liveWaiting ?? status.waiting ?? 0;
 
-  const askBackup = useBackupAsk();
+  // The import reports and the backup question are cards at the chat's foot (Notices), never over the canvas: a new
+  // one opens a folded chat, so it is seen.
+  const notices = useNoticeCount();
+  const noticesSeen = useRef(notices);
+  useEffect(() => {
+    if (notices > noticesSeen.current) setChatShown(true);
+    noticesSeen.current = notices;
+  }, [notices]);
 
   // A Brief started from a screen (the "I understood this" Brief, the lessons): the chat reads it from the core.
   // A short Brief may end between the chat's two reads (its messages, then its stream): when the chat is not
@@ -210,7 +216,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     const key: FrameKey = `deliverable:${id}`;
     if (DELIVERABLE_CARD_OPENS === "frame" && canvasApi.frames().some((frame) => frame.key === key)) {
       if (narrow) setSheetChat(false);
-      canvasApi.focusFrame(key);
+      canvasApi.focusFrame(key, { mark: true }); // it glides there, and the frame says "here"
     } else {
       deliverable.show(id, false, card); // from its chat card, it grows from there
     }
@@ -334,11 +340,6 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               {floatingPanel}
             </>
           )}
-          {/* the import reports and the backup question: top centre, clear of the panels (start) and the chat (end) */}
-          <div className="pointer-events-none absolute inset-x-4 top-2 z-30 flex flex-col items-center gap-3 [&>*]:pointer-events-auto">
-            <ImportReports />
-            {askBackup && <BackupAsk />}
-          </div>
           <FolderChooser />
         </div>
         <Palette
