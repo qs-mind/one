@@ -98,8 +98,9 @@ type FrameProps = {
   children?: ReactNode;
 };
 
+// a 32 px square at 100%, so the fold caret and its neighbours are a real target, not a glyph's width
 const iconButton =
-  "nodrag tap shrink-0 rounded-lg px-2 py-1.5 leading-none text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
+  "nodrag tap inline-flex size-8 shrink-0 items-center justify-center rounded-lg leading-none text-slate hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
 
 export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenFull, closable, scrolls = true, children }: FrameProps) {
   useLanguage();
@@ -141,7 +142,9 @@ export function Frame({ id, selected, collapsed, title, dir, lang, meta, onOpenF
             aria-expanded={!collapsed}
             className={iconButton}
           >
-            {collapsed ? "▾" : "▴"}
+            <svg data-caret aria-hidden="true" viewBox="0 0 16 16" className={`size-4 transition-transform duration-150 motion-reduce:transition-none ${collapsed ? "" : "rotate-180"}`}>
+              <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </Tip>
         {closable && (

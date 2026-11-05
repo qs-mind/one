@@ -124,6 +124,10 @@ describe("the Project Canvas", () => {
     const desk = await frameEl(name);
     expect(desk.querySelector("[data-frame-body]")).toBeNull();
     expect(placedOf("desk:pricing")).toMatchObject({ collapsed: true });
+    // the fold caret is a 32 px target with a drawn chevron, not a small glyph
+    const caret = screen.getByRole("button", { name: texts.expand.ar });
+    expect(caret).toHaveClass("size-8");
+    expect(caret.querySelector("svg[data-caret]")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: texts.expand.ar }));
     expect(await screen.findByText("مهندس التسعير - عينة")).toBeInTheDocument();
   });

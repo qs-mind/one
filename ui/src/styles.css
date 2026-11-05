@@ -120,13 +120,16 @@ html[data-pointer] :focus-visible:not(input, textarea, select, [contenteditable=
     background-size: 10px 6px;
     background-position: right 0.75rem center;
     text-overflow: ellipsis;
+    /* never wider than its box: a long option (a model's name and price) is cut, the panel never scrolls sideways */
+    max-width: 100%;
+    min-width: 0;
   }
   [dir="rtl"] select:not([dir="ltr"]),
   select[dir="rtl"] {
     background-position: left 0.75rem center;
   }
 }
-select {
+select:not([class*="pe-"]) {
   padding-inline-end: 2.25rem;
 }
 
