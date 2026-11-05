@@ -307,7 +307,8 @@ async def test_an_engineer_wide_number_needs_engineer_evidence(ctx, eng):
             {"kind": "file", "file_id": project_file, "locator": {"page": 1}, "where": "engineer"},
             ctx,
         )
-    own = spec_file(eng)
+    priced = sample_pdf([["concrete C30 3950 EGP - sample"]])
+    own = add_file(eng, "عرض - عينة.pdf", priced, actor="engineer").id
     source = ids(
         await call(
             "add_source",

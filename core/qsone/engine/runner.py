@@ -28,6 +28,7 @@ Never logs Brief text, messages, cards or tool arguments: only ids and states.""
 import asyncio
 import json
 import logging
+import re
 import shutil
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field, replace
@@ -56,6 +57,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
+    RetryFeedbackPart,
     RetryPromptPart,
     TextPart,
     TextPartDelta,
@@ -80,6 +82,7 @@ from qsone.engine import (
     selection,
     team,
     tools,
+    truth,
 )
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.costs import CallRefused, CapReached, CostedModel, Spending
@@ -127,7 +130,7 @@ BUSY_WAIT = 5  # seconds before the one more try at a busy provider
 OFFLINE_WAITS = (5, 15, 30, 60)  # then every 60 s while the app runs
 REVIEW_AS_JSON = (  # the model reads it: a check on Claude Code answers in text
     'Answer with one JSON object only: {"code": "A" | "B" | "C", "comments": '
-    '[{"about": "...", "text": "..."}]}.'
+    '[{"about": "...", "text": "..."}], "checked": ["..."]}.'
 )
 _ROLE_NAMES: dict[str, Text] = {
     "lead": copy.ROLE_LEAD,
@@ -136,6 +139,54 @@ _ROLE_NAMES: dict[str, Text] = {
     "quick": copy.ROLE_QUICK,
 }
 _DEFERRED = object()  # the Lead's pass ended with deferred calls to run
+# Every specialist's principles from ONE, beside the Lead's instructions for it: the tender day's
+# weak model priced walls at a block's supply price «شامل العمالة» and cited worked-out numbers
+# as read from a quote. The record tools refuse both; these say why before they do.
+SPECIALIST_RULES = (
+    "ONE's principles for every specialist:\n"
+    "- A number read from a file is recorded at the place that has it, as written there. A "
+    "number you work out (a total, an average, a price with waste or a margin) goes through "
+    "calculate with its inputs and formula, never as read from a file.\n"
+    "- A rate says what it includes: supply, or supply and installation. A supply-only quote "
+    "never covers labour; an installed item's rate adds labour from its own source, with "
+    "calculate. A rate is per the item's own unit.\n"
+    "- A value you do not have is missing: say so; never leave a blank for it."
+)
+_RECORD_ID = re.compile(r"\b[0-9a-f]{32}\b")  # an item, file or number id in a tool's words
+# The reply says ONE could not search the web: the screen adds the way to set it up.
+_NO_SEARCH_SAID = re.compile(
+    r"الإنترنت|الانترنت|\bالنت\b|الويب|أونلاين|اونلاين|\b(?:web|internet|online)\b", re.I
+)
+
+
+def _descriptions(rec: Records) -> list[str]:
+    """The project's item descriptions, as its records have them."""
+    with rec.read() as c:
+        rows = c.execute(
+            "SELECT json_extract(fields, '$.description') FROM items"
+            " WHERE json_extract(fields, '$.description') IS NOT NULL"
+        ).fetchall()
+    return [str(d) for (d,) in rows]
+
+
+def _no_search_notice(brief_id: str) -> Data:
+    """The notice the web tools give when no search is set up, with its fix (audit B8)."""
+    data = {"text": copy.WEB_NO_SEARCH, "fix": "search"}
+    return Data(brief_id, "notice", f"{brief_id}-no-search", data)
+
+
+def _refused(history: bytes, tool: str) -> str | None:
+    """The last refusal a run's tool call got (its retry text), or None."""
+    found = None
+    for m in _load(history):
+        if isinstance(m, ModelRequest):
+            for p in m.parts:
+                retried = isinstance(p, RetryPromptPart) or (
+                    isinstance(p, ToolReturnPart) and p.outcome == "retried"
+                )
+                if retried and p.tool_name == tool:
+                    found = p.content if isinstance(p.content, str) else json.dumps(p.content)
+    return found
 
 
 def utc_now() -> datetime:
@@ -251,12 +302,23 @@ def settled(messages: list) -> list:
     return []
 
 
+def _sent_back(messages: list, i: int) -> bool:
+    """Whether the answer at `i` went back to be fixed: the next request retries the output (a
+    retry with no tool), as the truth checks do (`_Brief._truthful`)."""
+    after = messages[i + 1] if i + 1 < len(messages) else None
+    return isinstance(after, ModelRequest) and any(
+        isinstance(p, RetryFeedbackPart) or (isinstance(p, RetryPromptPart) and p.tool_name is None)
+        for p in after.parts
+    )
+
+
 def lead_text(messages: list) -> str:
-    """Everything the Lead said, its answers' text, as one reply."""
+    """Everything the Lead said, its answers' text, as one reply; an answer it was sent back to
+    fix is left out, as the screen left it out live (`data-redo`)."""
     said = [
         "".join(p.content for p in m.parts if isinstance(p, TextPart))
-        for m in messages
-        if isinstance(m, ModelResponse)
+        for i, m in enumerate(messages)
+        if isinstance(m, ModelResponse) and not _sent_back(messages, i)
     ]
     return "\n\n".join(s for s in said if s)
 
@@ -380,6 +442,10 @@ class _Brief:
         self._given_sheet = sheet
         self.lead_run_id: str | None = None
         self.lead_ctx: ToolContext | None = None
+        self.truth_retried = False  # the reply went back once to be fixed (engine.truth)
+        self.said = 0  # the reply's length so far, in the screen's units (UTF-16)
+        self.answer_from = 0  # where the Lead's latest response began in it
+        self.redo_cleared = False  # a reply sent back left the screen with no words
         self._news = asyncio.Event()
         saved = brief.get("worklog")
         self.worklog = (
@@ -402,6 +468,8 @@ class _Brief:
             event = replace(event, lang=self.lang)
         if isinstance(event, Progress | Settled) and event.at is None:
             event = replace(event, at=self._now())
+        if isinstance(event, TextDelta):
+            self.said += len(event.text.encode("utf-16-le")) // 2
         self.log.append(event)
         if isinstance(event, Progress):
             self._agent(event.run_id, state="working", line=event.text, focus=event.focus)
@@ -700,7 +768,39 @@ class _Brief:
                 except Exception:  # noqa: BLE001 - its own words are only for the Progress Line
                     pass
             on = self._focus(c.tool_name, c.args_as_dict())
+            words = self._plain(words)
             self.emit(Progress(self.brief_id, run_id, spec.name, words, on, tool=True))
+
+    def _plain(self, words: Text) -> Text:
+        """The work log's words with each record id the model gave named as the engineer knows
+        it: an item by its code, a file by its name (never «البند 707d81e9…»)."""
+        rec = self.place.rec
+        ids = {i for text in words.values() for i in _RECORD_ID.findall(text)}
+        if rec is None or not ids:
+            return words
+        names: dict[str, str] = {}
+        try:
+            with rec.read() as c:
+                for i in ids:
+                    row = (
+                        c.execute(
+                            "SELECT coalesce(code, '') FROM items WHERE id = ?", (i,)
+                        ).fetchone()
+                        or c.execute("SELECT name FROM files WHERE id = ?", (i,)).fetchone()
+                        or c.execute(
+                            "SELECT coalesce(i.code, '') FROM numbers n JOIN items i"
+                            " ON i.id = n.item_id WHERE n.id = ?",
+                            (i,),
+                        ).fetchone()
+                    )
+                    if row and row[0]:
+                        names[i] = row[0]
+        except RecordsError:
+            return words
+        return {
+            lang: _RECORD_ID.sub(lambda m: names.get(m[0], m[0]), text)
+            for lang, text in words.items()
+        }
 
     def _focus(self, tool: str, args: dict) -> dict | None:
         try:
@@ -808,6 +908,7 @@ class _Brief:
         )
         found = (
             said,
+            truth.today_line(self.engine.clock()),  # dates come from the core, in Cairo time
             reply_line(self.text),
             self._search_line(),
             self.instruction,
@@ -825,6 +926,12 @@ class _Brief:
             services = oneshot.for_run(services, self.models(self.lead_run_id))
         if web_tools.searchable(services):
             return None
+        if self.place.rec is not None:  # a project's Lead has no web_search: ONE adds the way
+            return (
+                "No web search is set up in ONE. When the engineer asks for something from the "
+                "web or today's price, say in one line that ONE could not search the web (ONE "
+                "shows them how to set it up), and give no remembered price as today's."
+            )
         return (
             "No web search is set up in ONE. When the engineer asks for something from the web "
             "or today's price, call web_search once (ONE shows them how to set search up), say "
@@ -910,6 +1017,8 @@ class _Brief:
             self._toolset(spec, self.lead_ctx),
             output_type=[self.output_type or str, DeferredToolRequests],
         )
+        if not report and self.output_type is None:
+            agent.output_validator(self._truthful)
         said = bool(lead_text(own))
         self._agent(run_id, state="thinking", model=choice.model)
         async with agent.iter(
@@ -929,6 +1038,9 @@ class _Brief:
                         self._tools_done(run_id)
                     if Agent.is_model_request_node(node):
                         self._agent(run_id, state="thinking")
+                        self.answer_from = self.said  # where this response's words begin
+                        if self.redo_cleared:  # the screen dropped every word said so far
+                            said, self.redo_cleared = False, False
                         async with node.stream(run.ctx) as events:
                             first = True
                             async for ev in events:
@@ -1058,6 +1170,8 @@ class _Brief:
         )
         # what a specialist writes for the engineer is in the engineer's language (audit C6)
         extra = reply_line(self.text) if spec.role == "specialist" else None
+        if spec.role == "specialist":  # ONE's own principles, whatever the Lead wrote (5 Nov)
+            extra = "\n\n".join((truth.today_line(self.engine.clock()), extra, SPECIALIST_RULES))
         async with agent.iter(
             prompt, message_history=own or None, instructions=extra, retries=TOOL_RETRIES
         ) as run:
@@ -1100,6 +1214,7 @@ class _Brief:
                 checker=choice,
                 same_provider=mine.provider == theirs.provider,
                 round=1,
+                checked=tuple(out.checked),
             )
         return await checker.review(
             packet,
@@ -1160,15 +1275,101 @@ class _Brief:
         """What the Brief's tools gave (the team's own words do not count)."""
         return _tool_results(self.store.runs(self.brief_id))
 
+    # The truth checks (engine.truth) ---------------------------------------------------------
+
+    def _did(self) -> truth.Brief:
+        """What this Brief did, from its runs' tool results: the facts a reply is checked on."""
+        did = truth.Brief(tool_names=frozenset(n for n in REGISTRY if "_" in n))
+        for run in self.store.runs(self.brief_id):
+            spec = run["spec"]
+            if spec.role == "specialist":
+                did.specialists += (spec.name["en"], spec.name["ar"])
+            if not run["history"]:
+                continue
+            for name, text in agents.tool_returns(run["history"]):
+                tool = REGISTRY.get(name)
+                if tool is None:
+                    continue
+                if tool.writes and (name not in team.TEAM_TOOLS or name == "make_deliverable"):
+                    did.writes += 1
+                if name in ("deliverable_create", "make_deliverable"):
+                    did.deliverables += 1
+                did.shown = did.shown or name == view.TOOL
+                did.understood = did.understood or name == understand.TOOL
+                if name == "add_source":
+                    try:
+                        found = json.loads(text)
+                    except ValueError:
+                        continue
+                    if isinstance(found, dict) and found.get("covers") == "supply":
+                        did.supply_only += (str(found.get("title", "")),)
+            if not did.understood:
+                refused = _refused(run["history"], understand.TOOL)
+                did.understood_refused = refused or did.understood_refused
+        return did
+
+    def _reply_problems(self, output: str) -> list[truth.Problem]:
+        rec = self.place.rec
+        return truth.reply_problems(
+            output,
+            cov=truth.coverage(rec) if rec is not None else None,
+            did=self._did(),
+            engineer_text=self.text,
+            understand_brief=self.instruction == understand.INSTRUCTION,
+        )
+
+    async def _truthful(self, output: Any) -> Any:
+        """The Lead's answer against ONE's records, before the engineer relies on it. Once per
+        Brief, what it says that the records do not show (a blank for a value, a promise of work
+        that is not running, more priced items than there are, a change never made) goes back
+        for the Lead to fix, and the screen drops the words it replaces (`data-redo`)."""
+        if not isinstance(output, str) or self.truth_retried:
+            return output
+        problems = await asyncio.to_thread(self._reply_problems, output)
+        if not problems:
+            return output
+        self.truth_retried = True
+        cut = {"from": self.answer_from, "to": self.said}
+        self.redo_cleared = self.answer_from == 0
+        self.emit(Data(self.brief_id, "redo", self.brief_id, cut))
+        raise ModelRetry(
+            "ONE checked your answer against its records before the engineer reads it. Answer "
+            "again, fixing this:\n- " + "\n- ".join(p.fix for p in problems)
+        )
+
+    async def _facts(self, output: str) -> None:
+        """The facts beside the reply, from ONE's own records (`data-facts`): the BOQ's real
+        coverage and its Deliverables, with a flag for each claim the records do not show; and
+        the way to set up web search when the reply says ONE could not search."""
+        problems = await asyncio.to_thread(self._reply_problems, output)
+        rec = self.place.rec
+        cov = await asyncio.to_thread(truth.coverage, rec) if rec is not None else None
+        flags = [p.flag for p in problems if p.flag]
+        did = self._did()
+        worked = did.writes or truth.PRICED.search(output)
+        found = truth.facts(cov, flags) if flags or worked else None
+        no_search = bool(
+            rec is not None and _NO_SEARCH_SAID.search(output) and self._search_line() is not None
+        )
+        if found is not None:
+            self.emit(Data(self.brief_id, "facts", self.brief_id, found))
+        if no_search:
+            self.emit(_no_search_notice(self.brief_id))
+        self.worklog.truth = {"facts": found, "no_search": no_search}
+
     async def _finish(self, output: Any) -> None:
         if isinstance(output, str):
             results = self.results()
             marked = numbers_guard.unsourced(output, numbers_guard.known_values(results))
+            if marked and self.place.rec is not None:  # a size in an item's own words is no price
+                found = await asyncio.to_thread(_descriptions, self.place.rec)
+                marked = numbers_guard.described(output, marked, found)
             if marked:
                 self.emit(Unsourced(self.brief_id, tuple(marked)))
             named = numbers_guard.sourced(output, results)
             if named:  # decision 16.3: each opens into its ledger number's source card
                 self.emit(Data(self.brief_id, "sourced", self.brief_id, {"numbers": named}))
+            await self._facts(output)
         drafts = self.store.unchecked(self.brief_id)
         if self.place.rec is not None:  # Plan 6: the Deliverables this Brief made or changed
             returns = [
@@ -1808,5 +2009,10 @@ def _stored_events(
         worklog = WorkLog.load(brief["worklog"], stopped_at=brief["updated_at"])
         worklog.ended = json.loads(brief["worklog"]).get("ended")
         events.append(Data(brief_id, "worklog", brief_id, worklog.as_json()))
+        said = worklog.truth or {}  # the facts the core put beside the reply, as they were then
+        if said.get("facts"):
+            events.append(Data(brief_id, "facts", brief_id, said["facts"]))
+        if said.get("no_search"):
+            events.append(_no_search_notice(brief_id))
     events.append(Status(brief_id, brief["status"], brief["step"]))
     return events

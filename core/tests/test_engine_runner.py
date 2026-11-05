@@ -319,7 +319,9 @@ async def test_unchecked_deliverable_with_numbers_is_checked_before_done(make_en
         "sources": [ids["source"]],
     }
     lead = scripted(call("make_deliverable", deliverable), said("الجدول جاهز - عينة"))
-    checker = scripted(call("final_result", {"code": "A", "comments": []}))
+    checker = scripted(
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)
@@ -337,7 +339,9 @@ async def test_a_deliverable_the_brief_made_is_checked_on_its_saved_version(make
     rows = sample_boq_rows(rec, 2)
     sheet = {"kind": "sheet", "variant": "boq", "title": "جدول - عينة", "language": "ar"}
     lead = scripted(call("deliverable_create", sheet | {"rows": rows}), said("الجدول جاهز - عينة"))
-    checker = scripted(call("final_result", {"code": "B", "comments": []}))
+    checker = scripted(
+        call("final_result", {"code": "B", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)
@@ -354,7 +358,9 @@ async def test_a_deliverables_card_stays_in_the_stored_chat(make_engine, registr
     sheet = {"kind": "sheet", "variant": "boq", "title": "جدول - عينة", "language": "ar"}
     rows = sample_boq_rows(rec, 2)
     lead = scripted(call("deliverable_create", sheet | {"rows": rows}), said("الجدول جاهز - عينة"))
-    checker = scripted(call("final_result", {"code": "A", "comments": []}))
+    checker = scripted(
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     await finish(engine, brief)
@@ -382,7 +388,9 @@ async def test_a_deliverable_the_brief_proposed_to_is_checked_once(make_engine, 
         ),
         said("اقترحت تعديل - عينة"),
     )
-    checker = scripted(call("final_result", {"code": "A", "comments": []}))
+    checker = scripted(
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]})
+    )
     engine = await started(make_engine(links(lead=lead, checker=checker)))
     brief = await engine.start_brief(project, BRIEF)
     events = await finish(engine, brief)
@@ -413,7 +421,7 @@ async def test_the_engineers_checker_choice_wins_even_on_the_leads_model(make_en
     model = claude.models[HAIKU.choice.model] = scripted(
         call("make_deliverable", table_brief(ids)),
         said("الجدول جاهز - عينة"),
-        call("final_result", {"code": "A", "comments": []}),
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]}),
     )
     events, review = await checked_on(await started(make_engine([claude])), project)
     assert review.review.checker == HAIKU.choice and review.review.same_provider is True
@@ -430,7 +438,7 @@ async def test_a_default_checker_never_moves_to_a_costlier_model(make_engine, re
     claude.models[HAIKU.choice.model] = scripted(
         call("make_deliverable", table_brief(ids)),
         said("الجدول جاهز - عينة"),
-        call("final_result", {"code": "A", "comments": []}),
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]}),
     )
     events, review = await checked_on(await started(make_engine([claude])), project)
     assert review.review.checker == HAIKU.choice
@@ -446,7 +454,7 @@ async def test_a_default_checker_moves_off_the_makers_model_to_a_cheaper_one(mak
         call("make_deliverable", table_brief(ids)), said("الجدول جاهز - عينة")
     )
     claude.models[HAIKU.choice.model] = scripted(
-        call("final_result", {"code": "A", "comments": []})
+        call("final_result", {"code": "A", "comments": [], "checked": ["sources - sample"]})
     )
     _, review = await checked_on(await started(make_engine([claude])), project)
     assert review.review.checker == HAIKU.choice and review.review.same_provider is True
@@ -946,7 +954,8 @@ async def test_the_checking_qs_on_claude_code_answers_in_json_text(make_engine, 
         "sources": [ids["source"]],
     }
     lead = scripted(call("make_deliverable", deliverable), said("الجدول جاهز - عينة"))
-    review = {"code": "B", "comments": [{"about": "03/02", "text": "راجع الوحدة - عينة"}]}
+    review = {"code": "B", "comments": [{"about": "03/02", "text": "راجع الوحدة - عينة"}],
+              "checked": ["الوحدات - عينة"]}  # fmt: skip
     answer = f"المراجعة - عينة:\n{json.dumps(review, ensure_ascii=False)}\nخلصت."
     log = tmp_path / "claude.log"
     claude = claude_code_link(["init", {"text": answer}, "result"], log)

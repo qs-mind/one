@@ -30,7 +30,7 @@ def quote_source(rec) -> dict:
     with rec.read() as c:
         found = c.execute("SELECT id FROM files WHERE name = ?", (QUOTE,)).fetchone()
     if found is None:
-        rows = [["حديد تسليح - عينة", "طن", "39850.50"]]
+        rows = [["حديد تسليح - عينة", "طن", "120", "39850.50"]]  # quantity, rate
         found = (add_file(rec, QUOTE, sample_xlsx({"Quote": rows}), actor="engineer").id,)
     locator = {"sheet": "Quote", "row": 1}
     source = {"kind": "quote", "title": "عرض سعر - عينة", "file_id": found[0]}

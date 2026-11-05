@@ -51,7 +51,9 @@ def scripted_checker(seen: list, *, code: str = "B", times: int = 1):
             }
         )
         comments = [{"about": "03/02", "text": "الهالك غير مذكور - عينة"}]
-        return tool_call("final_result", {"code": code, "comments": comments})
+        return tool_call(
+            "final_result", {"code": code, "comments": comments, "checked": ["sources - sample"]}
+        )
 
     return scripted(*[answer] * times)
 
@@ -151,7 +153,9 @@ async def test_the_packet_holds_numbers_formulas_sources_and_marks(ctx):
     assert [s["kind"] for s in packet.sources] == ["quote", "calculation"]
     text = packet_text(packet, "f00d")
     assert '"7,500"' in text and "Off-Desk" in text
-    assert text.count("<<data id=f00d") == text.count("<</data id=f00d>>") == 5
+    # and ONE's own checks: each file-sourced number looked for at its place
+    assert text.count("<<data id=f00d") == text.count("<</data id=f00d>>") == 6
+    assert all(c["found"] for c in packet.citations) and packet.citations
 
 
 async def test_unsourced_numbers_go_to_the_checker(ctx, host):

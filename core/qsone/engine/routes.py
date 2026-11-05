@@ -38,6 +38,7 @@ class StandardIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     base_url: str = Field(min_length=1, max_length=500)
     key: str | None = Field(default=None, max_length=1000)
+    model: str | None = Field(default=None, max_length=200)  # typed: the Lead's default
 
 
 class PriceIn(BaseModel):
@@ -168,7 +169,7 @@ def settings_router(
     @router.post("/settings/ai/standard")
     def add_standard(body: StandardIn) -> JSONResponse:
         try:
-            link = standard.add(body.name, body.base_url, body.key or None)
+            link = standard.add(body.name, body.base_url, body.key or None, body.model or None)
         except KeyringError:
             return JSONResponse({"error": copy.KEY_STORE_DOWN}, status_code=503)
         except ValueError as error:  # also KeyInTheClear

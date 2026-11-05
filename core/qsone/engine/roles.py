@@ -1,12 +1,15 @@
 """The model for each role: the engineer's choice in Settings, else the Recommended Setting.
 
 Ranking is by `price_in + price_out`. A card with no price is never a default and never a
-fallback: only the engineer can pick it. An on-device card (price 0) can be both.
+fallback: only the engineer can pick it. An on-device card (price 0) can be both. Nor is a model
+its provider refused, one the price book marks deprecated, or a "-latest" alias (finding 12).
+The model the engineer typed with a Standard Link is their own pick: it leads, priced or not.
 """
 
 from decimal import Decimal
 
 from qsone import settings
+from qsone.engine.connectors import refused, standard
 from qsone.engine.types import ModelCard, ModelChoice, Role
 
 ROLES: tuple[Role, ...] = ("lead", "checker", "specialist", "quick")
@@ -24,15 +27,64 @@ def _ranked(sheet: list[ModelCard]) -> list[ModelCard]:
     return sorted((c for c in sheet if _price(c) is not None), key=_price, reverse=True)
 
 
-def defaults(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
-    """The Recommended Settings; empty when no card on the sheet has a price.
+def _eligible(card: ModelCard) -> bool:
+    """ONE may pick it by itself: its provider serves it, the price book has not retired it, and
+    it is no alias (the model behind "-latest", and so its price, changes unannounced)."""
+    return not (card.retired or refused(card.choice) or card.choice.model.endswith("-latest"))
 
+
+def _typed(sheet: list[ModelCard]) -> ModelCard | None:
+    """The first model the engineer typed with a link that is on the sheet and not refused."""
+
+    def bare(model: str) -> str:
+        return model.removeprefix("models/")
+
+    for choice in standard.typed():
+        for card in sheet:
+            same = card.choice.connector == choice.connector
+            if same and bare(card.choice.model) == bare(choice.model) and not refused(card.choice):
+                return card
+    return None
+
+
+def _around(typed: ModelCard, sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
+    """The typed model leads and does the specialists' work; no role goes to a costlier model.
+
+    - Checking QS: the most expensive model of another provider at or under its price; else
+      another model of its provider at or under it; else the typed model.
+    - quick: the cheapest model of its provider under its price; else the typed model.
+    A typed model of unknown price does every job: nothing can be said to cost less."""
+    limit = _price(typed)
+    under = [
+        c
+        for c in _ranked(sheet)
+        if limit is not None and _eligible(c) and c.choice != typed.choice and _price(c) <= limit
+    ]
+    checker = next((c for c in under if c.provider != typed.provider), next(iter(under), typed))
+    quick = next(
+        (c for c in reversed(under) if c.provider == typed.provider and _price(c) < limit), typed
+    )
+    return {
+        "lead": typed.choice,
+        "checker": checker.choice,
+        "specialist": typed.choice,
+        "quick": quick.choice,
+    }
+
+
+def defaults(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
+    """The Recommended Settings; empty when no card ONE may pick has a price.
+
+    With a model the engineer typed: `_around` it. Otherwise:
     - Lead QS: `LEAD_MODEL`, else the most expensive model.
     - Checking QS: the most expensive model of another provider; with one provider, the most
       expensive other model (a Same-provider check); with one model, that model.
     - specialist: the middle price. quick: the cheapest.
     """
-    ranked = _ranked(sheet)
+    typed = _typed(sheet)
+    if typed is not None:
+        return _around(typed, sheet)
+    ranked = _ranked([c for c in sheet if _eligible(c)])
     if not ranked:
         return {}
     lead = next((c for c in ranked if c.choice.model == LEAD_MODEL), ranked[0])
@@ -79,8 +131,8 @@ def choose(role: Role, choice: ModelChoice) -> None:
 
 
 def chosen(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
-    """The engineer's choices over the defaults."""
-    return defaults(sheet) | saved()
+    """The engineer's choices over the defaults; a choice its provider refused gives way."""
+    return defaults(sheet) | {r: c for r, c in saved().items() if not refused(c)}
 
 
 def _failed_price(sheet: list[ModelCard], failed: ModelChoice) -> Decimal | None:

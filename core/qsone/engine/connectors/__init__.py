@@ -32,7 +32,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
 
 from qsone import copy, settings
-from qsone.engine.types import EFFORTS, Effort, Event, ModelCard, Text
+from qsone.engine.types import EFFORTS, Effort, Event, ModelCard, ModelChoice, Text
 
 log = logging.getLogger("qsone.engine.connectors")
 
@@ -134,7 +134,8 @@ async def check(
 
     A model connector gets one request for at most 1 output token; `on_usage` is given its
     usage, so the call is counted in costs like any other. None means it answered; otherwise
-    the plain {en, ar} reason. `among` defaults to `connectors()`."""
+    the plain {en, ar} reason. A model the provider does not serve (404) is noted
+    (`note_refused`). `among` defaults to `connectors()`."""
     connector_id, _, model_id = via.partition("/")
     found = {c.id: c for c in (connectors() if among is None else among)}
     connector = found.get(connector_id)
@@ -152,6 +153,8 @@ async def check(
         return copy.NO_AI
     except PROVIDER_ERRORS as error:
         log.warning("The check through %s failed: %s", connector.id, error)
+        if getattr(error, "status_code", None) == 404:
+            note_refused(ModelChoice(connector_id, model_id))
         said = plain_error(error, connector.name)
         # a check has no work to save: its own words, not AI_FAILED's
         failed = copy.fill(copy.AI_FAILED, provider=connector.name)

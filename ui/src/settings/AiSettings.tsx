@@ -54,8 +54,8 @@ type Settings = {
 };
 type Loaded = { state: "loading" | "failed" } | { state: "ready"; settings: Settings };
 
-const roleTexts = { lead: "roleLead", checker: "roleChecker", specialist: "roleSpecialist", quick: "roleQuick" } as const;
-const roleOrder: Role[] = ["lead", "checker", "specialist", "quick"];
+export const roleTexts = { lead: "roleLead", checker: "roleChecker", specialist: "roleSpecialist", quick: "roleQuick" } as const;
+export const roleOrder: Role[] = ["lead", "checker", "specialist", "quick"];
 
 const field = "rounded-md border border-slate bg-paper px-3 py-2 outline-none focus:border-ink";
 const primary = "rounded-md bg-ink px-4 py-2 text-paper disabled:opacity-40";
@@ -198,6 +198,7 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
   );
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [model, setModel] = useState("");
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<Text>();
@@ -207,7 +208,12 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
     setSaving(true);
     setFailed(undefined);
     setAdded(undefined);
-    const body = { name: name.trim(), base_url: baseUrl.trim(), ...(key.trim() ? { key: key.trim() } : {}) };
+    const body = {
+      name: name.trim(),
+      base_url: baseUrl.trim(),
+      ...(model.trim() ? { model: model.trim() } : {}), // typed: the Lead QS's default (finding 12)
+      ...(key.trim() ? { key: key.trim() } : {}),
+    };
     const response = await send("/settings/ai/standard", "POST", body);
     setSaving(false);
     setKey(""); // the key is sent once and never kept on the page, whatever the answer
@@ -216,6 +222,7 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
       setAdded({ name: body.name, ...(link?.id && link.provider ? { link } : {}) });
       setName("");
       setBaseUrl("");
+      setModel("");
       onChanged();
     } else {
       // a refused address comes back as technical detail, so the screen says it in its own words
@@ -288,6 +295,10 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
             onChange={(event) => setBaseUrl(event.target.value)}
             className={field}
           />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span>{t("providerModel")}</span>
+          <input dir="ltr" spellCheck={false} value={model} onChange={(event) => setModel(event.target.value)} className={field} />
         </label>
         <label className="flex flex-col gap-1">
           <span>{t("providerKey")}</span>

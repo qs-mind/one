@@ -11,14 +11,20 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.models.function import FunctionModel
 
-from qsone import chat, copy
+from qsone import chat, copy, settings
 from qsone.app import create_app
+from qsone.engine import cards, connectors, roles
 from qsone.engine.connectors import claude_code as claude_link
+from qsone.engine.types import ModelCard, ModelChoice
 from qsone.journey import claude_code, engineer, routes, setup_state
 from tests.conftest import AUTH, SECRET, ui_message
 from tests.engine_fakes import FakeSleep, scripted, text
-from tests.test_engine_runner import links
+from tests.test_chat import GOOGLE_GONE
+from tests.test_engine_connectors import GOOGLE_URL
+from tests.test_engine_runner import FakeLink, links
 
 CARD = {"role": "contractor", "country": "EG", "city": "القاهرة", "currency": "EGP"}
 
@@ -353,6 +359,54 @@ def test_check_a_standard_link_makes_one_tiny_call_on_its_model(data_dir):
         missing = {"via": "standard", "connector": "standard:gone"}
         r = client.post("/settings/ai/check", json=missing, headers=AUTH)
         assert r.status_code == 409 and r.json()["error"] == copy.NO_AI
+
+
+def google_link() -> FakeLink:
+    """A Standard Link to Google as its list gave it; each model's cards priced by the book."""
+    sheet = [
+        ModelCard(
+            ModelChoice("standard:g", f"models/{m}"), m, "google", False, True, None, *([None] * 3)
+        )
+        for m in (
+            "gemini-pro-latest",
+            "gemini-3.1-pro-preview",
+            "gemini-3.1-flash-lite",
+            "gemini-2.5-flash-lite",
+        )
+    ]
+    return FakeLink("standard:g", "Google", "google", sheet=sheet)
+
+
+def gone(messages, info):
+    raise ModelHTTPError(404, "models/gemini-2.5-flash-lite", body=GOOGLE_GONE)
+
+
+def test_check_a_standard_link_uses_the_typed_model_and_drops_a_retired_default(data_dir):
+    """Finding 12: the check runs on the model the engineer typed, then once on each other
+    role's default on the link; a model the provider refuses is noted and is no default."""
+    settings.save_ai(
+        "standard",
+        [
+            {
+                "id": "g",
+                "name": "Google",
+                "base_url": GOOGLE_URL,
+                "provider": "google",
+                "model": "gemini-3.1-flash-lite",
+            }
+        ],
+    )
+    link = google_link()
+    typed = link.models["models/gemini-3.1-flash-lite"] = scripted(text("OK"))
+    link.models["models/gemini-2.5-flash-lite"] = FunctionModel(gone)
+    with make_client([link]) as client:
+        body = {"via": "standard", "connector": "standard:g"}
+        assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
+        assert typed.calls == 1
+    assert connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite"))
+    lite = ModelChoice("standard:g", "models/gemini-3.1-flash-lite")
+    sheet = [cards.priced(c) for c in link.sheet]
+    assert roles.chosen(sheet) == {role: lite for role in roles.ROLES}  # never Pro Latest
 
 
 def test_a_standard_link_check_is_counted_in_costs(data_dir):

@@ -297,6 +297,10 @@ async def test_a_number_keeps_its_source_and_date(ctx):
 
 async def test_a_correction_keeps_the_old_number(ctx):
     source, item = await source_and_item(ctx)
+    remeasured = sample_xlsx({"Take-off": [["03/02", "م3", "125"]]})
+    sheet = add_file(ctx.rec, "إعادة حصر - عينة.xlsx", remeasured, actor="engineer").id
+    again = {"kind": "takeoff", "file_id": sheet, "locator": {"sheet": "Take-off", "row": 1}}
+    again = ids_of(await call("add_source", again | {"dated": DATED}, ctx))["source_id"]
     first = ids_of(
         await call(
             "record_number",
@@ -309,7 +313,7 @@ async def test_a_correction_keeps_the_old_number(ctx):
         await call(
             "correct_number",
             {"number_id": first, "value": "125", "reason": "re-measured - sample"}
-            | {"source_id": source, "dated": DATED},
+            | {"source_id": again, "dated": DATED},
             ctx,
         )
     )

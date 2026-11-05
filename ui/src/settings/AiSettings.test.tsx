@@ -226,6 +226,22 @@ describe("AiSettings", () => {
     );
   });
 
+  it("a Standard Link sends the model the engineer typed, the Lead's default (finding 12)", async () => {
+    const fetch = core({ "POST /api/settings/ai/standard": () => Response.json({}, { status: 201 }) });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.type(await screen.findByLabelText(texts.providerName.ar), "Gemini - sample");
+    await user.type(screen.getByLabelText(texts.baseUrl.ar), "https://generativelanguage.googleapis.com/v1beta/openai");
+    await user.type(screen.getByLabelText(texts.providerModel.ar), " gemini-3.1-flash-lite ");
+    await user.click(screen.getByRole("button", { name: texts.addProvider.ar }));
+    await waitFor(() =>
+      expect(bodies(fetch, "POST", "/api/settings/ai/standard")).toEqual([
+        { name: "Gemini - sample", base_url: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-3.1-flash-lite" },
+      ]),
+    );
+    expect(screen.getByLabelText(texts.providerModel.ar)).toHaveValue("");
+  });
+
   it("shows why a connector's models could not be listed, and removes a Standard Link", async () => {
     const url = "/api/settings/ai/standard/standard%3As1"; // the connector's whole id
     const fetch = core({

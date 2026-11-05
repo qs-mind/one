@@ -43,6 +43,7 @@ _UNITS = {
     *("egp", "le", "usd", "$", "sar", "aed", "kwd", "omr", "qar", "bhd", "eur", "€", "gbp", "£"),
     *("م", "م2", "م3", "م٢", "م٣", "م.ط", "م.م", "مم", "سم", "كم", "كجم", "كغ", "كيلو", "طن"),
     *("لتر", "ساعة", "ساعه", "يوم", "أيام", "ايام", "أسبوع", "شهر", "عدد", "مقطوعية"),
+    *("يوما", "يوماً", "أسابيع", "شهور", "أشهر"),  # «60 يوماً»: a validity typed in a letter
     *("ج.م", "جم", "جنيه", "جنيها", "جنيهات", "ريال", "درهم", "دينار", "دولار", "يورو"),
 }
 
@@ -204,3 +205,25 @@ def unsourced(text: str, known: set[str]) -> list[str]:
         if value not in have and written not in out:
             out.append(written)
     return out
+
+
+def _spaced(text: str) -> str:
+    return " ".join(text.translate(_DIGITS).split()).casefold()
+
+
+def described(text: str, marked: list[str], descriptions: Iterable[str]) -> list[str]:
+    """`marked` less each number that `text` writes with the word after it as an item's
+    description in the records writes them: a size or a grade («طوب 25 سم», "C30"), not a price
+    («طوب 25 سم» was marked "no source", 5 Nov 2026)."""
+    if not marked:
+        return marked
+    known = "\n".join(_spaced(d) for d in descriptions)
+    if not known:
+        return marked
+    keep = []
+    for written in marked:
+        pattern = rf"(?<![\d,٬.٫]){re.escape(written)}(?![\d,٬.٫])\s*([^\s\d.,،؛:]*)"
+        phrases = [f"{_spaced(written)} {_spaced(m.group(1))}" for m in re.finditer(pattern, text)]
+        if not phrases or not all(p.strip() != _spaced(written) and p in known for p in phrases):
+            keep.append(written)  # every time it is written, it is as a description has it
+    return keep

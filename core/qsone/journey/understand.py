@@ -174,7 +174,39 @@ def trace_value(conn, trace_id: str) -> str | None:
 
 def check(rec: Records, result: ProjectUnderstood) -> list[str]:
     """What is wrong with the result, each said exactly as the Lead must fix it (English)."""
+    return settle(rec, result)[1]
+
+
+def _place_of(conn, file_id: str, value: str) -> dict | None:
+    """The place in the file whose text has `value` (its first passage that does), or None."""
+    wanted = value.strip().casefold()
+    if len(wanted) < 3:
+        return None
+    for text, locator in conn.execute(
+        "SELECT text, locator FROM chunks WHERE file_id = ? ORDER BY id", (file_id,)
+    ):
+        if wanted in text.casefold():
+            place = {k: v for k, v in json.loads(locator).items() if k in _PLACES}
+            return place or None
+    return None
+
+
+def _newest_import(conn) -> str | None:
+    row = conn.execute(
+        "SELECT row_id FROM audit WHERE action = 'import' AND table_name = 'boq_imports'"
+        " ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    return row[0] if row else None
+
+
+def settle(rec: Records, result: ProjectUnderstood) -> tuple[ProjectUnderstood, list[str]]:
+    """The result as ONE can save it, and what was left out of it, each said as the Lead must
+    fix it (English). A fact whose locator names no place of its file is found by its value in
+    that file's text, and saved at that place (a weak model gave pages for a text file, was
+    refused three times, and the card never showed: 5 Nov 2026); a count with no trace takes the
+    project's newest BOQ import; a fact or a file that still does not check is left out."""
     wrong: list[str] = []
+    fixed: dict[str, Any] = {}
     with rec.read() as conn:
         for name in SOURCED:
             fact: Sourced | None = getattr(result, name)
@@ -182,25 +214,41 @@ def check(rec: Records, result: ProjectUnderstood) -> list[str]:
                 continue
             if not fact.file_id or not fact.locator:
                 wrong.append(copy.FACT_NEEDS_SOURCE["en"].format(fact=name))
+                fixed[name] = None
                 continue
             file_id = _id(fact.file_id)
             found = _current(conn, file_id)
             if found is None:
                 wrong.append(copy.FACT_FILE_UNKNOWN["en"].format(file_id=fact.file_id))
+                fixed[name] = None
             elif not _in_file(conn, file_id, found[0], fact.locator):
-                text = copy.FACT_LOCATOR_UNKNOWN["en"]
-                wrong.append(text.format(fact=name, file_id=fact.file_id))
+                place = _place_of(conn, file_id, fact.value)
+                if place is None:
+                    text = copy.FACT_LOCATOR_UNKNOWN["en"]
+                    wrong.append(text.format(fact=name, file_id=fact.file_id))
+                    fixed[name] = None
+                else:
+                    fixed[name] = fact.model_copy(update={"locator": place})
             if name == "submission_date" and not _real_date(fact.value):
                 wrong.append(copy.FACT_DATE_BAD["en"].format(fact=name))
+                fixed[name] = None
         count = result.items_count
         if count is not None and (
             not count.trace_id or trace_value(conn, _id(count.trace_id)) is None
         ):
-            wrong.append(copy.COUNT_NEEDS_TRACE["en"])
+            newest = _newest_import(conn)
+            if newest is None:
+                wrong.append(copy.COUNT_NEEDS_TRACE["en"])
+                fixed["items_count"] = None
+            else:
+                fixed["items_count"] = Counted(value="0", trace_id=newest)
+        files = []
         for sort in result.files:
             if _current(conn, _id(sort.file_id)) is None:
                 wrong.append(copy.FACT_FILE_UNKNOWN["en"].format(file_id=sort.file_id))
-    return list(dict.fromkeys(wrong))
+            else:
+                files.append(sort)
+    return result.model_copy(update=fixed | {"files": files}), list(dict.fromkeys(wrong))
 
 
 # Saving and reading --------------------------------------------------------------------------
@@ -267,8 +315,9 @@ def save(rec: Records, result: ProjectUnderstood, *, actor: str) -> None:
                 source = {"kind": "count", "trace_id": trace}
                 fields = {"name": "items_count", "value": value, "source": source}
                 _put(conn, rec, facts, FACT, "items_count", fields, actor)
-        missing = {"name": "missing", "value": list(result.missing), "source": {"kind": "lead"}}
-        _put(conn, rec, facts, FACT, "missing", missing, actor)
+        if result.missing or "missing" not in facts:  # a call that fixes facts keeps the list
+            missing = {"name": "missing", "value": list(result.missing), "source": {"kind": "lead"}}
+            _put(conn, rec, facts, FACT, "missing", missing, actor)
         sorts = _items(conn, SORT)
         for sort in result.files:
             file_id = _id(sort.file_id)
@@ -395,17 +444,22 @@ async def _understood(ctx: ToolContext, args: ProjectUnderstood) -> str:
     if ctx.rec is None:
         raise RecordsError(copy.PROJECT_NOT_OPEN)
     rec = ctx.rec
-    wrong = await asyncio.to_thread(check, rec, args)
-    if wrong:
+    args, wrong = await asyncio.to_thread(settle, rec, args)
+    saved = [n for n in NAMES if getattr(args, n) is not None]
+    if wrong and not (saved or args.files or args.missing):
         raise ModelRetry("Nothing was saved. Fix these, then call understood again:\n- "
                          + "\n- ".join(wrong))  # fmt: skip
     await asyncio.to_thread(save, rec, args, actor=ctx.agent.name["en"])
-    ctx.host.emit(_card(ctx.brief_id, rec.id))
-    saved = [n for n in NAMES if getattr(args, n) is not None]
-    return json.dumps(
-        {"saved": True, "card": CARD, "project_id": rec.id, "facts": saved,
-         "files": len(args.files), "missing": len(args.missing)}
-    )  # fmt: skip
+    ctx.host.emit(_card(ctx.brief_id, rec.id))  # the card shows what checks, always
+    out = {"saved": True, "card": CARD, "project_id": rec.id, "facts": saved,
+           "files": len(args.files), "missing": len(args.missing)}  # fmt: skip
+    if wrong:
+        out["not_saved"] = wrong
+        out["note"] = (
+            "The card shows what was saved. Tell the engineer plainly what was left out; to add "
+            "it, call understood again with only those facts fixed (the rest stays)."
+        )
+    return json.dumps(out)
 
 
 def stored_cards(brief_id: str, results: list[tuple[str, str]]) -> list[Data]:

@@ -17,6 +17,7 @@ import { CARD_ANSWERED, useApprovalQueue } from "./parts/ApprovalCard";
 import { ContinueBriefs } from "./parts/ContinueBriefs";
 import { CoordinationRoom } from "./parts/CoordinationRoom";
 import { CostNotice } from "./parts/CostNotice";
+import { FactsLine, withoutRedone } from "./parts/FactsLine";
 import { ProgressLine } from "./parts/ProgressLine";
 import { ReviewBadge } from "./parts/ReviewBadge";
 import { type OnePart, partsOf } from "./parts/types";
@@ -119,7 +120,7 @@ function BriefReply({
   projectId,
   onOpenDeliverable,
 }: { parts: OnePart[]; live: boolean } & Omit<ChatLogProps, "chat" | "label">) {
-  const text = textOf(parts);
+  const text = withoutRedone(textOf(parts), partsOf(parts, "redo").at(-1)?.data);
   const progress = partsOf(parts, "progress");
   // what is stored in both languages (the work log, the cards, notices) reads in the page's, whatever the Brief's was
   // (tender day: an English page kept «اشتغل 4 ثواني · 4 خطوات»); the reply's own words stay as written
@@ -153,6 +154,9 @@ function BriefReply({
       <ProgressLine items={progress} worklog={partsOf(parts, "worklog").at(-1)?.data} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
       {inOrder}
+      {partsOf(parts, "facts").map((facts) => (
+        <FactsLine key={facts.id} facts={facts.data} lang={said} />
+      ))}
       {partsOf(parts, "notice").map((notice) => (
         <div key={notice.id} role="status" className="flex flex-col gap-2 text-copper">
           <p dir="auto">{pick(notice.data.text, said)}</p>

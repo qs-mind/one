@@ -214,15 +214,19 @@ export function ConnectAi({ nav }: { nav: Nav }) {
 
 const field = "rounded-md border border-slate bg-paper px-3 py-2 outline-none focus:border-ink";
 
-/** Another provider: its name and OpenAI-compatible address, then its key, which adds the link and checks it at once (no
- * Save or Check button). A link whose check fails is taken out again, so a corrected key never leaves a second one. */
+/** Another provider: its name and OpenAI-compatible address, the model to use first if the engineer has one, then its
+ * key, which adds the link and checks it at once (no Save or Check button). A link whose check fails is taken out
+ * again, so a corrected key never leaves a second one. */
 function StandardFirst({ onChecked }: { onChecked: (works: boolean) => void }) {
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [model, setModel] = useState("");
   const ready = name.trim() !== "" && baseUrl.trim() !== "";
   const key = useLiveKey(KEY_MIN.brave, async (value, signal) => {
     onChecked(false);
-    const body = { name: name.trim(), base_url: baseUrl.trim(), key: value };
+    // a typed model is the Lead QS's default, and the one the check runs on (finding 12)
+    const typed = model.trim() ? { model: model.trim() } : {};
+    const body = { name: name.trim(), base_url: baseUrl.trim(), ...typed, key: value };
     const added = await send("/settings/ai/standard", "POST", body, signal);
     if (!added?.ok) return coreLine(added, added?.status === 422 ? texts.providerUrlRefused : texts.providerNotAdded);
     const link = (await added.json().catch(() => undefined)) as { id?: string } | undefined;
@@ -245,6 +249,10 @@ function StandardFirst({ onChecked }: { onChecked: (works: boolean) => void }) {
       <label className="flex flex-col gap-1">
         <span>{t("baseUrl")}</span>
         <input type="url" dir="ltr" spellCheck={false} value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} className={field} />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span>{t("providerModel")}</span>
+        <input dir="ltr" spellCheck={false} value={model} onChange={(event) => setModel(event.target.value)} className={field} />
       </label>
       <label className="flex flex-col gap-1">
         <span>{t("providerKey")}</span>

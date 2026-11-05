@@ -85,6 +85,7 @@ class ModelCard:
     subscription: bool = False
     efforts: tuple[Effort, ...] = ()  # the effort levels it accepts; none: no effort to pick
     effort_default: Effort | None = None  # the provider's own level when none is sent, if known
+    retired: bool = False  # the price book marks it deprecated: never a default
 
 
 @dataclass(frozen=True)
@@ -124,6 +125,12 @@ class CheckPacket:
     # Priced BOQ rows whose item is not in the client's imported BOQ, found by code (not AI):
     # {"row", "code", "description"}; One puts a comment on each for the engineer.
     not_in_client_boq: tuple[dict, ...] = ()
+    # ONE's own checks (engine.truth, code not AI): how much of the client's BOQ the Deliverable
+    # covers in the divisions it touches, {"client_items", "in_deliverable", "missing"}, or None;
+    # and each file-sourced number looked for at its place, {"number_id", "value", "where",
+    # "found", "there"}. The Checking QS cannot give Code A over either.
+    coverage: dict | None = None
+    citations: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -133,6 +140,7 @@ class Review:
     checker: ModelChoice
     same_provider: bool
     round: int
+    checked: tuple[str, ...] = ()  # what the Checking QS says it checked, in its own words
 
 
 CardKind = Literal[

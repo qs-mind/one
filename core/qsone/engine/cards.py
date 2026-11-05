@@ -67,8 +67,9 @@ def _book_name(model: str) -> str:
     return model.removeprefix("models/")
 
 
-def _genai(card: ModelCard) -> tuple[ModelPrice, str] | None:
-    """genai-prices' price for the card's model at its own provider, and its source text."""
+def _genai(card: ModelCard) -> tuple[ModelPrice, str, bool] | None:
+    """genai-prices' price for the card's model at its own provider, its source text, and
+    whether the book marks the model deprecated."""
     try:
         provider, model = data_snapshot.get_snapshot().find_provider_model(
             _book_name(card.choice.model), None, card.provider, None
@@ -76,7 +77,8 @@ def _genai(card: ModelCard) -> tuple[ModelPrice, str] | None:
     except LookupError:  # an unknown provider, or a model it does not list
         return None
     url = (provider.pricing_urls or [None])[0]
-    return model.get_prices(datetime.now(UTC)), (f"{GENAI}: {url}" if url else GENAI)
+    source = f"{GENAI}: {url}" if url else GENAI
+    return model.get_prices(datetime.now(UTC)), source, bool(model.deprecated)
 
 
 def priced(card: ModelCard) -> ModelCard:
@@ -94,11 +96,13 @@ def priced(card: ModelCard) -> ModelCard:
     found = _genai(card)
     if found is None:
         return card  # unknown stays unknown; a price the connector gave itself stays
-    price, source = found
+    price, source, retired = found
     price_in, price_out = _base(price.input_mtok), _base(price.output_mtok)
     if price_in is None or price_out is None:
-        return card
-    return replace(card, price_in=price_in, price_out=price_out, price_source=source)
+        return replace(card, retired=retired)
+    return replace(
+        card, price_in=price_in, price_out=price_out, price_source=source, retired=retired
+    )
 
 
 def cost(
