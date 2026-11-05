@@ -245,6 +245,33 @@ def update_item(rec: Records, item_id: str, *, fields: dict, actor: str) -> int:
     return version
 
 
+def _current_ids(conn, item_id: str, name: str) -> list[str]:
+    """The item's current numbers of that name, oldest first."""
+    rows = conn.execute(
+        "SELECT id FROM numbers WHERE item_id = ? AND name = ? AND valid_until IS NULL"
+        " ORDER BY recorded_at, rowid",
+        (item_id, name),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
+def _end(conn, number_ids: list[str], *, at: str, actor: str) -> None:
+    """Marks each current number `valid_until`, with its audit row: a newer entry took its place."""
+    for number_id in number_ids:
+        old = _row(conn, "numbers", number_id)
+        conn.execute("UPDATE numbers SET valid_until = ? WHERE id = ?", (at, number_id))
+        audit.record(
+            conn,
+            at=at,
+            actor=actor,
+            action="correct",
+            table="numbers",
+            row_id=number_id,
+            before=old,
+            after={**old, "valid_until": at},
+        )
+
+
 def write_number(
     conn,
     *,
@@ -258,7 +285,13 @@ def write_number(
     unit: str | None = None,
     currency: str | None = None,
 ) -> str:
+    """A new number on an item. A current number of the same name ends here: the new one
+    `replaces` the newest of them (with NUMBER_SUPERSEDED as its reason), and the older entry is
+    kept with its source, marked `valid_until`. So an item never holds two current numbers of
+    one name."""
     text, unit, currency = _checked(name, value, unit, currency, dated)
+    _need_source(conn, source_id)
+    older = _current_ids(conn, item_id, name)
     number_id = uuid4().hex
     row = {
         "id": number_id,
@@ -271,12 +304,12 @@ def write_number(
         "dated": dated,
         "recorded_at": at,
         "recorded_by": actor,
-        "replaces": None,
-        "reason": None,
+        "replaces": older[-1] if older else None,
+        "reason": copy.NUMBER_SUPERSEDED["en"] if older else None,
         "valid_until": None,
     }
-    _need_source(conn, source_id)
     _insert(conn, "numbers", row)
+    _end(conn, older, at=at, actor=actor)
     audit.record(
         conn,
         at=at,
@@ -335,17 +368,9 @@ def write_correction(
         "valid_until": None,
     }
     _insert(conn, "numbers", row)
-    conn.execute("UPDATE numbers SET valid_until = ? WHERE id = ?", (at, number_id))
-    audit.record(
-        conn,
-        at=at,
-        actor=actor,
-        action="correct",
-        table="numbers",
-        row_id=number_id,
-        before=old,
-        after={**old, "valid_until": at},
-    )
+    # Any other current entry of that name (two were possible before 5 Nov 2026) ends too.
+    others = [n for n in _current_ids(conn, old["item_id"], old["name"]) if n != new_id]
+    _end(conn, others, at=at, actor=actor)
     audit.record(
         conn,
         at=at,

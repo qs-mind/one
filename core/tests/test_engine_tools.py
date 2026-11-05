@@ -26,7 +26,7 @@ from qsone.engine.tools import (
     register_functions,
     toolset,
 )
-from qsone.engine.types import AgentSpec, ModelChoice
+from qsone.engine.types import AgentSpec, ModelChoice, Progress
 from qsone.records import ledger
 from qsone.records.files import add_file
 from tests.engine_fakes import FakeHost, scripted
@@ -343,7 +343,8 @@ async def test_writes_are_remembered_per_brief(ctx):
     await call("record_number", args, ctx)
     ctx.brief_id = ctx.store.new_brief(ctx.rec.id, "تكليف تاني - عينة")
     await call("record_number", args, ctx)
-    assert len(ledger.numbers(ctx.rec, item)) == 2
+    [now] = ledger.numbers(ctx.rec, item)  # the newer one takes the older one's place
+    assert now.replaces is not None
 
 
 # The Plan 3 calc tools --------------------------------------------------------------------------
@@ -372,6 +373,17 @@ async def test_a_calc_refusal_becomes_model_retry_with_its_example(ctx):
     with pytest.raises(ModelRetry) as e:
         await call("calculate", {"formula": "quantity * rat", "item": "03/02"}, ctx)
     assert "formula" in str(e.value) and "Example:" in str(e.value)
+
+
+async def test_a_refusal_reaches_the_engineer_in_plain_words(ctx, host):
+    """Tender day: deliverable_create was refused twice and the engineer never saw why."""
+    await source_and_item(ctx)
+    with pytest.raises(ModelRetry):
+        await call("calculate", {"formula": "quantity * rat", "item": "03/02"}, ctx)
+    [said] = [e for e in host.events if isinstance(e, Progress) and not e.tool]
+    assert said.agent == copy.ROLE_LEAD and set(said.text) == {"en", "ar"}
+    assert said.text["ar"].startswith(copy.TOOL_REFUSED["ar"].split("{")[0])
+    assert "مش من المدخلات" in said.text["ar"] and "`" not in said.text["ar"]
 
 
 async def test_a_calc_shape_refusal_keeps_plan_3s_own_example(ctx):

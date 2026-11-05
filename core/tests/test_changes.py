@@ -239,6 +239,16 @@ def test_every_op_is_checked_before_any_is_stored(rec):
             copy.OP_NOT_IN_TEMPLATE,
             "ops[0].name",
         ),
+        (  # «زوّد سعر الخرسانة ٥٪» once came as a set_number with no name: KeyError 'unit'
+            lambda v: {"op": "set_number", "row": v["rows"][1]["id"], "value": "1"},
+            copy.OP_NUMBER_NEEDS_NAME,
+            "ops[0].name",
+        ),
+        (
+            lambda v: {"op": "add_item_row", "code": "9/9", "numbers": [{"value": "1"}]},
+            copy.OP_NUMBER_NEEDS_NAME,
+            "ops[0].numbers[0].name",
+        ),
         (
             lambda v: {"op": "set_field", "row": v["rows"][1]["id"], "key": "code", "value": "x"},
             copy.OP_NOT_IN_TEMPLATE,

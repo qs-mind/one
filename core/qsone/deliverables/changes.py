@@ -392,7 +392,9 @@ def _records_try(rec, head: dict) -> dict:
     try:
         with rec.write(CALC_ACTOR) as conn:
             if head["kind"] == "sheet":
-                calc.bring_up_to_date(rec, head["id"], actor=CALC_ACTOR)
+                # a row the engine refuses (two current rates, say) stays as it is: the view
+                # names its problem; it never locks the Deliverable
+                calc.bring_up_to_date(rec, head["id"], actor=CALC_ACTOR, skipped=[])
             store.save_version(conn, rec, head["id"], by=CALC_ACTOR, change_ids=[])
             out.append(store.view(rec, head["id"]))
             raise _Undo

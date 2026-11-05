@@ -253,6 +253,30 @@ ALREADY_CORRECTED = {
     "ar": "الرقم ده اتصحح قبل كده. صحّح آخر قيمة بدل منه.",
 }
 
+# The reason stored when a newer number of the same name on an item takes the older one's place.
+NUMBER_SUPERSEDED = {
+    "en": "A newer number of the same name was recorded for this item.",
+    "ar": "اتسجّل رقم أحدث بنفس الاسم للبند ده.",
+}
+
+# A tool refused an agent's call: the engineer sees why in the work log. {why}: the refusal's
+# first sentence.
+TOOL_REFUSED = {
+    "en": "ONE refused this step: {why} The team is fixing it; if it keeps happening, tell the "
+    "Lead QS what to do.",
+    "ar": "ONE رفض الخطوة دي: {why} الفريق بيصلّحها؛ ولو اتكررت، قول لكبير مهندسي الكميات يعمل "
+    "إيه.",
+}
+
+# A row whose item has two current numbers of one name (written before 5 Nov 2026).
+# {name}: a BOQ_FIELDS label; {values}: the values, joined.
+ROW_NUMBERS_CONFLICT = {
+    "en": "This item has {n} different «{name}» values recorded: {values}. Type the right one in "
+    "this row and ONE keeps that one only.",
+    "ar": "البند ده متسجّل له {n} قيم مختلفة لـ«{name}»: {values}. اكتب القيمة الصح في الصف ده "
+    "وONE هيحتفظ بيها لوحدها.",
+}
+
 # The Lead QS model list and choice (GET /settings/models, PUT /settings/model).
 MODELS_FAILED = {
     "en": "The models could not be loaded because of a problem with Claude. Try again.",
@@ -1262,6 +1286,11 @@ OP_UNKNOWN = {
 OP_NOT_IN_TEMPLATE = {
     "en": "This Deliverable's template does not allow this operation.",
     "ar": "قالب المُخرَج ده مش بيسمح بالعملية دي.",
+}
+
+OP_NUMBER_NEEDS_NAME = {
+    "en": 'A number needs its name, the column it goes in: "name": "rate" or "quantity".',
+    "ar": 'الرقم محتاج اسمه، يعني العمود اللي هيتحط فيه: "name": "rate" أو "quantity".',
 }
 
 ROW_NOT_FOUND = {
