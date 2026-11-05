@@ -69,7 +69,7 @@ export function VersionsPanel({ projectId, view }: { projectId: string; view: Vi
                 <span className="text-slate">{when(v.at)}</span>
                 <span className="text-slate">{fill(t("reviewBy"), { who: authorName(v.by) })}</span>
                 <span className="text-slate">
-                  {v.changes.length ? count("reviewChangesCount", v.changes.length) : t("reviewNoChanges")}
+                  {v.changes.length ? count("reviewChangesCount", v.changes.length) : t("reviewVersionNoChanges")}
                 </span>
               </li>
             ))}

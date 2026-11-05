@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SelectionItem } from "../canvas/types";
 import { type Fix, fixOf } from "../core";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
-import { dir, fill, type Language, language, languageOf, pick, t, type Text, useLanguage } from "../i18n";
+import { dir, fill, pick, t, type Text, useLanguage } from "../i18n";
 import { UnderstoodCard } from "../import/UnderstoodCard";
 import { FixAction } from "../shell/FixAction";
 import { HandOffCards } from "../shell/HandOffCard";
@@ -115,11 +115,10 @@ const failedReply = (parts: OnePart[]) => partsOf(parts, "status").at(-1)?.data.
 
 function BriefReply({
   parts,
-  lang,
   live,
   projectId,
   onOpenDeliverable,
-}: { parts: OnePart[]; lang: Language; live: boolean } & Omit<ChatLogProps, "chat" | "label">) {
+}: { parts: OnePart[]; live: boolean } & Omit<ChatLogProps, "chat" | "label">) {
   const text = textOf(parts);
   const progress = partsOf(parts, "progress");
   // what is stored in both languages (the work log, the cards, notices) reads in the page's, whatever the Brief's was
@@ -318,7 +317,6 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
               <li key={message.id}>
                 <BriefReply
                   parts={message.parts}
-                  lang={briefLanguage(messages, index)}
                   live={busy && index === lastReply}
                   projectId={projectId}
                   onOpenDeliverable={onOpenDeliverable}
@@ -356,9 +354,3 @@ export function ChatLog({ chat, label, projectId, onOpenDeliverable, className =
   );
 }
 
-/** The language of the Brief whose reply is at `index`: the one of the engineer's message that started it (a
- * steering message does not change it); the page's when there is none. */
-function briefLanguage(messages: ChatState["messages"], index: number): Language {
-  const asked = messages.slice(0, index).findLast((m) => m.role === "user" && !m.metadata?.steering);
-  return asked ? languageOf(textOf(asked.parts)) : language();
-}

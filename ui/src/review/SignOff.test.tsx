@@ -138,7 +138,7 @@ describe("versions and issues, in words that do not look alike (tender day)", ()
     expect(screen.getByText(texts.reviewRevisionsHelp.ar)).toBeInTheDocument();
     expect(screen.getByText(texts.deliverableNoRevision.ar)).toBeInTheDocument();
     expect(texts.deliverableNoRevision.ar).not.toContain("إصدار"); // «لسه مفيش إصدار» read like «نسخة 1»
-    expect(screen.getByText(texts.reviewNoChanges.ar)).toBeInTheDocument();
+    expect(screen.getByText(texts.reviewVersionNoChanges.ar)).toBeInTheDocument();
     expect(screen.queryByText("0 تعديل")).toBeNull();
   });
 

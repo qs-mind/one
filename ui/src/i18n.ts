@@ -474,7 +474,7 @@ export const texts = {
     en: "A Revision is what you send to the client: Rev 1, Rev 2 and so on.",
     ar: "الإصدار هو اللي بتبعته للعميل: إصدار 1، إصدار 2، وهكذا.",
   },
-  reviewNoChanges: { en: "No changes", ar: "من غير تعديلات" },
+  reviewVersionNoChanges: { en: "No changes", ar: "من غير تعديلات" },
   reviewIssueRevision: { en: "Issue Revision", ar: "طلّع إصدار" },
   reviewCompare: { en: "Compare", ar: "قارن" },
   reviewCloseOut: { en: "Sign-off", ar: "الاعتماد" },
