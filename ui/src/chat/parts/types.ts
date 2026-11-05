@@ -36,6 +36,8 @@ export type CardPayload = {
   tick?: boolean;
   connector?: { name: string; transport: "stdio" | "http"; runs: string };
   tools?: ConnectorTool[];
+  /** A price card's model (core: costs._ask_unknown_price). */
+  model?: { connector: string; model: string; name: string };
 };
 /** data-card, id = the card: anything the engineer must answer. */
 export type CardData = {
@@ -43,6 +45,7 @@ export type CardData = {
     | "outside"
     | "online"
     | "cap"
+    | "price"
     | "budget"
     | "fallback"
     | "desk"
@@ -86,7 +89,8 @@ export type UnsourcedData = { values: string[] };
  * the reply writes them, with that number's id and exact value; the reply opens each into its source card. */
 export type SourcedData = { numbers: Record<string, { id: string; value: string }> };
 /** data-status, id = the Brief. */
-export type StatusData = { state: BriefState; step: Text | null };
+/** `fix`: a failed Brief's fix, as the core says (core.ts Fix). */
+export type StatusData = { state: BriefState; step: Text | null; fix?: string };
 /** data-deliverable, id = the Deliverable (Plan 6): the Lead QS made it; the chat shows its card. */
 export type DeliverableData = { id: string };
 /** data-understood, id = understood-<Brief id> (Plan 8): the Lead QS read a tender folder; the chat shows the
@@ -108,6 +112,8 @@ export type OneData = {
   unsourced: UnsourcedData;
   sourced: SourcedData;
   status: StatusData;
+  /** data-notice: a line from a tool for the engineer, with its fix (no web search: "search"). */
+  notice: { text: Text; fix?: string };
   deliverable: DeliverableData;
   understood: UnderstoodData;
   /** data-view, id = the view (decision 16.1): what the Lead QS chose to show, from ONE's blocks. */

@@ -279,31 +279,104 @@ async def test_the_day_is_the_engineers_local_day(general, host, fake_clock):
     assert stopped.value.scope == "day"
 
 
-async def test_unknown_price_asks_before_spending(spending, host):
-    host.answers["cap"] = "no"
+async def test_unknown_price_asks_once_with_a_price_card(spending, host):
+    """Audit B6: the hold «استخدمه» came back on every message. The first use of a model with no
+    known price shows one card: its price, or use it without a price cap."""
+    host.answers["price"] = "no"
     with pytest.raises(CapReached) as stopped:
         await spending.before_request(host, brief_id="b1", card=UNKNOWN)
     assert stopped.value.scope == "brief"
     [card] = host.cards
-    assert card.kind == "cap" and card.options == ("yes", "no")
+    assert card.kind == "price" and card.options == ("price", "nocap", "no")
+    assert card.payload == {
+        "model": {"connector": "standard:lab", "model": "lab-model", "name": "lab-model"}
+    }
     assert card.detail == copy.fill(copy.PRICE_UNKNOWN, model="lab-model")
 
 
-async def test_unknown_price_yes_is_asked_once_per_brief_and_model(spending, host):
-    host.answers["cap"] = "yes"
+class PricingHost(FakeHost):
+    """Answers the price card as the screen does: it saves the price, then says "price"."""
+
+    async def ask(self, card):
+        self.cards.append(card)
+        cards.enter_price(card_choice(card), "0.25", "1.50")
+        return "price"
+
+
+def card_choice(card) -> ModelChoice:
+    model = card.payload["model"]
+    return ModelChoice(model["connector"], model["model"])
+
+
+async def test_a_price_entered_in_the_card_is_kept_and_counted(spending, book):
+    host = PricingHost(brief_id="b1")
+    card = await spending.before_request(host, brief_id="b1", card=UNKNOWN)
+    assert card.price_in == Decimal("0.25") and card.price_source.startswith("engineer, ")
+    await spending.before_request(host, brief_id="b2", card=UNKNOWN)  # another Brief: no card
+    assert len(host.cards) == 1
+
+
+async def test_use_without_a_price_cap_is_remembered_per_model(spending, host):
+    host.answers["price"] = "nocap"
     await spending.before_request(host, brief_id="b1", card=UNKNOWN)
-    await spending.before_request(host, brief_id="b1", card=UNKNOWN)
+    await spending.before_request(host, brief_id="b2", card=UNKNOWN)  # remembered, not per Brief
     assert len(host.cards) == 1
     other = replace(UNKNOWN, choice=ModelChoice("standard:lab", "lab-model-2"), name="lab-model-2")
     await spending.before_request(host, brief_id="b1", card=other)
-    assert len(host.cards) == 2  # a yes for one model is not a yes for another
+    assert len(host.cards) == 2  # an answer for one model is not one for another
+
+
+def add_tokens(book: CostBook, brief: str, tokens: int) -> None:
+    book.add(
+        brief_id=brief,
+        project_id="p1",
+        run_id="r1",
+        role="lead",
+        choice=UNKNOWN.choice,
+        input_tokens=tokens,
+        output_tokens=0,
+        usd=None,
+        equivalent=False,
+        basis=costs.PRICE_UNKNOWN_BASIS,
+        at=datetime(2026, 11, 5, 7, 0, tzinfo=UTC),
+    )
+
+
+async def test_without_a_price_the_caps_count_tokens(spending, host, book):
+    host.answers["price"] = "nocap"
+    await spending.before_request(host, brief_id="b1", card=UNKNOWN)
+    # a Brief cap of 3 USD is 3,000,000 tokens of a model with no price
+    add_tokens(book, "b1", 2_500_000)
+    host.answers["cap"] = "continue"
+    await spending.before_request(host, brief_id="b1", card=UNKNOWN)
+    [pause] = [c for c in host.cards if c.kind == "cap"]
+    assert "2,500,000 of 3,000,000 tokens" in pause.detail["en"]
+    add_tokens(book, "b1", 600_000)
+    with pytest.raises(CapReached) as stopped:
+        await spending.before_request(host, brief_id="b1", card=UNKNOWN)
+    assert stopped.value.scope == "brief"
+    assert "3,100,000 of 3,000,000 tokens" in notices(host)[-1].text["en"]
 
 
 async def test_unknown_price_still_stops_at_the_cap(spending, host, book):
     book_add(book, brief="b1", usd="3.00")
-    host.answers["cap"] = "yes"
+    host.answers["price"] = "nocap"
     with pytest.raises(CapReached):
         await spending.before_request(host, brief_id="b1", card=UNKNOWN)
+
+
+def test_costs_count_tokens_and_say_when_a_price_is_unknown(book):
+    """Audit B6: Costs showed 0 today and this month after paid calls of a model with no price.
+    The tokens are counted always; an unknown cost is said, never a false 0."""
+    book_add(book, brief="b1", usd="0.50")
+    add_tokens(book, "b1", 40_000)
+    now = datetime(2026, 11, 5, 8, 0, tzinfo=UTC)
+    found = costs.summary(book, brief_id="b1", now=now)
+    assert found["today"] == "0.50" and found["unpriced"]["today"] == 1
+    assert found["tokens"]["today"] == {"input": 41_000, "output": 100}
+    assert found["tokens"]["brief"] == {"input": 41_000, "output": 100}
+    empty = costs.summary(None, brief_id=None, now=now)
+    assert empty["unpriced"]["today"] == 0 and empty["tokens"]["today"] == {"input": 0, "output": 0}
 
 
 async def test_on_device_is_free_and_never_asks(spending, host, book, general):
@@ -626,6 +699,13 @@ def add_sample_costs(book: CostBook) -> dict:
         "today": "1.75",
         "month": "1.75",
         "equivalent": {"brief": "0.75", "today": "0.75", "month": "0.75"},
+        # every response's tokens, and the one whose price is unknown said, never a false 0
+        "tokens": {
+            "brief": {"input": 3000, "output": 300},
+            "today": {"input": 4000, "output": 400},
+            "month": {"input": 4000, "output": 400},
+        },
+        "unpriced": {"brief": 1, "today": 1, "month": 1},
         "caps": {
             "brief": "3",
             "day": "15",
@@ -641,3 +721,17 @@ def test_costs_route_creates_no_engineer_records(data_dir):
     client = TestClient(create_app(SECRET, data_dir=data_dir))  # no lifespan: no engine start
     assert client.get("/costs", headers=AUTH).json()["today"] == "0"
     assert not (data_dir / "engineer").exists()
+
+
+def test_a_gemini_model_named_with_its_models_prefix_has_its_price():
+    """Audit B6: Google's OpenAI-compatible list names "models/gemini-3.1-flash-lite"; the price
+    book knows "gemini-3.1-flash-lite", so the price was unknown and every message held."""
+    gemini = replace(
+        UNKNOWN,
+        choice=ModelChoice("standard:google", "models/gemini-3.1-flash-lite"),
+        name="Gemini 3.1 Flash Lite",
+        provider="google",
+    )
+    card = cards.priced(gemini)
+    assert card.price_in is not None and card.price_source.startswith("genai-prices")
+    assert cards.cost(card, input_tokens=1_000_000, output_tokens=0) == card.price_in

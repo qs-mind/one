@@ -23,6 +23,7 @@ from qsone import copy, keys, settings
 from qsone.engine.costs import CallRefused
 from qsone.engine.oneshot import OneShotFailed
 from qsone.engine.tools import ModelRetry, Tool, ToolContext, register
+from qsone.engine.types import Data
 from qsone.records import files, keep
 from qsone.records.arabic import normalise
 from qsone.records.project import Records, RecordsError
@@ -136,16 +137,50 @@ def _provider(ctx: ToolContext):
     )
 
 
+def searchable(services) -> bool:
+    """Whether ONE can search the web now (a Brief's services, its native search included)."""
+    if services is None:
+        return False
+    if services.search is not None:
+        return True
+    hub = services.connectors
+    return (
+        choose_provider(
+            services.http,
+            setting=settings.load().get("search_provider"),
+            own_key=keys.get_key(KEY_USER),
+            native=services.native_search,
+            connector=None if hub is None else hub.search_provider(),
+        )
+        is not None
+    )
+
+
+# What the model reads when there is no search (audit B8): it gave remembered prices as today's.
+NO_SEARCH_SAY = (
+    "Tell the engineer in one line that ONE could not search the web; ONE shows them how to "
+    "set it up. Never give a remembered price as today's: a price with no source and date is "
+    "unsourced."
+)
+
+
+def _no_search(ctx: ToolContext) -> str:
+    """WEB_NO_SEARCH for the model, and a notice for the engineer with the way to the setting."""
+    data = {"text": copy.WEB_NO_SEARCH, "fix": "search"}
+    ctx.host.emit(Data(ctx.brief_id, "notice", f"{ctx.brief_id}-no-search", data))
+    return cite.not_done(copy.WEB_NO_SEARCH) + "\n" + NO_SEARCH_SAY
+
+
 async def _search(ctx: ToolContext, args: SearchArgs) -> str:
     if ctx.services is None:
-        return cite.not_done(copy.WEB_NO_SEARCH)
+        return _no_search(ctx)
     if ctx.services.on_device(ctx.rec):
         return cite.not_done(copy.ON_DEVICE_NO_ONLINE)
     _general_words(ctx.rec, args.query)
     _no_personal(args.query)
     provider = _provider(ctx)
     if provider is None:
-        return cite.not_done(copy.WEB_NO_SEARCH)
+        return _no_search(ctx)
     country, defaults = _country(ctx.rec, args.country)
     try:
         found = await provider.search(args.query, country=country, lang=args.lang, count=args.count)

@@ -19,7 +19,7 @@ from qsone.engine.oneshot import OneShotFailed
 from qsone.engine.tools import REGISTRY, Denied, ModelRetry, call
 from qsone.records import files
 from qsone.records.hidden import Flag
-from qsone.tools import web as web_tools  # noqa: F401 - registers the web tools
+from qsone.tools import web as web_tools  # registers the web tools
 from qsone.web import log as web_log
 from qsone.web.search import BraveSearch, SearchHit, choose_provider, provider_name
 from tests.conftest import AUTH, SECRET
@@ -162,6 +162,17 @@ async def test_no_provider_says_how_to_add_one(rec):
     ctx = ctx_for(rec)
     out = await call("web_search", {"query": "سعر الحديد"}, ctx)
     assert f"not done: {copy.WEB_NO_SEARCH['en']}" in out
+    # audit B8: the engineer sees it too, with the way to the search setting, and the model is
+    # told to say so and give no remembered price as today's
+    [notice] = [e for e in ctx.host.events if getattr(e, "name", None) == "notice"]
+    assert notice.data == {"text": copy.WEB_NO_SEARCH, "fix": "search"}
+    assert "remembered price" in out
+
+
+def test_whether_one_can_search_now(rec):
+    assert web_tools.searchable(ctx_for(rec).services) is False
+    assert web_tools.searchable(ctx_for(rec, search=FakeSearch([HIT])).services) is True
+    assert web_tools.searchable(None) is False
 
 
 async def test_native_search_is_used_without_a_key(rec):

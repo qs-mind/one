@@ -19,8 +19,18 @@ export function onOpenPanel(listener: (panel: FixPanel) => void): () => void {
   return () => listeners.delete(listener);
 }
 
-const actions: Partial<Record<Fix, { label: "openAiSettings" | "connectAi" | "openBackup"; go: () => void }>> = {
+/** The web search setting, in AI settings (SearchKey): the panel opens there (audit B8). */
+export const SEARCH_SETTING = "search-setting";
+
+function openSearch() {
+  openPanel("ai");
+  requestAnimationFrame(() => document.getElementById(SEARCH_SETTING)?.scrollIntoView?.({ block: "start" }));
+}
+
+type Label = "openAiSettings" | "connectAi" | "openBackup" | "setUpSearch";
+const actions: Partial<Record<Fix, { label: Label; go: () => void }>> = {
   ai: { label: "openAiSettings", go: () => openPanel("ai") },
+  search: { label: "setUpSearch", go: openSearch },
   consent: { label: "connectAi", go: () => openSetup("ai", true) },
   backup: { label: "openBackup", go: () => openPanel("backup") },
 };

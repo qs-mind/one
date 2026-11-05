@@ -22,7 +22,8 @@ const prose: ViewBlock = { kind: "prose", text: "The rate is from the supplier's
 const figures: ViewBlock = { kind: "figures", items: [{ label: "Rate", value: rate }, { label: "Quantity", value: quantity }] };
 const table: ViewBlock = {
   kind: "table",
-  columns: [{ label: "Item" }, { label: "Description" }, { label: "Rate" }],
+  label_header: "Item",
+  columns: [{ label: "Description" }, { label: "Rate" }],
   rows: [{ label: "03/02 (sample)", texts: ["Reinforced concrete"], numbers: [rate] }],
 };
 const inSection: ViewBlock[] = [
@@ -60,6 +61,7 @@ describe("ViewPart", () => {
     expect(within(grid).getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
     // a row is its label, its texts, then its numbers, under the columns in that order
     const [header, row] = within(grid).getAllByRole("row");
+    // the label's header is its own field, then the columns of the texts and the numbers
     expect(within(header!).getAllByRole("columnheader").map((c) => c.textContent)).toEqual(["Item", "Description", "Rate"]);
     expect(within(row!).getByRole("rowheader", { name: "03/02 (sample)" })).toBeInTheDocument();
     const [words, number] = within(row!).getAllByRole("cell");
@@ -131,7 +133,7 @@ describe("ViewPart", () => {
     const arabic = viewOf(
       [
         { kind: "heading", text: "فئة الخرسانة - عينة" },
-        { kind: "table", columns: [{ label: "البند" }, { label: "الفئة" }], rows: [{ label: "خرسانة مسلحة - عينة", texts: [], numbers: [rate] }] },
+        { kind: "table", label_header: "البند", columns: [{ label: "الفئة" }], rows: [{ label: "خرسانة مسلحة - عينة", texts: [], numbers: [rate] }] },
       ],
       { title: "ملخص التسعير - عينة" },
     );
@@ -139,8 +141,32 @@ describe("ViewPart", () => {
     const view = screen.getByRole("region", { name: "ملخص التسعير - عينة" });
     expect(view).toHaveAttribute("dir", "rtl");
     expect(within(view).getByRole("columnheader", { name: "الفئة" })).toHaveClass("text-end");
-    // the number keeps its own left-to-right order inside the Arabic table
-    expect(within(view).getByText("39,850.50 EGP/m3")).toHaveAttribute("dir", "ltr");
+    // the number and its unit keep their order: the run takes its direction from its unit (audit C17: «م3 1,200»)
+    expect(within(view).getByText("39,850.50 EGP/m3")).toHaveAttribute("dir", "auto");
+  });
+
+  it("a number with an Arabic unit reads number first in an Arabic view, in one isolated run", () => {
+    const cubic: NumberCell = { ...quantity, value: "1200", unit: "م3" };
+    render(<ViewPart view={viewOf([{ kind: "figures", items: [{ label: "الكمية", value: cubic }] }], { title: "ملخص - عينة" })} projectId="p1" />);
+    const run = screen.getByText("1,200 م3");
+    expect(run.tagName).toBe("BDI");
+    expect(run).toHaveAttribute("dir", "auto"); // its first strong letter is Arabic: right to left, the number first
+  });
+
+  it("a calculated number's chip says it is calculated, never its formula's raw keys", () => {
+    const amount: NumberCell = { value: "102000", currency: "EGP", number_id: "n3", source: "s2", dated: DAY, calculated: true };
+    const calc: Source = { kind: "calculation", title: "quantity * rate", file_name: null, locator: {}, dated: DAY };
+    setLanguage("ar");
+    render(<ViewPart view={viewOf([{ kind: "figures", items: [{ label: "الإجمالي", value: amount }] }], { title: "ملخص - عينة", sources: { s2: calc } })} projectId="p1" />);
+    expect(screen.queryByText("quantity * rate")).toBeNull();
+    expect(screen.getByRole("button", { name: fill(texts.viewSourceOf.ar, { value: "102,000 EGP" }) })).toHaveTextContent(texts.calculated.ar);
+  });
+
+  it("figure cards line up in a grid of equal columns", () => {
+    render(<ViewPart view={viewOf([figures])} projectId="p1" />);
+    const list = document.querySelector("dl")!;
+    expect(list.className).toContain("grid");
+    expect(list.className).toContain("minmax(");
   });
 
   it("speaks Arabic on an Arabic page", () => {

@@ -307,6 +307,17 @@ AI_FAILED = {
     "en": "The work stopped because of a problem with {provider}. The work so far is saved.",
     "ar": "الشغل وقف بسبب مشكلة في {provider}. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
 }
+# The provider's own reason, in plain words (audit B7): a model it retired, and the one it names.
+MODEL_GONE_TRY = {
+    "en": "{provider} says {model} is no longer available; try {other}. Pick it in AI settings.",
+    "ar": (
+        "{provider} بيقول إن {model} مبقاش متاح؛ جرّب {other}. اختاره من إعدادات الذكاء الاصطناعي."
+    ),
+}
+MODEL_GONE = {
+    "en": "{provider} says {model} is not available. Pick another model in AI settings.",
+    "ar": "{provider} بيقول إن {model} مش متاح. اختار نموذج تاني من إعدادات الذكاء الاصطناعي.",
+}
 
 # The one tiny check (first launch, AI settings): there is no work to save yet.
 AI_CHECK_FAILED = {
@@ -392,12 +403,35 @@ EQUIVALENT_COST = {
 
 PRICE_UNKNOWN = {
     "en": (
-        "ONE does not know the price of {model}, so the Spending Cap cannot protect you "
-        "until you enter its price. Use it anyway in this Brief?"
+        "ONE does not know the price of {model}. Enter its price per million tokens, and the "
+        "Spending Caps count its cost. Or use it without a price: ONE then counts its tokens "
+        "against the caps, a million tokens for each dollar of a cap. ONE asks once for this model."
     ),
     "ar": (
-        "ONE مش عارف سعر {model}، فسقف الصرف مش هيقدر يحميك لحد ما تكتب سعره. "
-        "نستخدمه برضه في التكليف ده؟"
+        "ONE مش عارف سعر {model}. اكتب سعره لكل مليون توكن، وسقوف الصرف هتحسب تكلفته. "
+        "أو استخدمه من غير سعر: ONE ساعتها هيعدّ التوكنز بتاعته على السقوف، مليون توكن "
+        "لكل دولار في السقف. ONE هيسألك مرة واحدة بس عن النموذج ده."
+    ),
+}
+PRICE_TITLE = {"en": "A model with no known price", "ar": "نموذج سعره مش معروف"}
+CAP_TOKENS_PAUSED = {
+    "en": (
+        "ONE paused at 80% of the Spending Cap for {scope_name}: {spent} of {cap} tokens of "
+        "models with no known price. Continue up to the cap, raise the cap, or stop with a report?"
+    ),
+    "ar": (
+        "ONE وقّف عند 80% من سقف الصرف بتاع {scope_name}: {spent} من {cap} توكن من نماذج "
+        "سعرها مش معروف. تكمّل لحد السقف، ولا ترفع السقف، ولا توقف بتقرير؟"
+    ),
+}
+CAP_TOKENS_STOPPED = {
+    "en": (
+        "The Spending Cap for {scope_name} is reached: {spent} of {cap} tokens of models with "
+        "no known price. Nothing more will be spent, and the work so far is saved."
+    ),
+    "ar": (
+        "وصلنا لسقف الصرف بتاع {scope_name}: {spent} من {cap} توكن من نماذج سعرها مش معروف. "
+        "مش هيتصرف حاجة تاني، والشغل اللي اتعمل لحد دلوقتي محفوظ."
     ),
 }
 
@@ -2268,10 +2302,11 @@ FIXES = {
         NO_AI,
         AI_KEY_REFUSED,
         PRICE_UNKNOWN,
-        WEB_NO_SEARCH,
-        WEB_SEARCH_KEY_REFUSED,
-        WEB_SEARCH_LIMIT,
+        MODEL_GONE_TRY,
+        MODEL_GONE,
     ),
+    # the web search setting, in AI settings (audit B8)
+    "search": (WEB_NO_SEARCH, WEB_SEARCH_KEY_REFUSED, WEB_SEARCH_LIMIT),
     "consent": (AI_CONSENT_NEEDED,),
     "retry": (
         KEY_STORE_DOWN,

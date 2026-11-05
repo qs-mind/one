@@ -5,6 +5,7 @@
 import type { JSX } from "react";
 import type { Language } from "../../i18n";
 import { ConnectorCard } from "./ConnectorCard";
+import { PriceCard } from "./PriceCard";
 import { QuestionCard } from "./QuestionCard";
 import { RowsCard } from "./RowsCard";
 import type { CardData } from "./types";
@@ -28,4 +29,5 @@ export const cardKinds: Partial<Record<string, (p: CardKindProps) => JSX.Element
   question: QuestionCard,
   rows: RowsCard,
   connector: ConnectorCard,
+  price: PriceCard,
 };

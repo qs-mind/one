@@ -8,9 +8,9 @@ type InSection = { section?: string | null };
 export type HeadingBlock = InSection & { kind: "heading"; text: string };
 export type ProseBlock = InSection & { kind: "prose"; text: string };
 export type FiguresBlock = InSection & { kind: "figures"; items: { label: string; value: NumberCell }[] };
-/** A row's label, then its texts, then its numbers, under the columns in that order. */
+/** A row's label (under `label_header`), then its texts, then its numbers, under the columns in that order. */
 export type TableRow = { label: string; texts: string[]; numbers: NumberCell[] };
-export type TableBlock = InSection & { kind: "table"; columns: { label: string }[]; rows: TableRow[] };
+export type TableBlock = InSection & { kind: "table"; label_header: string; columns: { label: string }[]; rows: TableRow[] };
 export type ViewBlock = HeadingBlock | ProseBlock | FiguresBlock | TableBlock;
 
 export type ViewData = {

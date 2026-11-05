@@ -154,8 +154,13 @@ async def test_a_sheet_cell_resolves_and_a_cell_with_no_number_is_refused(rec):
     assert "no number" in str(refused.value) and views(host) == []
 
 
-def table(*rows: dict, columns=("البند", "الوصف", "الفئة")) -> dict:
-    return {"kind": "table", "columns": [{"label": c} for c in columns], "rows": list(rows)}
+def table(*rows: dict, columns=("الوصف", "الفئة"), label_header="البند") -> dict:
+    return {
+        "kind": "table",
+        "label_header": label_header,
+        "columns": [{"label": c} for c in columns],
+        "rows": list(rows),
+    }
 
 
 async def test_a_table_row_is_its_label_then_its_texts_then_its_numbers(ledger):
@@ -166,10 +171,11 @@ async def test_a_table_row_is_its_label_then_its_texts_then_its_numbers(ledger):
     [out] = shown.data["blocks"][0]["rows"]
     assert out["label"] == "03/02 - عينة" and out["texts"] == ["خرسانة مسلحة"]
     assert out["numbers"][0]["value"] == "39850.50" and out["numbers"][0]["currency"] == "EGP"
-    assert [c["label"] for c in shown.data["blocks"][0]["columns"]] == ["البند", "الوصف", "الفئة"]
+    assert shown.data["blocks"][0]["label_header"] == "البند"
+    assert [c["label"] for c in shown.data["blocks"][0]["columns"]] == ["الوصف", "الفئة"]
 
     host.events.clear()  # texts and numbers may be left out: a table of labels only
-    await show(ctx, blocks=[table({"label": "بند - عينة"}, columns=("البند",))])
+    await show(ctx, blocks=[table({"label": "بند - عينة"}, columns=())])
     [labels] = views(host)
     assert labels.data["blocks"][0]["rows"] == [{"label": "بند - عينة", "texts": [], "numbers": []}]
 
@@ -191,10 +197,91 @@ async def test_every_row_fits_the_columns(ledger):
     with pytest.raises(ModelRetry) as refused:
         await show(ctx, blocks=[table(good, short)])
     message = str(refused.value)
-    assert "blocks[0].rows[1]" in message and "3 columns" in message and views(host) == []
+    assert "blocks[0].rows[1]" in message and "2 columns" in message and views(host) == []
     # rows that agree with each other but not with the columns; the one retry is used, so words
-    out = await show(ctx, blocks=[table(good, good, columns=("البند", "الفئة"))])
-    assert out["shown"] is None and "2 columns" in out["note"]
+    out = await show(ctx, blocks=[table(good, good, columns=("الفئة",))])
+    assert out["shown"] is None and "1 column" in out["note"] and "label_header" in out["note"]
+
+
+async def test_the_label_columns_header_is_its_own_field(ledger):
+    """Round 2 of the bake-off: 4 of 20 views counted the label's header among the columns.
+    The label's header is `label_header`; the columns head only the texts and the numbers."""
+    defs = view.View.model_json_schema()["$defs"]
+    # both required: round 3's function calls left out columns that had a default
+    assert {"label_header", "columns"} <= set(defs["Table"]["required"])
+    ctx, host, ids = ledger
+    row = {"label": "03/02", "texts": ["خرسانة"], "numbers": [{"number": ids["rate"]}]}
+    with pytest.raises(ModelRetry) as refused:  # the label's header among the columns, as before
+        await show(ctx, blocks=[table(row, columns=("البند", "الوصف", "الفئة"))])
+    message = str(refused.value)
+    assert "1 text and 1 number" in message and "3 columns" in message
+    assert "label_header" in message
+
+
+async def test_an_id_in_words_is_refused(ledger):
+    """An id in a text shows as hex on screen (bake-off 1, p20): a number goes by reference."""
+    ctx, host, ids = ledger
+    prose = f"الفئة هي {ids['rate']} من عرض السعر."
+    with pytest.raises(ModelRetry) as refused:
+        await show(ctx, blocks=[{"kind": "prose", "text": prose}])
+    assert "blocks[0].text" in str(refused.value) and "id" in str(refused.value)
+    assert views(host) == []
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        "The difference is one hundred and forty EGP per ton.",
+        "زيادة الكمية بنسبة عشرة بالمئة",
+        "حوالي ألفين جنيه للطن",
+        "about two thousand tonnes",
+    ],
+)
+async def test_a_number_written_in_words_is_refused(ledger, words):
+    """Round 3: told never to type a number, the model wrote a computed one in words (p11:
+    "one hundred and forty EGP"), which the numbers guard cannot see."""
+    ctx, host, _ = ledger
+    with pytest.raises(ModelRetry) as refused:
+        await show(ctx, blocks=[{"kind": "prose", "text": words}])
+    assert "blocks[0].text" in str(refused.value) and "in words" in str(refused.value)
+    assert views(host) == []
+
+
+async def test_a_count_in_words_is_not_a_number_in_words(ledger):
+    ctx, host, _ = ledger
+    words = "The three quotes, and the two cheapest of them. أعلى خمسة بنود والعروض الثلاثة."
+    await show(ctx, blocks=[{"kind": "prose", "text": words}])
+    assert len(views(host)) == 1
+
+
+def test_the_tool_text_says_no_number_in_words_and_no_id_in_text():
+    recipe = REGISTRY["show"].description.rsplit("\nExample:\n", 1)[0]
+    assert "never written in words" in recipe and "never put an id in" in recipe
+    assert "label_header" in recipe
+
+
+def test_the_example_is_in_no_language():
+    """Round 2: the example's Arabic words pulled 7 of 10 English requests into Arabic."""
+    words = json.dumps(REGISTRY["show"].example, ensure_ascii=False)
+    assert not re.search(r"[؀-ۿ]", words)
+    assert not re.search(r'"(?:title|label|label_header|section|text)": "[A-Za-z]', words)
+
+
+async def test_a_view_stored_before_label_header_still_shows(rec):
+    """A table stored before round 3 has the label's header as its first column."""
+    data = {
+        "title": "ملخص - عينة",
+        "blocks": [
+            {
+                "kind": "table",
+                "columns": [{"label": "البند"}, {"label": "الوصف"}],
+                "rows": [{"label": "03/02", "texts": ["خرسانة"], "numbers": []}],
+            }
+        ],
+    }
+    built, _, _ = view._build(rec, data, rec.clock(), stored=True)
+    assert built["blocks"][0]["label_header"] == "البند"
+    assert built["blocks"][0]["columns"] == [{"label": "الوصف"}]
 
 
 # Words ----------------------------------------------------------------------------------------

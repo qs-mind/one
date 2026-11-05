@@ -132,7 +132,10 @@ class _Parts:
         if isinstance(event, Unsourced):
             return "data-unsourced", event.brief_id, {"values": list(event.values)}
         if isinstance(event, Status):
-            return "data-status", event.brief_id, {"state": event.state, "step": event.step}
+            data = {"state": event.state, "step": event.step}
+            fix = copy.fix_of(event.step) if event.state == "failed" else None
+            # a failed Brief keeps its line and its fix in the reply, after later messages too
+            return "data-status", event.brief_id, data if fix is None else data | {"fix": fix}
         if isinstance(event, Data):
             if event.name == "card" and event.id in self.cards:  # e.g. withdrawn
                 return "data-card", event.id, self.cards[event.id] | event.data

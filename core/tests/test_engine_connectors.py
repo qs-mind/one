@@ -330,6 +330,67 @@ async def test_standard_link_lists_models_from_its_server():
     assert card.price_source.startswith("genai-prices 0.2.1: https://")
 
 
+# Part of what Google's OpenAI-compatible list gave on 5 Nov 2026 (audit C4): 60 models, most of
+# them not for a chat that uses tools.
+GOOGLE_MODELS = [
+    ("models/gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite"),
+    ("models/gemini-3.5-pro", "Gemini 3.5 Pro"),
+    ("models/gemini-2.5-flash-preview-tts", "Gemini 2.5 Flash Preview TTS"),
+    ("models/gemini-2.5-flash-image", "Nano Banana"),
+    ("models/gemini-embedding-001", "Gemini Embedding 001"),
+    ("models/imagen-4.0-generate-001", "Imagen 4"),
+    ("models/veo-3.0-generate-001", "Veo 3"),
+    ("models/lyria-realtime-exp", "Lyria Realtime"),
+    ("models/gemini-robotics-er-1.5-preview", "Gemini Robotics-ER 1.5 Preview"),
+    ("models/gemini-2.5-flash-native-audio-latest", "Gemini 2.5 Flash Native Audio"),
+    ("models/gemini-2.5-computer-use-preview-10-2025", "Gemini 2.5 Computer Use Preview"),
+    ("models/aqa", "Model that performs Attributed Question-Answering."),
+    ("models/gemma-3-27b-it", None),
+]
+
+
+def google_list() -> httpx2.AsyncClient:
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        data = [
+            {"id": m, "object": "model", "owned_by": "google"} | ({"display_name": n} if n else {})
+            for m, n in GOOGLE_MODELS
+        ]
+        return httpx2.Response(200, json={"object": "list", "data": data})
+
+    return httpx2.AsyncClient(transport=httpx2.MockTransport(handle))
+
+
+async def test_only_chat_models_are_listed_by_their_names():
+    link = StandardLink(
+        "g",
+        "Google",
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        "google",
+        http_client=google_list(),
+    )
+    keys.set_key(link.id, STANDARD_KEY)
+    found = await link.cards()
+    assert [(c.choice.model, c.name) for c in found] == [
+        ("models/gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite"),
+        ("models/gemini-3.5-pro", "Gemini 3.5 Pro"),
+        ("models/gemma-3-27b-it", "gemma-3-27b-it"),  # no name given: its id, without models/
+    ]
+
+
+async def test_a_model_the_provider_refused_is_no_longer_listed():
+    link = StandardLink(
+        "g",
+        "Google",
+        "https://generativelanguage.googleapis.com/v1beta/openai",
+        "google",
+        http_client=google_list(),
+    )
+    keys.set_key(link.id, STANDARD_KEY)
+    connectors.note_refused(ModelChoice("standard:g", "models/gemini-3.5-pro"))
+    found = await link.cards()
+    assert "models/gemini-3.5-pro" not in [c.choice.model for c in found]
+
+
 def test_a_key_over_plain_http_to_another_computer_is_refused():
     with pytest.raises(standard.KeyInTheClear):
         standard.add("Office server", "http://192.168.1.10:8080/v1", STANDARD_KEY)

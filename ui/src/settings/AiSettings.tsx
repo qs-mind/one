@@ -187,10 +187,14 @@ function ClaudeKey({ settings, onSaved }: { settings: Settings; onSaved: () => v
 function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[]; onChanged: () => void }) {
   // each one removed in this window stays in its place with its Undo (the core has it out of use already)
   const [removed, setRemoved] = useState<Record<string, Removed & { link: ConnectorInfo }>>({});
+  // the one just added shows at once, from the core's answer, before the settings come back with it (audit C5)
+  const [added, setAdded] = useState<{ name: string; link?: ConnectorInfo }>();
   const listed = connectors.filter((c) => c.id.startsWith("standard:"));
+  const fresh = added?.link;
+  const withAdded = fresh && !listed.some((l) => l.id === fresh.id) ? [...listed, fresh] : listed;
   const links = Object.values(removed).reduce(
     (all, { link }) => (all.some((l) => l.id === link.id) ? all : [...all, link]),
-    listed,
+    withAdded,
   );
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -202,11 +206,14 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
     event.preventDefault();
     setSaving(true);
     setFailed(undefined);
+    setAdded(undefined);
     const body = { name: name.trim(), base_url: baseUrl.trim(), ...(key.trim() ? { key: key.trim() } : {}) };
     const response = await send("/settings/ai/standard", "POST", body);
     setSaving(false);
     setKey(""); // the key is sent once and never kept on the page, whatever the answer
     if (response?.ok) {
+      const link = (await response.json().catch(() => undefined)) as ConnectorInfo | undefined;
+      setAdded({ name: body.name, ...(link?.id && link.provider ? { link } : {}) });
       setName("");
       setBaseUrl("");
       onChanged();
@@ -300,6 +307,11 @@ function StandardLinks({ connectors, onChanged }: { connectors: ConnectorInfo[];
           </button>
         </div>
       </form>
+      {added && (
+        <p role="status" className="text-slate">
+          <bdi>{fill(t("addedName"), { name: added.name })}</bdi>
+        </p>
+      )}
       <Alert line={failed} />
     </div>
   );

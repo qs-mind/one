@@ -211,7 +211,48 @@ async def test_a_brief_streams_lead_text_and_progress(make_engine, project, regi
     assert store.brief(brief)["status"] == "done"
     [run] = store.runs(brief)
     assert run["history"] and run["choice"] == OPUS.choice
-    assert lead.calls == 2 and "You run on the model claude-opus-5-5" in str(lead.seen[0])
+    assert lead.calls == 2 and "The AI model you run on is claude-opus-5-5" in str(lead.seen[0])
+
+
+async def test_the_lead_names_its_model_only_when_asked(make_engine, project):
+    # audit R15: «You run on the model …; say so when asked» made a small model announce it in
+    # every reply; the line now says never to mention it otherwise
+    lead = scripted(said("تمام - عينة"))
+    engine = await started(make_engine(links(lead=lead)))
+    await finish(engine, await engine.start_brief(project, BRIEF))
+    seen = str(lead.seen[0])
+    assert "You run on the model" not in seen
+    assert "never mention it otherwise" in seen
+
+
+async def test_with_no_web_search_the_lead_is_told_to_say_so(make_engine, project):
+    # audit B8: with a Standard Link and no search key there is no search at all, and the Lead
+    # gave remembered prices as today's; it is told there is none, and never to do that
+    lead = scripted(said("تمام - عينة"))
+    engine = await started(make_engine(links(lead=lead)))
+    await finish(engine, await engine.start_brief(project, BRIEF))
+    seen = str(lead.seen[0])
+    assert "No web search is set up in ONE" in seen
+    assert "never say ONE cannot search" not in seen
+
+
+@pytest.mark.parametrize(
+    ("text", "wanted"),
+    [
+        ("What is the rate for C30 concrete in القاهرة?", "in English: reply in English"),
+        ("إيه الفرق بين المقايسة المسعرة والصماء؟ باختصار", "in Egyptian Arabic"),
+        ("ما الفرق بين المقايسة المسعرة والمقايسة الصماء؟", "in Arabic: reply in Arabic"),
+    ],
+)
+async def test_the_lead_replies_in_the_language_and_register_of_the_message(
+    make_engine, project, text, wanted
+):
+    # audit C6: an English message with a few Arabic words got formal Arabic, and Egyptian
+    # questions got formal Arabic; the Brief now says which language and register to answer in
+    lead = scripted(said("تمام - عينة"))
+    engine = await started(make_engine(links(lead=lead)))
+    await finish(engine, await engine.start_brief(project, text))
+    assert wanted in str(lead.seen[0])
 
 
 async def test_lead_builds_two_specialists_and_runs_them_at_once(make_engine, project):

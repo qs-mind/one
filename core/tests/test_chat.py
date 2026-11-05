@@ -121,7 +121,9 @@ def test_no_core_text_points_to_a_place_on_the_screen():
 def test_every_text_the_screen_offers_a_fix_for_is_matched():
     for fix, found in copy.FIXES.items():
         for text in found:
-            filled = copy.fill(text, provider="Claude", model="Sample model", date="2026-11-05")
+            filled = copy.fill(
+                text, provider="Claude", model="Sample model", date="2026-11-05", other="sample-2"
+            )
             assert copy.fix_of(text) == fix and copy.fix_of(filled) == fix
     assert copy.fix_of(copy.fill(copy.AI_FAILED, provider="Claude")) is None
     assert copy.error(copy.KEY_REFUSED) == {"error": copy.KEY_REFUSED, "fix": "ai"}
@@ -317,6 +319,55 @@ def test_model_errors_reach_the_screen_in_plain_words(error, plain, caplog):
     assert error_chunk(r.text) == plain
     assert str(error) not in r.text  # the provider's own words stay out of the stream
     assert str(error) in caplog.text  # and go to core.log
+
+
+# Google's own answer for a model it retired (read once from the real API, 5 Nov 2026).
+GOOGLE_GONE = [
+    {
+        "error": {
+            "code": 404,
+            "message": "This model models/gemini-2.5-flash-lite is no longer available to new "
+            "users. Please update your code to use models/gemini-3.5-flash-lite for the latest "
+            "features and improvements.",
+            "status": "NOT_FOUND",
+        }
+    }
+]
+
+
+def failed_brief(error) -> str:
+    model = FunctionModel(stream_function=raising(error))
+    only = [FakeLink("anthropic", "Claude", "anthropic", {OPUS.choice.model: model}, sheet=[OPUS])]
+    client = TestClient(create_app(SECRET, connectors=lambda: only, sleep=FakeSleep()))
+    return client.post("/chat", json=message("hello"), headers=AUTH).text
+
+
+def test_a_model_the_provider_retired_is_said_with_the_model_it_suggests():
+    """Audit B7: Google's 404 "no longer available … use gemini-3.5-flash-lite" became «الشغل
+    وقف بسبب مشكلة». The reason is said in plain words, with the fix: AI settings."""
+    body = failed_brief(ModelHTTPError(404, chat.LEAD_MODEL, body=GOOGLE_GONE))
+    said = copy.fill(
+        copy.MODEL_GONE_TRY, provider="Claude", model=chat.LEAD_MODEL, other="gemini-3.5-flash-lite"
+    )
+    assert error_chunk(body) == said and chunk_fix(body) == "ai"
+    # the failed status keeps the line and its fix in the reply, after later messages too
+    [failed] = [c for c in chunks(body) if c["type"] == "data-status"][-1:]
+    assert failed["data"] == {"state": "failed", "step": said, "fix": "ai"}
+
+
+def test_a_model_the_provider_does_not_know_says_so():
+    body = failed_brief(ModelHTTPError(404, chat.LEAD_MODEL, body={"error": {"message": "nope"}}))
+    assert error_chunk(body) == copy.fill(copy.MODEL_GONE, provider="Claude", model=chat.LEAD_MODEL)
+    assert chunk_fix(body) == "ai"
+
+
+def test_googles_refused_key_is_a_refused_key():
+    """Google answers a wrong key with 400 "API key not valid", not 401."""
+    refused = [
+        {"error": {"code": 400, "message": "API key not valid. Please pass a valid API key."}}
+    ]
+    body = failed_brief(ModelHTTPError(400, chat.LEAD_MODEL, body=refused))
+    assert chunk_fix(body) == "ai"
 
 
 def test_no_connection_waits_and_then_answers():

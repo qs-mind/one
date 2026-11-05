@@ -6,9 +6,12 @@ from vetted blocks (ui/src/chat/parts/view). Rules:
 - blocks: heading, prose, figures (label + number) and table (columns + rows), at most 24; any
   block may name its section, and the screen shows a run of blocks with one section under its
   title, so a view is one level deep;
-- a table row has one fixed shape, its label, then its texts, then its numbers, under the
-  columns in that order: no free keys and no cell that may be words or a reference, since the
-  first bake-off (5 Nov 2026) found both broke a small model's function calls;
+- a table row has one fixed shape, its label, then its texts, then its numbers: no free keys
+  and no cell that may be words or a reference, since the first bake-off (5 Nov 2026) found
+  both broke a small model's function calls. The label's header is the table's own
+  `label_header`, and the columns head the texts, then the numbers, so a row has as many of
+  them as there are columns (the second bake-off: models counted the label's header among the
+  columns);
 - a number is never typed: it is a reference, `{"number": <number id>}` or a Sheet's cell
   `{"deliverable", "row", "column"}`, which the core resolves to its value, source and date
   (followed through corrections, as a Document's references are). An unknown reference, or a
@@ -16,7 +19,8 @@ from vetted blocks (ui/src/chat/parts/view). Rules:
 - every text goes through the numbers guard, as the Lead's reply does: a number no tool gave is
   marked on screen, never removed;
 - `sample` is the model's flag, and always true when a shown number comes from a sample source;
-- no HTML, ever: text with a tag is refused, and the screen renders words only;
+- no HTML, ever: text with a tag is refused, and the screen renders words only; nor an id in
+  a text, which would show as hex;
 - a block of a kind ONE does not have is dropped, with a note back to the model.
 
 A refusal is one `ModelRetry` per Brief. After that, `show` answers "not shown" as an ordinary
@@ -113,10 +117,11 @@ class Row(_Closed):
 
 
 class Table(_Block):
-    """The columns head a row's label, then its texts, then its numbers, in that order."""
+    """`label_header` heads the rows' labels; the columns head a row's texts, then its numbers."""
 
     kind: Literal["table"]
-    columns: list[Column] = Field(min_length=1, max_length=8)
+    label_header: Short
+    columns: list[Column] = Field(max_length=8)  # required: with a default a model left it out
     rows: list[Row] = Field(min_length=1, max_length=50)
 
 
@@ -149,6 +154,19 @@ class _Refused(Exception):
 # Checking ---------------------------------------------------------------------------------------
 
 _HTML = re.compile(r"<\s*/?\s*[A-Za-z!][^>]*>")
+_ID = re.compile(r"(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])")
+# A number written in words, which the numbers guard cannot see: the words for hundreds and up,
+# and for a percentage (round 3 of the bake-off: "one hundred and forty EGP", «عشرة بالمئة»). A
+# count in words ("the three quotes", «أعلى خمسة بنود») is words, not a figure.
+_AR_WORD = r"(?<![؀-ۿ])(?:[وب]?(?:ال)?)(?:{})(?![؀-ۿ])"
+_IN_WORDS = re.compile(
+    r"\b(?:hundreds?|thousands?|millions?|billions?|percent|per\s+cent)\b|"
+    + _AR_WORD.format(
+        "مائة|مئة|مية|مئات|ميت|مائتين|مئتين|ميتين|ألف|الف|ألفين|الفين|آلاف|الاف|مليون|"
+        "مليونين|ملايين|مليار|مليارات|بالمئة|بالمائة|بالمية|في المية|في المائة"
+    ),
+    re.IGNORECASE,
+)
 _REF_HINT = (
     'A number is never typed: give {"number": "<number id>"} from the Source Ledger, or '
     '{"deliverable": "<sheet id>", "row": "<row id>" or "total", "column": "<column key>"}.'
@@ -208,9 +226,13 @@ def _validated(args: dict) -> View:
         raise _Refused(f"«{where}»: {first['msg']}.{hint}") from None
 
 
+def _many(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
 def _check(data: dict) -> None:
-    """The rules a schema cannot hold: each table's rows fit its columns, and no HTML in any
-    text."""
+    """The rules a schema cannot hold: each table's rows fit its columns, and no HTML and no id
+    in any text."""
     for i, block in enumerate(data["blocks"]):
         if block["kind"] != "table":
             continue
@@ -218,23 +240,33 @@ def _check(data: dict) -> None:
         first = block["rows"][0]
         for j, row in enumerate(block["rows"]):
             at = f"«blocks[{i}].rows[{j}]»"
-            if (len(row["texts"]), len(row["numbers"])) != (
-                len(first["texts"]),
-                len(first["numbers"]),
-            ):
+            texts, numbers = len(row["texts"]), len(row["numbers"])
+            if (texts, numbers) != (len(first["texts"]), len(first["numbers"])):
                 raise _Refused(
                     f"{at}: every row has as many texts and as many numbers as the first; "
-                    f"the table has {width} columns."
+                    f"the table has {_many(width, 'column')}."
                 )
-            if 1 + len(row["texts"]) + len(row["numbers"]) != width:
+            if texts + numbers != width:
                 raise _Refused(
-                    f"{at}: the label, {len(row['texts'])} texts and {len(row['numbers'])} numbers "
-                    f"do not fit the table's {width} columns: one column for the label, then one "
-                    "for each text, then one for each number."
+                    f"{at}: {_many(texts, 'text')} and {_many(numbers, 'number')} need "
+                    f"{_many(texts + numbers, 'column')}, and the table has "
+                    f"{_many(width, 'column')}. The rows' labels have their header in "
+                    "label_header, not among the columns."
                 )
     for place, text in _texts(data):
         if _HTML.search(text):
             raise _Refused(f"«{place}»: no HTML or code; write plain words.")
+        if _ID.search(text):
+            raise _Refused(
+                f"«{place}»: never put an id in words; show a number as "
+                '{"number": "<number id>"} in figures or in a row\'s numbers.'
+            )
+        found = _IN_WORDS.search(text)
+        if found:
+            raise _Refused(
+                f"«{place}»: «{found.group()}» writes a number in words. Show a number as "
+                '{"number": "<number id>"}; if the data has no such number, say so plainly.'
+            )
 
 
 def _texts(data: dict):
@@ -250,6 +282,7 @@ def _texts(data: dict):
             for j, item in enumerate(block["items"]):
                 yield f"{here}.items[{j}].label", item["label"]
         else:
+            yield f"{here}.label_header", block["label_header"]
             for j, column in enumerate(block["columns"]):
                 yield f"{here}.columns[{j}].label", column["label"]
             for j, row in enumerate(block["rows"]):
@@ -329,10 +362,28 @@ def _sheet_cell(sheet: dict, row: str, column: str) -> dict | None:
     return cell if isinstance(cell, dict) and "value" in cell else None
 
 
-def _build(rec: Records, args: dict, at: str) -> tuple[dict, list[dict], list[str]]:
+def _stored_tables(args: dict) -> dict:
+    """A view stored before `label_header`: its tables' first column headed the labels."""
+    blocks = args.get("blocks")
+    if not isinstance(blocks, list):
+        return args
+    out = []
+    for block in blocks:
+        columns = block.get("columns") if _kind(block) == "table" else None
+        if isinstance(columns, list) and columns and "label_header" not in block:
+            head = columns[0].get("label") if isinstance(columns[0], dict) else None
+            block = block | {"label_header": head, "columns": columns[1:]}
+        out.append(block)
+    return args | {"blocks": out}
+
+
+def _build(
+    rec: Records, args: dict, at: str, *, stored: bool = False
+) -> tuple[dict, list[dict], list[str]]:
     """The view's data part (without its unsourced numbers), its cells and the notes on what
-    was dropped. Raises `_Refused`."""
-    cleaned, dropped = _drop_unknown(args)
+    was dropped. `stored`: arguments from the history, perhaps from before `label_header`.
+    Raises `_Refused`."""
+    cleaned, dropped = _drop_unknown(_stored_tables(args) if stored else args)
     data = _validated(cleaned).model_dump(mode="json")
     _check(data)
     cells = _resolve(rec, data, at)
@@ -427,7 +478,7 @@ def stored_views(rec: Records | None, brief_id: str, history: bytes) -> list[Dat
                 continue
             try:
                 out = json.loads(p.content) if isinstance(p.content, str) else p.content
-                data, _, _ = _build(rec, asked[p.tool_call_id], out["at"])
+                data, _, _ = _build(rec, asked[p.tool_call_id], out["at"], stored=True)
             except (ValueError, KeyError, TypeError, _Refused):
                 continue  # not shown, or not readable
             data["unsourced"] = list(out.get("unsourced") or [])
@@ -435,21 +486,23 @@ def stored_views(rec: Records | None, brief_id: str, history: bytes) -> list[Dat
     return found
 
 
+# In no language: "…" stands for the engineer's words (round 2: an example in one language
+# pulled requests in the other into it).
 _EXAMPLE = {
-    "title": "ملخص التسعير",
+    "title": "…",
     "blocks": [
         {
             "kind": "figures",
-            "items": [{"label": "الفئة", "value": {"number": "6f1c0d2e9a4b4c7e8f3a2b1c0d9e8f7a"}}],
+            "items": [{"label": "…", "value": {"number": "6f1c0d2e9a4b4c7e8f3a2b1c0d9e8f7a"}}],
         },
         {
             "kind": "table",
-            "section": "البنود",
-            "columns": [{"label": "البند"}, {"label": "الوصف"}, {"label": "الكمية"}],
+            "label_header": "…",
+            "columns": [{"label": "…"}, {"label": "…"}],
             "rows": [
                 {
                     "label": "03/02",
-                    "texts": ["خرسانة مسلحة"],
+                    "texts": ["…"],
                     "numbers": [{"number": "0b7e4c2a9d1f4e8a8c3b2a1d0e9f8c7b"}],
                 }
             ],
@@ -457,12 +510,13 @@ _EXAMPLE = {
     ],
 }
 
-_DOC = f"""Show the engineer a view when figures or a table say it better than words. \
-Blocks: heading, prose, figures and table; 24 at most; any may take a section. A table row is \
-its label, then its texts, then its numbers, under columns in that order. A number is never \
-typed: {{"number": "<number id>"}} or a Sheet's cell \
-{{"deliverable": "<sheet id>", "row": "<row id>" or "total", "column": "<key>"}}; ONE adds its \
-value, source and date. Words in the engineer's language. No HTML. sample: true for sample data.
+_DOC = f"""Show a view when figures or a table say it better than words. \
+Blocks: heading, prose, figures, table; at most 24; any may take a section. A table's \
+label_header heads its rows' labels; columns head each row's texts, then its numbers. A number \
+is never typed, never written in words; never put an id in a text: \
+{{"number": "<number id>"}} or a Sheet's cell \
+{{"deliverable": "<sheet id>", "row": "<row id>" or "total", "column": "<key>"}}; ONE adds \
+value, source, date. Words in the engineer's language. No HTML. sample: true for sample data.
 Example:
 {json.dumps(_EXAMPLE, ensure_ascii=False)}"""
 

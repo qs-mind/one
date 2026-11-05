@@ -111,6 +111,7 @@ from qsone.engine.types import (
     Unsourced,
     brief_language,
     choice_of,
+    reply_line,
 )
 from qsone.engine.worklog import WorkLog
 from qsone.journey import engineer, understand
@@ -733,8 +734,11 @@ class _Brief:
                 log.warning("run %s on %s: %s %s", run_id, choice.connector, kind, error)
                 if kind == "auth":
                     raise _Fail(connectors_mod.key_refused(provider)) from None
-                if kind == "other":
-                    raise _Fail(copy.fill(copy.AI_FAILED, provider=provider)) from None
+                if kind == "other":  # the provider's reason when ONE knows it (audit B7)
+                    said = connectors_mod.provider_reason(error, provider, choice.model)
+                    if getattr(error, "status_code", None) == 404:
+                        connectors_mod.note_refused(choice)  # no longer listed (audit C4)
+                    raise _Fail(said or copy.fill(copy.AI_FAILED, provider=provider)) from None
                 if kind == "offline":
                     before = self.step
                     self.set_state("waiting_connection", copy.WAITING_INTERNET)
@@ -795,9 +799,35 @@ class _Brief:
         return found
 
     def _instructions(self, choice: ModelChoice) -> str:
-        said = f"You run on the model {choice.model}; say so when asked which model you are."
-        found = (said, self.instruction, selection.line(self.selection))
+        # a small model repeated "you run on …" in every reply (audit R15): only when asked
+        said = (
+            f"The AI model you run on is {choice.model}. Say it only if the engineer asks which "
+            "model answers; never mention it otherwise."
+        )
+        found = (
+            said,
+            reply_line(self.text),
+            self._search_line(),
+            self.instruction,
+            selection.line(self.selection),
+        )
         return "\n\n".join(part for part in found if part)
+
+    def _search_line(self) -> str | None:
+        """With no web search at all (a Standard Link, no search key), the Lead is told so
+        (audit B8): it said nothing and gave remembered prices as today's."""
+        from qsone.tools import web as web_tools
+
+        services = self.engine.services
+        if services is not None and self.lead_run_id is not None:
+            services = oneshot.for_run(services, self.models(self.lead_run_id))
+        if web_tools.searchable(services):
+            return None
+        return (
+            "No web search is set up in ONE. When the engineer asks for something from the web "
+            "or today's price, call web_search once (ONE shows them how to set search up), say "
+            "in one line that you could not search, and give no remembered price as today's."
+        )
 
     async def _lead(self, *, report: bool = False) -> Any:
         assert self.lead_run_id is not None
@@ -1006,7 +1036,7 @@ class _Brief:
         self._agent(run_id, state="working", model=choice.model)
         # Claude Code reads only its instructions file: a Brief from code's own instruction
         # (Plan 8) and the canvas selection go there.
-        for extra in (self.instruction, selection.line(self.selection)):
+        for extra in (reply_line(self.text), self.instruction, selection.line(self.selection)):
             if extra:
                 spec = replace(spec, instructions=f"{spec.instructions}\n\n{extra}")
         return await self._job(run_id, spec, choice, self.text)
@@ -1024,7 +1054,11 @@ class _Brief:
         agent = agents.build_agent(
             spec, self._costed(run_id, spec.tier, choice), self._toolset(spec, ctx), output_type=str
         )
-        async with agent.iter(prompt, message_history=own or None, retries=TOOL_RETRIES) as run:
+        # what a specialist writes for the engineer is in the engineer's language (audit C6)
+        extra = reply_line(self.text) if spec.role == "specialist" else None
+        async with agent.iter(
+            prompt, message_history=own or None, instructions=extra, retries=TOOL_RETRIES
+        ) as run:
             async for node in run:
                 if Agent.is_call_tools_node(node):
                     self._say_tools(run_id, spec, node.model_response)

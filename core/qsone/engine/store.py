@@ -635,6 +635,38 @@ class CostBook:
             rows = c.execute(f"SELECT usd FROM ai_costs WHERE {' AND '.join(where)}", args)
             return sum((Decimal(usd) for (usd,) in rows.fetchall()), Decimal("0"))
 
+    def tokens(
+        self,
+        *,
+        brief_id: str | None = None,
+        day: date | None = None,
+        month: tuple[int, int] | None = None,
+        unpriced_only: bool = False,
+    ) -> dict[str, int]:
+        """The tokens of what matches every filter given, priced or not, and how many responses
+        had no known price: {"input", "output", "unpriced"}. `unpriced_only` counts only those
+        (the caps of a model used without a price)."""
+        where, args = ["1"], []
+        if unpriced_only:
+            where.append("usd IS NULL AND equivalent = 0")
+        if brief_id is not None:
+            where.append("brief_id = ?")
+            args.append(brief_id)
+        if day is not None:
+            where.append("local_day = ?")
+            args.append(day.isoformat())
+        if month is not None:
+            year, m = month
+            where.append("local_day >= ? AND local_day < ?")
+            args += [date(year, m, 1).isoformat(), date(year + m // 12, m % 12 + 1, 1).isoformat()]
+        with self.rec.read() as c:
+            found = c.execute(
+                "SELECT coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0),"
+                f" coalesce(sum(usd IS NULL), 0) FROM ai_costs WHERE {' AND '.join(where)}",
+                args,
+            ).fetchone()
+        return {"input": found[0], "output": found[1], "unpriced": found[2]}
+
     def tokens_per_request(
         self, project_id: str | None, effort: str | None = None
     ) -> tuple[int, int, int] | None:

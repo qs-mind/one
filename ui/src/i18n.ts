@@ -169,6 +169,10 @@ export const texts = {
   dontAllow: { en: "Don't allow", ar: "ماتسمحش" },
   useIt: { en: "Use it", ar: "استخدمه" },
   dontUseIt: { en: "Don't use it", ar: "ماتستخدموش" },
+  enterItsPrice: { en: "Enter its price", ar: "اكتب سعره" },
+  setUpSearch: { en: "Set up web search", ar: "اظبط البحث في الويب" },
+  useWithoutPrice: { en: "Use it without a price", ar: "استخدمه من غير سعر" },
+  useThisPrice: { en: "Use it at this price", ar: "استخدمه بالسعر ده" },
   startBrief: { en: "Start", ar: "ابدأ" },
   dontStart: { en: "Don't start", ar: "ماتبدأش" },
   keepDesk: { en: "Keep the Desk", ar: "احتفظ بالقسم" },
@@ -399,6 +403,7 @@ export const texts = {
   enteredByCalc: { en: "Worked out by the QS Calc Engine", ar: "حسبه محرك الحسابات" },
   enteredByPrices: { en: "From QS Mind Prices", ar: "من أسعار كيو إس مايند" },
   sheetRecalculated: { en: "Recalculated", ar: "اتحسب تاني" },
+  calculated: { en: "Calculated", ar: "محسوب" },
   sheetSample: {
     en: "Sample data: these numbers are not real.",
     ar: "بيانات تجريبية: الأرقام دي مش حقيقية.",
@@ -771,6 +776,11 @@ export const texts = {
     en: "A Claude key from Anthropic: you pay Anthropic for what you use.",
     ar: "مفتاح Claude من Anthropic: بتدفع لـ Anthropic على قد استخدامك.",
   },
+  aiLinkStandard: { en: "Another AI provider", ar: "مزوّد ذكاء اصطناعي تاني" },
+  aiLinkStandardHelp: {
+    en: "Any provider with an OpenAI-compatible address and key: Gemini, DeepSeek, or a model on this computer.",
+    ar: "أي مزوّد عنده عنوان متوافق مع OpenAI ومفتاح: Gemini أو DeepSeek أو نموذج على الجهاز ده.",
+  },
   aiLinkChecking: { en: "Checking…", ar: "بنتأكد…" },
   aiLinkWorks: { en: "It works. ONE is connected to AI.", ar: "شغال. ONE اتوصّل بالذكاء الاصطناعي." },
   aiLinkLater: {
@@ -1007,6 +1017,7 @@ export const texts = {
   undo: { en: "Undo", ar: "تراجع" },
   undoDone: { en: "Back as it was.", ar: "رجع زي ما كان." },
   removedName: { en: "Removed «{name}»", ar: "اتشال «{name}»" },
+  addedName: { en: "Added «{name}»", ar: "اتضاف «{name}»" },
   undoFailed: { en: "It was not put back. Add it again if you need it.", ar: "مارجعش. ضيفه تاني لو محتاجه." },
   // The BOQ change review (ui/src/review/ChangesPanel.tsx)
   reviewAcceptedShort: { en: "Accepted", ar: "اتقبل" },

@@ -103,7 +103,8 @@ GENERAL_LINE = (
     "This is the General chat: no project is open. Hand project work to its project with "
     "hand_to_project, offer a new project with offer_new_project when none fits, and never "
     "name a project that projects did not return. Market news, prices and suppliers you search "
-    "yourself: web_search, then web_read for each page you use, and cite it."
+    "yourself: web_search, then web_read for each page you use, and cite it; never give a "
+    "remembered price as today's."
 )
 
 

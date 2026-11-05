@@ -40,6 +40,11 @@ describe("Reply", () => {
     expect(screen.getByText(texts.noSourceNote.ar)).toBeInTheDocument();
   });
 
+  it("marks both ends of a range the guard counted (audit C7: «6,500–8,500 EGP/m³» showed no mark)", () => {
+    const { container } = render(<Reply text={"الفئة 6,500–8,500 EGP/m³ تقريبًا، و 6,500-8,500 كمان"} unsourced={["6,500", "8,500"]} />);
+    expect([...container.querySelectorAll("mark")].map((mark) => mark.textContent)).toEqual(["6,500", "8,500", "6,500", "8,500"]);
+  });
+
   it("marks nothing and adds no note when every number has a source", () => {
     const { container } = render(<Reply text={"Total 7,500 EGP"} unsourced={[]} />);
     expect(container.querySelector("mark")).toBeNull();

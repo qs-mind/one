@@ -5,8 +5,8 @@ import type { Text } from "./i18n";
 /** What fixes a core text, as the core says (core/qsone/copy.py FIXES): AI settings, the Connect AI step, the same
  * check once more, or the Backup panel. The core's words never say where to go; the screen adds the action that fits
  * where the text shows (none in the place itself). */
-export type Fix = "ai" | "consent" | "retry" | "backup";
-const FIXES: readonly string[] = ["ai", "consent", "retry", "backup"];
+export type Fix = "ai" | "consent" | "retry" | "backup" | "search";
+const FIXES: readonly string[] = ["ai", "consent", "retry", "backup", "search"];
 
 /** The `fix` the core sent with a text, when it is one the screen knows. */
 export function fixOf(value: unknown): Fix | undefined {

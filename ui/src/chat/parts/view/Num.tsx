@@ -17,11 +17,13 @@ export function Num({ cell }: { cell: NumberCell }) {
   const source = cell.source ? sources[cell.source] : undefined;
   const shown = numberText(cell);
   const chip = "inline-flex min-w-0 max-w-48 items-center rounded-full border border-slate px-2 text-xs leading-5 text-slate";
-  // one line: a long source name is cut, its full name on hover
-  const name = source ? <FileName name={source.title} fit /> : t("noSource");
+  // one line: a long source name is cut, its full name on hover; a calculation says so, not its formula's keys
+  const name = !source ? t("noSource") : source.kind === "calculation" ? t("calculated") : <FileName name={source.title} fit />;
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-      <bdi dir="ltr" className="font-semibold tabular-nums">
+      {/* one isolated run taking its direction from its unit: «1,200 م3» reads number first in Arabic, and
+          "39,850.50 EGP/m3" left to right */}
+      <bdi dir="auto" className="font-semibold tabular-nums">
         {shown}
       </bdi>
       {openSource ? (
