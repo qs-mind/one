@@ -1208,6 +1208,14 @@ DOING_CONNECTOR = {
 }
 DOING_ASK = {"en": "Waiting for your answer", "ar": "مستني ردك"}
 
+# ask_engineer's card. {agent} is the agent's name; the questions are the agent's own words.
+QUESTION_TITLE = {"en": "{agent} asks", "ar": "{agent} بيسأل"}
+QUESTION_DETAIL = {
+    "en": "Answer every question, then press Send. Your answers are kept as the source of "
+    "any number they give.",
+    "ar": "جاوب على كل سؤال، وبعدين دوس إرسال. ردودك بتتحفظ كمصدر لأي رقم فيها.",
+}
+
 ON_DEVICE_NO_ONLINE = {
     "en": (
         "This is an On-device Project: nothing leaves this computer, so One cannot do this here."
