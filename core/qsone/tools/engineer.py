@@ -103,16 +103,13 @@ _EXAMPLE = {
     ]
 }
 
-_DOC = f"""Ask the engineer what only they can answer, and wait for the answers: a choice that \
-is theirs (ready-mixed or site-mixed concrete, which BOQ revision counts), a rate or quantity no \
-file gives, a document that is missing. Look in the records first; never ask what a tool finds.
-- questions: every question you have now, in one call ({MAX_QUESTIONS} at most). Each has an id \
-("q1", "q2", …), its text, and options when the answer is one of a few (2 to 6), or free_text: \
-true for a written answer (both: the options, or any other written answer).
-- Write each question in the engineer's language (the Brief's), in plain QS words. \
-{_NO_IDS}.
-Returns the answers by question id, with the card as their source and the day they were given: \
-cite a number from an answer with add_source as the result says.
+_DOC = f"""Ask the engineer what only they can answer, and wait: their choice, a rate no file \
+gives, a missing document. Look in the records first.
+- questions: all in one call ({MAX_QUESTIONS} at most), each with an id ("q1", …), its text, \
+and 2 to 6 options, or free_text: true.
+- Write in the engineer's language, in plain QS words. Never show or ask for an id: name the \
+file or item as the engineer knows it.
+Returns the answers by id, with the card as source and date for add_source.
 Example:
 {json.dumps(_EXAMPLE, ensure_ascii=False)}"""
 

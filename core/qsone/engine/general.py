@@ -106,10 +106,10 @@ GENERAL_LINE = (
 
 def project_only() -> set[str]:
     """The Lead's tools that need an open project: Project Records (Plan 4 and the `records`
-    group) and the Deliverables (Plan 6)."""
+    group), the BOQ import (Plan 5's `boq` group) and the Deliverables (Plan 6)."""
     from qsone.deliverables.tools import OUTPUTS_TOOLS
 
-    grouped = {name for name, tool in REGISTRY.items() if tool.group == "records"}
+    grouped = {name for name, tool in REGISTRY.items() if tool.group in ("records", "boq")}
     return {*RECORDS_TOOLS, *OUTPUTS_TOOLS, *grouped}
 
 
