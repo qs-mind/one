@@ -12,7 +12,7 @@ import { isMod, isTyping, matches } from "../canvas/keys";
 import { leadFromChat, useWaiting } from "../canvas/live/activity";
 import { Announcer } from "../canvas/live/Announcer";
 import { Cursors } from "../canvas/live/Cursors";
-import { select } from "../canvas/selection";
+import { currentSelection, select } from "../canvas/selection";
 import { httpSources } from "../canvas/sources";
 import type { FrameKey, ProjectSources, ProjectStatus } from "../canvas/types";
 import { BackupPanel } from "../backup/BackupPanel";
@@ -241,6 +241,13 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         event.preventDefault();
         setPaletteOrigin(undefined);
         setPaletteOpen((open) => !open);
+      } else if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        currentSelection().length > 0 &&
+        !document.querySelector("[role='dialog'], [role='alertdialog']")
+      ) {
+        select([]); // an Escape nothing else used: the selection the next message would go with is let go
       } else if (event.code === "F6") {
         event.preventDefault();
         moveRegion(event.shiftKey);

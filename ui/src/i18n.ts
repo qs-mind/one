@@ -465,6 +465,16 @@ export const texts = {
   reviewVersion: { en: "Version {n}", ar: "نسخة {n}" },
   reviewRevisions: { en: "Revisions", ar: "الإصدارات" },
   reviewRev: { en: "Rev {n}", ar: "إصدار {n}" },
+  // a saved version (نسخة) stays in ONE; an issue (إصدار) is what goes to the client: the two never read alike
+  reviewVersionsHelp: {
+    en: "Each accepted change saves a version. Versions stay in ONE.",
+    ar: "كل مرة بتقبل فيها تعديل بتتحفظ نسخة. النسخ بتفضل جوّه ONE.",
+  },
+  reviewRevisionsHelp: {
+    en: "A Revision is what you send to the client: Rev 1, Rev 2 and so on.",
+    ar: "الإصدار هو اللي بتبعته للعميل: إصدار 1، إصدار 2، وهكذا.",
+  },
+  reviewNoChanges: { en: "No changes", ar: "من غير تعديلات" },
   reviewIssueRevision: { en: "Issue Revision", ar: "طلّع إصدار" },
   reviewCompare: { en: "Compare", ar: "قارن" },
   reviewCloseOut: { en: "Sign-off", ar: "الاعتماد" },
@@ -506,7 +516,7 @@ export const texts = {
   deliverableType: { en: "Type", ar: "النوع" },
   deliverableTitle: { en: "Title", ar: "العنوان" },
   deliverableStatus: { en: "Status", ar: "الحالة" },
-  deliverableNoRevision: { en: "No Revision yet", ar: "لسه مفيش إصدار" },
+  deliverableNoRevision: { en: "Not sent to the client yet", ar: "لسه ما اتبعتش للعميل" },
   deliverableFailed: { en: "This Deliverable could not be loaded. Try again.", ar: "مقدرناش نجيب المُخرَج ده. جرّب تاني." },
   deliverableNoViewer: { en: "This kind of Deliverable cannot be shown here yet.", ar: "النوع ده من المُخرَجات لسه مينفعش يتعرض هنا." },
   deliverableLoading: { en: "Loading…", ar: "بيحمّل…" },

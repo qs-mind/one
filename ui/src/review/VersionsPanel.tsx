@@ -61,19 +61,23 @@ export function VersionsPanel({ projectId, view }: { projectId: string; view: Vi
       <div className="grid gap-3 min-[600px]:grid-cols-2">
         <div>
           <h3 className="font-semibold">{t("reviewVersions")}</h3>
+          <p className="text-sm text-slate">{t("reviewVersionsHelp")}</p>
           <ol className="flex flex-col">
             {[...found.versions].reverse().map((v) => (
               <li key={v.n} className="flex flex-wrap gap-x-2">
                 <span>{fill(t("reviewVersion"), { n: v.n })}</span>
                 <span className="text-slate">{when(v.at)}</span>
                 <span className="text-slate">{fill(t("reviewBy"), { who: authorName(v.by) })}</span>
-                <span className="text-slate">{count("reviewChangesCount", v.changes.length)}</span>
+                <span className="text-slate">
+                  {v.changes.length ? count("reviewChangesCount", v.changes.length) : t("reviewNoChanges")}
+                </span>
               </li>
             ))}
           </ol>
         </div>
         <div>
           <h3 className="font-semibold">{t("reviewRevisions")}</h3>
+          <p className="text-sm text-slate">{t("reviewRevisionsHelp")}</p>
           {found.revisions.length === 0 && <p className="text-slate">{t("deliverableNoRevision")}</p>}
           <ol className="flex flex-col">
             {[...found.revisions].reverse().map((r) => (

@@ -5,6 +5,7 @@ import { isNumber } from "../deliverables/types";
 import { fill, language, pick, t, texts, type Language } from "../i18n";
 import { blockText, type SlateElement } from "../viewers/document/blockOps";
 import { formatDecimal } from "../viewers/sheet/format";
+import { unitText } from "../sources/SourceCard";
 
 const TOTAL = "total"; // the core's row for the bill total
 
@@ -67,12 +68,13 @@ export function anchorPlace(view: View, anchor: CommentAnchor, lang: Language = 
   return anchor.moved ? fill(pick(texts.placeMoved, lang), { place }) : place;
 }
 
-/** A cell's value as plain text («39,850.50 EGP», a text, or «—» when there is none: never 0). */
+/** A cell's value as plain text («39,850.50 ج.م.» in Arabic, as the page writes money; a text; or «—» when there is
+ * none: never 0). */
 export function cellValue(cell: ViewCell | null | undefined): string {
   if (!cell) return "—";
   if (isNumber(cell)) {
     const unit = cell.currency ?? cell.unit;
-    return `${formatDecimal(cell.value, cell.currency ? 2 : undefined)}${unit ? ` ${unit}` : ""}`;
+    return `${formatDecimal(cell.value, cell.currency ? 2 : undefined)}${unit ? ` ${unitText(unit)}` : ""}`;
   }
   return cell.text;
 }

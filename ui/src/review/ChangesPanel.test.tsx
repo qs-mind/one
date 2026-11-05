@@ -56,7 +56,7 @@ describe("ChangesPanel", () => {
     expect(within(item).getByText("Estimator")).toBeInTheDocument();
     expect(within(item).getByText("سعر أحدث - عينة")).toBeInTheDocument();
     expect(within(item).getByText("البند 03/02، الفئة")).toBeInTheDocument();
-    expect(within(item).getByText("39,850.50 EGP")).toBeInTheDocument();
+    expect(within(item).getByText("39,850.50 ج.م.")).toBeInTheDocument();
     expect(within(item).getByText(texts.reviewFollows.ar)).toBeInTheDocument();
     expect(within(item).getByText("البند 03/02، الإجمالي")).toBeInTheDocument();
     expect(item.textContent).not.toMatch(/p3|r-p3|c1/);
