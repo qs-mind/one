@@ -3,6 +3,7 @@ and a PDF's pages as images and text. Synthetic «عينة» data only."""
 
 import json
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -57,6 +58,18 @@ def test_open_document_round_trips(client, project):
     got = workspace_of(client, project)
     assert got["open"] == "deliverable:abc" and got["anchor"] == {"row": "3/02"}
     assert got["client_boqs"] == []
+
+
+CONTRACT = Path(__file__).parent / "contract" / "workspace_put.json"
+
+
+@pytest.mark.parametrize("case", json.loads(CONTRACT.read_text(encoding="utf-8"))["cases"])
+def test_the_screens_save_is_taken_as_it_sends_it(client, project, case):
+    """The body the screen's saveWorkspace sends (ui/src/project/sources.test.ts reads the same
+    file) is taken, and read back as it was sent."""
+    assert put_open(client, project, case["body"]).status_code == 200
+    got = workspace_of(client, project)
+    assert (got["open"], got["anchor"]) == (case["body"]["open"], case["body"]["anchor"])
 
 
 def test_open_document_survives_a_restart(data_dir):
