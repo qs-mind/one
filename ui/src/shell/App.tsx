@@ -86,6 +86,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const setChatShown = (shown: boolean) => (narrow ? setSheetChat(shown) : setWideChat(shown));
   const [width, setWidth] = useState(sessionWidth);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteOrigin, setPaletteOrigin] = useState<DOMRect>(); // the search field's place, when opened from it
   const deliverable = useDeliverablePanel(project?.id);
   const [status, setStatus] = useState<ProjectStatus>({});
   const liveWaiting = useWaiting(); // the live stream's count, once it has said one; until then the status's
@@ -220,6 +221,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
     function onKey(event: KeyboardEvent) {
       if (isMod(event) && matches(event, "KeyK")) {
         event.preventDefault();
+        setPaletteOrigin(undefined);
         setPaletteOpen((open) => !open);
       } else if (event.code === "F6") {
         event.preventDefault();
@@ -282,7 +284,10 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
           aiExpanded={panel === "ai" || aiMain}
           waiting={waiting}
           onWaiting={showWaiting}
-          onPalette={() => setPaletteOpen(true)}
+          onPalette={(origin) => {
+            setPaletteOrigin(origin);
+            setPaletteOpen(true);
+          }}
           chatOpen={chatShown}
           onChat={() => setChatShown(!chatShown)}
         />
@@ -338,6 +343,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
         </div>
         <Palette
           open={paletteOpen}
+          origin={paletteOrigin}
           onOpenChange={setPaletteOpen}
           project={project}
           sources={sources}

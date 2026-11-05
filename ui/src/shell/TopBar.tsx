@@ -1,6 +1,6 @@
 // The top bar, 56 px: the mark, the project (or the General chat) with its switcher, the project's status (its two
 // most important items; the rest in More status), the agent the view follows, who is working now, "Waiting for you",
-// then search, the Deliverables and Project Records. AI settings and the other language are always in More: they are
+// then the search field (it opens the palette from itself), the Deliverables and Project Records. AI settings and the other language are always in More: they are
 // set once, not used every hour, and so is Setup, the first launch's steps again. Below 900 px the status folds into one Status button and the rest into More; below
 // 1280 px search and the panels fold into More too: the project's name is never cut. The chrome mirrors in Arabic.
 import { useRef } from "react";
@@ -37,7 +37,8 @@ export type TopBarProps = {
   aiExpanded: boolean;
   waiting: number;
   onWaiting(): void;
-  onPalette(): void;
+  /** Opens the palette; from `origin`, the search field's place, when it was clicked. */
+  onPalette(origin?: DOMRect): void;
   /** Narrow layout: the chat sheet. */
   chatOpen: boolean;
   onChat(): void;
@@ -51,8 +52,26 @@ export function TopBar(props: TopBarProps) {
   const compact = useCompact(); // the tools fold into More before the project name or the status would be cut
 
   const search = (
-    <button type="button" className={button} onClick={props.onPalette}>
+    <button type="button" className={button} onClick={() => props.onPalette()}>
       {fill(t("searchKeys"), { keys })}
+    </button>
+  );
+  // A field to look at, a button to use: the palette grows from it and closes back into it, and focus comes back here.
+  const searchField = (
+    <button
+      type="button"
+      data-search-field=""
+      aria-label={fill(t("searchKeys"), { keys })}
+      className="flex w-48 items-center justify-between gap-4 rounded-lg border border-ink/10 bg-stone/60 px-3 py-1.5 text-start whitespace-nowrap hover:border-ink/20 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink"
+      onClick={(event) => {
+        event.currentTarget.focus(); // WebKit does not focus a clicked button; the palette gives focus back to this
+        props.onPalette(event.currentTarget.getBoundingClientRect());
+      }}
+    >
+      <span>{t("searchField")}</span>
+      <kbd dir="ltr" className="font-sans text-xs text-slate">
+        {keys}
+      </kbd>
     </button>
   );
   const ai = (opener?: HTMLElement | null) => (
@@ -158,7 +177,7 @@ export function TopBar(props: TopBarProps) {
         )}
         {!(narrow || compact) && (
           <>
-            {search}
+            {searchField}
             {projectPanels()}
           </>
         )}
