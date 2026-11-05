@@ -48,7 +48,7 @@ export function SourcePopover({
   onClose: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
-  const [stack, setStack] = useState<string[]>([cell.number_id]); // the number shown, and the ones it was opened from
+  const [stack, setStack] = useState<(string | null)[]>([cell.number_id]); // the number shown, and the ones it was opened from
   const [page, setPage] = useState(1);
   const [explained, setExplained] = useState<Explained>();
   const [failed, setFailed] = useState<Text>();
@@ -61,6 +61,7 @@ export function SourcePopover({
     let live = true;
     setExplained(undefined);
     setFailed(undefined);
+    if (numberId === null) return; // a number a pending change would write: not in Project Records yet
     void deliverablesApi.explain(projectId, numberId, page).then((answer) => {
       if (!live) return;
       if (answer.ok) setExplained(answer.data);
@@ -72,7 +73,7 @@ export function SourcePopover({
   }, [projectId, numberId, page]);
 
   const first = stack.length === 1;
-  const viewSource = first ? sources[cell.source] : undefined; // the view knows the file's name
+  const viewSource = first && cell.source !== null ? sources[cell.source] : undefined; // the view knows the file's name
   const source = viewSource ?? explained?.source;
   const dated = (first ? cell.dated : null) ?? explained?.number.dated ?? source?.dated;
   const by = explained?.number.recorded_by;
