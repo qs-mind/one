@@ -25,18 +25,30 @@ from qsone.engine.types import (
     TeamMessage,
     TextDelta,
     Unsourced,
+    read_answer,
 )
 
 HEADERS = {"x-vercel-ai-ui-message-stream": "v1", "cache-control": "no-cache"}
 
 
 def _card(card) -> dict:
-    return {
+    found = {
         "kind": card.kind,
         "title": card.title,
         "detail": card.detail,
         "options": list(card.options),
     }
+    if card.payload is not None:
+        found["payload"] = card.payload
+    return found
+
+
+def _settled(card, value: str) -> dict:
+    """A settled card's answer: the choice, and for a card with a payload its answers and
+    ticked rows too (Plan 5)."""
+    if card is None or card.payload is None:
+        return {"choice": value}
+    return read_answer(card, value)
 
 
 class _Parts:
@@ -44,6 +56,7 @@ class _Parts:
 
     def __init__(self) -> None:
         self.cards: dict[str, dict] = {}
+        self.asked: dict = {}  # card id -> Card, to read a settled answer
 
     def data(self, event: Event) -> tuple[str, str, dict] | None:
         """(part type, id, data) for a data event; None for text."""
@@ -53,11 +66,13 @@ class _Parts:
             data = {"sender": event.sender, "recipient": event.recipient, "text": event.text}
             return "data-team", event.id, data
         if isinstance(event, Asked):
+            self.asked[event.card.id] = event.card
             self.cards[event.card.id] = _card(event.card)
             return "data-card", event.card.id, self.cards[event.card.id] | {"status": "pending"}
         if isinstance(event, Settled):
             card = self.cards.get(event.card_id, {})
-            data = card | {"status": "settled", "choice": event.choice}
+            answer = _settled(self.asked.get(event.card_id), event.choice)
+            data = card | {"status": "settled"} | answer
             return "data-card", event.card_id, data
         if isinstance(event, CostNotice):
             data = {
