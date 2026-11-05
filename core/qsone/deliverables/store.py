@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from qsone import copy
 from qsone.deliverables import calc, template
+from qsone.engine import truth
 from qsone.records import audit, ledger
 from qsone.records.project import Records, RecordsError
 
@@ -421,7 +422,7 @@ def _numbers(conn, item_ids: list[str], at: str) -> tuple[dict, dict]:
     by_item: dict[str, dict] = {}
     sources: dict[str, dict] = {}
     for row in rows:
-        item_id, name, cell, source_id, source = _read_number(row)
+        item_id, name, cell, source_id, source = _read_number(conn, row)
         by_item.setdefault(item_id, {})[name] = cell
         sources[source_id] = source
     return by_item, sources
@@ -459,7 +460,21 @@ def _problem(conflicts: dict[str, list[str]]) -> dict | None:
     return None
 
 
-def _read_number(row) -> tuple:
+QUOTE_CHARS = 240
+
+
+def _quote(conn, file_id: str | None, locator: dict) -> str | None:
+    """The line a file source was read from: the file's text at its locator, passages joined by
+    a space, cut to 240 characters with «…». None for a source with no file, or no text there."""
+    if file_id is None:
+        return None
+    text = " ".join(truth.texts_at(conn, file_id, locator) or []).strip()
+    if not text:
+        return None
+    return text if len(text) <= QUOTE_CHARS else text[: QUOTE_CHARS - 1] + "…"
+
+
+def _read_number(conn, row) -> tuple:
     """A row of `_NUMBER_COLUMNS` as (item id, name, cell, source id, source)."""
     number_id, item_id, name, value, unit, currency, source_id, dated = row[:8]
     kind, title, locator, url, source_dated, file_name, file_id = row[8:]
@@ -480,6 +495,7 @@ def _read_number(row) -> tuple:
         "locator": json.loads(locator),
         "url": url,
         "dated": source_dated,
+        "quote": _quote(conn, file_id, json.loads(locator)),
     }
     return item_id, name, cell, source_id, source
 
@@ -493,18 +509,19 @@ def sources_of(rec: Records, source_ids: list[str]) -> dict:
             " WHERE s.id IN (SELECT value FROM json_each(?))",
             (_dump(source_ids),),
         ).fetchall()
-    return {
-        sid: {
-            "kind": kind,
-            "title": title,
-            "file_name": file_name,
-            "file_id": file_id,
-            "locator": json.loads(locator),
-            "url": url,
-            "dated": dated,
+        return {
+            sid: {
+                "kind": kind,
+                "title": title,
+                "file_name": file_name,
+                "file_id": file_id,
+                "locator": json.loads(locator),
+                "url": url,
+                "dated": dated,
+                "quote": _quote(conn, file_id, json.loads(locator)),
+            }
+            for sid, kind, title, locator, url, dated, file_name, file_id in rows
         }
-        for sid, kind, title, locator, url, dated, file_name, file_id in rows
-    }
 
 
 def _sample(conn, cells: list[dict], sources: dict) -> bool:
@@ -736,7 +753,7 @@ def _numbers_followed(conn, number_ids: list[str], at: str) -> dict:
         f" WHERE {_NUMBER_AT}",
         {"ids": _dump(number_ids), "at": at},
     ).fetchall()
-    return {row[0]: _read_number(row[1:]) for row in rows}
+    return {row[0]: _read_number(conn, row[1:]) for row in rows}
 
 
 def _sheet_then(conn, sheet_id: str, at: str) -> dict | None:
