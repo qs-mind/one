@@ -10,7 +10,7 @@ Keys live only in the key store, under the connector's id ("anthropic", "standar
 """
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal, Protocol
 
 import anthropic
@@ -31,7 +31,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
 
 from qsone import copy
-from qsone.engine.types import Event, ModelCard, Text
+from qsone.engine.types import EFFORTS, Effort, Event, ModelCard, Text
 
 log = logging.getLogger("qsone.engine.connectors")
 
@@ -81,6 +81,22 @@ class AgentConnector(Protocol):
 
 
 Connector = ModelConnector | AgentConnector
+
+
+def efforts_of(profile: Mapping | None) -> tuple[tuple[Effort, ...], Effort | None]:
+    """The effort levels a model accepts, from PydanticAI's profile of it, and the level its
+    provider uses when none is sent, when that is known.
+
+    - Anthropic's `effort` (Opus 4.5 and later, Sonnet 4.6 and later, Haiku 5.5): its default is
+      "high" (Anthropic's documentation).
+    - An OpenAI-style `reasoning_effort` model: its default differs by model, so it is not said.
+    - Anything else takes no effort: the message box shows no effort to pick."""
+    profile = profile or {}
+    if profile.get("anthropic_supports_effort"):
+        return EFFORTS, "high"
+    if profile.get("openai_supports_reasoning"):
+        return EFFORTS, None
+    return (), None
 
 
 def connectors(

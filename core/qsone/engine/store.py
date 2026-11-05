@@ -74,21 +74,37 @@ class Store:
 
     # Briefs -----------------------------------------------------------------------------------
 
-    def new_brief(self, chat_id: str, text: str, selection: list[dict] | None = None) -> str:
-        """`selection` is what the engineer selected on the canvas (Plan 7), kept with it."""
+    def new_brief(
+        self,
+        chat_id: str,
+        text: str,
+        selection: list[dict] | None = None,
+        *,
+        effort: str | None = None,
+    ) -> str:
+        """`selection` is what the engineer selected on the canvas (Plan 7), kept with it;
+        `effort` the Lead QS's effort picked in the message box (None: the provider's own)."""
         brief_id = _new_id()
         at = self.rec.clock()
         with self.rec.write(ENGINE) as c:
             c.execute(
-                "INSERT INTO briefs(id, chat_id, text, status, created_at, updated_at, selection)"
-                " VALUES (?, ?, ?, 'queued', ?, ?, ?)",
-                (brief_id, chat_id, text, at, at, None if not selection else _dump(selection)),
+                "INSERT INTO briefs(id, chat_id, text, status, created_at, updated_at, selection,"
+                " effort) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)",
+                (
+                    brief_id,
+                    chat_id,
+                    text,
+                    at,
+                    at,
+                    None if not selection else _dump(selection),
+                    effort,
+                ),
             )
         return brief_id
 
     _BRIEF = (
         "id, chat_id, text, status, step, read_untrusted, allowed, created_at, updated_at,"
-        " selection"
+        " selection, effort"
     )
 
     @staticmethod
@@ -551,8 +567,10 @@ class CostBook:
         equivalent: bool,
         basis: str,
         at: datetime,
+        effort: str | None = None,
     ) -> None:
-        """`usd` is None when the price is unknown: it is kept as unknown, never as 0.
+        """`usd` is None when the price is unknown: it is kept as unknown, never as 0. `effort`
+        is the one the request was sent with (None: the provider's own).
         Raises `TypeError` for money that is not a `Decimal` and `ValueError` for a naive `at`."""
         if usd is not None and not isinstance(usd, Decimal):
             raise TypeError("money is a Decimal, never a float")
@@ -562,8 +580,8 @@ class CostBook:
         with self.rec.write(ENGINE) as c:
             c.execute(
                 "INSERT INTO ai_costs(at, local_day, brief_id, project_id, run_id, role,"
-                " connector, model, input_tokens, output_tokens, usd, equivalent, basis)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " connector, model, input_tokens, output_tokens, usd, equivalent, basis, effort)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     at.astimezone(UTC).isoformat(timespec="microseconds"),
                     local_day,
@@ -578,6 +596,7 @@ class CostBook:
                     None if usd is None else str(usd),
                     int(equivalent),
                     basis,
+                    effort,
                 ),
             )
 
@@ -610,14 +629,17 @@ class CostBook:
             rows = c.execute(f"SELECT usd FROM ai_costs WHERE {' AND '.join(where)}", args)
             return sum((Decimal(usd) for (usd,) in rows.fetchall()), Decimal("0"))
 
-    def tokens_per_request(self, project_id: str | None) -> tuple[int, int, int] | None:
+    def tokens_per_request(
+        self, project_id: str | None, effort: str | None = None
+    ) -> tuple[int, int, int] | None:
         """Average input and output tokens per model request in this project's past runs (the
-        General chat's when None), rounded half up, and the number of requests; None if none."""
+        General chat's when None), rounded half up, and the number of requests; None if none.
+        Only the requests sent with `effort` count (None: those sent with none)."""
         with self.rec.read() as c:
             total_in, total_out, n = c.execute(
                 "SELECT sum(input_tokens), sum(output_tokens), count(*) FROM ai_costs"
-                " WHERE project_id IS ?",
-                (project_id,),
+                " WHERE project_id IS ? AND effort IS ?",
+                (project_id, effort),
             ).fetchone()
         if n == 0:
             return None

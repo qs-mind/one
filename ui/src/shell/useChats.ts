@@ -11,6 +11,7 @@ import type { Unfinished } from "../chat/parts/ContinueBriefs";
 import { activeBrief, type OneMessage, type OnePart, partsOf } from "../chat/parts/types";
 import { coreLine, send as sendJson } from "../core";
 import { type Text, texts } from "../i18n";
+import type { Choice, Effort } from "../settings/AiSettings";
 
 // Only the new message goes to the core: it keeps the chat's history with its Briefs. The selection rides along.
 // The transport's own URLs ("/chat", "/chat/<id>/stream") are core routes, so they go through api() too.
@@ -29,6 +30,9 @@ function busyWith(error: Error | undefined): string | undefined {
     return undefined;
   }
 }
+
+/** The Lead QS's model and effort, as picked in the message box; left out, the core uses its own. */
+export type Picked = { model?: Choice; effort?: Effort };
 
 const RESYNC_TRIES = 3;
 const RESYNC_MS = 1000;
@@ -131,9 +135,10 @@ export function useChats(chatId: string) {
     return response?.ok === true;
   }
 
-  /** Sends a message to the Lead QS, with the canvas selection; while a Brief runs it steers it instead. Answers
-   * false when the text was not taken (a refused steer), so the box can keep it. */
-  async function send(text: string, selection: readonly SelectionItem[] = []): Promise<boolean> {
+  /** Sends a message to the Lead QS, with the canvas selection and the model and effort picked in the message box
+   * (for the Brief it starts); while a Brief runs it steers it instead. Answers false when the text was not taken (a
+   * refused steer), so the box can keep it. */
+  async function send(text: string, selection: readonly SelectionItem[] = [], picked: Picked = {}): Promise<boolean> {
     const trimmed = text.trim();
     if (!trimmed) return false;
     if (brief) {
@@ -145,9 +150,14 @@ export function useChats(chatId: string) {
     if (streaming) return false; // the Brief is starting; its id comes with its first status
     setFailed(undefined);
     const chosen = [...selection];
+    const body = {
+      ...(chosen.length ? { selection: chosen } : {}),
+      ...(picked.model ? { model: picked.model } : {}),
+      ...(picked.effort ? { effort: picked.effort } : {}),
+    };
     void sendMessage(
       { text: trimmed, ...(chosen.length ? { metadata: { selection: chosen } } : {}) },
-      chosen.length ? { body: { selection: chosen } } : undefined,
+      Object.keys(body).length ? { body } : undefined,
     );
     return true;
   }

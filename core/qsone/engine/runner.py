@@ -63,6 +63,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
+from pydantic_ai.settings import ModelSettings
 
 from qsone import activity, copy, usage
 from qsone.deliverables import tools as outputs
@@ -94,6 +95,7 @@ from qsone.engine.types import (
     Card,
     CheckPacket,
     Data,
+    Effort,
     Event,
     ModelCard,
     ModelChoice,
@@ -340,6 +342,7 @@ class _Brief:
         instruction: str | None = None,
         output_type: type | None = None,
         sheet: tuple[list[ModelCard], list] | None = None,
+        lead: ModelChoice | None = None,
     ) -> None:
         self.engine = engine
         self.place = place
@@ -349,6 +352,10 @@ class _Brief:
         self.text: str = brief["text"]
         self.lang = brief_language(self.text)  # the engineer's, for the Brief's Progress words
         self.selection: list[dict] | None = brief["selection"]  # on the canvas (Plan 7)
+        # The Lead QS's model and effort, as picked in the message box; the effort is kept with
+        # the Brief, so a continued Brief thinks as hard as it began.
+        self.lead_choice = lead
+        self.effort: Effort | None = brief["effort"]
         self.state: BriefState = brief["status"]
         self.step: Text | None = brief["step"]
         self.instruction = instruction
@@ -582,7 +589,12 @@ class _Brief:
         connector = self.found.get(choice.connector)
         return getattr(connector, "name", choice.connector)
 
-    def _costed(self, run_id: str, role: Role, choice: ModelChoice):
+    def lead_effort(self, choice: ModelChoice) -> Effort | None:
+        """The Brief's effort, when the Lead's model `choice` accepts it (a model moved to after
+        a failure may not); None sends none, and the provider uses its own."""
+        return self.effort if self.effort in self.card(choice).efforts else None
+
+    def _costed(self, run_id: str, role: Role, choice: ModelChoice, effort: Effort | None = None):
         connector = self.found.get(choice.connector)
         if connector is None:
             raise _Fail(copy.NO_AI)
@@ -599,6 +611,7 @@ class _Brief:
             run_id=run_id,
             role=role,
             card=self.card(choice),
+            effort=effort,
         )
 
     def models(self, run_id: str) -> oneshot.Models:
@@ -826,7 +839,8 @@ class _Brief:
             results = DeferredToolResults(calls=calls)
         prompt = copy.REPORT_NOW if report else (None if own else self.text)
         earlier = self._earlier()
-        model = self._costed(run_id, "lead", choice)
+        effort = self.lead_effort(choice)
+        model = self._costed(run_id, "lead", choice, effort)
         agent = agents.build_agent(
             spec,
             model,
@@ -841,6 +855,7 @@ class _Brief:
             deferred_tool_results=results,
             instructions=self._instructions(choice),
             retries=TOOL_RETRIES,
+            model_settings=None if effort is None else ModelSettings(thinking=effort),
         ) as run:
             self.lead_run = run
             try:
@@ -885,6 +900,7 @@ class _Brief:
         run = self.store.run(run_id)
         card = self.card(choice)
         role: Role = spec.role if spec.role != "specialist" else spec.tier
+        effort = self.lead_effort(choice) if run_id == self.lead_run_id else None
         await self.engine.spending.before_request(self, brief_id=self.brief_id, card=card)
         mirror = _load(run["history"])
         prompt = task
@@ -917,6 +933,7 @@ class _Brief:
             tools=spec.tools,
             cwd=self.engine.data_dir / WORK / run_id,
             resume=run["session_id"],
+            effort=effort,
         )
         if run_id == self.lead_run_id:
             self.claude_lead = (connector, run_id)
@@ -937,6 +954,7 @@ class _Brief:
             input_tokens=sum(n for _, n, _ in outcome.usage),
             output_tokens=sum(n for _, _, n in outcome.usage),
             reported_usd=outcome.reported_usd,
+            effort=effort,
         )
         if outcome.ended == "limit":
             raise _Busy()
@@ -1032,12 +1050,18 @@ class _Brief:
         saved = {r: c for r, c in roles.saved().items() if c in allowed}
         self.saved_roles = set(saved)
         picked: dict[Role, ModelChoice] = defaults | saved
+        if self.lead_choice in allowed:  # picked in the message box for this Brief
+            picked["lead"] = self.lead_choice
         if "lead" not in picked:
             picked["lead"] = sheet[0].choice
         for role in roles.ROLES:
             picked.setdefault(role, picked["lead"])
-        measured = self.engine.book.tokens_per_request(self.place.project_id)
-        self.setup = TeamSetup(tuple(sheet), picked, measured)
+        book, project = self.engine.book, self.place.project_id
+        measured = book.tokens_per_request(project)
+        # the Lead's requests as measured at this Brief's effort (each effort costs its own)
+        effort = self.lead_effort(picked["lead"])
+        lead_measured = measured if effort is None else book.tokens_per_request(project, effort)
+        self.setup = TeamSetup(tuple(sheet), picked, measured, lead_measured)
         lead = next(
             (
                 r
@@ -1332,10 +1356,15 @@ class Engine:
         instruction: str | None = None,
         output_type: type | None = None,
         selection: list[dict] | None = None,
+        lead: ModelChoice | None = None,
+        effort: Effort | None = None,
     ) -> str:
         """Starts a Brief in the chat (a project id or "general"), under the caps. `selection`
-        is what the engineer selected on the canvas (`engine.selection.read`). Raises
-        `BriefBusy`, `NoAI` and `RecordsError`."""
+        is what the engineer selected on the canvas (`engine.selection.read`). `lead` and
+        `effort` are the Lead QS's model and effort picked in the message box; without them the
+        Lead runs on its role's model at its provider's own effort. An effort the model does not
+        accept is dropped. Raises `BriefBusy`, `NoAI` (also for a `lead` no longer on the Model
+        Data Sheet) and `RecordsError`."""
         place = self._place(chat_id)
         busy = self.active(chat_id)
         if busy is not None:
@@ -1344,7 +1373,13 @@ class Engine:
         busy = self.active(chat_id)
         if busy is not None:
             raise BriefBusy(busy)
-        brief_id = place.store.new_brief(chat_id, text, selection)
+        if lead is not None:
+            card = next((c for c in sheet[0] if c.choice == lead), None)
+            if card is None:
+                raise NoAI(copy.CHAT_MODEL_GONE)
+            if effort not in card.efforts:
+                effort = None
+        brief_id = place.store.new_brief(chat_id, text, selection, effort=effort)
         self._launch(
             _Brief(
                 self,
@@ -1353,6 +1388,7 @@ class Engine:
                 instruction=instruction,
                 output_type=output_type,
                 sheet=sheet,
+                lead=lead,
             )
         )
         log.info("brief %s started", brief_id)

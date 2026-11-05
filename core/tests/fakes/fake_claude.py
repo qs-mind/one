@@ -84,6 +84,7 @@ OPTIONS = [
         "Model for the current session. Provide an alias for the latest model (e.g. 'opus' or "
         "'sonnet' or 'haiku') or a model's full name (e.g. 'claude-opus-5-5').",
     ),
+    ("--effort <level>", "Effort level for the current session (low, medium, high, xhigh, max)"),
     ("-r, --resume [sessionId]", "Resume a conversation by session ID"),
     ("--no-session-persistence", "Do not save the session to disk (only with --print)"),
     ("-v, --version", "Output the version number"),
@@ -99,6 +100,7 @@ VALUED = {
     "--system-prompt-file",
     "--append-system-prompt-file",
     "--model",
+    "--effort",
     "--resume",
     "-r",
 }
