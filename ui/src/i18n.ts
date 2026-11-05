@@ -965,6 +965,7 @@ export const texts = {
   undo: { en: "Undo", ar: "تراجع" },
   undoDone: { en: "Back as it was.", ar: "رجع زي ما كان." },
   removedName: { en: "Removed «{name}»", ar: "اتشال «{name}»" },
+  addedName: { en: "Added «{name}»", ar: "اتضاف «{name}»" },
   undoFailed: { en: "It was not put back. Add it again if you need it.", ar: "مارجعش. ضيفه تاني لو محتاجه." },
   // The BOQ change review (ui/src/review/ChangesPanel.tsx)
   reviewAcceptedShort: { en: "Accepted", ar: "اتقبل" },

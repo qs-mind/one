@@ -197,6 +197,21 @@ describe("AiSettings", () => {
     expect(screen.getByText(texts.onDevice.ar)).toBeInTheDocument();
   });
 
+  it("says the link was added, and lists it at once, before the settings come back with it (audit C5)", async () => {
+    const fresh = { id: "standard:s3", kind: "model", name: "Gemini - sample", provider: "google", on_device: false, key_set: true, error: null };
+    core({
+      "GET /api/settings/ai": () => Response.json(settings({})), // the refresh has not caught up yet
+      "POST /api/settings/ai/standard": () => Response.json(fresh, { status: 201 }),
+    });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.type(await screen.findByLabelText(texts.providerName.ar), "Gemini - sample");
+    await user.type(screen.getByLabelText(texts.baseUrl.ar), "https://generativelanguage.googleapis.com/v1beta/openai");
+    await user.click(screen.getByRole("button", { name: texts.addProvider.ar }));
+    expect(await screen.findByRole("status")).toHaveTextContent(fill(texts.addedName.ar, { name: "Gemini - sample" }));
+    expect(screen.getAllByText("Gemini - sample").some((el) => el.closest("li"))).toBe(true);
+  });
+
   it("a Standard Link with no key sends no key", async () => {
     const fetch = core({ "POST /api/settings/ai/standard": () => Response.json({}, { status: 201 }) });
     const user = userEvent.setup();
