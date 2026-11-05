@@ -1,11 +1,13 @@
 // The one polite live region for the team: it says when an agent starts working, waits for the engineer, finishes,
 // stops on an error or goes silent, in the page language, at most once every 2 s (what comes in between is said
-// together, the latest per agent). Never a cursor move, never streamed text. Mounted once by the shell.
+// together, the latest per agent). Never a cursor move, never streamed text. Mounted once by the shell. What it said
+// empties again after ANNOUNCE_HOLD_MS: «… شغال» must not stay on the page once nothing runs (tender day, 5 Nov 2026).
 import { useEffect, useState } from "react";
 import { fill, pick, t } from "../../i18n";
 import { subscribeChanges, type Change } from "./activity";
 
 export const ANNOUNCE_GAP_MS = 2000;
+export const ANNOUNCE_HOLD_MS = 5000; // long enough for a screen reader to have read it
 
 const busy = (state: string | undefined) => state === "working" || state === "thinking";
 
@@ -26,6 +28,7 @@ export function Announcer() {
   useEffect(() => {
     let last = -Infinity;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let hold: ReturnType<typeof setTimeout> | undefined;
     const pending = new Map<string, Change>();
     const say = () => {
       timer = undefined;
@@ -34,6 +37,8 @@ export function Announcer() {
       if (!lines.length) return;
       setText(lines.join(". "));
       last = Date.now();
+      clearTimeout(hold);
+      hold = setTimeout(() => setText(""), ANNOUNCE_HOLD_MS);
     };
     const off = subscribeChanges((changes) => {
       for (const change of changes) {
@@ -49,6 +54,7 @@ export function Announcer() {
     return () => {
       off();
       clearTimeout(timer);
+      clearTimeout(hold);
     };
   }, []);
   return (

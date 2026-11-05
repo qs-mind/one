@@ -121,8 +121,9 @@ describe("the projects' rows", () => {
     expect(general.querySelector('[data-activity="working"]')).not.toBeNull();
     const tower = within(picker()).getByRole("button", { name: `${P2.name} ${texts.activityWaiting.ar}` });
     expect(tower.querySelector('[data-activity="waiting"]')).not.toBeNull();
-    const school = within(picker()).getByRole("button", { name: `${P1.name} ${texts.open.ar}` });
-    expect(school.querySelector("[data-activity]")).toBeNull();
+    // the open project's row says Open, and what its Briefs do too (tender day: it had no mark)
+    const school = within(picker()).getByRole("button", { name: `${P1.name} ${texts.open.ar} · ${texts.activityWorking.ar}` });
+    expect(school.querySelector('[data-activity="working"]')).not.toBeNull();
   });
 
   it.each([
@@ -172,6 +173,36 @@ describe("the notice from another chat", () => {
     const line = fill(texts.activityNoticeWaiting.ar, { name: "⁨" + texts.generalChat.ar + "⁩" });
     expect(await screen.findByRole("region", { name: line })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("region", { name: line })).toBeNull());
+  });
+
+  it("never says «‹name› مستنيك» inside that same project's chat", async () => {
+    setCurrentProject(P1);
+    core({
+      routes: {
+        "GET /api/projects/p1/files": () => Response.json({ files: [] }),
+        "GET /api/briefs/activity": answers([chat("p1", "working")], [chat("p1", "waiting")]),
+      },
+    });
+    render(<App />);
+    await within(topBar()).findByRole("button", { name: new RegExp(P1.name) });
+    await new Promise((r) => setTimeout(r, ACTIVITY_POLL.ms * 4));
+    expect(screen.queryByRole("region", { name: fill(texts.activityNoticeWaiting.ar, { name: "⁨" + P1.name + "⁩" }) })).toBeNull();
+  });
+
+  it("the top bar's Waiting for you counts every project that waits, and goes to one", async () => {
+    setCurrentProject(P1);
+    core({
+      routes: {
+        "GET /api/projects/p1/files": () => Response.json({ files: [] }),
+        "GET /api/projects/p2/files": () => Response.json({ files: [] }),
+        "GET /api/briefs/activity": answers([chat("p2", "waiting")]),
+      },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const waiting = await within(topBar()).findByRole("button", { name: fill(texts.waitingForYou.ar, { n: 1 }) });
+    await user.click(waiting);
+    await waitFor(() => expect(currentProject()?.id).toBe("p2"));
   });
 
   it("says a chat failed; Close takes it away; nothing ended before the screen looked makes one", async () => {

@@ -16,6 +16,8 @@ import { FixAction } from "../shell/FixAction";
 type Lesson = { id: string; text: string; kind: string; carried: boolean };
 type Closing = {
   open_comments: number;
+  /** Deliverables that do not open or have a row with a problem, each with why. */
+  broken?: { id: string; name: string; why: Text }[];
   unsigned: { id: string; name: string }[];
   reports: { id: string; name: string; revision: number }[];
   confidential: boolean;
@@ -133,7 +135,9 @@ export function CloseProject({
 
   const archived = closing ? closing.archived_at : (project.archived_at ?? null); // the core's answer, once read, wins
   const waiting = closing?.waiting ?? 0;
-  const open = closing ? closing.open_comments > 0 || closing.unsigned.length > 0 || waiting > 0 : false;
+  const broken = closing?.broken ?? [];
+  const blocked = broken.length > 0 || (closing?.unsigned.length ?? 0) > 0;
+  const open = closing ? closing.open_comments > 0 || blocked || waiting > 0 : false;
   const lessons = closing?.lessons.filter((lesson) => !kept.has(lesson.id)) ?? [];
 
   return (
@@ -166,10 +170,31 @@ export function CloseProject({
       {closing && (
         <>
           <div className="flex flex-col gap-3">
-            {!archived && <p className="text-slate">{t("closeProjectHelp")}</p>}
+            {!archived && (blocked ? <p className="text-copper">{t("closeProjectBlockers")}</p> : <p className="text-slate">{t("closeProjectHelp")}</p>)}
             {!open && <p>{t("closeProjectAllClear")}</p>}
             {waiting > 0 && <p className="text-copper">{count("closeProjectWaiting", waiting)}</p>}
             {closing.open_comments > 0 && <p className="text-copper">{fill(t("closeProjectOpenComments"), { n: closing.open_comments })}</p>}
+            {broken.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <p className="text-copper">{t("closeProjectBroken")}</p>
+                <ul className="flex flex-col">
+                  {broken.map((d) => (
+                    <li key={d.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenDeliverable(d.id)}
+                        className="-ms-3 flex w-[calc(100%+12px)] flex-col items-start gap-0.5 rounded-md px-3 py-1.5 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+                      >
+                        <span dir="auto" className="underline decoration-slate/40 underline-offset-4">
+                          {d.name}
+                        </span>
+                        <span className="text-sm text-slate">{pick(d.why)}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {closing.unsigned.length > 0 && (
               <div className="flex flex-col gap-1">
                 <p className="text-copper">{t("closeProjectUnsigned")}</p>

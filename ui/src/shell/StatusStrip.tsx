@@ -103,6 +103,12 @@ export function StatusStrip({
               {/* rolls when the core's total changes; another BOQ, or the other language, shows still */}
               <RollingNumber key={`${boq.deliverable_id} ${lang}`} text={money(boq.value, boq.currency, true)} />
             </bdi>
+            {boq.items !== undefined && (
+              <span className="text-slate">
+                {" · "}
+                {boq.of ? count("boqItemsOf", boq.of, { done: boq.items }) : count("boqItems", boq.items)}
+              </span>
+            )}
             {boq.sample && <span className="ms-1 text-copper">({t("sampleData")})</span>}
           </PopoverTrigger>
           <PopoverContent className="flex flex-col gap-1">

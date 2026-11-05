@@ -27,6 +27,7 @@ import hashlib
 import inspect
 import json
 import logging
+import re
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -38,7 +39,7 @@ from pydantic_ai import ModelRetry
 from qsone import copy
 from qsone.engine import data_text
 from qsone.engine.store import Store
-from qsone.engine.types import AgentSpec, Risk, TeamHost, Text
+from qsone.engine.types import AgentSpec, Progress, Risk, TeamHost, Text
 from qsone.records.project import Records, RecordsError
 
 if TYPE_CHECKING:
@@ -262,6 +263,7 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
     try:
         out = await tool.run(ctx, parsed)
     except RecordsError as e:
+        say_refused(ctx, e.text)
         raise ModelRetry(
             f"{tool.name}: {e.text['en']} Field: {e.field or 'none'}. "
             f"Example: {_example_text(tool)}"
@@ -274,6 +276,24 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
     if key is not None:
         ctx.store.remember_write(ctx.brief_id, key, result)
     return result
+
+
+_HEX_ID = re.compile(r"\s*\b[0-9a-f]{32}\b,?")
+_SENTENCE = re.compile(r"(.+?[.؟?!])(\s|$)", re.S)
+
+
+def _first_sentence(text: str) -> str:
+    """A refusal's first sentence, without ids: the rest tells the model how to call again."""
+    text = _HEX_ID.sub("", text).strip()
+    found = _SENTENCE.match(text)
+    return (found[1] if found else text).rstrip(" :،,") or text
+
+
+def say_refused(ctx: ToolContext, text: dict) -> None:
+    """The refusal in the work log, so the engineer sees why a step did not happen."""
+    why = {lang: _first_sentence(words) for lang, words in text.items()}
+    words = copy.fill(copy.TOOL_REFUSED, why=why)
+    ctx.host.emit(Progress(ctx.brief_id, ctx.run_id, ctx.agent.name, words))
 
 
 # The PydanticAI toolset -------------------------------------------------------------------------

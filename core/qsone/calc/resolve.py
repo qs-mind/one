@@ -244,12 +244,21 @@ def _code(conn, item_id: str) -> str:
 
 
 def current_of(conn, number_id: str) -> str:
-    """Follows `replaces` forward from `number_id` to the current entry."""
+    """Follows `replaces` forward from `number_id` to the current entry. An entry that ended with
+    none after it (one of two current numbers of a name, before 5 Nov 2026) leads to its item's
+    current number of that name, when there is one."""
     while True:
         row = conn.execute("SELECT id FROM numbers WHERE replaces = ?", (number_id,)).fetchone()
         if row is None:
-            return number_id
+            break
         number_id = row[0]
+    found = conn.execute(
+        "SELECT n.id FROM numbers o JOIN numbers n ON n.item_id = o.item_id AND n.name = o.name"
+        " WHERE o.id = ? AND o.valid_until IS NOT NULL AND n.valid_until IS NULL"
+        " ORDER BY n.recorded_at DESC, n.rowid DESC LIMIT 1",
+        (number_id,),
+    ).fetchone()
+    return found[0] if found else number_id
 
 
 def _number(conn, number_id: str, field: str) -> dict:

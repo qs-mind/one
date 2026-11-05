@@ -147,9 +147,29 @@ def _stage(raw: str | None) -> dict | None:
     return {"en": found["en"], "ar": found["ar"]} if ok else None
 
 
+def _client_items(rec: Records) -> int | None:
+    """How many items the client's BOQ has: those of the newest import; None with none."""
+    with rec.read() as conn:
+        newest = conn.execute(
+            "SELECT json_extract(fields, '$.import_id') AS i FROM items"
+            " WHERE kind = 'boq_item' AND i IS NOT NULL"
+            " ORDER BY created_at DESC, rowid DESC LIMIT 1"
+        ).fetchone()
+        if newest is None:
+            return None
+        (n,) = conn.execute(
+            "SELECT count(*) FROM items WHERE kind = 'boq_item'"
+            " AND json_extract(fields, '$.import_id') = ?",
+            (newest[0],),
+        ).fetchone()
+    return n
+
+
 def _boq_value(rec: Records) -> dict | None:
     """The total of the most recently updated BOQ Sheet, with its Deliverable and Revision, and
-    `sample` when any number behind it is sample data (the screen labels it)."""
+    `sample` when any number behind it is sample data (the screen labels it). `items` is how many
+    items the Sheet has, and `of` how many the client's BOQ has (when one was imported): the total
+    says what it covers, «٤ من ٣٢٥ بند»."""
     with rec.read() as conn:
         found = conn.execute(
             "SELECT id FROM deliverables WHERE kind = 'sheet' AND variant = 'boq'"
@@ -168,7 +188,8 @@ def _boq_value(rec: Records) -> dict | None:
         "revision": entry["revision"],
         "status": entry["status"],
         "sample": entry["sample"],
-    }
+        "items": (entry["progress"] or {}).get("total", 0),
+    } | ({"of": of} if (of := _client_items(rec)) else {})
 
 
 def project_status(rec: Records, waiting: int) -> dict:

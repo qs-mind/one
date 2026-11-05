@@ -42,7 +42,12 @@ test("the smoke test's core gets keyring's fail backend", () => {
 
 test("the bench's core puts its key store in memory before the core starts", () => {
   const bench = readFileSync(path.join(root, "core/tests/bench/__main__.py"), "utf8");
-  expect(bench.indexOf("guard.install()")).toBeGreaterThan(-1);
-  expect(bench.indexOf("guard.install()")).toBeLessThan(bench.indexOf("core_main("));
+  // guard.install(allow): `allow` names hosts the bench may reach; the key store goes in memory either way
+  const install = bench.search(/^\s*guard\.install\([^)]*\)/m);
+  expect(install).toBeGreaterThan(-1);
+  expect(install).toBeLessThan(bench.indexOf("core_main("));
+  const guard = readFileSync(path.join(root, "core/tests/bench/guard.py"), "utf8");
+  const body = guard.slice(guard.indexOf("def install("), guard.indexOf("def ", guard.indexOf("def install(") + 1));
+  expect(body).toMatch(/keyring\.set_keyring\(MemoryKeyring\(/);
   expect(readFileSync(path.join(root, "vite.bench.config.ts"), "utf8")).toMatch(/"-m", "tests\.bench"/);
 });

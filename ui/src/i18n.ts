@@ -181,6 +181,9 @@ export const texts = {
   sendBackToFix: { en: "No, send it back to be fixed", ar: "لأ، رجّعه يتصلّح" },
   keepForAll: { en: "Keep it for all projects", ar: "احفظه لكل المشاريع" },
   keepTicked: { en: "Keep the ticked rows", ar: "احفظ الصفوف المعلّمة" },
+  // a BOQ import's card: each column of the sheet with what it holds (core: tools/boq.py)
+  keepColumns: { en: "Import with these columns", ar: "استورد بالأعمدة دي" },
+  columnMeaning: { en: "What column {letter} holds", ar: "العمود {letter} فيه إيه" },
   keepNone: { en: "Don't keep any", ar: "ماتحفظش حاجة" },
   goAhead: { en: "Go ahead", ar: "كمّل" },
   notNow: { en: "Not now", ar: "مش دلوقتي" },
@@ -844,6 +847,11 @@ export const texts = {
   importNotRead: { en: "Kept, not read yet: {n}", ar: "اتحفظ ولسه ماتقراش: {n}" },
   importTooBig: { en: "Too big to add:", ar: "أكبر من إنه يتضاف:" },
   importUnreadable: { en: "Could not be read:", ar: "مقدرناش نقراه:" },
+  importLocked: {
+    en: "Locked with a password: save an open copy (without the password) and add that one:",
+    ar: "مقفول بباسورد: احفظ نسخة مفتوحة (من غير الباسورد) وضيفها:",
+  },
+  importEmpty: { en: "Read, but its sheets are empty:", ar: "اتقرا، بس الشيتات بتاعته فاضية:" },
   importZips: { en: "Zips opened: {n}", ar: "ملفات مضغوطة اتفتحت: {n}" },
   importFailed: { en: "Some files were not added. Try again.", ar: "في ملفات ماتضافتش. جرّب تاني." },
   importUnderstanding: { en: "The Lead QS is reading the folder…", ar: "كبير مهندسي الكميات بيقرا الفولدر…" },
@@ -888,6 +896,11 @@ export const texts = {
   },
   closeProjectOpenComments: { en: "Review comments still open: {n}", ar: "ملاحظات مراجعة لسه مفتوحة: {n}" },
   closeProjectUnsigned: { en: "Not signed off:", ar: "لسه ماتعتمدش:" },
+  closeProjectBlockers: {
+    en: "These Deliverables are not ready to go out. Fix them first, or archive anyway.",
+    ar: "المُخرَجات دي لسه مش جاهزة تطلع. ظبّطها الأول، أو أرشف برضه.",
+  },
+  closeProjectBroken: { en: "Not right yet:", ar: "لسه فيها مشكلة:" },
   closeProjectReports: { en: "Review reports", ar: "تقارير المراجعة" },
   closeProjectAllClear: { en: "Nothing is open.", ar: "مفيش حاجة مفتوحة." },
   lessonsTitle: { en: "Lessons Learned", ar: "الدروس المستفادة" },
@@ -1119,6 +1132,14 @@ export const counted = {
       other: "{n} ملاحظة مفتوحة",
     },
   },
+  boqItems: {
+    en: { one: "{n} item", other: "{n} items" },
+    ar: { one: "بند واحد", two: "بندين", few: "{n} بنود", other: "{n} بند" },
+  },
+  boqItemsOf: {
+    en: { one: "{done} of {n} item", other: "{done} of {n} items" },
+    ar: { one: "{done} من بند واحد", two: "{done} من بندين", few: "{done} من {n} بنود", other: "{done} من {n} بند" },
+  },
   connectorTools: {
     en: { one: "{n} tool", other: "{n} tools" },
     ar: { one: "أداة واحدة", two: "أداتين", few: "{n} أدوات", other: "{n} أداة" },
@@ -1156,6 +1177,11 @@ export const counted = {
   rowsApproved: {
     en: { one: "approved {n} row", other: "approved {n} rows" },
     ar: { one: "وافقت على صف واحد", two: "وافقت على صفين", few: "وافقت على {n} صفوف", other: "وافقت على {n} صف" },
+  },
+  // a folded BOQ columns card's answer: the columns it imports
+  columnsApproved: {
+    en: { one: "approved {n} column", other: "approved {n} columns" },
+    ar: { one: "وافقت على عمود واحد", two: "وافقت على عمودين", few: "وافقت على {n} أعمدة", other: "وافقت على {n} عمود" },
   },
   rowsApprovedOf: {
     en: { one: "approved {kept} of {n} row", other: "approved {kept} of {n} rows" },

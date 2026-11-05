@@ -1249,10 +1249,8 @@ class _Brief:
             log.exception("brief %s failed", self.brief_id)
             usage.crash(error)  # a bug in One: its class and line, never the message
             self._withdraw()
-            provider = "ONE"
-            if self.lead_run_id is not None:
-                provider = self._provider(self.store.run(self.lead_run_id)["choice"])
-            self.set_state("failed", copy.fill(copy.AI_FAILED, provider=provider))
+            # only `_attempts` knows a provider's error; anything that reaches here is ONE's own
+            self.set_state("failed", copy.CORE_FAILED)
         finally:
             self.finished = True
             for token in tuple(self.tokens):

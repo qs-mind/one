@@ -109,7 +109,20 @@ class Projects:
         }
         return self._known[rec.id]
 
+    def named(self, name: str) -> dict | None:
+        """The project of that name, archived or not, compared without case or extra spaces."""
+        wanted = " ".join(name.split()).casefold()
+        return next(
+            (p for p in self.list() if " ".join(p.get("name", "").split()).casefold() == wanted),
+            None,
+        )
+
     def create(self, name: str, actor: str) -> dict:
+        """A new project, open. Raises `NameTaken` when one of that name is here already: two
+        projects never share a name."""
+        found = self.named(name)
+        if found is not None:
+            raise NameTaken(found)
         project_id = uuid.uuid4().hex
         try:
             rec = Records.create(self.root / project_id, name=name, actor=actor)
@@ -242,6 +255,14 @@ class Projects:
             rec.close()
 
 
+class NameTaken(RecordsError):
+    """PROJECT_NAME_TAKEN, with the project that has the name."""
+
+    def __init__(self, project: dict):
+        super().__init__(copy.PROJECT_NAME_TAKEN, status=409, field="name")
+        self.project = project
+
+
 class ProjectIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -254,8 +275,10 @@ class RerankIn(BaseModel):
 
 
 def _file(info: files.FileInfo) -> dict:
-    """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair."""
-    return asdict(info) | {"note": getattr(copy, info.note) if info.note else None}
+    """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair; `note_key`
+    keeps the name (the import report names a locked or an empty file by it)."""
+    note = getattr(copy, info.note) if info.note else None
+    return asdict(info) | {"note": note, "note_key": info.note}
 
 
 def _zip_note(text: dict) -> str:
@@ -343,7 +366,11 @@ def router(
 
     @r.post("/projects")
     def create_project(body: ProjectIn) -> JSONResponse:
-        return JSONResponse(projects.create(body.name, ACTOR), status_code=201)
+        try:
+            return JSONResponse(projects.create(body.name, ACTOR), status_code=201)
+        except NameTaken as e:  # the screen offers the one there instead
+            body = copy.error(e.text) | {"field": e.field, "project": e.project}
+            return JSONResponse(body, status_code=e.status)
 
     @r.post("/projects/{project_id}/open")
     def open_project(project_id: str) -> dict:

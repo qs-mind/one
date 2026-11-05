@@ -94,8 +94,20 @@ def _looks_right(kind: str, data: bytes) -> bool:
     return True
 
 
+_CFB = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # an OLE2 compound file
+_ENCRYPTED = "EncryptedPackage".encode("utf-16-le")  # its stream holding a locked Office file
+
+
+def _locked(kind: str, data: bytes) -> bool:
+    """An .xlsx or .docx locked with a password: Office keeps it as an OLE2 file with an
+    EncryptedPackage stream instead of the zip an open one is."""
+    return kind in ("xlsx", "docx") and data.startswith(_CFB) and _ENCRYPTED in data[: 1 << 20]
+
+
 def extract(name: str, data: bytes) -> Extracted:
     kind = _KINDS.get(name.rsplit(".", 1)[1].lower()) if "." in name else None
+    if kind is not None and _locked(kind, data):
+        return Extracted(kind, "unreadable", None, [], "FILE_LOCKED")
     if kind is None or not _looks_right(kind, data):
         return Extracted("other", "stored", None, [], "FILE_NOT_READ_YET")
     if kind in _STORED:
@@ -122,15 +134,19 @@ def _reader(kind: str, data: bytes) -> Extracted:
         if kind in ("xlsx", "xls"):
             sheets, flags = _xlsx(data) if kind == "xlsx" else _xls(data)
             pieces = [p for sheet, rows in sheets for p in _table(sheet, rows)]
-            return Extracted(kind, "read", len(sheets), pieces, None, flags)
+            empty = None if pieces else "FILE_SHEETS_EMPTY"
+            return Extracted(kind, "read", len(sheets), pieces, empty, flags)
         if kind == "docx":
             pieces, flags, vanished = docx.read(data)
             # vanished text is not in the pieces, but is still checked for orders to an AI
             flags += hidden.ai_instruction_flags(vanished)
             return Extracted(kind, "read", None, pieces, None, flags)
         return Extracted(kind, "read", None, (dxf if kind == "dxf" else ifc).read(data), None)
-    except Exception:  # the readers raise many kinds of error on a damaged or locked file
-        return Extracted(kind, "unreadable", None, [], "FILE_UNREADABLE")
+    except Exception as e:  # the readers raise many kinds of error on a damaged or locked file
+        locked = "encrypt" in str(e).lower()  # xlrd: "Workbook is encrypted"
+        return Extracted(
+            kind, "unreadable", None, [], "FILE_LOCKED" if locked else "FILE_UNREADABLE"
+        )
 
 
 def _text(kind: str, data: bytes) -> Extracted:

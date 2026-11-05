@@ -35,5 +35,14 @@
   )
   set table(stroke: 0.4pt + slate.lighten(60%), inset: 4pt)
   show heading: set text(fill: ink)
+  // the header block, page 1 only: project, client, dates, "Prepared with ONE"
+  if data.at("head", default: ()).len() > 0 {
+    block(width: 100%, fill: paper, inset: 8pt, below: 10pt, {
+      set text(size: 9pt)
+      set par(spacing: 0.45em)
+      for line in data.head.slice(0, -1) { par(line) }
+      par(text(fill: slate, data.head.last()))
+    })
+  }
   body
 }

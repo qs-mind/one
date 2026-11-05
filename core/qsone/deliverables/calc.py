@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from qsone import copy
 from qsone.calc.engine import calculate
+from qsone.calc.errors import CalcError
 from qsone.calc.formula import names, parse
 from qsone.calc.spec import CalcRequest, ListRef
 from qsone.records import audit
@@ -268,12 +269,15 @@ def bring_up_to_date(
     actor: str,
     reason: str | None = None,
     rows: Iterable[str] | None = None,
+    skipped: list[dict] | None = None,
 ) -> list[dict]:
     """Runs `calculate(save)` for each request, in one write (it joins the caller's), and
     returns the cells it wrote: `[{"row", "column", "before", "after"}]`, where `before` is the
     cell's number before (None when there was none), `after` is None for a total that was ended
     (nothing left under it), and `row` is a part id or "total". The reason defaults to
-    «calculated in "<title>"» in the Deliverable's language."""
+    «calculated in "<title>"» in the Deliverable's language. With `skipped`, a request the
+    QS Calc Engine refuses is left out and noted there (`{"row", "column", "error"}`), so the rest
+    still comes up to date; without it the refusal is raised."""
     changed = []
     with rec.write(actor) as conn:
         sheet = _sheet(conn, deliverable_id)
@@ -293,7 +297,13 @@ def bring_up_to_date(
                     )
                 continue
             old = _current(conn, [target.item_id], req.save.name).get(target.item_id)
-            [result] = calculate(rec, req, actor=actor).results
+            try:
+                [result] = calculate(rec, req, actor=actor).results
+            except CalcError as e:
+                if skipped is None:
+                    raise
+                skipped.append({"row": target.row, "column": target.column["key"], "error": e.text})
+                continue
             if result.unchanged:
                 continue
             changed.append(

@@ -193,8 +193,22 @@ def test_status_names_the_boq_value_by_its_deliverable(client, project):
             "revision": None,
             "status": "draft",
             "sample": True,  # the sample sheet's rates come from a sample source
+            "items": 6,  # what the total covers: the Sheet's items (no client BOQ imported here)
         }
     }
+
+
+def test_the_boq_value_says_how_much_of_the_clients_boq_it_covers(client, project):
+    """Tender day: «المقايسة لحد دلوقتي 1.4 مليون» came from a 4-row draft of a 325-item BOQ."""
+    from qsone.records import ledger
+
+    rec = client.app.state.projects.get(project)
+    for n, import_id in enumerate(["old", "new", "new", "new", "new"]):  # the newest import counts
+        ledger.add_item(rec, kind="boq_item", actor="lead_qs", code=f"9-{n}",
+                        fields={"description": "بند - عينة", "import_id": import_id})  # fmt: skip
+    sample_sheet(rec)
+    boq = client.get(f"/projects/{project}/status", headers=AUTH).json()["boq_value"]
+    assert (boq["items"], boq["of"]) == (6, 4)
 
 
 def test_status_skips_what_does_not_read(client, project):

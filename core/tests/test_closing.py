@@ -194,6 +194,26 @@ def test_checklist_lists_open_comments_and_unsigned(rec, engineer):
     assert row["after"]["open_comments"] == 1 and row["after"]["unsigned"] == [sheet]
 
 
+def test_checklist_lists_a_broken_deliverable_as_a_blocker(rec, engineer, monkeypatch):
+    """Tender day: the card said «مفيش حاجة هنا بتمنعك» while the priced BOQ did not open."""
+    from tests.samples import sample_source
+    from tests.test_numbers_newest import _legacy_rate, _row
+
+    sheet = sample_sheet(rec)
+    assert closing.checklist(rec, engineer)["broken"] == []
+    _legacy_rate(rec, _row(store.view(rec, sheet), "1-1")["item_id"], "15", sample_source(rec))
+    got = closing.checklist(rec, engineer)
+    [broken] = got["broken"]
+    assert broken["id"] == sheet and broken["name"] == store.entry(rec, sheet)["title"]
+    assert "1-1" in broken["why"]["ar"] and "الفئة" in broken["why"]["ar"]
+
+    def fails(*a, **k):
+        raise RecordsError(copy.DELIVERABLE_NOT_FOUND)
+
+    monkeypatch.setattr(closing.store, "view", fails)  # one that does not open at all
+    assert closing.checklist(rec, engineer)["broken"][0]["why"] == copy.DELIVERABLE_NOT_FOUND
+
+
 async def test_confidential_project_proposes_no_lessons(rec, engineer):
     with rec.write("engineer") as conn:
         rec.set_meta(conn, "confidential", "1")

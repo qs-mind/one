@@ -80,6 +80,11 @@ const didTexts: Partial<Record<keyof typeof texts, keyof typeof texts>> = {
 /** The answer a settled card gives, in words: the answers typed or picked, the rows approved, or what was done. */
 function answerWords(card: CardData, choice: string, lang: Language): string {
   const rows = card.payload?.rows;
+  const meaning = card.payload?.meaning_column;
+  if (card.kind === "rows" && meaning && rows?.length && choice !== "no") {
+    const set = card.answers && Object.keys(card.answers).length ? Object.values(card.answers) : rows.map((r) => r[meaning]);
+    return count("columnsApproved", set.filter((m) => m && m !== "none").length, {}, lang);
+  }
   if (card.kind === "rows" && card.payload?.tick && rows?.length && choice !== "no") {
     const kept = card.rows_ok?.length ?? 0;
     return kept === rows.length ? count("rowsApproved", kept, {}, lang) : count("rowsApprovedOf", rows.length, { kept }, lang);

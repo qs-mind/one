@@ -68,10 +68,32 @@ def waiting(rec: Records, cards: int) -> int:
     return cards + int(there and not found["approved"])
 
 
+def _broken(rec: Records, listed: list[dict]) -> list[dict]:
+    """The Deliverables that are not right: one that does not open, or a row with a problem
+    (two current numbers of one name), each with why in plain words."""
+    out = []
+    for d in listed:
+        try:
+            v = store.view(rec, d["id"])
+        except RecordsError as e:
+            out.append({"id": d["id"], "name": d["title"], "why": e.text})
+            continue
+        row = next((r for r in v.get("rows", []) if r.get("problem")), None)
+        if row is not None:
+            why = {
+                lang: copy.CLOSE_ROW_PROBLEM[lang].format(
+                    code=row.get("code") or "", problem=row["problem"][lang]
+                )
+                for lang in ("en", "ar")
+            }
+            out.append({"id": d["id"], "name": d["title"], "why": why})
+    return out
+
+
 def checklist(rec: Records, engineer: Records) -> dict:
-    """The GET /closing answer: open comments, the Deliverables not signed off, each
-    Deliverable's newest Review report, Confidential, the archive time, and the lessons with
-    whether each is already in Engineer Records."""
+    """The GET /closing answer: open comments, the Deliverables that are not right (`broken`,
+    with why) and those not signed off, each Deliverable's newest Review report, Confidential,
+    the archive time, and the lessons with whether each is already in Engineer Records."""
     listed = store.list_deliverables(rec)
     with rec.read() as conn:
         newest = dict(
@@ -83,6 +105,7 @@ def checklist(rec: Records, engineer: Records) -> dict:
     carried = _carried(engineer, rec.id)
     return {
         "open_comments": _open_comments(rec),
+        "broken": _broken(rec, listed),
         "unsigned": [
             {"id": d["id"], "name": d["title"]} for d in listed if d["status"] != "signed_off"
         ],

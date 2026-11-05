@@ -62,6 +62,11 @@ PROJECT_NOT_FOUND = {
     "ar": "المشروع ده مش موجود على الجهاز ده.",
 }
 
+PROJECT_NAME_TAKEN = {
+    "en": "A project with this name is already on this computer. Open it, or pick another name.",
+    "ar": "فيه مشروع بالاسم ده على الجهاز. افتحه، أو اختار اسم تاني.",
+}
+
 PROJECT_NOT_OPEN = {
     "en": "Open the project first.",
     "ar": "افتح المشروع الأول.",
@@ -120,6 +125,18 @@ FILE_SCANNED_PAGES = {
 FILE_UNREADABLE = {
     "en": "Kept, but ONE could not read it (it is damaged, or locked with a password).",
     "ar": "اتحفظ، بس ONE مقدرش يقراه (يا إما بايظ، يا إما مقفول بباسورد).",
+}
+
+FILE_LOCKED = {
+    "en": "Kept, but it is locked with a password, so ONE cannot read it. Save an open copy "
+    "(without the password) and add that one.",
+    "ar": "اتحفظ، بس مقفول بباسورد فـ ONE مش قادر يقراه. احفظ نسخة مفتوحة (من غير الباسورد) "
+    "وضيفها.",
+}
+
+FILE_SHEETS_EMPTY = {
+    "en": "Read: its sheets are empty, so there is nothing in it.",
+    "ar": "اتقرا: الشيتات بتاعته فاضية، مفيهوش حاجة.",
 }
 
 FILE_NOT_FOUND = {
@@ -253,6 +270,32 @@ ALREADY_CORRECTED = {
     "ar": "الرقم ده اتصحح قبل كده. صحّح آخر قيمة بدل منه.",
 }
 
+# The reason stored when a newer number of the same name on an item takes the older one's place.
+NUMBER_SUPERSEDED = {
+    "en": "A newer number of the same name was recorded for this item.",
+    "ar": "اتسجّل رقم أحدث بنفس الاسم للبند ده.",
+}
+
+# A tool refused an agent's call: the engineer sees why in the work log. {why}: the refusal's
+# first sentence.
+TOOL_REFUSED = {
+    "en": "ONE refused this step: {why} The team is fixing it; if it keeps happening, tell the "
+    "Lead QS what to do.",
+    "ar": "ONE رفض الخطوة دي: {why} الفريق بيصلّحها؛ ولو اتكررت، قول لكبير مهندسي الكميات يعمل إيه.",
+}
+
+# A row whose item has two current numbers of one name (written before 5 Nov 2026).
+# {name}: a BOQ_FIELDS label; {values}: the values, joined.
+# The close card: a Deliverable that is not right, with the first row that says why.
+CLOSE_ROW_PROBLEM = {"en": "Item {code}: {problem}", "ar": "البند {code}: {problem}"}
+
+ROW_NUMBERS_CONFLICT = {
+    "en": "This item has {n} different «{name}» values recorded: {values}. Type the right one in "
+    "this row and ONE keeps that one only.",
+    "ar": "البند ده متسجّل له {n} قيم مختلفة لـ«{name}»: {values}. اكتب القيمة الصح في الصف ده "
+    "وONE هيحتفظ بيها لوحدها.",
+}
+
 # The Lead QS model list and choice (GET /settings/models, PUT /settings/model).
 MODELS_FAILED = {
     "en": "The models could not be loaded because of a problem with Claude. Try again.",
@@ -306,6 +349,13 @@ AI_BUSY = {
 AI_FAILED = {
     "en": "The work stopped because of a problem with {provider}. The work so far is saved.",
     "ar": "الشغل وقف بسبب مشكلة في {provider}. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
+}
+# A bug inside ONE itself: never the provider's fault (tender day, 5 Nov 2026).
+CORE_FAILED = {
+    "en": "The work stopped because of a problem inside ONE, not with the AI. The work so far is "
+    "saved. Send the same request again; if it stops again, tell the QS Mind team.",
+    "ar": "الشغل وقف بسبب مشكلة جوّه ONE نفسه، مش في الذكاء الاصطناعي. الشغل اللي اتعمل لحد "
+    "دلوقتي محفوظ. ابعت نفس الطلب تاني؛ ولو وقف تاني، بلّغ فريق كيو إس مايند.",
 }
 # The provider's own reason, in plain words (audit B7): a model it retired, and the one it names.
 MODEL_GONE_TRY = {
@@ -1264,6 +1314,11 @@ OP_NOT_IN_TEMPLATE = {
     "ar": "قالب المُخرَج ده مش بيسمح بالعملية دي.",
 }
 
+OP_NUMBER_NEEDS_NAME = {
+    "en": 'A number needs its name, the column it goes in: "name": "rate" or "quantity".',
+    "ar": 'الرقم محتاج اسمه، يعني العمود اللي هيتحط فيه: "name": "rate" أو "quantity".',
+}
+
 ROW_NOT_FOUND = {
     "en": "This row is not in the Deliverable, or it was removed. Read the Deliverable again.",
     "ar": "الصف ده مش موجود في المُخرَج، أو اتشال. اقرا المُخرَج تاني.",
@@ -1459,11 +1514,37 @@ EXPORT_LABELS = {
     "src_place": {"en": "Place", "ar": "الموضع"},
     "src_link": {"en": "Link", "ar": "الرابط"},
     "src_dated": {"en": "Dated", "ar": "التاريخ"},
-    "src_kind": {"en": "Entered by", "ar": "أدخله"},
+    "src_kind": {"en": "Kind", "ar": "النوع"},
     "page": {"en": "page", "ar": "صفحة"},
     "sheet": {"en": "sheet", "ar": "ورقة"},
     "row": {"en": "row", "ar": "صف"},
     "cell": {"en": "cell", "ar": "خلية"},
+    "column": {"en": "column", "ar": "عمود"},
+    "line": {"en": "line", "ar": "سطر"},
+    "layer": {"en": "layer", "ar": "طبقة"},
+    # A calculation's formula in words: «الكمية × الفئة», «مجموع الإجمالي».
+    "fn_sum": {"en": "Sum of", "ar": "مجموع"},
+    "fn_count": {"en": "Count of", "ar": "عدد"},
+    "fn_avg": {"en": "Average of", "ar": "متوسط"},
+    "fn_min": {"en": "Least of", "ar": "أقل"},
+    "fn_max": {"en": "Greatest of", "ar": "أكبر"},
+    # A file source's kind as the sources list names it; any other kind reads "Document".
+    "kind_boq": {"en": "BOQ", "ar": "مقايسة"},
+    "kind_quote": {"en": "Quotation", "ar": "عرض سعر"},
+    "kind_specification": {"en": "Specification", "ar": "مواصفات"},
+    "kind_contract": {"en": "Contract", "ar": "عقد"},
+    "kind_drawing": {"en": "Drawing", "ar": "رسومات"},
+    "kind_web": {"en": "Web page", "ar": "صفحة ويب"},
+    "kind_prices": {"en": "QS Mind market prices", "ar": "أسعار السوق من كيو إس مايند"},
+    "kind_connector": {"en": "Connector", "ar": "موصّل"},
+    "kind_chat": {"en": "The chat", "ar": "الشات"},
+    "kind_document": {"en": "Document", "ar": "مستند"},
+    # The PDF's header block.
+    "head_project": {"en": "Project", "ar": "المشروع"},
+    "head_client": {"en": "Client", "ar": "العميل"},
+    "head_submission": {"en": "Submission", "ar": "ميعاد التقديم"},
+    "head_date": {"en": "Date", "ar": "التاريخ"},
+    "prepared": {"en": "Prepared with ONE", "ar": "تم الإعداد باستخدام ONE"},
     "calc_engine": {"en": "QS Calc Engine", "ar": "محرك الحسابات"},
     "engineer": {"en": "The engineer", "ar": "المهندس"},
     # The Review report.
@@ -1759,11 +1840,13 @@ BOQ_WHY_HEADER = {"en": "the column headings again", "ar": "عناوين الأ�
 BOQ_FIELDS = {
     "code": {"en": "Item no.", "ar": "رقم البند"},
     "description": {"en": "Description", "ar": "الوصف"},
+    "description_2": {"en": "Description, other language", "ar": "الوصف باللغة التانية"},
     "unit": {"en": "Unit", "ar": "الوحدة"},
     "quantity": {"en": "Quantity", "ar": "الكمية"},
     "rate": {"en": "Rate", "ar": "الفئة"},
     "amount": {"en": "Amount", "ar": "الإجمالي"},
 }
+BOQ_NOT_USED = {"en": "Not used", "ar": "مش مستخدم"}
 BOQ_FILE = {"en": "the BOQ file", "ar": "ملف المقايسة"}
 DOING_BOQ_PREVIEW = {
     "en": "Look at the BOQ columns in {name}",
@@ -1795,8 +1878,9 @@ BOQ_CONFIRM_DETAIL = {
 }
 BOQ_CONFIRM_SKIPPED = {"en": "Left out: {count}.", "ar": "واتساب {count}."}
 BOQ_CONFIRM_TICK = {
-    "en": "Tick each column that is right. An unticked rate or amount is left out.",
-    "ar": "علّم على كل عمود صح. الفئة أو الإجمالي اللي مش متعلّم عليه مش هيتستورد.",
+    "en": "Check what each column holds and change any that is wrong. A column set to «Not used» "
+    "is left out.",
+    "ar": "راجع كل عمود فيه إيه، وغيّر اللي غلط. العمود اللي «مش مستخدم» مش هيتستورد.",
 }
 BOQ_CONFIRM_HIDDEN = {
     "en": "Hidden in Excel and left out: {count}.",
@@ -1813,7 +1897,7 @@ BOQ_CONFIRM_FLAGGED = {
     "{count}. بيتستورد كبيانات بس.",
 }
 BOQ_CARD_COLUMNS = {
-    "field": {"en": "What", "ar": "البيان"},
+    "meaning": {"en": "What it holds", "ar": "فيه إيه"},
     "column": {"en": "Column", "ar": "العمود"},
     "header": {"en": "Its heading in the file", "ar": "عنوانه في الملف"},
     "example": {"en": "First values", "ar": "أول القيم"},
@@ -1823,8 +1907,12 @@ BOQ_NOT_CONFIRMED = {
     "ar": "المهندس ماأكدش الأعمدة، فمااتستوردش حاجة.",
 }
 BOQ_REQUIRED_UNTICKED = {
-    "en": "The engineer did not tick the {fields} column, so nothing was imported.",
-    "ar": "المهندس ماعلّمش على عمود {fields}، فمااتستوردش حاجة.",
+    "en": "The engineer did not set the {fields} column, so nothing was imported.",
+    "ar": "المهندس ماحددش عمود {fields}، فمااتستوردش حاجة.",
+}
+BOQ_MEANING_TWICE = {
+    "en": "The engineer set {fields} on more than one column, so nothing was imported.",
+    "ar": "المهندس حدد {fields} لأكتر من عمود، فمااتستوردش حاجة.",
 }
 
 # Evidence for numbers.

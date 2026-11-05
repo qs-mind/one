@@ -125,6 +125,22 @@ describe("Close project", () => {
     expect(screen.getByRole("button", { name: texts.archiveAnyway.en })).toBeInTheDocument();
   });
 
+  it("lists a broken or unsigned Deliverable as a blocker, never «nothing stops you»", async () => {
+    const p = project();
+    const broken = [{ id: "d1", name: "المقايسة المسعرة - عينة", why: { en: "Item 1-1: two rates.", ar: "البند 1-1: فئتين." } }];
+    const opened: string[] = [];
+    mockCore({ [`GET /projects/${p.id}/closing`]: () => Response.json(closing({ open_comments: 0, broken })) });
+    const user = userEvent.setup();
+    render(<CloseProject project={p} briefRunning={false} onOpenDeliverable={(id) => opened.push(id)} onClose={() => undefined} />);
+    expect(await screen.findByText(texts.closeProjectBroken.en)).toBeInTheDocument();
+    expect(screen.getByText("Item 1-1: two rates.")).toBeInTheDocument();
+    expect(screen.getByText(texts.closeProjectBlockers.en)).toBeInTheDocument();
+    expect(screen.queryByText(texts.closeProjectHelp.en)).toBeNull();
+    await user.click(screen.getByRole("button", { name: /المقايسة المسعرة - عينة/ }));
+    expect(opened).toEqual(["d1"]);
+    expect(screen.getByRole("button", { name: texts.archiveAnyway.en })).toBeInTheDocument();
+  });
+
   it("a Confidential project proposes no lessons", async () => {
     const p = project({ confidential: true });
     const fetch = mockCore({ [`GET /projects/${p.id}/closing`]: () => Response.json(closing({ confidential: true, lessons: [] })) });

@@ -112,7 +112,9 @@ def _columns(head: dict) -> list[tuple[dict, dict]]:
 def _number_column(head: dict, name, field: str, *, editable: bool) -> None:
     """A number the Sheet shows in its own column: never a calculated one (AMOUNT_IS_COMPUTED);
     for a typed edit, an editable column."""
-    shown = [(c, s) for c, s in _columns(head) if s.get("number") == name and not s["unit"]]
+    if not isinstance(name, str) or not name.strip():
+        raise _refuse(copy.OP_NUMBER_NEEDS_NAME, field)
+    shown = [(c, s) for c, s in _columns(head) if s.get("number") == name and not s.get("unit")]
     if any("calc" in c for c, _ in shown):
         raise _refuse(copy.AMOUNT_IS_COMPUTED, field)
     if not shown or (editable and not any(c.get("edit") for c, _ in shown)):

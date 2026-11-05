@@ -11,6 +11,7 @@ Heavy work (views, exports, the fill) runs in the thread pool. Only ids are ever
 import json
 import re
 from dataclasses import asdict
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Annotated, Literal
 from urllib.parse import quote
 
@@ -203,8 +204,34 @@ def _close(rec: Records, c: str, status: str) -> dict:
     return _thread(rec, c)
 
 
+def _cairo_today() -> str:
+    """Today in Cairo. Without the system's zone data (Windows without tzdata) it is UTC+2."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        zone = ZoneInfo("Africa/Cairo")
+    except Exception:  # no zone data on this machine
+        zone = timezone(timedelta(hours=2))
+    return datetime.now(UTC).astimezone(zone).date().isoformat()
+
+
+def _with_head(rec: Records, v: dict) -> dict:
+    """The view with the PDF's header block: the project's name, the client and submission date
+    the Lead QS found (when there), and today in Cairo."""
+    from qsone.journey import understand  # here: the journey imports the Deliverables
+
+    facts = understand.facts(rec)["facts"]
+    head = {
+        "project": rec.meta().get("name"),
+        "client": facts.get("client", {}).get("value"),
+        "submission": facts.get("submission_date", {}).get("value"),
+        "date": _cairo_today(),
+    }
+    return v | {"head": {k: x for k, x in head.items() if x}}
+
+
 def _export(rec: Records, d: str, format_: str, revision: int | None) -> Response:
-    v = current_view(rec, d, revision=revision)
+    v = _with_head(rec, current_view(rec, d, revision=revision))
     make = _EXPORTS.get((v["kind"], format_))
     if make is None:
         raise RecordsError(copy.EXPORT_FORMAT_NOT_ALLOWED, status=422, field="format")
