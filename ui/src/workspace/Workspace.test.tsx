@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { entry } from "../deliverables/fixtures";
-import { setLanguage, texts } from "../i18n";
+import { fill, setLanguage, texts } from "../i18n";
 import { fakeSources } from "../project/fake";
 import { currentSelection, select } from "../project/selection";
 import type { ViewerProps } from "../project/types";
@@ -400,5 +400,25 @@ describe("the project keeps its open document", () => {
     await waitFor(() => expect(sources.saved.workspace.at(-1)?.opened).toEqual({ key: "deliverable:dA", anchor: { row: "3/02" } }), {
       timeout: 1500,
     });
+  });
+});
+
+describe("a file's page", () => {
+  it("each opening at a page moves to it, the same page asked again too; a page turned to is the place Back returns to", async () => {
+    const sources = fakeSources({ deliverables: [A], files: [file], pages: { f1: 18 } });
+    const documents = { deliverables: [A], clientBoqs: [], files: [file], desks: [] };
+    render(<Workspace projectId="p1" sources={sources} documents={documents} />);
+    const shown = (page: number) => screen.findByRole("img", { name: fill(texts.sheetPageOf.ar, { page, pages: 18 }) });
+    act(() => workspaceApi.open("file:f1", { page: 3 }));
+    await shown(3);
+    fireEvent.click(screen.getByRole("button", { name: texts.sheetNextPage.ar }));
+    fireEvent.click(screen.getByRole("button", { name: texts.sheetNextPage.ar }));
+    await shown(5);
+    expect(workspaceApi.current()).toEqual({ key: "file:f1", anchor: { page: 5 } }); // the engineer's page is the place
+    act(() => workspaceApi.open("file:f1", { page: 3 })); // a number's card asks for page 3 again
+    await shown(3);
+    act(() => void workspaceApi.back());
+    await shown(5);
+    expect(workspaceApi.current()).toEqual({ key: "file:f1", anchor: { page: 5 } });
   });
 });

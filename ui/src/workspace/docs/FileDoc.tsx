@@ -2,9 +2,10 @@
 // switch to the page's text; other files show the text pieces ONE read, with their sheet and row.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { dir, fill, t, useLanguage } from "../../i18n";
-import type { FilePiece, ProjectSources } from "../../project/types";
+import type { FilePiece, Opened, ProjectSources } from "../../project/types";
 import { fileKey, TARGET } from "../../sources/targets";
 import { Segmented } from "../../ui/Segmented";
+import { workspaceApi } from "../api";
 
 /** Page images come in two widths: enough for the file on screen, never more (decision 13). */
 export const SMALL = 600;
@@ -32,15 +33,25 @@ export type FilePage = {
   pageOf: string | null;
 };
 
-/** The file's pages and the page shown; `asked` (an answer or the palette asked for this page) moves to it. */
-export function useFilePage(sources: ProjectSources, fileId: string, asked?: number): FilePage {
+/** The file's pages and the page shown. Each opening of the file at a page (an answer, a number's card, the palette)
+ * moves to it, the same page asked again too; a page the engineer turns to is the open document's place, so Back and
+ * the project come back to it. */
+export function useFilePage(sources: ProjectSources, fileId: string, opened?: Opened): FilePage {
   const [pages, setPages] = useState<number | null>(null);
-  const [page, setPage] = useState(asked ?? 1);
+  const [page, setPage] = useState(opened?.anchor?.page ?? 1);
   const [mode, setMode] = useState<"image" | "text">("image");
 
+  const openedRef = useRef(opened);
+  openedRef.current = opened;
   useEffect(() => {
+    const asked = opened?.anchor?.page;
     if (asked) setPage(asked);
-  }, [asked]);
+  }, [opened]);
+  useEffect(() => {
+    const now = openedRef.current;
+    if (!now || workspaceApi.current() !== now || now.anchor?.page === page) return;
+    workspaceApi.at({ ...now.anchor, page });
+  }, [page]);
 
   useEffect(() => {
     let live = true;
@@ -175,10 +186,10 @@ export function FilePages({
   );
 }
 
-/** The file as the open document, at `page` when one is asked for. */
-export function FileDoc({ sources, fileId, page, notice }: { sources: ProjectSources; fileId: string; page?: number; notice?: string | null }) {
+/** The file as the open document, at its anchor's page when one is asked for. */
+export function FileDoc({ sources, fileId, opened, notice }: { sources: ProjectSources; fileId: string; opened?: Opened; notice?: string | null }) {
   useLanguage();
-  const state = useFilePage(sources, fileId, page);
+  const state = useFilePage(sources, fileId, opened);
   const root = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(SMALL);
   // measured again when the room changes (the chat folds, the window resizes), settled for 150 ms before a reload
