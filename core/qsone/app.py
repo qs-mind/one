@@ -15,6 +15,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import Response
 
 from qsone import about, activity, canvas, chat, copy, keys, models, projects, settings, usage
+from qsone.account import routes as account_routes
+from qsone.account import vault as account_vault
+from qsone.account.session import Account
 from qsone.backup import routes as backup_routes
 from qsone.backup.runner import Backups
 from qsone.calc import routes as calc_routes
@@ -116,10 +119,19 @@ def create_app(
         mcp=mcp,
         meaning=service,
     )
-    # Task 5 gives the escrow (the account vault); until then the Backup key stays local.
     sender = usage.Sender()
-    backups = Backups(Path(folder), registry, engineer=engine.engineer_records)
+    account = Account()  # the QS Mind account; its vault keeps the Backup key
+    backups = Backups(
+        Path(folder), registry, escrow_factory=account.escrow, engineer=engine.engineer_records
+    )
     registry.backups = backups
+
+    def settle_backup_key() -> None:
+        # Under the Backups lock, so no backup copy writes a key.json while it is wrapped again.
+        with backups._lock:
+            account_vault.settle_backup_key(account.escrow(), Path(folder))
+
+    account.on_signed_in = settle_backup_key
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -150,6 +162,7 @@ def create_app(
             stop_listening()
             backups.stop()  # waits for a running copy
             sender.stop()
+            account.close()  # a sign-in under way stops
         service.stop()
         registry.close_all()
 
@@ -166,6 +179,7 @@ def create_app(
     app.state.engine = engine
     app.state.connectors = connector_hub
     app.state.backups = backups
+    app.state.account = account
     app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
     app.include_router(projects.router(registry, service))
     app.include_router(meaning_routes.router(service))
@@ -177,6 +191,7 @@ def create_app(
     app.add_middleware(canvas.no_store)
     app.include_router(connector_routes.router(connector_hub))
     app.include_router(backup_routes.router(backups))
+    app.include_router(account_routes.router(account))
     app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)
 
     @app.middleware("http")
