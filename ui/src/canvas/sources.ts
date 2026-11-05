@@ -8,7 +8,8 @@ import { deliverablesApi } from "../deliverables/api";
 import type { Text } from "../i18n";
 import { texts } from "../i18n";
 import { uploadFile } from "../records/RecordsPanel";
-import type { DeliverableInfo, FileInfo, FilePiece, Placed, ProjectSources, Team, View, ViewerProps } from "./types";
+import type { SheetView } from "../deliverables/types";
+import type { ClientBoqInfo, DeliverableInfo, FileInfo, FilePiece, Placed, ProjectSources, Team, View, ViewerProps } from "./types";
 
 /** A refused call, with the core's line in both languages. */
 export class SourceError extends Error {
@@ -62,7 +63,8 @@ export function httpSources(projectId: string): ProjectSources {
     },
     team: () => json<Team>(`${base}/team`, { desks: [], agents: [] }),
     status: () => json(`${base}/status`, {}),
-    layout: () => json<{ frames: Placed[]; view: View | null }>(`${base}/canvas`, { frames: [], view: null }),
+    layout: () =>
+      json<{ frames: Placed[]; view: View | null; client_boqs?: ClientBoqInfo[] }>(`${base}/canvas`, { frames: [], view: null }),
     saveFrames: (frames, removed, keepalive = false) => put(`${base}/canvas/frames`, { frames, removed }, keepalive),
     saveView: (view, keepalive = false) => put(`${base}/canvas/view`, view, keepalive),
     activity(onEvent, signal, onReconnect) {
@@ -101,6 +103,11 @@ export function httpSources(projectId: string): ProjectSources {
     async fileText(fileId, page) {
       const query = page === undefined ? "" : `?page=${page}`;
       return (await json<{ pieces: FilePiece[] }>(`${file(fileId)}/text${query}`, { pieces: [] })).pieces;
+    },
+    async clientBoq(fileId) {
+      const response = await api(`${base}/client-boq/${encodeURIComponent(fileId)}`).catch(() => undefined);
+      if (!response?.ok) throw new SourceError(await coreLine(response, texts.canvasFailed));
+      return (await response.json()) as SheetView;
     },
     async upload(chosen) {
       const added = await uploadFile(projectId, chosen);

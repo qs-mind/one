@@ -70,11 +70,13 @@ describe("subscribeActivity", () => {
     const stop = subscribeActivity("p3", (e) => got.push(e));
     await settle();
     const file = { type: "file", file: { id: "f1", name: "جدول - عينة.xlsx", status: "read", note: null, replaces: null } };
+    const boq = { type: "client_boq", client_boq: { file_id: "f1", name: "جدول - عينة.xlsx", items: 2, headings: 1, at: "2026-11-05T09:00:00+00:00" } };
     calls[0]!.write(
-      ": ping\n\n" + "data: {not json\n\n" + line({ type: "mystery", x: 1 }) + line({ type: "agent" }) + line({ type: "file" }) + line(waiting(1)) + line(file),
+      ": ping\n\n" + "data: {not json\n\n" + line({ type: "mystery", x: 1 }) + line({ type: "agent" }) + line({ type: "file" }) + line(waiting(1)) + line(file) +
+        line({ type: "client_boq" }) + line(boq),
     );
     await settle();
-    expect(got).toEqual([waiting(1), file]); // a file added to Project Records is one of the events
+    expect(got).toEqual([waiting(1), file, boq]); // a file added to Project Records, a client BOQ imported
     stop();
   });
 

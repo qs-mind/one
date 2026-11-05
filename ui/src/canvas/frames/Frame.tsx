@@ -3,10 +3,10 @@
 // frame never move the canvas or the frame (decision 11). Enter goes in, Esc comes back (handled by the canvas).
 import { NodeResizer, useStore, type Node } from "@xyflow/react";
 import { createContext, memo, useContext, type ComponentType, type ReactNode } from "react";
-import { count, pick, t, useLanguage } from "../../i18n";
+import { count, fill, pick, t, useLanguage } from "../../i18n";
 import { lod, type Detail } from "../lod";
 import { MIN_H, MIN_W, STRIP_H } from "../place";
-import type { Anchor, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
+import type { Anchor, ClientBoqInfo, DeliverableInfo, DeskInfo, FileInfo, FrameKey, FrameKind, ProjectSources } from "../types";
 import { FileName } from "../../ui/FileName";
 
 /** `h` is the frame's open height, kept while it is folded to its strip. */
@@ -18,13 +18,16 @@ export type DeliverableData = Base & { deliverable: DeliverableInfo };
  * themselves are read by the frames from the live store, so their moves never touch the canvas's nodes. */
 export type DeskData = Base & { desk: DeskInfo; working: number };
 export type TeamData = Base;
+/** A client BOQ as imported: the client's document, shown read only. */
+export type ClientBoqData = Base & { boq: ClientBoqInfo };
 
 export type FrameNode =
   | Node<FilesData, "files">
   | Node<FileData, "file">
   | Node<DeliverableData, "deliverable">
   | Node<DeskData, "desk">
-  | Node<TeamData, "team">;
+  | Node<TeamData, "team">
+  | Node<ClientBoqData, "clientboq">;
 
 /** What a frame may ask of the canvas around it. */
 export type CanvasActions = {
@@ -70,6 +73,8 @@ export function frameTitle(node: Titled): string {
       return node.data.collapsed
         ? count("deskSummary", node.data.working, { desk: pick(node.data.desk.name) })
         : pick(node.data.desk.name);
+    case "clientboq":
+      return fill(t("clientBoqTitle"), { name: node.data.boq.name });
     default:
       return t("projectTeam");
   }

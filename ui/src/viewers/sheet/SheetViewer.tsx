@@ -34,6 +34,8 @@ export type SheetViewerProps = {
   onSelection?: (range: SheetRange | null) => void;
   onToggleFullScreen?: () => void;
   virtualize?: boolean;
+  /** A document that is not ours (the client's BOQ): nothing can be typed, pasted or changed. */
+  readOnly?: boolean;
   ref?: Ref<SheetHandle>;
 };
 
@@ -239,9 +241,10 @@ export function SheetViewer(props: SheetViewerProps) {
     // toggle and decide read the latest state when called
     [byKey, titleColumn, direction, pending, marks, collapsed],
   );
+  const readOnly = !!props.readOnly;
   const canEdit = useCallback(
-    (row: ViewRow, column: SheetColumn) => why(row, byKey.get(column.key)!, titleColumn) === null,
-    [byKey, titleColumn],
+    (row: ViewRow, column: SheetColumn) => !readOnly && why(row, byKey.get(column.key)!, titleColumn) === null,
+    [byKey, titleColumn, readOnly],
   );
   const editText = useCallback(
     (row: ViewRow, column: SheetColumn) => cellText(row, byKey.get(column.key)!, titleColumn),
@@ -288,10 +291,16 @@ export function SheetViewer(props: SheetViewerProps) {
         <h2 dir="auto" className="font-semibold">
           {view.title}
         </h2>
-        <StatusChips view={view} />
-        <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
-        {view.revision && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
-        {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
+        {readOnly ? (
+          <span className="rounded-full border border-slate px-2 text-xs leading-5 text-slate">{t("clientBoqReadOnly")}</span>
+        ) : (
+          <>
+            <StatusChips view={view} />
+            <span className="text-slate">{fill(t("reviewVersion"), { n: view.version })}</span>
+            {view.revision && <span className="text-slate">{fill(t("reviewRev"), { n: view.revision.no })}</span>}
+            {view.pending > 0 && <span>{count("sheetPending", view.pending)}</span>}
+          </>
+        )}
         {props.onToggleFullScreen && (
           <button
             type="button"
@@ -330,7 +339,7 @@ export function SheetViewer(props: SheetViewerProps) {
           onCommit={(row, column, text) => {
             const r = rows.indexOf(row);
             const c = columns.findIndex((x) => x.key === column.key);
-            if (r >= 0 && c >= 0) sendBlock({ row: r, col: c }, [[text]]);
+            if (r >= 0 && c >= 0 && !readOnly) sendBlock({ row: r, col: c }, [[text]]);
           }}
           selection={selection}
           onSelection={select}
@@ -341,7 +350,7 @@ export function SheetViewer(props: SheetViewerProps) {
               .map((r) => columns.slice(start, end + 1).map((c) => cellText(r, c, titleColumn)));
             return { text: toTsv(values), html: toHtml(values, direction) };
           }}
-          onPaste={(at, text) => sendBlock(at, parseTsv(text))}
+          onPaste={(at, text) => !readOnly && sendBlock(at, parseTsv(text))}
           onActivate={(row, column, el, byKey) => {
             const cell = row.cells[column.key];
             if (isNumber(cell) && !pending.has(cellKey(row.id, column.key))) openSource(cell, el, byKey);

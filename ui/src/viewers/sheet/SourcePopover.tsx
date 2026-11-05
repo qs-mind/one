@@ -3,6 +3,7 @@
 // that was itself calculated opens the same way. It sits inside the viewer's own box (absolutely placed, never
 // a portal), so it scales with a canvas frame.
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { canvasApi } from "../../canvas/api";
 import { deliverablesApi } from "../../deliverables/api";
 import type { Explained, NumberCell, Source } from "../../deliverables/types";
 import { fill, language, pick, t, texts, type Text } from "../../i18n";
@@ -132,6 +133,18 @@ export function SourcePopover({
           !failed && <span className="text-slate">{t("noSource")}</span>
         )}
         {place && <span dir="auto" className="text-slate">{place}</span>}
+        {viewSource?.file_id && (
+          <button
+            type="button"
+            className="self-start rounded px-1 underline hover:text-copper"
+            onClick={() => {
+              const page = viewSource.locator?.page;
+              canvasApi.openFile(viewSource.file_id!, typeof page === "number" ? page : undefined);
+            }}
+          >
+            {t("sourceOpenFile")}
+          </button>
+        )}
         {dated && <span>{fill(t(datedLabel(source?.locator?.dated_how)), { date: dated })}</span>}
         {by && <span>{fill(t("sheetEnteredBy"), { who: roles[by] ? pick(roles[by]) : by })}</span>}
       </section>

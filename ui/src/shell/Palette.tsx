@@ -16,10 +16,11 @@ const SEARCH_DELAY = 250;
 
 /** Each frame's title in the page language, from the project's own lists. */
 async function frameTitles(sources: ProjectSources): Promise<Map<FrameKey, string>> {
-  const [files, deliverables, team] = await Promise.all([
+  const [files, deliverables, team, layout] = await Promise.all([
     sources.files().catch(() => []),
     sources.deliverables().catch(() => []),
     sources.team().catch(() => ({ desks: [], agents: [] })),
+    sources.layout().catch(() => undefined),
   ]);
   const titles = new Map<FrameKey, string>([
     ["files:all", t("projectFiles")],
@@ -28,6 +29,7 @@ async function frameTitles(sources: ProjectSources): Promise<Map<FrameKey, strin
   for (const f of files) titles.set(`file:${f.id}`, f.name);
   for (const d of deliverables) titles.set(`deliverable:${d.id}`, d.title);
   for (const d of team.desks) titles.set(`desk:${d.id}`, pick(d.name));
+  for (const b of layout?.client_boqs ?? []) titles.set(`clientboq:${b.file_id}`, fill(t("clientBoqTitle"), { name: b.name }));
   return titles;
 }
 

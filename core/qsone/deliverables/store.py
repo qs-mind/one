@@ -30,7 +30,7 @@ _AT = "valid_from <= :at AND (valid_until IS NULL OR valid_until > :at)"
 _NUMBER_AT = "n.recorded_at <= :at AND (n.valid_until IS NULL OR n.valid_until > :at)"
 _NUMBER_COLUMNS = (
     "n.id, n.item_id, n.name, n.value, n.unit, n.currency, n.source_id, n.dated,"
-    " s.kind, s.title, s.locator, s.url, s.dated, f.name"
+    " s.kind, s.title, s.locator, s.url, s.dated, f.name, s.file_id"
 )
 _NUMBER_JOIN = (
     "FROM numbers n JOIN sources s ON s.id = n.source_id LEFT JOIN files f ON f.id = s.file_id"
@@ -420,7 +420,7 @@ def _numbers(conn, item_ids: list[str], at: str) -> tuple[dict, dict]:
 def _read_number(row) -> tuple:
     """A row of `_NUMBER_COLUMNS` as (item id, name, cell, source id, source)."""
     number_id, item_id, name, value, unit, currency, source_id, dated = row[:8]
-    kind, title, locator, url, source_dated, file_name = row[8:]
+    kind, title, locator, url, source_dated, file_name, file_id = row[8:]
     cell = calc.number_cell(
         value=value,
         unit=unit,
@@ -434,6 +434,7 @@ def _read_number(row) -> tuple:
         "kind": kind,
         "title": title,
         "file_name": file_name,
+        "file_id": file_id,
         "locator": json.loads(locator),
         "url": url,
         "dated": source_dated,

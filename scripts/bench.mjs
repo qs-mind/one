@@ -7,7 +7,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { root } from "./python.mjs";
 
-export const benchDir = path.join(tmpdir(), "qs-mind-one-bench");
+// QSONE_BENCH_PORT (default 1442) lets two worktrees run their own bench at once, each with its own folder.
+export const benchPort = Number(process.env.QSONE_BENCH_PORT || 1442);
+export const benchDir = path.join(tmpdir(), benchPort === 1442 ? "qs-mind-one-bench" : `qs-mind-one-bench-${benchPort}`);
 
 if (!process.argv.includes("--keep")) rmSync(benchDir, { recursive: true, force: true });
 mkdirSync(benchDir, { recursive: true });
@@ -16,6 +18,7 @@ console.log(`QS Mind One bench: ${benchDir} (core.log, data, samples)`);
 const env = {
   ...process.env,
   QSONE_BENCH_DIR: benchDir,
+  QSONE_BENCH_PORT: String(benchPort),
   PYTHONPATH: [path.join(root, "core"), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
 };
 const vite = path.join(root, "node_modules", "vite", "bin", "vite.js");

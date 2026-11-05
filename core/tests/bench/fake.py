@@ -238,11 +238,30 @@ def _delegate(seen: Seen) -> Step | None:
     return _call("delegate", "delegate", {"specialist_id": specialist, "task": task})
 
 
+EXTRA_CODE = "99/01"  # the bench's own item: not in the client's BOQ, so the Checking QS flags it
+
+
+def _extra(seen: Seen) -> Step | None:
+    if not seen.done.get("import", ("", False))[1]:
+        return None
+    description = _words(
+        seen,
+        "Site hoarding (bench extra item, not in the client's BOQ)",
+        "سور مؤقت للموقع (بند تجريبي زيادة، مش في مقايسة العميل)",
+    )
+    args = {"kind": "boq_item", "code": EXTRA_CODE, "fields": {"description": description}}
+    return _call("extra", "add_item", args)
+
+
 def _sheet(seen: Seen) -> Step | None:
     result, ok = seen.done.get("items", ("", False))
     items = [i["id"] for i in _data(result).get("items", []) if isinstance(i, dict)] if ok else []
     if not items:
         return None
+    result, ok = seen.done.get("extra", ("", False))
+    extra = _data(result).get("item_id") if ok else None
+    if extra:
+        items.append(extra)
     section = _words(seen, "Sample works (bench)", "أعمال عينة (تجريبي)")
     rows = [{"section": section, "level": 1}, *({"item_id": i} for i in items)]
     args = {
@@ -287,7 +306,7 @@ LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     "chat": (),
     "question": (_ask,),
     "boq": BOQ,
-    "deliverable": (*BOQ, _sheet, _letter),
+    "deliverable": (*BOQ, _extra, _sheet, _letter),  # with one priced row of our own
     "team": (_plan, _build, _delegate),
     "full": (
         _files_step,
@@ -309,6 +328,7 @@ _STEP_OF = {
     _preview: "preview",
     _import: "import",
     _items: "items",
+    _extra: "extra",
     _ask: "ask",
     _plan: "plan",
     _build: "build",
@@ -412,6 +432,9 @@ def brain(messages: list, info: AgentInfo) -> Step:
             "code": "A",
             "comments": [{"about": "bench", "text": "(bench check) Sample review, no finding."}],
         }
+        if "not in the client's imported BOQ" in seen.brief:  # One's code found such rows
+            text = "(bench check) Rows not in the client's BOQ: the engineer keeps or removes each."
+            verdict = {"code": "B", "comments": [{"about": EXTRA_CODE, "text": text}]}
         part = ToolCallPart(tool.name, verdict, tool_call_id=f"bench-verdict-{uuid4().hex[:8]}")
         return Step((part,), USAGE)
     if "boq_import" in seen.tools and "ask_engineer" in seen.tools:

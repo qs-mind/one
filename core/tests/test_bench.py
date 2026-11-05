@@ -101,3 +101,25 @@ def test_the_general_chat(bench):
     client, _ = bench
     kinds, reply, _ = run(client, "general", "bench:chat أهلا")
     assert kinds == [] and "رد تجريبي" in reply
+
+
+def test_the_imported_boq_is_on_the_canvas(bench):
+    client, project = bench
+    run(client, project, "bench:boq Import the BOQ")
+    [boq] = client.get(f"/projects/{project}/canvas").json()["client_boqs"]
+    assert boq["name"] == samples.BOQ_NAME and boq["items"] == 4 and boq["headings"] == 2
+    rows = client.get(f"/projects/{project}/client-boq/{boq['file_id']}").json()["rows"]
+    assert [r["kind"] for r in rows] == ["section", "item", "item", "section", "item", "item"]
+
+
+def test_the_extra_priced_row_is_flagged_for_the_engineer(bench):
+    client, project = bench
+    _, reply, events = run(client, project, "bench:deliverable Make the priced BOQ")
+    assert "Refused" not in reply
+    assert [e["data"]["code"] for e in events if e["type"] == "data-review"] == ["B"]
+    made = client.get(f"/projects/{project}/deliverables").json()["deliverables"]
+    sheet = next(d for d in made if d["kind"] == "sheet")
+    threads = client.get(f"/projects/{project}/deliverables/{sheet['id']}/comments").json()
+    flags = [t for t in threads["comments"] if t["anchor"]["type"] == "row"]
+    assert [t["body"].split(":")[0] for t in flags] == ["Not in the client's BOQ"]
+    assert fake.EXTRA_CODE in flags[0]["body"] and flags[0]["status"] == "open"

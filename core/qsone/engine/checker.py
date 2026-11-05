@@ -2,7 +2,8 @@
 
 Every check is a fresh run with no history. Its input is only a `CheckPacket`: the Brief text,
 the Deliverable draft, its numbers with their sources, formulas and dates, the numbers with no
-source, and on a re-check the previous comments. `packet_for` reads the draft and the Source
+source, the rows of a Priced BOQ that are not in the client's imported BOQ (found by code), and
+on a re-check the previous comments. `packet_for` reads the draft and the Source
 Ledger only: never agent runs, team messages or any history, so nothing of the team's
 reasoning reaches the checker. Its tools only read; its output is a `Review` with Code A, B or C.
 
@@ -216,6 +217,12 @@ def packet_text(packet: CheckPacket, fence: str) -> str:
         "Numbers in it with no source, marked by One: "
         + (_json(list(packet.unsourced)) if packet.unsourced else "none."),
     ]
+    if packet.not_in_client_boq:
+        parts += [
+            "Rows not in the client's imported BOQ, found by One's code. One has put a comment on "
+            "each for the engineer to keep it or remove it; mention them in your review:",
+            data(list(packet.not_in_client_boq), "client-boq"),
+        ]
     if packet.previous_comments:
         parts += [
             "Comments from the previous check; confirm that each was fixed:",

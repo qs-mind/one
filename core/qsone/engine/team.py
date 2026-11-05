@@ -27,6 +27,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from qsone import copy, settings
+from qsone.clientfile import imported
 from qsone.deliverables import review as deliverable_review
 from qsone.deliverables import tools as outputs
 from qsone.engine import agents, checker, desks, numbers_guard
@@ -704,7 +705,12 @@ async def _check_output(
             "submit it again."
         )
     packet = _unsourced(ctx, draft)
-    packet = replace(packet, unsourced=tuple(dict.fromkeys([*packet.unsourced, *untraced])))
+    extra = await asyncio.to_thread(imported.not_in_client, ctx.rec, draft.id, version=version_n)
+    packet = replace(
+        packet,
+        unsourced=tuple(dict.fromkeys([*packet.unsourced, *untraced])),
+        not_in_client_boq=tuple(extra),
+    )
     review = await checker.check(packet, ctx.store.run(ctx.run_id)["choice"], ctx.host)
     with ctx.rec.read() as c:
         (earlier,) = c.execute(
@@ -712,7 +718,12 @@ async def _check_output(
         ).fetchone()
     review = replace(review, round=earlier + 1)
     await asyncio.to_thread(
-        deliverable_review.record_review, ctx.rec, draft.id, review, version_n=version_n
+        deliverable_review.record_review,
+        ctx.rec,
+        draft.id,
+        review,
+        version_n=version_n,
+        not_in_client=extra,
     )
     ctx.host.emit(Reviewed(ctx.brief_id, draft.id, review))
     out = _review_json(draft.id, review, 0) | {"version": version_n}
