@@ -16,8 +16,8 @@ export const texts = {
   chatError: { en: "The reply stopped because of an error. Try again.", ar: "توقف الرد بسبب خطأ. حاول مرة أخرى." },
   aiKeyTitle: { en: "Add your Claude key", ar: "أضف مفتاح Claude الخاص بك" },
   aiKeyHelp: {
-    en: "One works with your own Claude key from Anthropic. It is kept in this computer's key store, never in a file.",
-    ar: "يعمل ون بمفتاح Claude الخاص بك من Anthropic. يُحفظ في مخزن المفاتيح على هذا الجهاز، ولا يُكتب في أي ملف.",
+    en: "One works with your own Claude key from Anthropic. It is kept in this computer's key store.",
+    ar: "يعمل ون بمفتاح Claude الخاص بك من Anthropic. يُحفظ في مخزن المفاتيح على هذا الجهاز.",
   },
   aiKeyLabel: { en: "Claude API key", ar: "مفتاح Claude API" },
   save: { en: "Save", ar: "حفظ" },
@@ -47,6 +47,10 @@ export const texts = {
   claudeKeySaved: {
     en: "A Claude key is saved. Add a new one only to replace it.",
     ar: "في مفتاح Claude محفوظ. ضيف مفتاح جديد بس لو عايز تغيّره.",
+  },
+  keyStoreFile: {
+    en: "This computer has no key store, so One keeps your keys in a protected file in its own folder instead.",
+    ar: "لا يوجد على هذا الجهاز مخزن مفاتيح، لذلك يحفظ ون مفاتيحك في ملف محمي داخل مجلده بدلًا منه.",
   },
   standardLink: { en: "Standard Link: other AI Providers", ar: "ربط عام: مزوّدين تانيين" },
   standardLinkHelp: {
@@ -181,8 +185,8 @@ export const texts = {
   connectorCommand: { en: "The command that runs it", ar: "الأمر اللي بيشغّله" },
   connectorAddress: { en: "Its address (https://)", ar: "العنوان بتاعه (https://)" },
   connectorToken: {
-    en: "Token (optional; kept in this computer's key store, never in a file)",
-    ar: "التوكن (اختياري؛ بيتحفظ في مخزن المفاتيح على الجهاز ده، مش في ملف)",
+    en: "Token (optional; kept in this computer's key store)",
+    ar: "التوكن (اختياري؛ بيتحفظ في مخزن المفاتيح على الجهاز ده)",
   },
   connectorTokenEnv: {
     en: "The environment variable it reads the token from (optional)",
@@ -236,8 +240,8 @@ export const texts = {
   searchTitle: { en: "Web search", ar: "البحث في الويب" },
   searchKey: { en: "Your Brave Search key", ar: "مفتاح Brave Search بتاعك" },
   searchKeyHelp: {
-    en: "One can search the web with your own Brave Search key. It is kept in this computer's key store, never in a file, and is never shown again.",
-    ar: "One يقدر يدوّر في الويب بمفتاح Brave Search بتاعك. بيتحفظ في مخزن المفاتيح على الجهاز ده، مش في ملف، ومش بيظهر تاني.",
+    en: "One can search the web with your own Brave Search key. It is kept in this computer's key store and is never shown again.",
+    ar: "One يقدر يدوّر في الويب بمفتاح Brave Search بتاعك. بيتحفظ في مخزن المفاتيح على الجهاز ده، ومش بيظهر تاني.",
   },
   searchKeyKept: { en: "A key is kept. Saving a new one replaces it.", ar: "في مفتاح محفوظ. لو حفظت واحد جديد هياخد مكانه." },
   searchProvider: { en: "Search in use:", ar: "البحث المستخدم:" },

@@ -106,6 +106,17 @@ describe("AiSettings", () => {
     expect(marked.map((o) => o.textContent)).toEqual([expect.stringContaining("sample-model")]);
   });
 
+  it("says the keys are kept in a file only when this computer has no key store", async () => {
+    core();
+    const { unmount } = render(<Harness />);
+    await screen.findByRole("combobox", { name: texts.roleLead.ar });
+    expect(screen.queryByText(texts.keyStoreFile.ar)).toBeNull();
+    unmount();
+    core({ "GET /api/settings/ai": () => Response.json({ ...settings(), key_store: "file" }) });
+    render(<Harness />);
+    expect(await screen.findByText(texts.keyStoreFile.ar)).toBeInTheDocument();
+  });
+
   it("choosing a model for a role saves every role in the core", async () => {
     const fetch = core({ "PUT /api/settings/ai/roles": (init) => Response.json(JSON.parse(String(init.body))) });
     const user = userEvent.setup();

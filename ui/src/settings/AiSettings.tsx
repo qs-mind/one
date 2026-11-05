@@ -30,7 +30,13 @@ export type ConnectorInfo = {
   error: Text | null; // why its models could not be listed just now
 };
 type Roles = Partial<Record<Role, Choice>>;
-type Settings = { connectors: ConnectorInfo[]; sheet: ModelCard[]; roles: Roles; defaults: Roles };
+type Settings = {
+  connectors: ConnectorInfo[];
+  sheet: ModelCard[];
+  roles: Roles;
+  defaults: Roles;
+  key_store?: "system" | "file"; // "file": this computer has no key store, so the core keeps keys in a file
+};
 type Loaded = { state: "loading" | "failed" } | { state: "ready"; settings: Settings };
 
 const roleTexts = { lead: "roleLead", checker: "roleChecker", specialist: "roleSpecialist", quick: "roleQuick" } as const;
@@ -139,6 +145,7 @@ function ClaudeKey({ settings, onSaved }: { settings: Settings; onSaved: () => v
     <div className="flex flex-col gap-1">
       <h3 className="font-semibold">{t("aiKey")}</h3>
       {saved && <p className="text-slate">{t("claudeKeySaved")}</p>}
+      {settings.key_store === "file" && <p className="text-slate">{t("keyStoreFile")}</p>}
       <Alert line={settings.connectors.find((c) => c.id === "anthropic" && c.key_set)?.error ?? undefined} />
       <AiKey onSaved={onSaved} />
     </div>

@@ -18,7 +18,7 @@ from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from starlette.responses import Response, StreamingResponse
 
-from qsone import copy, keys
+from qsone import copy, keys, keystore
 from qsone.engine import cards, connectors, costs, roles
 from qsone.engine.connectors import claude_code, standard
 from qsone.engine.types import BadAnswer, ModelCard, ModelChoice, Role, Text, answer_value
@@ -131,6 +131,7 @@ def settings_router(
             "sheet": [card_json(c) for c in listed],
             "roles": _roles_json(roles.chosen(listed)),
             "defaults": _roles_json(roles.defaults(listed)),
+            "key_store": keystore.kind(),  # "file" when this computer has no key store
         }
 
     @router.put("/settings/ai/roles")
