@@ -22,6 +22,7 @@ import { dir, fill, pick, t, texts, useLanguage, type Text } from "../i18n";
 import { registerCanvas } from "./api";
 import { arrange } from "./arrange";
 import { DESKS_START_COLLAPSED, FILE_FRAMES } from "./choices";
+import { ClientBoqFrame } from "./frames/ClientBoqFrame";
 import { DeliverableFrame } from "./frames/DeliverableFrame";
 import { DeskFrame } from "./frames/DeskFrame";
 import { FileFrame } from "./frames/FileFrame";
@@ -46,6 +47,7 @@ import { SourceError } from "./sources";
 import type {
   ActivityEvent,
   Anchor,
+  ClientBoqInfo,
   DeliverableInfo,
   DeskInfo,
   FileInfo,
@@ -64,7 +66,14 @@ export type CanvasProps = {
   children?: ReactNode;
 };
 
-const nodeTypes = { files: FilesFrame, file: FileFrame, deliverable: DeliverableFrame, desk: DeskFrame, team: TeamFrame };
+const nodeTypes = {
+  files: FilesFrame,
+  file: FileFrame,
+  deliverable: DeliverableFrame,
+  desk: DeskFrame,
+  team: TeamFrame,
+  clientboq: ClientBoqFrame,
+};
 const NO_EDGES: Edge[] = [];
 const GAP = 80;
 const ROW_GAP = 120;
@@ -75,9 +84,11 @@ type Things = {
   files: FileInfo[];
   deliverables: Map<string, DeliverableInfo>;
   desks: Map<string, DeskInfo>;
+  /** The client BOQs imported, by file id: one read-only frame each. */
+  clientBoqs: Map<string, ClientBoqInfo>;
 };
 
-const nothing = (): Things => ({ files: [], deliverables: new Map(), desks: new Map() });
+const nothing = (): Things => ({ files: [], deliverables: new Map(), desks: new Map(), clientBoqs: new Map() });
 
 const reduced = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 const duration = () => (reduced() ? 0 : 300);
@@ -95,14 +106,17 @@ function exists(key: FrameKey, things: Things): boolean {
       return things.deliverables.has(id);
     case "desk":
       return things.desks.has(id);
+    case "clientboq":
+      return things.clientBoqs.has(id);
   }
 }
 
 
-/** What should be on the canvas: Project files, every Deliverable, the team and every Desk. */
+/** What should be on the canvas: Project files, every Deliverable, every imported client BOQ, the team and every Desk. */
 function wanted(things: Things): Incoming[] {
   const out: Incoming[] = [{ key: "files:all", ...sizeFor("files:all") }];
   for (const d of things.deliverables.values()) out.push({ key: `deliverable:${d.id}`, ...sizeFor(`deliverable:${d.id}`, d) });
+  for (const b of things.clientBoqs.values()) out.push({ key: `clientboq:${b.file_id}`, ...sizeFor(`clientboq:${b.file_id}`) });
   out.push({ key: "team:core", ...sizeFor("team:core") });
   for (const desk of things.desks.values()) {
     const agents = deskCounts().get(desk.id)?.members ?? 0;
@@ -151,6 +165,12 @@ function nodeFor(p: Placed, things: Things, previous?: FrameNode): FrameNode | n
     case "team":
       node = { ...common, type: "team", data: { ...base } };
       break;
+    case "clientboq": {
+      const boq = things.clientBoqs.get(id);
+      if (!boq) return null;
+      node = { ...common, type: "clientboq", data: { ...base, boq } };
+      break;
+    }
   }
   node.ariaLabel = frameTitle(node);
   return node;
@@ -497,6 +517,7 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
           files,
           deliverables: new Map(deliverables.map((d) => [d.id, d])),
           desks: new Map(loaded.desks.map((d) => [d.id, d])),
+          clientBoqs: new Map((layout.client_boqs ?? []).map((b) => [b.file_id, b])),
         };
         startActivity(sources, team.signal, loaded);
         const kept = layout.frames.filter((f) => exists(f.key, things.current));
@@ -534,20 +555,22 @@ function Pane({ projectId, sources, onOpenFull, children }: CanvasProps) {
       let files = now.files;
       if (event.type === "deliverable") now.deliverables.set(event.deliverable.id, event.deliverable);
       else if (event.type === "desk") now.desks.set(event.desk.id, event.desk);
+      else if (event.type === "client_boq") now.clientBoqs.set(event.client_boq.file_id, event.client_boq);
       else if (event.type === "file") files = [event.file, ...files.filter((f) => f.id !== event.file.id && f.id !== event.file.replaces)];
       else return;
       things.current = { ...now, files };
       rebuild();
     };
     const reload = () => {
-      void Promise.all([sources.deliverables(), sources.team(), sources.files()]).then(
-        ([deliverables, team, files]) => {
+      void Promise.all([sources.deliverables(), sources.team(), sources.files(), sources.layout()]).then(
+        ([deliverables, team, files, layout]) => {
           if (controller.signal.aborted) return;
           things.current = {
             ...things.current,
             files,
             deliverables: new Map(deliverables.map((d) => [d.id, d])),
             desks: new Map(team.desks.map((d) => [d.id, d])),
+            clientBoqs: new Map((layout.client_boqs ?? []).map((b) => [b.file_id, b])),
           };
           rebuild();
         },

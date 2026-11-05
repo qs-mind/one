@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { deliverablesApi, dispositionName } from "../../deliverables/api";
 import type { Change, Explained, SheetView, Thread, ViewColumn, ViewRow } from "../../deliverables/types";
 import { setLanguage, texts } from "../../i18n";
+import { canvasApi } from "../../canvas/api";
 import { SheetViewer, type SheetHandle } from "./SheetViewer";
 
 const P = "p1";
@@ -200,6 +201,32 @@ describe("SheetViewer", () => {
     expect(amount.querySelector("ins")).toHaveTextContent("4,800,000.00");
     expect(amount).toHaveTextContent(texts.sheetRecalculated.ar);
     expect(within(amount).queryByRole("button")).toBeNull();
+  });
+
+  it("read only (the client's BOQ): nothing opens an editor or posts a change, each number opens its file", async () => {
+    const user = userEvent.setup();
+    const fetch = core({});
+    const openFile = vi.spyOn(canvasApi, "openFile").mockImplementation(() => {});
+    const client = sheet({
+      variant: "client_boq",
+      sample: false,
+      total: null,
+      sources: { s1: { kind: "boq", title: "BOQ", file_name: "مقايسة العميل - عينة.xlsx", file_id: "f1", locator: { sheet: "BOQ", row: 5, column: "E" }, url: null, dated: null } },
+    });
+    render(<SheetViewer projectId={P} view={client} readOnly />);
+    expect(screen.getByText(texts.clientBoqReadOnly.ar)).toBeInTheDocument();
+    expect(screen.queryByText(texts.statusDraft.ar)).toBeNull();
+    await user.dblClick(cellOf("03/02", "rate"));
+    expect(within(cellOf("03/02", "rate")).queryByRole("textbox")).toBeNull();
+    await user.dblClick(cellOf("03/02", "description"));
+    expect(within(cellOf("03/02", "description")).queryByRole("textbox")).toBeNull();
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toEqual([]);
+    await user.click(cellOf("03/02", "rate"));
+    const dialog = await screen.findByRole("dialog", { name: texts.sheetSource.ar });
+    expect(dialog).toHaveTextContent("مقايسة العميل - عينة.xlsx");
+    await user.click(within(dialog).getByRole("button", { name: texts.sourceOpenFile.ar }));
+    expect(openFile).toHaveBeenCalledWith("f1", undefined);
+    openFile.mockRestore();
   });
 
   it("a computed amount never opens an editor", async () => {

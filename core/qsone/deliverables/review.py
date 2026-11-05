@@ -119,11 +119,36 @@ def record_check(
     return row["id"]
 
 
-def record_review(rec: Records, deliverable_id: str, review, *, version_n: int) -> str:
+def _not_in_client(rec: Records, deliverable_id: str, rows: list[dict]) -> list[dict]:
+    """One open comment for each row not in the client's BOQ (`clientfile.imported`), on its
+    row, in the Deliverable's language, with no code: it never blocks Sign-off by itself. A row
+    the Checking QS has said this of before (whatever became of the comment) gets none again."""
+    if not rows:
+        return []
+    with rec.read() as conn:
+        language = ops.deliverable(conn, deliverable_id)["language"]
+    said = {
+        (t["anchor"].get("row"), t["body"])
+        for t in threads.list_comments(rec, deliverable_id)
+        if t["author"] == CHECKER and t["anchor"].get("type") == "row"
+    }
+    out = []
+    for r in rows:
+        text = copy.fill(copy.NOT_IN_CLIENT_BOQ, code=r["code"], description=r["description"])
+        body = " ".join(text[language].split())
+        if (r["row"], body) not in said:
+            out.append({"anchor": {"type": "row", "row": r["row"]}, "body": body, "code": None})
+    return out
+
+
+def record_review(
+    rec: Records, deliverable_id: str, review, *, version_n: int, not_in_client: list[dict] = ()
+) -> str:
     """The hook for Plan 4's Checking QS: its `Review` (code, comments of {"about", "text"},
     checker model, same_provider) of Saved version `version_n`, recorded as a check. Each comment
     sits on the whole Deliverable, «about: text», and carries the check's code when it is B or C,
-    so a Code C check's comments block Sign-off until the engineer closes them."""
+    so a Code C check's comments block Sign-off until the engineer closes them. `not_in_client`:
+    the rows code found missing from the client's BOQ, each given its own comment on its row."""
     code = review.code if review.code in ("B", "C") else None
     comments = [
         {
@@ -134,6 +159,7 @@ def record_review(rec: Records, deliverable_id: str, review, *, version_n: int) 
         for c in review.comments
         if str(c.get("text", "")).strip()
     ]
+    comments += _not_in_client(rec, deliverable_id, list(not_in_client))
     return record_check(
         rec,
         deliverable_id,

@@ -22,6 +22,7 @@ test("BOQ import, in English", async ({ walk }) => {
   await walk.addFiles();
   const kinds = await walk.brief("bench:boq Import the attached BOQ");
   expect.soft(kinds).toEqual(["rows"]);
+  await walk.clientBoq("حفر في تربة عادية لأي عمق (عينة)");
 });
 
 test("Deliverables from a BOQ, in English", async ({ walk }) => {
@@ -30,6 +31,7 @@ test("Deliverables from a BOQ, in English", async ({ walk }) => {
   await walk.addFiles();
   await walk.brief("bench:deliverable Make the priced BOQ and the cover letter");
   await walk.deliverables(2);
+  await walk.notInClientFlag(); // the fake prices one row of its own: the Checking QS flags it
 });
 
 test("a question card, in English", async ({ walk }) => {

@@ -1,13 +1,13 @@
 // The Project Canvas's contracts (Plan 7): what is on the canvas, where it sits, and what the core says about the
 // project's files, Deliverables, Desks and agents. `sources.ts` is the only file that knows the routes behind them.
 import type { Ref } from "react";
-import type { DeliverableInfo } from "../deliverables/types";
+import type { DeliverableInfo, SheetView } from "../deliverables/types";
 import type { Language, Text } from "../i18n";
 
 export type { DeliverableInfo }; // Plan 6 declares it (plus pending, total, sample): never redeclared
 
-export type FrameKind = "files" | "file" | "deliverable" | "desk" | "team";
-/** `files:all`, `file:<id>`, `deliverable:<id>`, `desk:<id>`, `team:core`. */
+export type FrameKind = "files" | "file" | "deliverable" | "desk" | "team" | "clientboq";
+/** `files:all`, `file:<id>`, `deliverable:<id>`, `desk:<id>`, `team:core`, `clientboq:<file id>`. */
 export type FrameKey = `${FrameKind}:${string}`;
 /** Where a frame sits, in world coordinates (the same in both languages). */
 export type Placed = { key: FrameKey; x: number; y: number; w: number; h: number; z: number; collapsed: boolean };
@@ -26,6 +26,10 @@ export type FileInfo = {
   replaces: string | null;
   duplicate?: boolean;
 };
+
+/** A client BOQ imported from a file (GET /projects/{id}/canvas -> client_boqs): one read-only frame each. `at` is the
+ * newest import of the file. */
+export type ClientBoqInfo = { file_id: string; name: string; items: number; headings: number; at: string };
 
 /** Plan 4. A Temporary Desk's id is its Brief id; a saved Desk's is its slug. */
 export type DeskInfo = { id: string; name: Text; stage: "temporary" | "draft" | "approved" };
@@ -54,6 +58,7 @@ export type ActivityEvent =
   | { type: "agent-gone"; id: string }
   | { type: "deliverable"; deliverable: DeliverableInfo }
   | { type: "file"; file: FileInfo }
+  | { type: "client_boq"; client_boq: ClientBoqInfo }
   | { type: "desk"; desk: DeskInfo }
   | { type: "waiting"; count: number };
 
@@ -80,7 +85,7 @@ export interface ProjectSources {
   deliverables(): Promise<DeliverableInfo[]>;
   team(): Promise<Team>;
   status(): Promise<ProjectStatus>;
-  layout(): Promise<{ frames: Placed[]; view: View | null }>;
+  layout(): Promise<{ frames: Placed[]; view: View | null; client_boqs?: ClientBoqInfo[] }>;
   saveFrames(frames: Placed[], removed: FrameKey[], keepalive?: boolean): Promise<void>;
   saveView(view: View, keepalive?: boolean): Promise<void>;
   /** Live events until `signal` aborts; reconnects by itself and then calls `onReconnect`. */
@@ -90,6 +95,8 @@ export interface ProjectSources {
   /** The number of pages; 0 when the file is not a PDF. */
   pages(fileId: string): Promise<number>;
   fileText(fileId: string, page?: number): Promise<FilePiece[]>;
+  /** The client BOQ imported from the file, as a read-only Sheet view. */
+  clientBoq(fileId: string): Promise<SheetView>;
   upload(file: File): Promise<FileInfo>;
 }
 

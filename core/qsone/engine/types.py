@@ -89,6 +89,9 @@ class CheckPacket:
     sources: tuple[dict, ...]
     unsourced: tuple[str, ...]
     previous_comments: tuple[dict, ...]
+    # Priced BOQ rows whose item is not in the client's imported BOQ, found by code (not AI):
+    # {"row", "code", "description"}; One puts a comment on each for the engineer.
+    not_in_client_boq: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)

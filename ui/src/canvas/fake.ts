@@ -1,8 +1,10 @@
 // Fake project sources: for tests (given lists, recorded saves, events a test emits) and for the dev-only sample
 // mode (?sample=1), where every title says it is a sample and the screen shows the "Sample data" label.
+import type { SheetView } from "../deliverables/types";
 import type {
   ActivityEvent,
   AgentInfo,
+  ClientBoqInfo,
   DeliverableInfo,
   FileInfo,
   FilePiece,
@@ -23,6 +25,9 @@ export type FakeOptions = {
   /** Page counts by file id; a file not listed has no pages. */
   pages?: Record<string, number>;
   text?: Record<string, FilePiece[]>;
+  /** The imported client BOQs, and each one's read-only Sheet view by file id. */
+  clientBoqs?: ClientBoqInfo[];
+  clientBoqViews?: Record<string, SheetView>;
 };
 
 export type FakeSources = ProjectSources & {
@@ -50,7 +55,11 @@ export function fakeSources(options: FakeOptions): FakeSources {
     deliverables: async () => [...(options.deliverables ?? [])],
     team: async () => options.team ?? { desks: [], agents: [] },
     status: async () => options.status ?? {},
-    layout: async () => ({ frames: [...frames.values()], view }),
+    layout: async () => ({
+      frames: [...frames.values()],
+      view,
+      ...(options.clientBoqs ? { client_boqs: [...options.clientBoqs] } : {}),
+    }),
     async saveFrames(changed, removed, keepalive = false) {
       saved.frames.push({ frames: changed, removed, keepalive });
       for (const key of removed) frames.delete(key);
@@ -70,6 +79,11 @@ export function fakeSources(options: FakeOptions): FakeSources {
     pages: async (fileId) => options.pages?.[fileId] ?? 0,
     fileText: async (fileId, page) =>
       (options.text?.[fileId] ?? []).filter((p) => page === undefined || p.locator.page === page),
+    async clientBoq(fileId) {
+      const found = options.clientBoqViews?.[fileId];
+      if (!found) throw new Error(`no client BOQ ${fileId}`);
+      return found;
+    },
     async upload(file) {
       uploads.push(file);
       const info: FileInfo = { id: `upload${uploads.length}`, name: file.name, status: "stored", note: null, replaces: null };

@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from qsone import copy
+from qsone.clientfile import imported
 from qsone.deliverables import store as deliverables
 from qsone.projects import Projects
 from qsone.records import files, render
@@ -25,7 +26,7 @@ from qsone.records.project import Records, RecordsError
 
 MAX_FRAMES = 2000  # in one save, and as removed keys
 MAX_PIECES = 1000  # text pieces in one answer
-KEY = re.compile(r"^(files|file|deliverable|desk|team):[0-9a-z_-]{1,64}$")
+KEY = re.compile(r"^(files|file|deliverable|desk|team|clientboq):[0-9a-z_-]{1,64}$")
 _PLACE = 1_000_000  # world coordinates within ±1,000,000
 
 Coordinate = Annotated[float, Field(ge=-_PLACE, le=_PLACE, allow_inf_nan=False)]
@@ -82,6 +83,7 @@ async def _layout_body(request: Request, model: type[BaseModel]) -> BaseModel:
 
 
 def read_layout(rec: Records) -> dict:
+    """Where each frame sits, the view, and the Client BOQs the canvas shows (one frame each)."""
     with rec.read() as conn:
         frames = conn.execute(
             "SELECT key, x, y, w, h, z, collapsed FROM canvas_frames ORDER BY z, key"
@@ -93,6 +95,7 @@ def read_layout(rec: Records) -> dict:
             for k, x, y, w, h, z, c in frames
         ],
         "view": None if view is None else {"x": view[0], "y": view[1], "zoom": view[2]},
+        "client_boqs": imported.list_imported(rec),
     }
 
 
@@ -288,6 +291,10 @@ def router(projects: Projects, waiting=lambda project_id: 0) -> APIRouter:
         except RecordsError as e:
             return _refusal(e)
         return await run(save, body)
+
+    @r.get("/projects/{project_id}/client-boq/{file_id}")
+    async def get_client_boq(project_id: str, file_id: str):
+        return await run(lambda: imported.sheet(project(project_id), file_id))
 
     @r.get("/projects/{project_id}/status")
     async def get_status(project_id: str):

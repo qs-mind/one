@@ -118,6 +118,15 @@ CANVAS_BAD_LAYOUT = {
     "en": "The canvas layout was not saved: a frame's place or size is out of range.",
     "ar": "ترتيب الكانفاس ماتحفظش: مكان أو مقاس إطار برّه الحدود.",
 }
+CLIENT_BOQ_NOT_FOUND = {
+    "en": "No BOQ was imported from this file.",
+    "ar": "مفيش مقايسة اتستوردت من الملف ده.",
+}
+# The Checking QS's comment on a Priced BOQ row whose item is not in the client's BOQ.
+NOT_IN_CLIENT_BOQ = {
+    "en": "Not in the client's BOQ: {code} {description}. Keep it or remove it?",
+    "ar": "البند ده مش موجود في مقايسة العميل: {code} {description}. تسيبه ولا تشيله؟",
+}
 
 PAGE_NOT_FOUND = {
     "en": "The file has no page with this number.",
