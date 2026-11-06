@@ -9,7 +9,7 @@ The model the engineer typed with a Standard Link is their own pick: it leads, p
 from decimal import Decimal
 
 from qsone import settings
-from qsone.engine.connectors import refused, standard
+from qsone.engine.connectors import allow_model, refused, standard
 from qsone.engine.types import ModelCard, ModelChoice, Role
 
 ROLES: tuple[Role, ...] = ("lead", "checker", "specialist", "quick")
@@ -129,6 +129,7 @@ def choose(role: Role, choice: ModelChoice) -> None:
     current = {r: {"connector": c.connector, "model": c.model} for r, c in saved().items()}
     current[role] = {"connector": choice.connector, "model": choice.model}
     settings.save_ai("roles", current)
+    allow_model(choice)
 
 
 def chosen(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
@@ -152,7 +153,7 @@ def same_or_cheaper(
     return [
         c.choice
         for c in _ranked(sheet)
-        if _price(c) <= limit and c.choice != failed and c.choice not in avoid
+        if _eligible(c) and _price(c) <= limit and c.choice != failed and c.choice not in avoid
     ]
 
 
@@ -164,5 +165,13 @@ def costlier(
     return [
         c.choice
         for c in reversed(_ranked(sheet))
-        if (limit is None or _price(c) > limit) and c.choice != failed and c.choice not in avoid
+        if _eligible(c)
+        and (limit is None or _price(c) > limit)
+        and c.choice != failed
+        and c.choice not in avoid
     ]
+
+
+def available(sheet, current):
+    """Refresh stale per-request choices while retaining available explicit picks."""
+    return chosen(list(sheet)) | {r: c for r, c in current.items() if not refused(c)}

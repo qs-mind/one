@@ -830,3 +830,23 @@ async def test_google_request_sends_compatible_tool_and_output_schemas():
         )
     assert len(seen) == 2
     assert schema["properties"]["files"]["maxItems"] == 4
+
+
+@pytest.mark.parametrize("role", roles.ROLES)
+def test_explicit_choice_clears_only_its_refusal(role):
+    connectors.note_refused(HAIKU.choice)
+    connectors.note_refused(SONNET.choice)
+    roles.choose(role, HAIKU.choice)
+    assert not connectors.refused(HAIKU.choice)
+    assert connectors.refused(SONNET.choice)
+
+
+def test_retirement_is_persisted_for_exact_connector_and_model(data_dir):
+    choice = ModelChoice("standard:sample-a", "sample-cheapest")
+    connectors.note_refused(choice)
+    assert json.loads((data_dir / "settings.json").read_text())["ai"]["refused_models"] == [
+        "standard:sample-a/sample-cheapest"
+    ]
+    assert connectors.refused(choice)
+    assert not connectors.refused(ModelChoice("standard:sample-b", choice.model))
+    assert not connectors.refused(ModelChoice(choice.connector, "sample-next"))

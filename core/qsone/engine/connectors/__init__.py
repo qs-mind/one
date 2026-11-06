@@ -201,6 +201,18 @@ def note_refused(choice) -> None:
         log.warning("the refused model was not saved")
 
 
+def allow_model(choice) -> None:
+    """An explicit engineer pick permits trying this exact model again."""
+    found = settings.ai().get("refused_models")
+    if isinstance(found, list):
+        settings.save_ai("refused_models", [k for k in found if k != _model_key(choice)])
+
+
+def model_unavailable(error: BaseException) -> bool:
+    # Only HTTP 404 is safe to replay without paying for the failed request.
+    return getattr(error, "status_code", None) == 404
+
+
 def refused(choice) -> bool:
     found = settings.ai().get("refused_models")
     return isinstance(found, list) and _model_key(choice) in found

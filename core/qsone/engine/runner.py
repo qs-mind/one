@@ -973,9 +973,19 @@ class _Brief:
         """Runs `once` on the run's model, from its Checkpoint each time, through the failures
         that have a plan: busy (once more, then another model), offline (wait), refused key."""
         retried = False
+        unavailable_retried = False
         waits = iter(OFFLINE_WAITS)
         while True:
             choice = self.store.run(run_id)["choice"]
+            if connectors_mod.refused(choice):
+                current = self.setup.roles if self.setup is not None else {}
+                refreshed = roles.available(self.sheet, current)
+                new = refreshed.get(spec.tier)
+                if new is None or new in avoid or not self._model(new):
+                    raise _Fail(copy.NO_AI)
+                choice = new
+                self.store.set_run(run_id, choice=choice)
+                self._agent(run_id, model=choice.model)
             try:
                 return await once(choice)
             except (CapReached, CallRefused, _Fail, asyncio.CancelledError):
@@ -989,12 +999,39 @@ class _Brief:
                     raise
                 provider = self._provider(choice)
                 log.warning("run %s on %s: %s %s", run_id, choice.connector, kind, error)
+                if connectors_mod.model_unavailable(error):
+                    connectors_mod.note_refused(choice)
+                    self.emit(
+                        Progress(
+                            self.brief_id,
+                            run_id,
+                            spec.name,
+                            copy.fill(copy.MODEL_STOPPED, model=choice.model, provider=provider),
+                        )
+                    )
+                    current = self.setup.roles if self.setup is not None else {}
+                    refreshed = roles.available(self.sheet, current)
+                    if self.setup is not None:
+                        self.setup.roles.clear()
+                        self.setup.roles.update(refreshed)
+                    new = refreshed.get(spec.tier)
+                    if (
+                        not unavailable_retried
+                        and new is not None
+                        and new not in avoid
+                        and self._model(new)
+                    ):
+                        unavailable_retried = True
+                        self.store.set_run(run_id, choice=new)
+                        self._agent(run_id, model=new.model)
+                        continue
+                    raise _Fail(
+                        connectors_mod.provider_reason(error, provider, choice.model) or copy.NO_AI
+                    ) from None
                 if kind == "auth":
                     raise _Fail(connectors_mod.key_refused(provider)) from None
                 if kind == "other":  # the provider's reason when ONE knows it (audit B7)
                     said = connectors_mod.provider_reason(error, provider, choice.model)
-                    if getattr(error, "status_code", None) == 404:
-                        connectors_mod.note_refused(choice)  # no longer listed (audit C4)
                     raise _Fail(said or copy.fill(copy.AI_FAILED, provider=provider)) from None
                 if kind == "offline":
                     before = self.step
@@ -1456,7 +1493,9 @@ class _Brief:
         self.sheet, self.found = sheet, {c.id: c for c in found}
         allowed = {c.choice for c in sheet}
         defaults = roles.defaults(sheet)
-        saved = {r: c for r, c in roles.saved().items() if c in allowed}
+        saved = {
+            r: c for r, c in roles.saved().items() if c in allowed and not connectors_mod.refused(c)
+        }
         self.saved_roles = set(saved)
         picked: dict[Role, ModelChoice] = defaults | saved
         if self.lead_choice in allowed:  # picked in the message box for this Brief

@@ -382,3 +382,124 @@ async def test_native_search_failure_is_plain(make):
     with pytest.raises(OneShotFailed) as failed:
         await oneshot.native_search("rebar", country=None, lang=None, models=models)
     assert failed.value.text == copy.fill(copy.AI_BUSY, provider="Claude")
+
+
+@pytest.mark.parametrize("role", ["lead", "checker", "specialist", "quick"])
+@pytest.mark.parametrize("status", [404, 400, 403, 429, 503])
+async def test_retired_quick_retries_only_unbilled_404(make, status, role):
+    from qsone.engine import connectors
+
+    seen = []
+
+    def gone(messages, info):
+        seen.append("gone")
+        raise ModelHTTPError(status, HAIKU.choice.model, "no longer available - sample")
+
+    def answer(messages, info):
+        seen.append("next")
+        return ModelResponse([TextPart("sample result")])
+
+    link = FakeLink(
+        "anthropic",
+        "Claude",
+        "anthropic",
+        models={
+            HAIKU.choice.model: FunctionModel(gone),
+            SONNET.choice.model: FunctionModel(answer),
+        },
+    )
+    models = make({role: HAIKU.choice}, [link], sheet=[HAIKU, SONNET])
+    agent = oneshot.Agent(oneshot._costed(models, HAIKU, role))
+    if status == 404:
+        result = await oneshot._once(models, HAIKU, role, agent, "sample")
+        assert result.output == "sample result"
+        assert seen == ["gone", "next"]
+        assert connectors.refused(HAIKU.choice)
+    else:
+        with pytest.raises(OneShotFailed):
+            await oneshot._once(models, HAIKU, role, agent, "sample")
+        assert seen == ["gone"]
+        assert not connectors.refused(HAIKU.choice)
+
+
+async def test_map_recomputes_quick_for_next_file_and_records_only_success(make, general):
+    from pydantic import BaseModel
+    from pydantic_ai.messages import ToolCallPart
+
+    from qsone import settings
+    from qsone.engine import roles
+
+    class Result(BaseModel):
+        title: str
+
+    seen = []
+    cheap = replace(HAIKU, choice=ModelChoice("standard:sample", "sample-cheapest"))
+    next_card = replace(SONNET, choice=ModelChoice("standard:sample", "sample-next"))
+    typed = replace(OPUS, choice=ModelChoice("standard:sample", "sample-typed"))
+    settings.save_ai(
+        "standard",
+        [
+            {
+                "id": "sample",
+                "name": "Sample",
+                "provider": "sample",
+                "base_url": "https://sample.invalid",
+                "model": "sample-typed",
+            }
+        ],
+    )
+
+    async def gone(messages, info):
+        seen.append("gone")
+        raise ModelHTTPError(404, cheap.choice.model, "not supported for this account - sample")
+
+    async def answer(messages, info):
+        seen.append("next")
+        return ModelResponse([ToolCallPart(info.output_tools[0].name, {"title": "sample"})])
+
+    link = FakeLink(
+        "standard:sample",
+        "Sample",
+        "sample",
+        models={
+            cheap.choice.model: FunctionModel(gone),
+            next_card.choice.model: FunctionModel(answer),
+        },
+    )
+    sheet = [cheap, next_card, typed]
+    models = make(roles.defaults(sheet), [link], sheet=sheet)
+    assert oneshot.map_model(models) == cheap
+    for _ in range(2):
+        assert (
+            await oneshot.map_text(models, "sample file", Result, "sample mapping")
+        ).title == "sample"
+    assert seen == ["gone", "next", "next"]
+    assert oneshot.map_model(models) == next_card
+    assert [row[3] for row in costs_of(general)] == [next_card.choice.model] * 2
+
+
+async def test_retirement_retries_once_and_marks_both_failed_models(make):
+    from qsone.engine import connectors
+
+    seen = []
+
+    async def gone(messages, info):
+        seen.append("gone")
+        raise ModelHTTPError(404, "sample", "model not found - sample")
+
+    link = FakeLink(
+        "anthropic",
+        "Claude",
+        "anthropic",
+        models={
+            HAIKU.choice.model: FunctionModel(gone),
+            SONNET.choice.model: FunctionModel(gone),
+        },
+    )
+    models = make({"quick": HAIKU.choice}, [link], sheet=[HAIKU, SONNET])
+    agent = oneshot.Agent(oneshot._costed(models, HAIKU, "quick"))
+    with pytest.raises(OneShotFailed):
+        await oneshot._once(models, HAIKU, "quick", agent, "sample")
+    assert seen == ["gone", "gone"]
+    assert connectors.refused(HAIKU.choice) and connectors.refused(SONNET.choice)
+    assert oneshot.map_model(models) is None
