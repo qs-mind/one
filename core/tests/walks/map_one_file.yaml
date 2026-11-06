@@ -1,0 +1,15 @@
+name: map_one_file
+max_usd: 0.1
+scripted:
+- project: Sample one-file map {run}
+- files:
+  - '{samples}/sample-map-contract.pdf'
+- map: {}
+- check:
+    map_total: 1
+    map_key_pages:
+    - {label: Contract data, page: 58}
+    - {label: Bid data, page: 26}
+- ask: bench:map Read the sample contract data.
+- check:
+    max_tool_steps: 5

@@ -1,1 +1,1 @@
-"""The local Project Map. No AI or external services."""
+"""Project navigation: local structure and drawings, plus a cost-gated text-only AI pass."""

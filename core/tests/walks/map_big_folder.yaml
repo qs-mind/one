@@ -1,0 +1,10 @@
+name: map_big_folder
+max_usd: 0.1
+scripted:
+- project: Sample 2000-file map {run}
+- synthetic_map_files: 2000
+- map: {cost_card: true, wait_seconds: 600}
+- check:
+    map_total: 2000
+    map_page_fast: 2
+    map_cost_card: true

@@ -524,6 +524,14 @@ class _Brief:
         self.state: BriefState = brief["status"]
         self.step: Text | None = brief["step"]
         self.instruction = instruction
+        self.mapping_files = next(
+            (
+                item["anchor"]["project_map_files"]
+                for item in brief.get("selection") or []
+                if "project_map_files" in (item.get("anchor") or {})
+            ),
+            None,
+        )
         self.output_type = output_type
         self.output: Any = None
         self.log: list[Event] = []
@@ -1423,6 +1431,8 @@ class _Brief:
         )
         # The General chat's Lead has its three tools only; a project's has the project's.
         spec = general.lead_spec() if self.place.rec is None else agents.lead_spec()
+        if self.mapping_files is not None:
+            spec = replace(spec, name=copy.MAP_AI_LABEL, instructions="", tools=())
         introduced = engineer.card_line(engineer.card(self.engine.engineer_records()))
         if introduced:  # the introduction card's one line (Plan 8)
             spec = replace(spec, instructions=f"{spec.instructions}\n\n{introduced}")
@@ -1724,17 +1734,29 @@ class _Brief:
                 )
                 await self._prepare()
                 try:
-                    output = await self._lead()
+                    if self.mapping_files is not None:
+                        from qsone.records.mapping import ai as map_ai
+
+                        await map_ai.run(
+                            self.place.rec,
+                            self.models(self.lead_run_id),
+                            file_ids=self.mapping_files,
+                        )
+                        output = ""
+                    else:
+                        output = await self._lead()
                 except CapReached as reached:
                     if not reached.report:
                         raise
                     self.set_state("paused_cap")
                     try:
-                        await self._lead(report=True)
+                        if self.mapping_files is None:
+                            await self._lead(report=True)
                     except CapReached:
                         pass
                     raise
-                await self._finish(output)
+                if self.mapping_files is None:
+                    await self._finish(output)
                 self.output = output
                 self.set_state("done", copy.STEP_DONE)
                 self._track_done()
@@ -1932,11 +1954,51 @@ class Engine:
 
     # Briefs ----------------------------------------------------------------------------------
 
-    def active(self, chat_id: str) -> str | None:
+    def active(self, chat_id: str, *, include_mapping=True) -> str | None:
+        mapping = None
         for b in self._briefs.values():
             if b.chat_id == chat_id and not b.finished:
-                return b.brief_id
-        return None
+                if b.mapping_files is None:
+                    return b.brief_id
+                mapping = b.brief_id
+        return mapping if include_mapping else None
+
+    async def map_project(self, project_id: str, file_ids: list[str]) -> bool:
+        """Use a normal chat Brief for automatic mapping, approvals, events and spending."""
+        from qsone.records.mapping import store as map_store
+
+        if self.active(project_id) is not None:
+            return False
+        place = self._place(project_id)
+        try:
+            sheet = await self.sheet()
+        except NoAI:
+            with place.rec.write(map_store.ACTOR) as c:
+                for fid in file_ids:
+                    map_store.write(
+                        c,
+                        place.rec,
+                        "map_files",
+                        {
+                            "file_id": fid,
+                            "ai_state": "no_ai",
+                            "note": copy.NO_AI,
+                        },
+                    )
+            return True
+        if self.active(project_id) is not None:
+            return False
+        selection = [
+            {
+                "kind": "files",
+                "id": project_id,
+                "title": copy.MAP_AI_LABEL["en"],
+                "anchor": {"project_map_files": file_ids},
+            }
+        ]
+        bid = place.store.new_brief(project_id, copy.MAP_AI_LABEL["en"], selection)
+        self._launch(_Brief(self, place, place.store.brief(bid), sheet=sheet))
+        return True
 
     async def start_brief(
         self,
@@ -1956,11 +2018,11 @@ class Engine:
         accept is dropped. Raises `BriefBusy`, `NoAI` (also for a `lead` no longer on the Model
         Data Sheet) and `RecordsError`."""
         place = self._place(chat_id)
-        busy = self.active(chat_id)
+        busy = self.active(chat_id, include_mapping=False)
         if busy is not None:
             raise BriefBusy(busy)
         sheet = await self.sheet()
-        busy = self.active(chat_id)
+        busy = self.active(chat_id, include_mapping=False)
         if busy is not None:
             raise BriefBusy(busy)
         if lead is not None:
@@ -2151,7 +2213,9 @@ class Engine:
                 "role": "user",
                 "parts": [{"type": "text", "text": brief["text"]}],
             }
-            if brief["selection"]:  # the chip on the engineer's message (Plan 7)
+            if brief["selection"] and not any(
+                "project_map_files" in (i.get("anchor") or {}) for i in brief["selection"]
+            ):  # the chip on the engineer's message (Plan 7)
                 question["metadata"] = {"selection": brief["selection"]}
             messages.append(question)
             running = self._briefs.get(brief_id)

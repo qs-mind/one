@@ -11,6 +11,7 @@ from qsone.tools import (  # noqa: F401 - each registers its tools
     files,
     lessons,
     prices,
+    project_map,
     sandbox,
     sheet_pricing,
     web,

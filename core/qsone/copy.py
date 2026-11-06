@@ -2899,3 +2899,11 @@ REPORT_DRAWING = {
 }
 
 REPORT_DRAWING_REV = {"en": "rev {revision}", "ar": "مراجعة {revision}"}
+
+MAP_REVISION = {"en": "Drawing revisions", "ar": "إصدارات اللوحة"}
+MAP_AI_LABEL = {"en": "Project Map", "ar": "خريطة المشروع"}
+MAP_AI_COST = {
+    "en": "Mapping {count} files costs about US${cost}.",
+    "ar": "تخطيط {count} ملف هيتكلف حوالي {cost} دولار.",
+}
+MAP_AI_RUN = {"en": "Map them", "ar": "خطّطهم"}

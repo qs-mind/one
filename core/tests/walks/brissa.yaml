@@ -11,6 +11,11 @@ real:
   - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
   - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol2_technical_specs.pdf'
   - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol3_boq.pdf'
+- map: {}
+- check:
+    map_key_pages:
+    - {label: Contract data, page: 58}
+    - {label: Bid data, page: 26}
 - ask: What are the payment terms, retention and delay damages? Cite the contract.
 - check:
     reply_numbers:
@@ -26,6 +31,7 @@ real:
       value: '0.2'
       page: 58
     no_promise: true
+    max_tool_steps: 5
 - ask: What are the bid validity and security requirements?
 - check:
     reply_numbers:
@@ -33,6 +39,7 @@ real:
     - 350000
     reply_contains:
     - USD
+    max_tool_steps: 5
     cited:
       value: 350,000
       page: 26
@@ -47,6 +54,17 @@ real:
       page_box: true
       minimum_number: 1000
 scripted:
+- project: Sample map navigation {run}
+- files:
+  - '{samples}/sample-map-contract.pdf'
+- map: {}
+- check:
+    map_key_pages:
+    - {label: Contract data, page: 58}
+    - {label: Bid data, page: 26}
+- ask: bench:map Read the sample contract and bid data from their key pages.
+- check:
+    max_tool_steps: 5
 - project: Sample contract and PDF BOQ {run}
 - files:
   - '{samples}/sample-conditions.pdf'

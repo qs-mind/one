@@ -162,7 +162,9 @@ def create_app(
 
     mapping = Mapping(
         registry,
-        foreground=lambda _: any(engine.active(pid) is not None for pid, _ in registry.opened()),
+        foreground=lambda _: any(
+            engine.active(pid, include_mapping=False) is not None for pid, _ in registry.opened()
+        ),
     )
     sender = usage.Sender()
     account = Account()  # the QS Mind account; its vault keeps the Backup key
@@ -186,6 +188,9 @@ def create_app(
             lambda project_id, event: loop.call_soon_threadsafe(activity.publish, project_id, event)
         )
         service.start()
+        mapping.completed = lambda pid, ids: asyncio.run_coroutine_threadsafe(
+            engine.map_project(pid, ids), loop
+        )
         mapping.start()
         trash.purge_all()  # what a core that stopped inside an Undo window left
         connector_hub.start()  # a Connector's server starts only when first used

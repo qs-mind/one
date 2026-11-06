@@ -69,3 +69,23 @@ def ai() -> dict:
 def save_ai(part: str, value: object) -> None:
     """Raises `OSError` when the file cannot be written."""
     save("ai", ai() | {part: value})
+
+
+def map_auto_usd():
+    """Per-drop automatic Project Map allowance, in exact USD."""
+    from decimal import Decimal, InvalidOperation
+
+    try:
+        value = Decimal(str(load().get("map_auto_usd", "0.50")))
+        return value if value.is_finite() and value >= 0 else Decimal("0.50")
+    except InvalidOperation:
+        return Decimal("0.50")
+
+
+def save_map_auto_usd(value: str):
+    """Persist an exact, nonnegative per-drop allowance; never accept a JSON float."""
+    import re
+
+    if not isinstance(value, str) or not re.fullmatch(r"\d{1,12}(?:\.\d{1,6})?", value):
+        raise ValueError("map_auto_usd")
+    save("map_auto_usd", value)

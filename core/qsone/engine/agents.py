@@ -23,6 +23,7 @@ _INSTRUCTIONS = Path(__file__).parent / "instructions"
 # proposals, the Sandbox and Connector calls go to specialists the Lead builds, which keeps the
 # Lead's context small; the Checking QS reads only, and never goes online.
 LEAD_TOOLS = (
+    "project_map",
     "files_list",
     "files_read",
     "compare_files",
