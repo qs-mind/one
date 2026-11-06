@@ -101,6 +101,12 @@ describe("Reply", () => {
     expect(document.body.textContent).not.toMatch(/[0-9a-f]{8}/);
   });
 
+  it("a number written in Arabic-Indic digits reads in Western digits, its decimal a point, still marked", () => {
+    render(<Reply text="الإجمالي ٦٤٠٬٩٨٣٫٣٥ جنيه" unsourced={["٦٤٠٬٩٨٣٫٣٥"]} />);
+    expect(screen.getByText("640,983.35").tagName).toBe("MARK");
+    expect(document.body.textContent).not.toMatch(/[٠-٩٫٬]/);
+  });
+
   it("never renders raw HTML", () => {
     const { container } = render(<Reply text={'<img src="x" onerror="alert(1)"><script>alert(2)</script>\n\nok'} />);
     expect(container.querySelector("img, script")).toBeNull();

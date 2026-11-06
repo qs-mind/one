@@ -3,6 +3,7 @@
 import { BidiText } from "../../bidi";
 import { t } from "../../../i18n";
 import { useDocumentNames, withoutIds } from "../../ids";
+import { westernNumbers } from "../../../ui/digits";
 
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const digit = "[0-9٠-٩]";
@@ -29,7 +30,7 @@ export function Words({ text, unsourced }: { text: string; unsourced: readonly s
   const names = useDocumentNames(); // an id in the words reads as its document's name, or goes
   return (
     <>
-      {splitUnsourced(withoutIds(text, names), unsourced).map((piece, i) =>
+      {splitUnsourced(westernNumbers(withoutIds(text, names)), unsourced.map(westernNumbers)).map((piece, i) =>
         piece.marked ? (
           <mark key={i} title={t("noSource")} className="rounded-sm bg-stone px-0.5 text-copper underline decoration-dotted">
             {piece.text}

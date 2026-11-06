@@ -9,6 +9,7 @@ import { sourceLineHandlers } from "../sources/line";
 import { useSourceCard } from "../sources/useSourceCard";
 import { isolateOtherScript } from "./bidi";
 import { useDocumentNames, withoutIds } from "./ids";
+import { westernNumbers } from "../ui/digits";
 import type { SourcedData } from "./parts/types";
 
 type BlockProps = ExtraProps & { className?: string; children?: ReactNode };
@@ -101,8 +102,8 @@ function markNumbers(values: string[], element: (written: string) => { hName: st
 
 export function Reply({
   text,
-  unsourced = [],
-  sourced = {},
+  unsourced: written = [],
+  sourced: writtenSourced = {},
   projectId,
 }: {
   text: string;
@@ -112,6 +113,9 @@ export function Reply({
   projectId?: string;
 }) {
   const lang = useLanguage();
+  // every number reads in Western digits with , and . (ui/digits.ts); the guard's numbers are found as they then read
+  const unsourced = written.map(westernNumbers);
+  const sourced = Object.fromEntries(Object.entries(writtenSourced).map(([as, number]) => [westernNumbers(as), number]));
   const key = unsourced.join("\n");
   const sourcedKey = projectId ? Object.keys(sourced).join("\n") : "";
   const plugins = useMemo(() => {
@@ -149,7 +153,7 @@ export function Reply({
   return (
     <div ref={source.host} className="relative flex flex-col gap-2">
       <Markdown remarkPlugins={plugins} components={shown} skipHtml>
-        {withoutIds(text, names)}
+        {westernNumbers(withoutIds(text, names))}
       </Markdown>
       {source.card}
       {unsourced.length > 0 && <p className="text-slate">{t("noSourceNote")}</p>}
