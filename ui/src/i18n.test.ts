@@ -31,6 +31,12 @@ describe("i18n", () => {
     expect(pick({ en: "Read" } as never, "ar")).toBe("Read");
   });
 
+  it("keeps revision comparison labels in the shared texts", () => {
+    const keys = ["Open", "Old", "Newer", "Overlay", "Legend", "Choose", "Loading", "Failed",
+      "Unchanged", "UnpairedOld", "UnpairedNew", "Added", "Removed", "NoChanges", "Scope", "Sheet", "Title", "Order"];
+    for (const key of keys) expect(texts).toHaveProperty(`compare${key}`);
+  });
+
   it("every text has both languages", () => {
     for (const text of Object.values(texts)) {
       expect(text.en.trim()).not.toBe("");

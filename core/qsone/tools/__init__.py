@@ -5,6 +5,7 @@ from qsone import view  # noqa: F401 - decision 16.1's `show`
 from qsone.journey import understand  # noqa: F401 - Plan 8's `understood`, the card's tool
 from qsone.tools import (  # noqa: F401 - each registers its tools
     boq,
+    compare,
     connectors,
     engineer,
     files,

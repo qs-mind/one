@@ -25,6 +25,7 @@ _INSTRUCTIONS = Path(__file__).parent / "instructions"
 LEAD_TOOLS = (
     "files_list",
     "files_read",
+    "compare_files",
     "boq_preview",
     "boq_import",
     "ask_engineer",

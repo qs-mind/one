@@ -27,7 +27,7 @@ dependencies = [
   "keyring",
   "sqlcipher3-wheels",
   "sqlite-vec",
-  "pypdfium2",
+  "pypdfium2",  # Apache-2.0 / BSD-3-Clause; PDF reading and revision page renders
   "pdfplumber",  # MIT; PDF BOQ tables; brings pdfminer.six (MIT)
   "openpyxl",
   "xlrd",
@@ -35,7 +35,7 @@ dependencies = [
   # Search by meaning. onnxruntime ships no Intel Mac wheel: there, search is by words only.
   "onnxruntime ; sys_platform != 'darwin' or platform_machine == 'arm64'",
   "tokenizers",
-  "numpy",
+  "numpy",  # BSD-3-Clause; search vectors and in-memory revision overlays
   "truststore",  # MIT; HTTPS with the system's certificates (the model download, the account)
   "httpx",  # BSD-3-Clause; the model download, the QS Mind account and Usage Stats (Plan 8)
   "pyjwt",  # MIT; checks the QS Mind account's ID token (Plan 8), already there through mcp
