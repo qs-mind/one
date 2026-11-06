@@ -5,8 +5,9 @@ The AI maps the columns; code reads every row.
   columns its headings name.
 - `plan` reads every row below the header (nothing is written) and sorts it: a `boq_item`
   (a description with a quantity, or with a unit), a `boq_heading` (a description only), or a row
-  left out with the reason: a total, the headings again, a number that is not exact, a quantity
-  with no unit, a row hidden in Excel. An empty row is passed over.
+  left out with the reason: the headings again, a number that is not exact, a quantity
+  with no unit, a row hidden in Excel. File totals and discounts are sourced heading lines.
+  An empty row is passed over.
 - `write` stores the plan in one transaction: the items, then each number with its own source,
   the cell it came from (`{"sheet", "row", "column"}`), and one audit row whose id is the
   `import_id`. Rates and amounts are copied as written, never computed.
@@ -60,8 +61,7 @@ Hidden = Literal["skip", "include"]
 
 # Exact cells ------------------------------------------------------------------------------------
 
-_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹٫", "01234567890123456789.")
-_PLAIN = re.compile(r"[+-]?[0-9]+(\.[0-9]+)?")
+_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 _FORMAT_NOISE = re.compile(r'"[^"]*"|\[[^\]]*\]|\\.|_.|\*.')
 
 
@@ -83,16 +83,72 @@ def _within(text: str) -> tuple[str | None, str | None]:
     return text, None
 
 
-def exact(value, fmt: str | None) -> tuple[str | None, str | None]:
+def _numeric_text(value: str) -> dict[str, str]:
+    """Possible decimal conventions, with validated groups; never infer by magnitude."""
+    text = value.translate(_DIGITS)
+    text = re.sub(r"[\u00a0\u2009\u202f]", " ", text.strip())
+    sign = text[:1] if text[:1] in ("+", "-") else ""
+    text = text[len(sign) :]
+    found = {}
+    for mark in (".", ","):
+        decimal = "٫" if "٫" in text else mark
+        if text.count(decimal) > 1:
+            continue
+        parts = text.split(decimal)
+        integer, fraction = parts[0], parts[1] if len(parts) == 2 else None
+        if fraction is not None and not re.fullmatch(r"[0-9]+", fraction):
+            continue
+        separators = {c for c in integer if not c.isdigit()}
+        allowed = {"٬", " ", "," if mark == "." else "."}
+        if separators:
+            if len(separators) != 1 or not separators <= allowed:
+                continue
+            sep = next(iter(separators))
+            if not re.fullmatch(r"[1-9][0-9]{0,2}(?:" + re.escape(sep) + r"[0-9]{3})+", integer):
+                continue
+            integer = integer.replace(sep, "")
+        elif not re.fullmatch(r"[0-9]+", integer):
+            continue
+        found[mark] = sign + integer + ("." + fraction if fraction is not None else "")
+    return found
+
+
+def _decimal_convention(sheet: "Sheet", columns: set[int], first: int) -> str | None:
+    """Only unambiguous text cells in numeric columns establish a file convention."""
+    votes = set()
+    for r, cells in sheet.cells.items():
+        if r < first:
+            continue
+        for col in columns:
+            cell = cells.get(col)
+            if cell is None or not isinstance(cell.value, str) or "٫" in cell.value:
+                continue
+            options = _numeric_text(cell.value)
+            if len(options) == 1:
+                votes.update(options)
+    return next(iter(votes)) if len(votes) == 1 else None
+
+
+def exact(
+    value, fmt: str | None, *, decimal_mark: str | None = None
+) -> tuple[str | None, str | None]:
     """(exact decimal text, None), or (None, why): "text" for text, a date or a flag, "decimals"
-    for more than 6 decimals. (None, None) is an empty cell. Never a float."""
+    for more than 6 decimals, "ambiguous" for unresolved separators. `decimal_mark` comes
+    only from unambiguous cells in the sheet's numeric columns. Empty cells give (None, None).
+    Text parsing preserves exact decimal digits; it never passes through float."""
     if value is None:
         return None, None
     if isinstance(value, str):
-        text = value.translate(_DIGITS).strip()
-        if not text:
+        if not value.strip():
             return None, None
-        return _within(text) if _PLAIN.fullmatch(text) else (None, "text")
+        options = _numeric_text(value)
+        if not options:
+            return None, "text"
+        if len(set(options.values())) == 1:
+            return _within(next(iter(options.values())))
+        if decimal_mark in options:
+            return _within(options[decimal_mark])
+        return None, "ambiguous"
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None, "text"
     if isinstance(value, float):
@@ -282,6 +338,19 @@ def match_sheet(names: list[str], asked: str) -> str | None:
         return asked
     found = [n for n in names if _sheet_key(n) == _sheet_key(asked)]
     return found[0] if len(found) == 1 else None
+
+
+def source_sheet(conn, file_id: str, asked: str) -> str | None:
+    """Resolve a locator against all the file's sheet names, retaining ambiguity checks."""
+    names = [
+        r[0]
+        for r in conn.execute(
+            "SELECT DISTINCT json_extract(locator, '$.sheet') FROM chunks WHERE file_id = ?"
+            " AND json_type(locator, '$.sheet') = 'text'",
+            (file_id,),
+        )
+    ]
+    return match_sheet(names, asked) if isinstance(asked, str) else None
 
 
 def read(book: Workbook, sheet: str | None) -> tuple[list[str], Sheet]:
@@ -496,6 +565,7 @@ def overview(
         {"row": r.row, "title": r.description}
         for r in p.rows
         if r.kind == HEADING
+        and not r.line_kind
         and not r.code
         and r.description
         and len(r.description) <= SECTION_CHARS
@@ -505,23 +575,15 @@ def overview(
     lead = first_item is not None and (not sections or first_item < sections[0]["row"])
     total = None
     if "amount" in columns:
-        col = column(columns["amount"])
-        for skipped in p.skipped:
-            if skipped["why"] is not copy.BOQ_WHY_TOTAL:
+        for line in p.rows:
+            if line.line_kind != "total" or "amount" not in line.numbers:
                 continue
-            row = ws.cells.get(skipped["row"], {})
-            cell = row.get(col)
-            value = None if cell is None else exact(cell.value, cell.fmt)[0]
-            if value is None:
-                continue
-            words = " ".join(
-                _text(c.value) for _, c in sorted(row.items()) if isinstance(c.value, str)
-            )
+            value, letter = line.numbers["amount"]
             total = {
                 "value": value,
-                "row": skipped["row"],
-                "column": columns["amount"],
-                "label": " ".join(words.split())[:120],
+                "row": line.row,
+                "column": letter,
+                "label": " ".join(line.description.split())[:120],
             }
     return {
         "items": p.items,
@@ -545,6 +607,8 @@ _TOTAL = re.compile(
     re.IGNORECASE,
 )
 
+_DISCOUNT = re.compile(r"خصم|خصومات|discount|rebate", re.IGNORECASE)
+
 
 @dataclass(frozen=True)
 class Row:
@@ -556,6 +620,7 @@ class Row:
     numbers: dict[str, tuple[str, str]]  # field -> (exact text, column letter)
     hidden: bool
     description_2: str | None = None  # the other language's, when both are written
+    line_kind: str | None = None  # file total or discount; never calculated
 
 
 @dataclass(frozen=True)
@@ -580,6 +645,7 @@ class Plan:
     sheet_hidden: bool
     hidden_columns: list[str]  # mapped columns hidden in Excel
     locators: dict = field(default_factory=dict)
+    quantity_fallbacks: dict[str, list[int]] = field(default_factory=dict)
 
     @property
     def items(self) -> int:
@@ -635,6 +701,7 @@ def _sheet_columns(sheet: Sheet, header_row: int, first: int, last: int) -> dict
 def _flagged(rec: Records, file_id: str, sheet: str) -> set[int]:
     """Rows of the sheet with hidden text (white, tiny, invisible) or orders to an AI."""
     with rec.read() as conn:
+        sheet = source_sheet(conn, file_id, sheet) or sheet
         rows = conn.execute(
             "SELECT kind, locator FROM file_flags WHERE file_id = ? AND kind IN"
             " ('white_text', 'tiny_text', 'invisible_text', 'ai_instruction')",
@@ -656,6 +723,7 @@ def _flagged(rec: Records, file_id: str, sheet: str) -> set[int]:
 
 def _imported_rows(rec: Records, file_id: str, sheet: str) -> set[int]:
     with rec.read() as conn:
+        sheet = source_sheet(conn, file_id, sheet) or sheet
         rows = conn.execute(
             "SELECT json_extract(fields, '$.row') FROM items WHERE kind IN (?, ?)"
             " AND json_extract(fields, '$.file_id') = ? AND json_extract(fields, '$.sheet') = ?",
@@ -706,6 +774,22 @@ def plan_sheet(
     headers = {f: _text(header[c].value) if c in header else "" for f, c in cols.items()}
     flagged = _flagged(rec, file_id, ws.name)
     before = set() if again else _imported_rows(rec, file_id, ws.name)
+    sheet_columns = _sheet_columns(ws, header_row, first, last)
+    candidates = [
+        column(c)
+        for c, info in sheet_columns.items()
+        if heading_field(info["header"]) == "quantity" and c != columns.get("quantity")
+    ]
+    _, guessed = guess(ws, PREVIEW_ROWS)
+    guessed_quantity = guessed.get("quantity")
+    if guessed_quantity and guessed_quantity != columns.get("quantity"):
+        c = column(guessed_quantity)
+        if c not in candidates:
+            candidates.append(c)
+    quantity_fallbacks: dict[str, list[int]] = {}
+    decimal_mark = _decimal_convention(
+        ws, {cols[f] for f in NUMBERS if f in cols} | set(candidates), header_row + 1
+    )
 
     def raw(r: int, f: str):
         if f not in cols:
@@ -740,20 +824,59 @@ def plan_sheet(
             skip(r, copy.BOQ_WHY_HEADER)
             continue
         quantity_empty = _text(values["quantity"][0]) == ""
-        if quantity_empty and (_TOTAL.search(texts["description"]) or _TOTAL.search(texts["code"])):
-            skip(r, copy.BOQ_WHY_TOTAL)
+        label = texts["description"] or texts["description_2"] or texts["code"]
+        line_kind = None
+        if not texts["unit"]:
+            if _TOTAL.search(label) or _TOTAL.search(texts["code"]):
+                line_kind = "total"
+            elif _DISCOUNT.search(label):
+                line_kind = "discount"
+        if line_kind:
+            # File summary cells have no item unit. Keep them as named file numbers,
+            # rather than pretending a discount fraction is an item's quantity or rate.
+            numbers = {}
+            for f in NUMBERS:
+                value, why = exact(*values[f], decimal_mark=decimal_mark)
+                if value is not None:
+                    name = "file_" + f if f in ("quantity", "rate") else f
+                    numbers[name] = (value, letters(cols[f]))
+            out.append(
+                Row(
+                    r,
+                    HEADING,
+                    texts["code"] or None,
+                    label,
+                    None,
+                    numbers,
+                    is_hidden,
+                    line_kind=line_kind,
+                )
+            )
             continue
+        fallback = None
+        if quantity_empty and texts["unit"]:
+            for c in candidates:
+                cell = ws.cells.get(r, {}).get(c)
+                if (
+                    cell is not None
+                    and exact(cell.value, cell.fmt, decimal_mark=decimal_mark)[0] is not None
+                ):
+                    values["quantity"] = (cell.value, cell.fmt)
+                    fallback = letters(c)
+                    break
         numbers, bad = {}, None
         for f in NUMBERS:
-            text, why = exact(*values[f])
+            text, why = exact(*values[f], decimal_mark=decimal_mark)
             if why is not None:
                 bad = (f, why)
                 break
             if text is not None:
-                numbers[f] = (text, letters(cols[f]))
+                numbers[f] = (text, fallback if f == "quantity" and fallback else letters(cols[f]))
         if bad is not None:
             f, why = bad
-            words = copy.BOQ_WHY_TEXT if why == "text" else copy.BOQ_WHY_DECIMALS
+            words = {"text": copy.BOQ_WHY_TEXT, "ambiguous": copy.BOQ_WHY_NUMBER_FORMAT}.get(
+                why, copy.BOQ_WHY_DECIMALS
+            )
             skip(r, copy.fill(words, field=copy.BOQ_FIELDS[f], column=letters(cols[f])))
             continue
         code, own, second, unit = (texts[f] or None for f in TEXTS)
@@ -774,6 +897,8 @@ def plan_sheet(
         kind = ITEM if unit is not None else HEADING
         if kind == ITEM and "quantity" not in numbers:
             no_quantity.append(r)
+        if fallback:
+            quantity_fallbacks.setdefault(fallback, []).append(r)
         out.append(Row(r, kind, code, description, unit, numbers, is_hidden, other))
 
     if not out and not already:
@@ -801,7 +926,8 @@ def plan_sheet(
         last_row=last,
         headers=headers,
         examples=examples,
-        sheet_columns=_sheet_columns(ws, header_row, first, last),
+        sheet_columns=sheet_columns,
+        quantity_fallbacks=quantity_fallbacks,
         hidden_rows=hidden_rows,
         flagged_rows=sorted(r.row for r in out if r.row in flagged),
         no_quantity=no_quantity,
@@ -875,6 +1001,8 @@ def write(
         import_id, at = uuid4().hex, rec.clock()
         for order, row in enumerate(p.rows, 1):
             fields: dict = {"description": row.description}
+            if row.line_kind is not None:
+                fields["line_kind"] = row.line_kind
             if row.description_2 is not None:
                 fields["description_2"] = row.description_2
             if row.unit is not None:
@@ -900,7 +1028,7 @@ def write(
                     source_id=source_id,
                     dated=src["dated"],
                     unit=None if name == "amount" else row.unit,
-                    currency=None if name == "quantity" else currency,
+                    currency=None if name in ("quantity", "file_quantity") else currency,
                 )
         summary = {
             "file_id": p.file_id,
@@ -920,6 +1048,7 @@ def write(
             ),
             "flagged_rows": p.flagged_rows,
             "no_quantity": p.no_quantity,
+            "quantity_fallbacks": p.quantity_fallbacks,
             "already_imported_rows": p.already,
         }
         audit.record(

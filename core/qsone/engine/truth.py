@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 from qsone import copy
 from qsone.engine import numbers_guard
+from qsone.records import boq
 
 CAIRO = ZoneInfo("Africa/Cairo")
 
@@ -694,6 +695,11 @@ def texts_at(conn, file_id: str, locator: dict) -> list[str] | None:
     place = {k: v for k, v in locator.items() if k in _PLACE_KEYS}
     if not place:
         return None
+    if "sheet" in place:
+        matched = boq.source_sheet(conn, file_id, place["sheet"])
+        if matched is None:
+            return []
+        place["sheet"] = matched
     where = " AND ".join(f"json_extract(locator, '$.{k}') = ?" for k in place)
     rows = conn.execute(
         f"SELECT text FROM chunks WHERE file_id = ? AND {where} ORDER BY id",

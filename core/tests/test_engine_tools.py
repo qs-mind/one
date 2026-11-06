@@ -282,6 +282,7 @@ async def test_records_tools_need_an_open_project(ctx):
 
 
 async def test_a_number_keeps_its_source_and_date(ctx):
+    ctx.brief_id = ctx.store.new_brief(ctx.rec.id, "Record the sample rate for item 03/02")
     source, item = await source_and_item(ctx)
     args = {"item": "03/02", "name": "rate", "value": "39850.50", "unit": "m3", "currency": "EGP"}
     out = ids_of(await call("record_number", {**args, "source_id": source, "dated": DATED}, ctx))
@@ -355,6 +356,7 @@ async def test_writes_are_remembered_per_brief(ctx):
 
 
 async def test_calc_tools_come_from_plan_3_with_their_docs(ctx):
+    ctx.brief_id = ctx.store.new_brief(ctx.rec.id, "Record the sample rate for item 03/02")
     for name, plan3 in calc_tool.TOOLS.items():
         tool = REGISTRY[name]
         assert tool.description == plan3.doc and tool.args is plan3.request

@@ -454,8 +454,10 @@ def _flags(rec: Records, info: FileInfo, sel: _Selection) -> list[str]:
         where = json.loads(locator)
         if "page" in where and where["page"] not in sel.pages:
             continue
-        if "sheet" in where and sel.sheet is not None and where["sheet"] != sel.sheet:
-            continue
+        if "sheet" in where and sel.sheet is not None:
+            # Selections are canonical; flags can come from another reader's spelling.
+            if boq.match_sheet(_sheets(rec, info.id), where["sheet"]) != sel.sheet:
+                continue
         times = f" (x{count})" if count > 1 else ""
         words = _FLAG_WORDS.get(kind, f"hidden: {kind}")
         shown.append(f"{words} at {_json(where)}{times}: «{excerpt}»")

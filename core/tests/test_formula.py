@@ -138,7 +138,7 @@ def test_the_end_reads_in_each_language():
 @pytest.mark.parametrize(
     "text, fn",
     [
-        ("sum(a, b)", "sum"),
+        ("sum()", "sum"),
         ("count()", "count"),
         ("abs(a, b)", "abs"),
         ("to(x)", "to"),

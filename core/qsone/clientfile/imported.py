@@ -164,7 +164,11 @@ def sheet(rec: Records, file_id: str) -> dict:
                     "item_id": item["id"],
                     "title": title,
                     "version": 1,
-                    "cells": {},
+                    "cells": {
+                        k.removeprefix("file_"): v
+                        for k, v in numbers.get(item["id"], {}).items()
+                        if k.removeprefix("file_") in NUMBERS
+                    },
                 }
             )
             continue
