@@ -4,7 +4,7 @@ ONE without the screen: a thin client of the existing local HTTP routes. No AI o
 quantity calculations are implemented here. Run from this checkout's `core/`:
 
 ```sh
-/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m qsone.cli --help
+core/.venv/bin/python -m qsone.cli --help
 ```
 
 Use that interpreter with this worktree's working directory (or `PYTHONPATH=core`
@@ -116,7 +116,7 @@ are private, read-only inputs; no fixture copies are included.
 Variables: `{samples}` is the session sample folder, `{test_files}` is the
 nearest checkout ancestor's `docs/test-files` (or `QSONE_TEST_FILES`), and `{run}`
 is a fresh suffix for repeatable project names. The supplied real paths resolve
-under `/home/kareem/Work/qs-mind/one/docs/test-files` in this worktree.
+under `docs/test-files` in this worktree.
 
 ```yaml
 name: Sample scenario
@@ -165,9 +165,9 @@ expectations, not claims about a real run.
 From the worktree root:
 
 ```sh
-/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m pytest core/tests/test_cli.py
-/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m ruff check core
-/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m ruff format --check core
+core/.venv/bin/python -m pytest core/tests/test_cli.py
+core/.venv/bin/python -m ruff check core
+core/.venv/bin/python -m ruff format --check core
 ```
 
 All CLI tests use scripted AI and free local ports. Real launcher selection is
