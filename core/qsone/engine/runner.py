@@ -1585,6 +1585,12 @@ class _Brief:
 
     async def _finish(self, output: Any) -> None:
         if isinstance(output, str):
+            clean = truth.clean_reply(output, shown=self._did().shown)
+            if clean != output:  # JSON or ids that stayed after the retry: never on the screen
+                self.emit(Data(self.brief_id, "redo", self.brief_id, {"from": 0, "to": self.said}))
+                self.emit(TextDelta(self.brief_id, clean))
+                self.worklog.truth = (self.worklog.truth or {}) | {"reply": clean}
+                output = clean
             results = self.results()
             marked = await asyncio.to_thread(_marked, self.place.rec, output, results)
             if marked:
@@ -2190,6 +2196,9 @@ def _stored_events(
     lead = next((r for r in runs if r["parent_id"] is None and r["spec"].role == "lead"), None)
     reply = lead_text(_load(lead["history"])) if lead is not None else ""
     said_at = _first_said(lead["history"]) if reply and lead is not None else None
+    cleaned = json.loads(brief["worklog"]).get("truth") if brief["worklog"] else None
+    if isinstance(cleaned, dict) and isinstance(cleaned.get("reply"), str):
+        reply = cleaned["reply"]  # the reply as the core cleaned it then (no JSON, no ids)
     with store.rec.read() as c:
         approvals = c.execute(
             "SELECT card, status, choice, asked_at, settled_at FROM approvals"

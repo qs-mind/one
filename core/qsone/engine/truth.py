@@ -49,14 +49,66 @@ _PLACEHOLDER = re.compile(
 _LETTERS = re.compile(r"[^\W\d_]{2,}")
 
 
+# ONE's insides are no blank: a record id, or a bit of JSON (the Brissa reply, 6 Nov 2026).
+_ID = re.compile(r"\b[0-9a-f]{32}\b")
+_JSONISH = re.compile(r"[{}\"]|^\s*\w+\s*:")
+
+
 def placeholders(text: str) -> list[str]:
     """Each blank left for a value in `text`, as written, once."""
     found: list[str] = []
     for m in _PLACEHOLDER.finditer(text or ""):
         inside = m.group("square") or m.group("curly") or m.group("angle") or ""
+        if _ID.search(inside) or (m.group("square") and _JSONISH.search(inside)):
+            continue
         if _LETTERS.search(inside) and m.group(0) not in found:
             found.append(m.group(0))
     return found
+
+
+# JSON a model wrote into its reply: a fenced block, or an object or array on its own lines.
+_JSON_FENCE = re.compile(r"```(?:json)?\s*\n?[\[{].*?```", re.S)
+_JSON_START = re.compile(r'^\s*(?:\{\s*"|\[\s*[{"])')
+
+
+def _json_lines(text: str) -> list[tuple[int, int]]:
+    """The (start, end) line ranges of the JSON objects and arrays standing on their own lines."""
+    lines = text.split("\n")
+    out, i = [], 0
+    while i < len(lines):
+        if not _JSON_START.match(lines[i]):
+            i += 1
+            continue
+        for j in range(i, min(len(lines), i + 200)):
+            try:
+                json.loads("\n".join(lines[i : j + 1]))
+            except ValueError:
+                continue
+            out.append((i, j + 1))
+            i = j
+            break
+        i += 1
+    return out
+
+
+def has_json(text: str) -> bool:
+    return bool(_JSON_FENCE.search(text or "") or _json_lines(text or "") or _ID.search(text or ""))
+
+
+def clean_reply(text: str, *, shown: bool) -> str:
+    """The reply as the engineer reads it: no JSON, no record ids; and, when the Brief showed a
+    view, no typed table of numbers beside it (the breakdown showed twice, 6 Nov 2026)."""
+    out = _JSON_FENCE.sub("", text or "")
+    lines = out.split("\n")
+    for start, end in reversed(_json_lines(out)):
+        del lines[start:end]
+    if shown:
+        table = [k for k, line in enumerate(lines) if _TABLE_ROW.fullmatch(line)]
+        if len(table) >= 3 and numbers_guard.numbers_in("\n".join(lines[k] for k in table)):
+            lines = [line for k, line in enumerate(lines) if k not in set(table)]
+    out = _ID.sub("", "\n".join(lines))
+    out = re.sub(r"[ \t]+\n", "\n", out)
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
 
 
 def placeholders_in(value) -> list[str]:
@@ -408,6 +460,15 @@ def reply_problems(
 ) -> list[Problem]:
     """Everything in a final reply the core sends back once for the model to fix."""
     found: list[Problem] = []
+    if has_json(text):
+        found.append(
+            Problem(
+                "json",
+                "Your reply has JSON or ONE's record ids in it. The engineer reads words: a view "
+                "you showed is on the screen already. Answer in plain words, with no JSON, no "
+                "ids and no copy of a view.",
+            )
+        )
     blanks = placeholders(text)
     if blanks:
         found.append(
@@ -471,6 +532,14 @@ def reply_problems(
             )
         )
     rows = _TABLE_ROW.findall(text or "")
+    if did.shown and len(rows) >= 3 and numbers_guard.numbers_in("\n".join(rows)):
+        found.append(
+            Problem(
+                "table_twice",
+                "Your reply types a table of numbers beside the view you showed, so the engineer "
+                "sees it twice. Leave the table to the view; say in words what it shows.",
+            )
+        )
     if not did.shown and len(rows) >= 3 and numbers_guard.numbers_in("\n".join(rows)):
         found.append(
             Problem(
