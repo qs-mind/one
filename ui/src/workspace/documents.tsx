@@ -10,6 +10,7 @@ import { beforeClose } from "../records/project";
 import type { ClientBoqInfo, DeskInfo, DocKey, FileInfo, ProjectSources } from "../project/types";
 import { subscribeMoved, subscribeOpened, workspaceApi } from "./api";
 import { createWorkspaceSaver } from "./persist";
+import { viewOf } from "./views";
 
 export type Documents = {
   deliverables: readonly DeliverableInfo[];
@@ -71,6 +72,7 @@ function exists(lists: Lists, key: DocKey): boolean {
   if (kind === "deliverable") return !lists.deliverables || lists.deliverables.some((d) => d.id === id);
   if (kind === "file") return !lists.files || lists.files.some((f) => f.id === id);
   if (kind === "clientboq") return !lists.clientBoqs || lists.clientBoqs.some((b) => b.file_id === id);
+  if (kind === "view") return viewOf(id) !== undefined;
   return false;
 }
 
@@ -84,6 +86,7 @@ export function titleOf(docs: Documents, key: string): string | null {
     const boq = docs.clientBoqs.find((b) => b.file_id === id);
     return boq ? fill(t("clientBoqTitle"), { name: boq.name }) : null;
   }
+  if (kind === "view") return viewOf(id)?.title ?? null;
   return null;
 }
 
@@ -117,7 +120,8 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
 
     const changed = () => {
       const opened = workspaceApi.current();
-      if (lists && opened) saver.save(opened);
+      // a view opened from the chat lives with the page only: the project keeps the document it came from
+      if (lists && opened && !opened.key.startsWith("view:")) saver.save(opened);
     };
     const offOpened = subscribeOpened(changed);
     const offMoved = subscribeMoved(changed); // a row selected, a page turned: saved as an opening is

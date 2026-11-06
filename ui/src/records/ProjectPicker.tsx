@@ -6,7 +6,7 @@
 // first; one it cannot read is listed with the reason, never hidden. Archived projects come last, each marked.
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { pick, t, type Text, texts, useLanguage } from "../i18n";
+import { count, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { askForBackupFolder } from "../backup/ask";
 import { coreLine } from "../core";
 import { ActivityMark, activityWord } from "../shell/ActivityMark";
@@ -49,7 +49,8 @@ export async function openChat(chatId: string): Promise<Text | undefined> {
 const row =
   "flex w-full items-center gap-3 rounded-[10px] px-3 py-1.5 text-start outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink disabled:opacity-40";
 
-export function ProjectPicker({ onClose }: { onClose: () => void }) {
+/** `files`: that many files were dropped in the General chat; the list asks which project they are for. */
+export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; files?: number }) {
   useLanguage();
   const current = useProject();
   const activity = useActivity();
@@ -223,6 +224,11 @@ export function ProjectPicker({ onClose }: { onClose: () => void }) {
 
   return (
     <section aria-label={t("projects")} className="flex flex-col gap-1 p-1.5" onKeyDown={move}>
+      {files > 0 && (
+        <p role="status" className="px-3 pt-1 pb-1.5 text-ink">
+          {count("filesForWhichProject", files)}
+        </p>
+      )}
       {searchable && (
         <input
           ref={search}

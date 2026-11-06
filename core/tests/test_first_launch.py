@@ -4,6 +4,7 @@ introduction card in Engineer Records, finding Claude Code, the AI check and the
 Scripted models behind fake connectors; the fake `claude` is a tiny script in a temporary folder,
 never the real one. Synthetic «عينة» data only."""
 
+import asyncio
 import json
 import sys
 from dataclasses import dataclass, field
@@ -381,9 +382,9 @@ def gone(messages, info):
     raise ModelHTTPError(404, "models/gemini-2.5-flash-lite", body=GOOGLE_GONE)
 
 
-def test_check_a_standard_link_uses_the_typed_model_and_drops_a_retired_default(data_dir):
-    """Finding 12: the check runs on the model the engineer typed, then once on each other
-    role's default on the link; a model the provider refuses is noted and is no default."""
+def test_check_a_standard_link_uses_only_the_typed_model(data_dir):
+    """Finding 12 and the real walk: the check runs on the model the engineer typed, once, and
+    every role uses it; a retired model on the list is never called (it took 20 s, with a 404)."""
     settings.save_ai(
         "standard",
         [
@@ -398,15 +399,54 @@ def test_check_a_standard_link_uses_the_typed_model_and_drops_a_retired_default(
     )
     link = google_link()
     typed = link.models["models/gemini-3.1-flash-lite"] = scripted(text("OK"))
-    link.models["models/gemini-2.5-flash-lite"] = FunctionModel(gone)
+    retired = link.models["models/gemini-2.5-flash-lite"] = scripted(text("OK"))
     with make_client([link]) as client:
         body = {"via": "standard", "connector": "standard:g"}
         assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
-        assert typed.calls == 1
-    assert connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite"))
+        assert typed.calls == 1 and retired.calls == 0
     lite = ModelChoice("standard:g", "models/gemini-3.1-flash-lite")
     sheet = [cards.priced(c) for c in link.sheet]
     assert roles.chosen(sheet) == {role: lite for role in roles.ROLES}  # never Pro Latest
+
+
+def test_a_typed_model_the_list_lacks_is_still_the_one_checked(data_dir):
+    """A preview model a provider serves but does not list: the check asks that model, not the
+    list's first one."""
+    settings.save_ai(
+        "standard",
+        [
+            {
+                "id": "g",
+                "name": "Google",
+                "base_url": GOOGLE_URL,
+                "provider": "google",
+                "model": "gemini-9-preview",
+            }
+        ],
+    )
+    link = google_link()
+    preview = link.models["gemini-9-preview"] = scripted(text("OK"))
+    first = link.models["models/gemini-pro-latest"] = scripted(text("OK"))
+    with make_client([link]) as client:
+        body = {"via": "standard", "connector": "standard:g"}
+        assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
+    assert preview.calls == 1 and first.calls == 0
+
+
+def test_a_check_that_hangs_stops_with_plain_words(data_dir, monkeypatch):
+    """One quick call: a provider that does not answer in time is said plainly, not waited on."""
+    monkeypatch.setattr(connectors, "CHECK_SECONDS", 0.05)
+    found = links()
+
+    async def slow(messages, info):
+        await asyncio.sleep(5)
+
+    found[1].models["deepseek-chat"] = FunctionModel(slow)
+    with make_client(found) as client:
+        body = {"via": "standard", "connector": "standard:deepseek"}
+        r = client.post("/settings/ai/check", json=body, headers=AUTH)
+    assert r.status_code == 409
+    assert r.json()["error"] == copy.fill(copy.AI_CHECK_SLOW, provider=found[1].name)
 
 
 def test_a_standard_link_check_is_counted_in_costs(data_dir):

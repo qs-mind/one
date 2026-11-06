@@ -3,9 +3,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { language, setLanguage, texts } from "../i18n";
+import { count, language, setLanguage, texts } from "../i18n";
 import { fakeSources } from "../project/fake";
 import { setCurrentProject } from "../records/project";
+import { resetZoom, zoomIn } from "../ui/scale";
+import { workspaceApi } from "../workspace/api";
 import { App } from "./App";
 import { bodyOf, calls, core, P1 } from "./testing";
 
@@ -149,6 +151,26 @@ describe("below 1000 px", () => {
   });
 });
 
+describe("what is waiting, at 900 px", () => {
+  it("the copper dot has its name and a tooltip that say what waits", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("999px"),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    render(<App sourcesFor={() => fakeSources({ status: { waiting: 1 } })} />);
+    const said = count("decisionsWaiting", 1);
+    const dot = await within(topBar()).findByRole("button", { name: said });
+    expect(dot).toHaveAttribute("title", said);
+    const chat = within(topBar()).getByRole("button", { name: texts.projectChat.ar });
+    await waitFor(() => expect(chat).toHaveAttribute("title", said)); // its dot says the same
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("what is waiting", () => {
   it("one quiet line: a copper dot and «مستنيك قرار واحد», «مستنيك قرارين», or Slate «مافيش حاجة مستنياك»", async () => {
     setCurrentProject(P1);
@@ -209,5 +231,31 @@ describe("the zoom in More", () => {
     await user.click(out);
     expect(out).toBeDisabled();
     expect(screen.getByRole("button", { name: `${texts.zoomReset.ar} (80%)` })).toBeInTheDocument();
+  });
+});
+
+describe("Back and the zoom in the top bar", () => {
+  it("a small Back arrow, off with nothing to go back to, takes the engineer to the document before", async () => {
+    setCurrentProject(P1);
+    core({ routes: { "GET /api/projects/p1/files": () => Response.json({ files: [] }) } });
+    render(<App sourcesFor={() => fakeSources({ deliverables: [] })} />);
+    const back = await within(topBar()).findByRole("button", { name: texts.goBack.ar });
+    expect(back).toBeDisabled();
+    expect(back).toHaveTextContent("→"); // back points right on an Arabic page
+    act(() => workspaceApi.open("files:all"));
+    await waitFor(() => expect(back).toBeEnabled());
+    fireEvent.click(back);
+    await waitFor(() => expect(back).toBeDisabled());
+  });
+
+  it("says the zoom as a percent for a moment when it changes", async () => {
+    core();
+    render(<App />);
+    await box();
+    expect(document.querySelector("[data-zoom-toast]")).toBeNull();
+    act(() => zoomIn());
+    expect(document.querySelector("[data-zoom-toast]")).toHaveTextContent("110%");
+    await waitFor(() => expect(document.querySelector("[data-zoom-toast]")).toBeNull(), { timeout: 2000 });
+    act(() => resetZoom());
   });
 });

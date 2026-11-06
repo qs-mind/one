@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../i18n";
-import { HealthGate, PING_MS, STARTING_MS } from "./CoreDown";
+import { HealthGate, LONG_MS, PING_MS, STARTING_MS } from "./CoreDown";
 
 const logPath = "/tmp/qs-mind-one/core.log";
 
@@ -84,12 +84,19 @@ describe("HealthGate while ONE is open", () => {
 
     up = false;
     await act(() => vi.advanceTimersByTimeAsync(5000));
-    expect(screen.getByRole("alertdialog")).toHaveTextContent(texts.coreDown.en);
-    expect(screen.getByText(logPath)).toBeInTheDocument();
+    // the screen stays, with one thin line over it; nothing covers the open document
+    expect(screen.getByRole("status")).toHaveTextContent(texts.coreRestarting.ar);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByText("chat")).toBeVisible();
+    expect(mounts).toBe(before);
+    expect(screen.queryByText(logPath)).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(LONG_MS));
+    expect(screen.getByRole("status")).toHaveTextContent(logPath); // still down: where its log is, and Retry
+    expect(screen.getByRole("button", { name: texts.retry.ar })).toBeInTheDocument();
 
     up = true;
     await act(() => vi.advanceTimersByTimeAsync(PING_MS + 100));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
     expect(screen.getByText("chat")).toBeInTheDocument();
     expect(mounts).toBe(before + 1); // its chats and streams start again from the core
   });

@@ -16,6 +16,7 @@ from qsone import chat, copy, usage
 from qsone.engine import cards, roles
 from qsone.engine import connectors as engine_connectors
 from qsone.engine.connectors import claude_code as claude_link
+from qsone.engine.connectors import standard
 from qsone.journey import claude_code, closing, engineer, setup_state, understand
 from qsone.journey.setup_state import Language, State
 
@@ -160,6 +161,9 @@ def router(engine: Any) -> APIRouter:
                 return JSONResponse(copy.error(errors[link.id]), 409)
             lead = roles.chosen(listed).get("lead")
             model = lead if lead is not None and lead.connector == body.connector else None
+            typed = next((c for c in standard.typed() if c.connector == body.connector), None)
+            if typed is not None and roles.typed_card(listed) is None:
+                model = typed  # a model the provider serves but does not list: still the one
             if model is None and listed:
                 model = listed[0].choice
             if model is None:
@@ -173,7 +177,8 @@ def router(engine: Any) -> APIRouter:
             card = next((c for c in listed if c.choice == model), None)
             if used and card is not None:
                 _count_check(card, used[0])
-            await _check_defaults(listed, {model}, found)
+            if typed is None:  # a typed model does every job: one call is the whole check
+                await _check_defaults(listed, {model}, found)
             usage.track("ai_link", via="standard")
             return JSONResponse({"ok": True})
         saved = claude_link.saved()["path"]

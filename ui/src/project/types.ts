@@ -11,10 +11,12 @@ export type FrameKind = "files" | "file" | "deliverable" | "desk" | "team" | "cl
 export type FrameKey = `${FrameKind}:${string}`;
 
 /** A place inside a frame: a sheet row and column, a document block (`row`) and text range, a PDF page. */
-export type Anchor = { row?: string; column?: string; page?: number; text?: [number, number]; point?: [number, number] };
-export type DocKind = "files" | "file" | "deliverable" | "clientboq";
-/** "files:all", "file:<id>", "deliverable:<id>", "clientboq:<id>". */
+export type Anchor = { row?: string; column?: string; page?: number; text?: [number, number]; point?: [number, number]; sheet?: string };
+export type DocKind = "files" | "file" | "deliverable" | "clientboq" | "view";
+/** "files:all", "file:<id>", "deliverable:<id>", "clientboq:<id>", "view:<chat part id>" (workspace/views.ts). */
 export type DocKey = `${DocKind}:${string}`;
+/** A spreadsheet file as its sheets (core/qsone/records/sheetview.py): one sheet's rows `r<row>`, columns by letter. */
+export type FileSheet = SheetView & { sheet: string; sheets: { name: string; hidden: boolean }[]; more?: boolean };
 /** The document open in the workspace, and where in it. */
 export type Opened = { key: DocKey; anchor: Anchor | null };
 export type Focus = { frame: FrameKey; anchor: Anchor | null };
@@ -118,6 +120,9 @@ export interface ProjectSources {
   fileText(fileId: string, page?: number): Promise<FilePiece[]>;
   /** The client BOQ imported from the file, as a read-only Sheet view. */
   clientBoq(fileId: string): Promise<SheetView>;
+  /** A spreadsheet file's sheet `name` (the first Excel shows when left out) as a read-only Sheet view; null for a
+   * file that is no spreadsheet or cannot be opened as one (its text shows instead). */
+  fileSheet(fileId: string, name?: string): Promise<FileSheet | null>;
   upload(file: File): Promise<FileInfo>;
 }
 

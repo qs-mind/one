@@ -142,7 +142,7 @@ function BriefReply({
         />
       ) : null;
     const [one] = partsOf([part], "view");
-    if (one) return <ViewPart key={`view:${one.id}`} view={one.data} projectId={projectId} />;
+    if (one) return <ViewPart key={`view:${one.id}`} id={one.id} view={one.data} projectId={projectId} />;
     const [card] = partsOf([part], "card");
     if (card) return cardAt(card.id);
     const [understood] = partsOf([part], "understood");
@@ -191,6 +191,12 @@ function BriefReply({
           <p dir="auto">{pick(status.step, said)}</p>
           <FixAction fix={fixOf(status.fix)} lang={said} />
         </div>
+      )}
+      {status?.state === "stopped" && status.step && (
+        // Stop never ends a Brief silently: the core says what its records show changed before it stopped
+        <p role="status" dir="auto" className="text-slate">
+          {pick(status.step, said)}
+        </p>
       )}
     </div>
   );

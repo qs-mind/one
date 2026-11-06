@@ -140,6 +140,19 @@ describe("ProjectPicker", () => {
     await waitFor(() => expect(switcher(school.name)).toBeInTheDocument());
   });
 
+  it("a remembered project is kept while the core is still coming back, and opens once it answers", async () => {
+    localStorage.setItem("qsone.project", school.id);
+    let tries = 0;
+    core({
+      [`POST /api/projects/${school.id}/open`]: () =>
+        ++tries < 3 ? new Response("starting", { status: 502 }) : Response.json({ ...school, open: true }),
+    });
+    render(<App />);
+    await waitFor(() => expect(switcher(school.name)).toBeInTheDocument(), { timeout: 5000 });
+    expect(localStorage.getItem("qsone.project")).toBe(school.id);
+    expect(screen.queryByRole("region", { name: texts.projects.ar })).toBeNull();
+  });
+
   it("a remembered project that cannot open is forgotten, and the picker shows", async () => {
     localStorage.setItem("qsone.project", school.id);
     core({

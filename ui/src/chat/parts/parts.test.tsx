@@ -325,7 +325,9 @@ describe("ContinueBriefs", () => {
     const user = userEvent.setup();
     render(<ContinueBriefs chatId="p1" onContinued={onContinued} />);
 
-    const card = (await screen.findByText(/مهندس التسعير بيسعّر بند 03\/02/)).closest("section")!;
+    const line = await screen.findByText(/مهندس التسعير بيسعّر بند 03\/02/);
+    expect(line.className).not.toMatch(/truncate/); // a narrow chat wraps the line, never cuts it (real walk)
+    const card = line.closest("section")!;
     expect(screen.queryByText(/بيخطط/)).not.toBeInTheDocument(); // the General chat's Brief shows only there
     expect(fetch.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false); // nothing by itself
 

@@ -87,7 +87,7 @@ for (const lang of ["ar", "en"] as const) {
     });
     const chat = walk.chat;
     await chat.dispatchEvent("dragenter", { dataTransfer: dt });
-    await expect(page.getByText(say(walk, "importDrop"))).toBeVisible();
+    await expect(page.getByText(say(walk, "windowDropGeneral"))).toBeVisible();
     await shot(walk, "drop-zone");
     await chat.dispatchEvent("dragleave", { dataTransfer: dt });
 

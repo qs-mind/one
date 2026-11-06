@@ -1,10 +1,10 @@
 // Before the chat opens, check that the core answers, behind the start screen. If it does not, say so in both
 // languages on that screen, show where its log is, and offer Retry, so the window is never just blank.
 import { invoke } from "@tauri-apps/api/core";
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { api, inInstalledApp } from "../api";
 import { systemLanguage } from "../firstlaunch/FirstLaunch";
-import { type Language, savedLanguage, t } from "../i18n";
+import { type Language, savedLanguage, t, useLanguage } from "../i18n";
 import { loadZoom } from "../ui/scale";
 import { SLOW_MS, StartScreen } from "./StartScreen";
 
@@ -38,22 +38,48 @@ function answers(): Promise<boolean> {
   return Promise.race([health, late]);
 }
 
+/** The core stopped answering while ONE is open: the screen stays (read-only: nothing is sent), with one thin line;
+ * after LONG_MS it also says where the core's log is, with Retry. */
+export type CoreLost = { log: string; retry(): void; at: number } | null;
+let coreLost: CoreLost = null;
+const lostListeners = new Set<() => void>();
+function setCoreLost(next: CoreLost) {
+  coreLost = next;
+  for (const listener of [...lostListeners]) listener();
+}
+export function useCoreLost(): CoreLost {
+  return useSyncExternalStore(
+    (listener) => {
+      lostListeners.add(listener);
+      return () => void lostListeners.delete(listener);
+    },
+    () => coreLost,
+  );
+}
+/** How long the core may take to come back before the line names its log. */
+export const LONG_MS = 30_000;
+
 /** While ONE is open: "down" once the core stops answering, then "back" when it answers again. */
-function useCoreWatch(open: boolean): { lost: boolean; retry(): void; session: number } {
+function useCoreWatch(open: boolean, log: string): { lost: boolean; retry(): void; session: number } {
   const [lost, setLost] = useState(false);
   const [session, setSession] = useState(0);
   const misses = useRef(0);
   const lostNow = useRef(false);
+  const logRef = useRef(log);
+  logRef.current = log;
   const look = useCallback(async () => {
     const up = await answers();
     misses.current = up ? 0 : misses.current + 1;
     if (!up && misses.current >= MISSES && !lostNow.current) {
       lostNow.current = true;
       setLost(true);
+      setCoreLost({ log: logRef.current, retry: () => void look(), at: Date.now() });
     } else if (up && lostNow.current) {
-      // back: ONE starts again from what the core has, so no chat or stream is left waiting on the old one
+      // back: ONE starts again from what the core has (the same project and document), so no chat or stream is
+      // left waiting on the old one
       lostNow.current = false;
       setLost(false);
+      setCoreLost(null);
       setSession((n) => n + 1);
     }
   }, []);
@@ -77,7 +103,7 @@ export function HealthGate({ children, logPath }: { children: ReactNode; logPath
   const [done, setDone] = useState(false);
   const [lang] = useState<Language>(() => savedLanguage() ?? systemLanguage());
   const slow = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const watch = useCoreWatch(done);
+  const watch = useCoreWatch(done, log);
 
   const check = useCallback(async () => {
     setState("checking");
@@ -110,18 +136,8 @@ export function HealthGate({ children, logPath }: { children: ReactNode; logPath
   return (
     <>
       {shown && <Fragment key={watch.session}>{children}</Fragment>}
-      {watch.lost && (
-        // the core stopped mid-session: the same words as at start, over ONE, until it answers again
-        <div
-          role="alertdialog"
-          aria-modal="true"
-          aria-label={t("coreDownTitle", lang)}
-          data-core-lost
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-paper px-4"
-        >
-          <CoreDown logPath={log} onRetry={watch.retry} lang={lang} />
-        </div>
-      )}
+      {/* the core stopped mid-session: ONE stays on the screen, read-only, with one thin line until it is back */}
+      {watch.lost && <RestartingLine />}
       {!done && (
         <StartScreen
           state={state === "up" ? "ready" : state === "checking" ? "starting" : state}
@@ -133,6 +149,40 @@ export function HealthGate({ children, logPath }: { children: ReactNode; logPath
         />
       )}
     </>
+  );
+}
+
+/** «محرك ONE بيعيد التشغيل…», over the top bar's middle; still down after LONG_MS, the line names the core's log and
+ * offers Retry. The screen under it stays as it was: the open document readable, nothing sent. */
+function RestartingLine() {
+  useLanguage();
+  const lost = useCoreLost();
+  const [long, setLong] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setLong(true), LONG_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div
+      role="status"
+      data-core-lost
+      className="fixed inset-x-0 top-1.5 z-[100] flex justify-center px-4 pointer-events-none"
+    >
+      <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-lg bg-ink px-3 py-1 text-sm text-paper shadow-[0_1px_2px_rgb(14_15_18/0.12)]">
+        <span>{t("coreRestarting")}</span>
+        {long && lost && (
+          <>
+            <span>{t("coreRestartingLong")}</span>
+            <code dir="ltr" className="max-w-full font-mono text-xs break-all">
+              {lost.log}
+            </code>
+            <button type="button" onClick={lost.retry} className="rounded-md px-2 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-paper">
+              {t("retry")}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

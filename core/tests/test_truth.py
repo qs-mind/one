@@ -109,9 +109,18 @@ def test_reply_problems_for_the_retry():
 
 def test_facts_say_what_the_records_hold():
     line = truth.facts(Coverage(325, 8, 0), [])
-    assert line["text"]["ar"] == "من سجلات ONE: اتسعّر 8 من 325 بند · مفيش مخرج لسه"
-    assert line["text"]["en"] == "From ONE's records: 8 of 325 items priced · no Deliverable yet"
+    assert line["text"]["ar"] == "من سجلات ONE: 325 بند · ONE سعّر 8 · مفيش مخرج لسه"
+    assert (
+        line["text"]["en"] == "From ONE's records: 325 items · 8 priced by ONE · no Deliverable yet"
+    )
     assert truth.facts(Coverage(0, 0, 0), []) is None
+    # the client's own rates are not ONE's pricing (real walk: «اتسعّر 54 من 54 بند» read as ONE's)
+    client = truth.facts(Coverage(54, 54, 0, client=54), [])["text"]
+    assert client["ar"] == "من سجلات ONE: 54 بند، فيهم 54 بسعر العميل · ONE سعّر 0 · مفيش مخرج لسه"
+    assert client["en"] == (
+        "From ONE's records: 54 items, 54 with the client's rates · 0 priced by ONE"
+        " · no Deliverable yet"
+    )
 
 
 def test_coverage_counts_items_rates_and_deliverables(rec):
@@ -124,7 +133,16 @@ def test_coverage_counts_items_rates_and_deliverables(rec):
             c, at=at, actor="t", item_id=a, name="rate", value="100", source_id=source,
             dated="2026-11-05", unit="m3", currency="EGP",
         )  # fmt: skip
-    assert truth.coverage(rec) == Coverage(items=2, priced=1, deliverables=0)
+    assert truth.coverage(rec) == Coverage(items=2, priced=1, deliverables=0, client=0)
+    boq = ledger.add_source(rec, kind="boq", title="مقايسة العميل", actor="t", dated="2026-11-05")
+    with rec.write("t") as c:
+        at = rec.clock()
+        b = ledger.write_item(c, at=at, actor="t", kind="boq_item", code="01-03", fields={})
+        ledger.write_number(
+            c, at=at, actor="t", item_id=b, name="rate", value="50", source_id=boq,
+            dated="2026-11-05", unit="m3", currency="EGP",
+        )  # fmt: skip
+    assert truth.coverage(rec) == Coverage(items=3, priced=2, deliverables=0, client=1)
 
 
 def _source(rec, file_id: str, locator: dict) -> str:

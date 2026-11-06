@@ -90,7 +90,7 @@ async def test_an_overclaim_that_stays_is_flagged_beside_the_reply(make_engine, 
     fix = str(lead.seen[1])
     assert "0 of 5 items with a rate" in fix and "ends on a promise" in fix
     [facts] = datas(events, "facts")
-    assert facts.data["text"]["ar"] == "من سجلات ONE: اتسعّر 0 من 5 بنود · مفيش مخرج لسه"
+    assert facts.data["text"]["ar"] == "من سجلات ONE: 5 بنود · ONE سعّر 0 · مفيش مخرج لسه"
     flags = [f["ar"] for f in facts.data["flags"]]
     assert any("والسجلات فيها 0 بس من 5" in f for f in flags)
     assert any("مفيش مخرج لسه" in f for f in flags)

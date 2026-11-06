@@ -1,8 +1,10 @@
 // The message queue while ONE works (kokonut ui's ai-message-queue, as an idea; our own code). While a Brief runs,
 // Enter in the message box queues the message instead of interrupting; Ctrl/⌘+Enter still steers the Brief now. The
 // queue shows above the box as small chips, «في الطابور: 2», each removable and editable in place (saved as typed).
-// When the Brief ends, the next queued message goes by itself, one at a time. Stop pauses the queue, never clears it;
-// «كمّل الطابور» carries on. The first time ever a message is queued, one quiet line under the box says how to interrupt.
+// When the Brief ends, the next queued message goes by itself, one at a time; after a Stop too, once the core has ended
+// the Brief (the engineer removes a chip to keep it from going). A queue that waits (a reload, a Stop the core did not
+// take) never clears: «كمّل الطابور» carries on. The first time ever a message is queued, one quiet line under the box
+// says how to interrupt.
 //
 // It is kept in this screen's local storage, per chat, so it survives a reload: a queued message is the engineer's own
 // draft, not sent yet, like the words in the box. The core keeps only what was sent (with its Brief), and a queued

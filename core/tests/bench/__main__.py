@@ -50,9 +50,9 @@ def check_keys() -> None:
 
     real = connectors.check
 
-    async def check(via: str, *, among=None):
+    async def check(via: str, *, among=None, on_usage=None):
         if not via.startswith("anthropic/"):
-            return await real(via, among=among)
+            return await real(via, among=among, on_usage=on_usage)
         await asyncio.sleep(1.2)
         if BENCH_KEY in (keys.get_key("anthropic") or ""):
             return None

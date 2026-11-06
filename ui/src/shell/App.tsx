@@ -15,11 +15,11 @@ import type { ProjectSources, ProjectStatus } from "../project/types";
 import { BackupPanel } from "../backup/BackupPanel";
 import { Confidential } from "../backup/Confidential";
 import { ProjectIndex } from "../deliverables/ProjectIndex";
-import { FolderChooser, FolderDrop } from "../import/FolderDrop";
+import { FolderChooser } from "../import/FolderDrop";
 import { onBriefStarted } from "../import/importer";
 import { CloseProject } from "../journey/CloseProject";
 import { dir, useLanguage } from "../i18n";
-import { restoreProject, useProject } from "../records/project";
+import { currentProject, restoreProject, useProject } from "../records/project";
 import { leaveProject, openChat, ProjectPicker } from "../records/ProjectPicker";
 import { RecordsPanel } from "../records/RecordsPanel";
 import { AiSettings, useAiSettings } from "../settings/AiSettings";
@@ -41,6 +41,7 @@ import { type PanelKind, TopBar } from "./TopBar";
 import { showsWaitingCard, useChats } from "./useChats";
 import { useClientBoqSample } from "../workspace/clientBoqSample";
 import { useZoomKeys } from "../ui/scale";
+import { filesToRecords, onAskForProject, takeWaitingFiles, WindowDrop } from "./WindowDrop";
 
 /** The dev-only sample mode (?sample=1): the screen shows sample data, labelled. Release builds drop it. */
 function sampleMode(): boolean {
@@ -57,25 +58,8 @@ const WAITING_SYNC_MS = 1500;
 const WAITING_FRAMES = 30;
 const BRIEF_REREAD_MS = 2000; // after a screen starts a Brief, the chat checks it did not miss the Brief's end
 
-/** Files dragged over or dropped where nothing takes them (the chat, the top bar, the gutters) are refused here, so
- * the window never opens a dropped file in ONE's place (dragDropEnabled is off: the webview's drop is the page's). */
-function useNoFileOpening() {
-  useEffect(() => {
-    const refuse = (event: globalThis.DragEvent) => {
-      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
-    };
-    window.addEventListener("dragover", refuse);
-    window.addEventListener("drop", refuse);
-    return () => {
-      window.removeEventListener("dragover", refuse);
-      window.removeEventListener("drop", refuse);
-    };
-  }, []);
-}
-
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
-  useNoFileOpening();
   useZoomKeys();
   const project = useProject();
   const narrow = useNarrow();
@@ -232,6 +216,25 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   };
   useEffect(() => onOpenPanel((kind) => showPanel.current?.(kind)), []);
 
+  // loose files dropped in the General chat: the projects list asks which project they are for (WindowDrop.tsx);
+  // once one opens and its documents are read, Project files opens and adds them
+  const [filesAsking, setFilesAsking] = useState(0);
+  useEffect(
+    () =>
+      onAskForProject((n) => {
+        opener.current = projectsButton();
+        setFilesAsking(n);
+        setPanel("projects");
+      }),
+    [],
+  );
+  useEffect(() => {
+    if (panel !== "projects") setFilesAsking(0);
+  }, [panel]);
+  useEffect(() => {
+    if (project && documents) filesToRecords(takeWaitingFiles());
+  }, [project?.id, documents !== null]);
+
   const projectsButton = () => document.querySelector<HTMLElement>('[data-region="topbar"] [data-region-start]');
 
   /** "Waiting for you": the chat opens at the first waiting card, scrolled to it, its first button focused. The chat
@@ -320,7 +323,15 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
           <Connectors />
         </>
       )}
-      {panel === "projects" && <ProjectPicker onClose={closePanel} />}
+      {panel === "projects" && (
+        <ProjectPicker
+          files={filesAsking}
+          onClose={(how?: unknown) => {
+            if (!currentProject()) takeWaitingFiles(); // closed with no project: the files are let go
+            closePanel(how);
+          }}
+        />
+      )}
       {panel === "records" && project && (
         <RecordsPanel onClose={closePanel} onPickProject={() => setPanel("projects")} />
       )}
@@ -400,13 +411,14 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               </main>
             ) : (
               <>
-                <FolderDrop className="flex min-h-0 flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 flex-col">
                   <GeneralChat {...body} onConnectAi={connectAi} />
-                </FolderDrop>
+                </div>
                 {floatingPanel}
               </>
             )}
             <FolderChooser />
+            <WindowDrop />
           </div>
           <Palette
             open={paletteOpen}

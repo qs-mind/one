@@ -222,12 +222,16 @@ export function SheetCell(p: CellProps) {
   } else if (!cell && row.kind === "section" && column.kind === "calc") {
     content = <span className="w-full text-end text-slate">—</span>; // nothing priced under it yet: never 0
   } else if (cell) {
+    // a file's cell (a spreadsheet opened as its sheets): a source there finds it and marks its row
+    const at = cell.at ? { [TARGET]: cell.at } : {};
     content = column.wrap ? (
-      <span dir="auto" className={wrap}>
+      <span dir="auto" className={wrap} {...at}>
         {cell.text}
       </span>
     ) : (
-      <bdi className="truncate">{cell.text}</bdi>
+      <bdi className="truncate" {...at}>
+        {cell.text}
+      </bdi>
     );
   }
   return (

@@ -38,6 +38,17 @@ def test_nothing_is_sent_before_yes(fake_umami, data_dir):
     assert fake_umami.received == [] and queued(data_dir) == []
 
 
+def test_before_the_choice_nothing_is_said_either(caplog, fake_umami, data_dir):
+    """Real walk: «Usage Stats: event ai_link refused» was logged before the usage choice, for
+    the "standard" link (Gemini, Ollama, …) the first launch saves."""
+    usage.track("ai_link", via="standard")
+    usage.track("anything", x=1)
+    assert "Usage Stats" not in caplog.text and queued(data_dir) == []
+    usage.set_on(True)
+    usage.track("ai_link", via="standard")  # another provider is a link the list knows
+    assert usage.Sender().flush() == 1 and "refused" not in caplog.text
+
+
 def test_nothing_is_sent_after_no(fake_umami, data_dir):
     usage.set_on(False)
     usage.track("app_start", version="0.1.0", os="linux", arch="x64", language="ar")

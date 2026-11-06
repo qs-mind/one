@@ -544,6 +544,7 @@ class _Brief:
         self.lead_run_id: str | None = None
         self.lead_ctx: ToolContext | None = None
         self.truth_retried = False  # the reply went back once to be fixed (engine.truth)
+        self.changes = 0  # the writes this Brief made to the records since it started (`wrote`)
         self.step_limited = False  # the Lead reached STEP_LIMIT and reported what it had
         self.budget_approved = False  # the engineer said yes to the Brief Budget of its plan
         self.said = 0  # the reply's length so far, in the screen's units (UTF-16)
@@ -1478,6 +1479,23 @@ class _Brief:
             did.item_rows = self._item_rows()
         return did
 
+    def wrote(self, tool: str) -> None:
+        """A tool call wrote to the records (engine.tools.call); team chatter is no change."""
+        if tool not in team.TEAM_TOOLS or tool == "make_deliverable":
+            self.changes += 1
+
+    def _stopped_line(self) -> Text:
+        """The engineer's Stop: what this Brief's records show it changed before it stopped (its
+        saved runs, and the writes since their last save)."""
+        try:
+            writes = max(self._did().writes, self.changes)
+        except Exception:  # its records cannot be read: the plain line, never a guess
+            log.exception("brief %s: what it changed", self.brief_id)
+            return copy.STOPPED
+        if not writes:
+            return copy.STOPPED_NOTHING
+        return copy.fill(copy.STOPPED_CHANGED, changes=copy.counted(writes, copy.CHANGES))
+
     def _refusal(self, tool: str, said: str) -> Text:
         """Why a call of `tool` was refused, in the engineer's words: as the tool said it, or the
         words of ONE's own text in the refusal, or a plain line naming the step."""
@@ -1671,7 +1689,7 @@ class _Brief:
                 raise
             self._withdraw()
             if self.cancel_mode == "stop":
-                self.set_state("stopped", copy.STOPPED)
+                self.set_state("stopped", self._stopped_line())
             else:
                 self.emit(Status(self.brief_id, self.state, self.step))
         except CapReached:
@@ -1983,7 +2001,11 @@ class Engine:
         """Every unfinished Brief that is not running now, in every project and General."""
         found = []
         for place in self._places():
-            for b in place.store.unfinished():
+            try:
+                briefs = place.store.unfinished()
+            except RecordsError:
+                continue  # a project closed while it was read (a project switch): asked again later
+            for b in briefs:
                 if b["id"] in self._briefs:
                     continue
                 found.append(

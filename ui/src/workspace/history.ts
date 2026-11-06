@@ -16,6 +16,10 @@ export function createHistory(limit = 50) {
       }
       return null;
     },
+    /** Whether a document that still exists waits on the way back. */
+    has(exists: (k: DocKey) => boolean): boolean {
+      return stack.some((o) => exists(o.key));
+    },
     clear() {
       stack = [];
     },

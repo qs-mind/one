@@ -167,6 +167,17 @@ describe("DocumentViewer", () => {
     expect(within(blockEl("b4")).queryByRole("button", { name: texts.sheetReject.ar })).toBeNull();
   });
 
+  it("an accept or reject in the text hands up its Undo, so Ctrl+Z and «تراجع» take it back (real walk: nothing did)", async () => {
+    core({
+      [`POST ${base}/deliverables/${D}/changes/accept`]: () =>
+        Response.json({ version: 2, accepted: ["c1"], stale: [], undo: "tok", window_ms: 6000 }),
+    });
+    const onAccepted = vi.fn();
+    render(<DocumentViewer projectId={P} view={letter()} changes={[change("c1")]} onAccepted={onAccepted} />);
+    await userEvent.setup().click(within(blockEl("b4")).getByRole("button", { name: texts.sheetAccept.ar }));
+    await waitFor(() => expect(onAccepted).toHaveBeenCalledWith(expect.objectContaining({ undo: "tok", window_ms: 6000 })));
+  });
+
   it("with no segments from the core, the old text is struck whole and the new one sits beside it", () => {
     render(<DocumentViewer projectId={P} view={letter()} changes={[change("c1", { segments: undefined })]} />);
     expect(blockEl("b4").querySelector("del")).toHaveTextContent(PRICES);

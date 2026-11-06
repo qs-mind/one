@@ -1,39 +1,7 @@
-// Where a tender folder comes in: dropped on the General chat (a new project named after it) or on an open project's
-// canvas (into that project), or picked with "Choose folder" (the browser's folder chooser, `<input webkitdirectory>`;
-// One's window has it too). Only folders: loose files dropped here are left to the drop targets that take files.
-import { type ReactNode, useEffect, useRef } from "react";
-import { t, useLanguage } from "../i18n";
-import { useDragDepth } from "../ui/useDragDepth";
+// Where a tender folder comes in when it is picked with "Choose folder" (the browser's folder chooser,
+// `<input webkitdirectory>`; One's window has it too). A dropped folder is the window's (shell/WindowDrop.tsx).
+import { useEffect, useRef } from "react";
 import { importFolders } from "./importer";
-import { holdsFolder } from "./walk";
-
-/** The General chat's drop target: a dropped folder becomes a new project. */
-export function FolderDrop({ children, className = "" }: { children: ReactNode; className?: string }) {
-  useLanguage();
-  const { over, handlers } = useDragDepth(); // counted, so the highlight never blinks over a child
-  return (
-    <div
-      className={`relative ${className}`}
-      {...handlers}
-      onDrop={(event) => {
-        handlers.onDrop();
-        if (!event.dataTransfer.types.includes("Files")) return;
-        event.preventDefault(); // the window must not open what was dropped
-        if (holdsFolder(event.dataTransfer.items)) void importFolders(event.dataTransfer, { old: false });
-      }}
-    >
-      {children}
-      {over && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-3 z-20 flex items-center justify-center rounded-[14px] border-2 border-dashed border-ink/40 bg-stone/90"
-        >
-          <p className="text-lg font-semibold">{t("importDrop")}</p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 let chooser: ((old: boolean) => void) | null = null;
 

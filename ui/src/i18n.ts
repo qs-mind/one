@@ -35,7 +35,8 @@ export const texts = {
     ar: "محرك ONE مش شغّال، فالشات مش هيشتغل. السجل بتاعه هنا:",
   },
   retry: { en: "Retry", ar: "جرّب تاني" },
-  coreDownTitle: { en: "ONE's core stopped", ar: "محرك ONE وقف" },
+  coreRestarting: { en: "ONE's engine is restarting…", ar: "محرك ONE بيعيد التشغيل…" },
+  coreRestartingLong: { en: "It is taking longer than usual. Its log:", ar: "واخد وقت أطول من العادي. السجل بتاعه:" },
   screenFailed: {
     en: "Something went wrong on this screen. Your work is saved in the project; reload to carry on.",
     ar: "حصلت مشكلة في الشاشة دي. شغلك محفوظ في المشروع؛ حمّلها تاني وكمّل.",
@@ -68,6 +69,8 @@ export const texts = {
     ar: "أي مزوّد عنده API متوافق مع OpenAI، زي DeepSeek أو Mistral، أو نموذج شغال على الجهاز ده، زي Ollama.",
   },
   providerName: { en: "Name", ar: "الاسم" },
+  presetsLabel: { en: "Fill in for", ar: "املا البيانات لـ" },
+  presetGemini: { en: "Google Gemini", ar: "Google Gemini" },
   baseUrl: { en: "Base URL", ar: "رابط الـ API (Base URL)" },
   providerKey: { en: "Key (optional: models on this computer have none)", ar: "المفتاح (اختياري: النماذج اللي على الجهاز ملهاش مفتاح)" },
   providerModel: {
@@ -125,10 +128,7 @@ export const texts = {
     ar: "لسه مفيش نماذج. هتظهر هنا أول ما ذكاء اصطناعي متوصّل يرد.",
   },
   roleNotSaved: { en: "The choice was not saved. Try again.", ar: "الاختيار ماتحفظش. جرّب تاني." },
-  pricePerMillion: {
-    en: "{in} USD in, {out} USD out per million tokens",
-    ar: "{in} دولار للداخل، {out} دولار للخارج لكل مليون توكن",
-  },
+  pricePerMillion: { en: "{in} in / {out} out per million tokens", ar: "{in} داخل / {out} خارج لكل مليون توكن" },
   priceSource: { en: "source: {source}", ar: "المصدر: {source}" },
   priceUnknown: { en: "price unknown", ar: "السعر مش معروف" },
   enterPrice: { en: "Enter a model's price", ar: "اكتب سعر نموذج" },
@@ -385,6 +385,7 @@ export const texts = {
   fileNotAdded: { en: "The file was not added. Try again.", ar: "الملف ماتضافش. جرّب تاني." },
   fileDuplicate: { en: "Already in Project Records.", ar: "موجود بالفعل في سجلات المشروع." },
   fileRead: { en: "Read", ar: "مقروء" },
+  fileAdded: { en: "Added", ar: "اتضاف" },
   filePartlyRead: { en: "Partly read", ar: "مقروء جزئيًا" },
   fileStored: { en: "Kept, not read", ar: "محفوظ دون قراءة" },
   fileUnreadable: { en: "Could not be read", ar: "مقدرناش نقراه" },
@@ -393,6 +394,8 @@ export const texts = {
   noResults: { en: "Nothing found.", ar: "ملقيتش حاجة." },
   page: { en: "Page {page}", ar: "صفحة {page}" },
   sheetRow: { en: "Sheet {sheet}, row {row}", ar: "ورقة {sheet}، صف {row}" },
+  fileSheets: { en: "Sheets", ar: "الأوراق" },
+  sheetHidden: { en: "hidden", ar: "مخفية" },
   row: { en: "Row {row}", ar: "صف {row}" },
   line: { en: "Line {line}", ar: "سطر {line}" },
   // Search by meaning gets ready by itself (5 Nov 2026): one quiet line, no button.
@@ -602,6 +605,7 @@ export const texts = {
   // The client BOQ as imported: a read-only document.
   clientBoqTitle: { en: "Client BOQ — {name}", ar: "مقايسة العميل — {name}" },
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
+  fileReadOnly: { en: "As the file has it: read only", ar: "زي ما في الملف: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
   // The workspace's open document (workspace Task 5)
   noViewer: { en: "No viewer for this kind yet", ar: "لسه مافيش عرض للنوع ده" },
@@ -654,6 +658,8 @@ export const texts = {
   submission: { en: "Submission {date}, {days} days left", ar: "التسليم {date}، فاضل {days} يوم" },
   boqSoFar: { en: "BOQ so far", ar: "المقايسة لحد دلوقتي" },
   sampleData: { en: "Sample data", ar: "بيانات تجريبية" },
+  openAsDocument: { en: "Open as a document", ar: "افتح كمستند" },
+  goBack: { en: "Back", ar: "رجوع" },
   continueInProject: { en: "Continue in «{name}»", ar: "كمّل في «{name}»" },
   createProjectNamed: { en: "Create the project «{name}»", ar: "اعمل مشروع «{name}»" },
   pageNotShown: { en: "This page could not be shown.", ar: "مقدرناش نعرض الصفحة دي." },
@@ -837,10 +843,10 @@ export const texts = {
   },
   readyLater: { en: "Start without a folder", ar: "ابدأ من غير فولدر" },
   readyStart: { en: "Start", ar: "ابدأ" },
-  readyRolePrice: { en: "${in}/${out} per million tokens", ar: "${in}/${out} لكل مليون توكن" },
   readyRolesChange: { en: "Change the models", ar: "غيّر النماذج" },
   // Task 11: tender folder import and the "I understood this" card.
-  importDrop: { en: "Drop a folder here", ar: "سيب الفولدر هنا" },
+  windowDropProject: { en: "Drop to add to this project", ar: "سيبهم هنا يتضافوا للمشروع ده" },
+  windowDropGeneral: { en: "Drop a tender folder, or files to pick their project", ar: "سيب فولدر المناقصة، أو ملفات وتختار مشروعها" },
   importChoose: { en: "Choose folder", ar: "اختار فولدر" },
   importNewProject: { en: "New project «{name}»", ar: "مشروع جديد «{name}»" },
   importUploading: { en: "Adding files: {done} of {total}", ar: "بنضيف الملفات: {done} من {total}" },
@@ -1113,8 +1119,10 @@ export function setLanguage(lang: Language) {
   for (const listener of listeners) listener();
 }
 
-export function pick(text: Text, lang: Language = current): string {
-  return text[lang];
+/** The text in `lang`. A text that is missing (a row the core sent without one) or has one language only gives what
+ * there is, or nothing: a screen never breaks on a missing line. */
+export function pick(text: Text | null | undefined, lang: Language = current): string {
+  return text?.[lang] ?? text?.en ?? text?.ar ?? "";
 }
 
 export function t(key: keyof typeof texts, lang: Language = current): string {
@@ -1152,6 +1160,19 @@ export const counted = {
       few: "{n} ملاحظات مفتوحة",
       other: "{n} ملاحظة مفتوحة",
     },
+  },
+  filesForWhichProject: {
+    en: { one: "Which project is this file for? Pick one, or make a new one.", other: "Which project are these {n} files for? Pick one, or make a new one." },
+    ar: {
+      one: "الملف ده لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
+      two: "الملفين دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
+      few: "الـ{n} ملفات دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
+      other: "الـ{n} ملف دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
+    },
+  },
+  viewRows: {
+    en: { one: "1 row", other: "{n} rows" },
+    ar: { zero: "مفيش صفوف", one: "صف واحد", two: "صفين", few: "{n} صفوف", other: "{n} صف" },
   },
   boqItems: {
     en: { one: "{n} item", other: "{n} items" },

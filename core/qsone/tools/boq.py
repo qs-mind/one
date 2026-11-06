@@ -237,7 +237,7 @@ quantity, rate and amount keeps its cell as its source.
 description_2 (another description column).
 - currency: if stated; else ONE asks. dated: the BOQ's date, if written. \
 rows: "5-200" for part. hidden_rows: skip (default), or include once the engineer agrees.
-The engineer sets the columns on a card first. Returns import_id and counts: quote them.
+The engineer sets the columns on a card first. Quote its counts, never its import_id.
 Example:
 {_json(_IMPORT_EXAMPLE)}"""
 

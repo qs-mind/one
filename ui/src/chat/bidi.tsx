@@ -4,6 +4,7 @@
 // «إجمالي البنود في ملف boq-priced.xls:» ends with its colon at the Arabic end, and 100,912,880.78 stays after it.
 // Runs are cut only between words, never inside one, so Arabic letters always stay joined.
 import { Fragment } from "react";
+import { westernNumbers } from "../ui/digits";
 
 const LATIN = "\\p{Script=Latin}";
 const ARABIC = "\\p{Script=Arabic}";
@@ -80,7 +81,7 @@ export function isolateOtherScript() {
 export function BidiText({ text }: { text: string }) {
   return (
     <>
-      {pieces(text, baseDirection(text)).map((piece, i) =>
+      {pieces(westernNumbers(text), baseDirection(text)).map((piece, i) =>
         piece.isolate ? <bdi key={i}>{piece.text}</bdi> : <Fragment key={i}>{piece.text}</Fragment>,
       )}
     </>

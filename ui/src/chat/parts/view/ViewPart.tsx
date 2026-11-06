@@ -1,11 +1,12 @@
 // A `data-view` part: what the Lead QS chose to show (decision 16.1), drawn only from ONE's blocks. The view takes the
 // direction of its own title, so an Arabic view reads right to left on an English page too. A number's chip opens
 // its source in the source popover, placed under the chip inside the view's own box.
-import { type CSSProperties, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { NumberCell } from "../../../deliverables/types";
-import { t, useLanguage } from "../../../i18n";
+import { count, t, useLanguage } from "../../../i18n";
 import { scaled } from "../../../ui/scale";
 import { SourcePopover } from "../../../viewers/sheet/SourcePopover";
+import { openView } from "../../../workspace/views";
 import { baseDirection } from "../../bidi";
 import { BlockBoundary } from "./BlockBoundary";
 import { Section } from "./blocks";
@@ -30,10 +31,25 @@ function sections(blocks: ViewBlock[]): { title: string | null; blocks: ViewBloc
   return runs;
 }
 
-export function ViewPart({ view, projectId }: { view: ViewData; projectId?: string }) {
+/** How many rows the view holds: its tables' rows and its figures. */
+const rowsOf = (blocks: ViewBlock[]) =>
+  blocks.reduce((n, b) => n + (b.kind === "table" ? b.rows.length : b.kind === "figures" ? b.items.length : 0), 0);
+
+/** A view in the chat; with `id` (its chat part) inside a project, a view wider than the chat shows as a short card
+ * that opens it as a document (`whole`: the document draws it at its own width). The chat stays narrow. */
+export function ViewPart({ view, projectId, id, whole }: { view: ViewData; projectId?: string; id?: string; whole?: boolean }) {
   useLanguage();
   const box = useRef<HTMLElement>(null);
   const [opened, setOpened] = useState<Opened | null>(null);
+  const [wide, setWide] = useState(false);
+  const canOpen = !whole && !!id && !!projectId;
+  useLayoutEffect(() => {
+    const root = box.current;
+    if (!canOpen || !root) return;
+    // wider than its place: the view itself, or a table inside it that scrolls sideways
+    const over = (el: Element) => el.scrollWidth > el.clientWidth + 1;
+    if (over(root) || [...root.querySelectorAll("[data-view-scroll]")].some(over)) setWide(true);
+  }, [canOpen, view]);
   const direction = baseDirection(view.title) ?? undefined;
 
   const env = useMemo<ViewEnv>(() => {
@@ -55,6 +71,29 @@ export function ViewPart({ view, projectId }: { view: ViewData; projectId?: stri
   function close() {
     opened?.from.focus();
     setOpened(null);
+  }
+
+  if (wide && canOpen) {
+    // the short card: every word wraps, nothing is cut
+    return (
+      <section aria-label={view.title} dir={direction} className="flex flex-col items-start gap-2 rounded-lg border border-stone bg-paper p-3 text-ink">
+        <h3 dir="auto" className="font-semibold break-words">
+          <Words text={view.title} unsourced={view.unsourced} />
+        </h3>
+        <p className="flex flex-wrap items-center gap-2 text-sm text-slate">
+          {count("viewRows", rowsOf(view.blocks))}
+          {view.sample && <span className="rounded-full border border-slate px-2.5 text-xs leading-6">{t("sampleData")}</span>}
+        </p>
+        {view.unsourced.length > 0 && <p className="text-sm text-slate">{t("noSourceNote")}</p>}
+        <button
+          type="button"
+          className="rounded-md border border-ink px-3 py-1 text-sm hover:border-copper hover:text-copper focus-visible:outline-2 focus-visible:outline-ink"
+          onClick={() => openView(id!, view)}
+        >
+          {t("openAsDocument")}
+        </button>
+      </section>
+    );
   }
 
   return (

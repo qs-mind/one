@@ -9,9 +9,7 @@ import { isMod, isTyping } from "../project/keys";
 import { useAgents, type LiveAgent } from "../project/live/activity";
 import { select } from "../project/selection";
 import type { Anchor, DocKey, Opened, ProjectSources, ViewerHandle } from "../project/types";
-import { importInto } from "../import/importer";
-import { holdsFolder } from "../import/walk";
-import { addToRecords } from "../records/RecordsPanel";
+import { takeDrop } from "../shell/WindowDrop";
 import { revealSource, REVEAL_WAIT_MS } from "../sources/mark";
 import { play } from "../ui/motion";
 import { useOpened, workspaceApi } from "./api";
@@ -22,7 +20,7 @@ import { markFor } from "./reveal";
 import { LiveWorkingLine } from "./WorkingLine";
 
 const FADE_MS = 200;
-const DOC_KINDS = ["deliverable:", "file:", "clientboq:", "files:"];
+const DOC_KINDS = ["deliverable:", "file:", "clientboq:", "files:", "view:"];
 const isDocKey = (key: string): key is DocKey => DOC_KINDS.some((kind) => key.startsWith(kind));
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -73,10 +71,11 @@ function useSourceMark(opened: Opened): boolean {
 
 const carriesFiles = (event: DragEvent) => event.dataTransfer?.types?.includes("Files") ?? false;
 
-/** Files or a folder dropped anywhere on the document: a folder (a tender's) goes into the project with its folders,
- * files go to Project Records (Project files opens to show them come). Taken on the way down (capture), before a
- * viewer under the pointer (a letter's editor) can take the drop as its own; Project files takes its own drops. */
-function dropHandlers(projectId: string, opened: Opened) {
+/** Files or a folder dropped anywhere on the document go where a drop anywhere in the window goes (WindowDrop.tsx):
+ * a folder into the project with its folders, files to Project Records (Project files opens to show them come). Taken
+ * on the way down (capture), before a viewer under the pointer (a letter's editor) can take the drop as its own;
+ * Project files takes its own drops. */
+function dropHandlers(opened: Opened) {
   const ours = (event: DragEvent) => carriesFiles(event) && opened.key !== "files:all";
   return {
     onDragOverCapture(event: DragEvent) {
@@ -86,11 +85,7 @@ function dropHandlers(projectId: string, opened: Opened) {
       if (!ours(event)) return;
       event.preventDefault();
       event.stopPropagation(); // the editor never inserts it
-      if (holdsFolder(event.dataTransfer.items)) return void importInto(projectId, event.dataTransfer);
-      const files = Array.from(event.dataTransfer.files);
-      if (!files.length) return;
-      workspaceApi.open("files:all"); // Back returns to the document
-      addToRecords(files);
+      takeDrop(event.dataTransfer);
     },
   };
 }
@@ -166,7 +161,7 @@ function Open({ projectId, sources, documents, opened }: { projectId: string; so
       aria-label={titleOf(documents, opened.key) ?? t("projectFiles")}
       tabIndex={-1}
       className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
-      {...dropHandlers(projectId, opened)}
+      {...dropHandlers(opened)}
     >
       <div data-document-sheet className="relative min-h-0 flex-1 overflow-hidden rounded-[10px] bg-paper ring-1 ring-slate/18">
         <Shown key={opened.key}>

@@ -9,7 +9,7 @@ import type { Text } from "../i18n";
 import { texts } from "../i18n";
 import { uploadFile } from "../records/RecordsPanel";
 import type { SheetView } from "../deliverables/types";
-import type { Anchor, ClientBoqInfo, DeliverableInfo, DocKey, FileInfo, FilePiece, ProjectSources, Team, ViewerProps } from "./types";
+import type { Anchor, ClientBoqInfo, DeliverableInfo, DocKey, FileInfo, FilePiece, FileSheet, ProjectSources, Team, ViewerProps } from "./types";
 
 /** A refused call, with the core's line in both languages. */
 export class SourceError extends Error {
@@ -107,10 +107,19 @@ export function httpSources(projectId: string): ProjectSources {
       if (!response?.ok) throw new SourceError(await coreLine(response, texts.documentFailed));
       return (await response.json()) as SheetView;
     },
+    async fileSheet(fileId, name) {
+      const query = name === undefined ? "" : `?name=${encodeURIComponent(name)}`;
+      const response = await api(`${file(fileId)}/sheet${query}`).catch(() => undefined);
+      if (response?.status === 404 || response?.status === 409) return null; // no route yet, or not a spreadsheet
+      if (!response?.ok) throw new SourceError(await coreLine(response, texts.documentFailed));
+      return (await response.json()) as FileSheet;
+    },
     async upload(chosen) {
       const added = await uploadFile(projectId, chosen);
       if (!added.ok) throw new SourceError(added.line);
-      return added.info;
+      const [info] = added.files;
+      if (!info) throw new SourceError(added.skipped[0]?.line ?? texts.fileNotAdded);
+      return info;
     },
   };
 }

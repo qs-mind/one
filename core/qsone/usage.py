@@ -62,7 +62,7 @@ EVENTS: dict[str, dict[str, type | tuple]] = {
         "language": ("ar", "en"),
     },
     "setup_step": {"step": setup_state.STEPS, "state": ("done", "skipped")},
-    "ai_link": {"via": ("api_key", "claude_code", "none")},
+    "ai_link": {"via": ("api_key", "claude_code", "standard", "none")},
     "project_new": {"files": int, "zips": int, "from_folder": bool},
     "brief_done": {
         "desks": int,
@@ -156,8 +156,11 @@ def _write(events: list[dict]) -> None:
 
 
 def track(name: str, **data) -> None:
-    """Queues one event when Usage Stats are on and it is allowed. Never raises."""
+    """Queues one event when Usage Stats are on and it is allowed. Never raises; before the
+    engineer said yes it does nothing, and says nothing either."""
     try:
+        if is_on() is not True:
+            return
         if not valid(name, data):
             log.warning("Usage Stats: event %s refused", name if name in EVENTS else "(unknown)")
             return

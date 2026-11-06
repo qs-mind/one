@@ -619,10 +619,29 @@ async def test_stop_reaches_every_agent(make_engine, project):
     await engine.stop(brief)
     assert specialist.cancelled
     stored = store_of(engine, project).brief(brief)
-    assert stored["status"] == "stopped" and stored["step"] == copy.STOPPED
+    assert stored["status"] == "stopped" and stored["step"] == copy.STOPPED_NOTHING
     assert engine.active(project) is None
     with pytest.raises(LookupError):
         await engine.stop(brief)
+
+
+async def test_stop_says_what_changed_before_it(make_engine, project, registry):
+    entered = asyncio.Event()
+    source = quote_source(registry.get(project))
+
+    async def blocks(messages, info):
+        entered.set()
+        await asyncio.Event().wait()
+
+    lead = scripted(call("add_source", source), blocks)
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, BRIEF)
+    await asyncio.wait_for(entered.wait(), 5)
+    await engine.stop(brief)
+    stored = store_of(engine, project).brief(brief)
+    assert stored["status"] == "stopped"
+    assert stored["step"] == copy.fill(copy.STOPPED_CHANGED, changes=copy.counted(1, copy.CHANGES))
+    assert stored["step"]["ar"] == "وقفت. اللي اتغيّر قبل ما أقف محفوظ: تغيير واحد."
 
 
 async def test_stop_cancels_a_thinking_lead_and_withdraws_its_card(make_engine, project):

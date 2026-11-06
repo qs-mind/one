@@ -215,7 +215,7 @@ def test_the_guards_catch_the_weak_models_mistakes(bench, tmp_path):
     _, _, events = run(client, project, "bench:weak سعّر المقايسة كلها واكتب الخطاب")
     assert any(e["type"] == "data-redo" for e in events)  # sent back once
     [facts] = [e["data"] for e in events if e["type"] == "data-facts"]
-    assert facts["text"]["ar"] == "من سجلات ONE: اتسعّر 0 من 4 بنود · مفيش مخرج لسه"
+    assert facts["text"]["ar"] == "من سجلات ONE: 4 بنود · ONE سعّر 0 · مفيش مخرج لسه"
     flags = " ".join(f["ar"] for f in facts["flags"])
     assert "والسجلات فيها" in flags and "ومفيش مخرج لسه" in flags
     assert "مفيش حاجة شغالة" in flags
@@ -283,6 +283,24 @@ def test_the_bench_checks_a_claude_key_itself(data_dir, monkeypatch):
 
 async def _no_wait(_seconds: float) -> None:
     return None
+
+
+async def test_the_bench_check_takes_what_the_check_route_passes(monkeypatch):
+    """journey/routes.py counts the check's usage (`on_usage`); the bench's stand-in took no such
+    argument, so the "standard" check failed with a TypeError on the bench."""
+    from qsone.engine import connectors
+    from tests.bench import __main__ as bench_main
+
+    passed: list = []
+
+    async def real(via, *, among=None, on_usage=None):
+        passed.append(on_usage)
+
+    monkeypatch.setattr(connectors, "check", real)
+    bench_main.check_keys()
+    used = []
+    assert await connectors.check("standard:local/m", among=[], on_usage=used.append) is None
+    assert passed == [used.append]
 
 
 def test_the_bench_gets_search_by_meaning_ready_from_the_fake_hub(data_dir):

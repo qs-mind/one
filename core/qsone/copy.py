@@ -378,6 +378,11 @@ MODEL_GONE = {
 }
 
 # The one tiny check (first launch, AI settings): there is no work to save yet.
+AI_CHECK_SLOW = {
+    "en": "{provider} did not answer within 10 seconds. Check the address and the model's name, "
+    "then try again.",
+    "ar": "{provider} مارَدّش في 10 ثواني. راجع العنوان واسم النموذج، وجرّب تاني.",
+}
 AI_CHECK_FAILED = {
     "en": "{provider} did not answer the check. Try again in a few minutes.",
     "ar": "{provider} مارَدّش على الفحص. جرّب تاني كمان كام دقيقة.",
@@ -659,6 +664,12 @@ STOPPED = {
     "en": "Stopped. The work so far is saved.",
     "ar": "وقفنا. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
 }
+# The engineer pressed Stop: what the Brief's records show it changed before it stopped.
+STOPPED_NOTHING = {"en": "Stopped. Nothing was changed.", "ar": "وقفت. ماتغيرش حاجة."}
+STOPPED_CHANGED = {
+    "en": "Stopped. What changed before the stop is kept: {changes}.",
+    "ar": "وقفت. اللي اتغيّر قبل ما أقف محفوظ: {changes}.",
+}  # {changes}: counted(n, CHANGES)
 
 DESK_SAVE = {
     "en": "Keep “{desk}” as a Draft Desk for next time?",
@@ -1016,6 +1027,10 @@ HEADINGS = Noun(
 ROWS = Noun(
     en={"one": "1 row", "other": "{n} rows"},
     ar={"one": "صف واحد", "two": "صفين", "few": "{n} صفوف", "other": "{n} صف"},
+)
+CHANGES = Noun(
+    en={"one": "1 change", "other": "{n} changes"},
+    ar={"one": "تغيير واحد", "two": "تغييرين", "few": "{n} تغييرات", "other": "{n} تغيير"},
 )
 SECTIONS = Noun(
     en={"one": "1 section", "other": "{n} sections"},
@@ -2487,8 +2502,12 @@ UPDATE_OFFLINE = {
 # The truth checks (engine/truth.py): the facts the core puts beside a Brief's reply, from its own
 # records, and the line for each claim the records do not show.
 TRUTH_COVERAGE = {
-    "en": "From ONE's records: {priced} of {items} priced · {made}",
-    "ar": "من سجلات ONE: اتسعّر {priced} من {items} · {made}",
+    "en": "From ONE's records: {items} · {priced} priced by ONE · {made}",
+    "ar": "من سجلات ONE: {items} · ONE سعّر {priced} · {made}",
+}
+TRUTH_CLIENT_RATES = {
+    "en": "{items}, {n} with the client's rates",
+    "ar": "{items}، فيهم {n} بسعر العميل",
 }
 TRUTH_NO_DELIVERABLE_YET = {"en": "no Deliverable yet", "ar": "مفيش مخرج لسه"}
 TRUTH_DELIVERABLES = {"en": "{n} made", "ar": "فيه {n}"}

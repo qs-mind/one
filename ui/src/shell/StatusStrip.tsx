@@ -3,12 +3,14 @@
 // sends it; nothing is guessed. Two at most show in the bar, so it stays calm: the submission and the items left
 // first, then the BOQ so far, the open comments, the stage; one too wide for the room is passed over for the next
 // that fits. The rest fold into a "More status" button rather than being cut.
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useContext, useLayoutEffect, useRef, useState } from "react";
 import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../project/types";
 import { count, fill, language, pick, t, useLanguage } from "../i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { RollingNumber } from "../ui/RollingNumber";
 import { scaled } from "../ui/scale";
+import { useOpened } from "../workspace/api";
+import { DocumentsContext } from "../workspace/documents";
 
 const locale = () => (language() === "ar" ? "ar-EG-u-nu-latn" : "en-GB");
 
@@ -69,6 +71,8 @@ export function StatusStrip({
   stacked?: boolean;
 }) {
   const lang = useLanguage();
+  const docs = useContext(DocumentsContext);
+  const opened = useOpened();
   const [boqFrom, setBoqFrom] = useState<DeliverableInfo | null>(null);
   const boq = status.boq_value;
   const items: { key: string; node: ReactNode }[] = [];
@@ -131,10 +135,14 @@ export function StatusStrip({
         </Popover>
       ),
     });
-  if (status.open_comments !== undefined && status.open_comments > 0)
+  // the open document's notes: a letter's note never shows while the client's BOQ is open
+  const notes = docs
+    ? (docs.deliverables.find((d) => opened?.key === `deliverable:${d.id}`)?.open_comments ?? 0)
+    : (status.open_comments ?? 0);
+  if (notes > 0)
     items.push({
       key: "comments",
-      node: <span className={`${chip} text-copper`}>{count("openComments", status.open_comments)}</span>,
+      node: <span className={`${chip} text-copper`}>{count("openComments", notes)}</span>,
     });
 
   // each item keeps its place in the strip, laid out even while folded (invisible, out of the flow), so its width is

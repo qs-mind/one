@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fill, setLanguage, texts } from "../i18n";
+import { usd } from "../ui/digits";
 import { AiSettings, useAiSettings } from "./AiSettings";
 
 type Route = (init: RequestInit) => Response | Promise<Response>;
@@ -115,7 +116,7 @@ describe("AiSettings", () => {
       expect.stringContaining("Claude Haiku 5.5"),
       expect.stringContaining("sample-model"),
     ]);
-    expect(options[0]).toContain("5.00 دولار للداخل، 25.00 دولار للخارج لكل مليون توكن");
+    expect(options[0]).toContain(`${usd("5.00")} داخل / ${usd("25.00")} خارج لكل مليون توكن`);
     expect(options[0]).toContain("المصدر: genai-prices sample: https://example.com/prices");
     expect(options[2]).toContain(texts.priceUnknown.ar);
     expect(options[0]).toContain(texts.recommended.ar); // the Recommended Setting for the Lead QS

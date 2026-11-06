@@ -126,6 +126,10 @@ describe("RecordsPanel", () => {
     const { container } = panel();
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
     expect(input).toHaveAttribute("multiple");
+    // the chooser offers the types ONE reads first (the core's readers), a zip too; "All files" stays in the dialog
+    const accept = input.getAttribute("accept")?.split(",") ?? [];
+    for (const type of [".pdf", ".xlsx", ".xls", ".csv", ".docx", ".txt", ".dxf", ".ifc", ".zip", ".png", ".jpg"])
+      expect(accept).toContain(type);
     const chooser = vi.spyOn(input, "click");
     await user.click(screen.getByRole("button", { name: texts.addFiles.ar }));
     expect(chooser).toHaveBeenCalled();
@@ -201,6 +205,31 @@ describe("RecordsPanel", () => {
     const { container } = panel();
     await user.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, new File(["x"], boqName));
     expect(await screen.findByText(texts.fileDuplicate.ar)).toBeInTheDocument();
+  });
+
+  it("a zip lists the files it held at once, and names the ones it skipped", async () => {
+    const empty = { en: "The file is empty.", ar: "الملف فاضي." };
+    core({
+      [`POST ${files}`]: () =>
+        Response.json(
+          { zip: true, files: [fileInfo("a - عينة.txt"), fileInfo("b - عينة.csv")], skipped: [{ name: "c.txt", folder: "z.zip", error: empty }] },
+          { status: 201 },
+        ),
+    });
+    const user = userEvent.setup();
+    const { container } = panel();
+    await user.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, new File(["PK"], "z - عينة.zip"));
+    expect(await screen.findByText(named("a - عينة.txt"))).toBeInTheDocument();
+    expect(screen.getByText(named("b - عينة.csv"))).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(empty.ar);
+    expect(screen.queryByText(named("z - عينة.zip"))).not.toBeInTheDocument();
+  });
+
+  it("a file row with no status text of its own still shows a line, never a broken screen", async () => {
+    core({ [`GET ${files}`]: () => Response.json({ files: [fileInfo(boqName, { status: "zipped" })] }) });
+    panel();
+    expect(await screen.findByText(named(boqName))).toBeInTheDocument();
+    expect(screen.getByText(texts.fileAdded.ar)).toBeInTheDocument();
   });
 
   it("files added together are reported in the chat once, with every one of them", async () => {

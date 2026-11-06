@@ -214,6 +214,10 @@ export function ConnectAi({ nav }: { nav: Nav }) {
 
 const field = "rounded-md border border-slate bg-paper px-3 py-2 outline-none focus:border-ink";
 
+/** Google's OpenAI-compatible address (ai.google.dev/gemini-api/docs/openai): the provider the real walk used, typed
+ * by hand. The model and the key stay the engineer's. */
+const GEMINI = { name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" };
+
 /** Another provider: its name and OpenAI-compatible address, the model to use first if the engineer has one, then its
  * key, which adds the link and checks it at once (no Save or Check button). A link whose check fails is taken out
  * again, so a corrected key never leaves a second one. */
@@ -242,13 +246,34 @@ function StandardFirst({ onChecked }: { onChecked: (works: boolean) => void }) {
   });
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-sm text-slate">{t("presetsLabel")}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setName(GEMINI.name);
+            setBaseUrl(GEMINI.baseUrl);
+          }}
+          className={`${secondary} py-1 text-sm`}
+        >
+          {t("presetGemini")}
+        </button>
+      </div>
       <label className="flex flex-col gap-1">
         <span>{t("providerName")}</span>
         <input dir="auto" value={name} onChange={(event) => setName(event.target.value)} className={field} />
       </label>
       <label className="flex flex-col gap-1">
         <span>{t("baseUrl")}</span>
-        <input type="url" dir="ltr" spellCheck={false} value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} className={field} />
+        <input
+          type="url"
+          dir="ltr"
+          spellCheck={false}
+          placeholder="https://api.example.com/v1"
+          value={baseUrl}
+          onChange={(event) => setBaseUrl(event.target.value)}
+          className={field}
+        />
       </label>
       <label className="flex flex-col gap-1">
         <span>{t("providerModel")}</span>

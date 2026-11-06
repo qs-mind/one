@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { count, counted, dir, language, setLanguage, t, texts } from "./i18n";
+import { count, counted, dir, language, pick, setLanguage, t, texts } from "./i18n";
 
 beforeEach(() => setLanguage("ar"));
 
@@ -23,6 +23,12 @@ describe("i18n", () => {
     setLanguage("en");
     expect(localStorage.getItem("qsone.language")).toBe("en");
     expect(language()).toBe("en");
+  });
+
+  it("pick never throws on a text that is missing or half there", () => {
+    expect(pick(undefined)).toBe("");
+    expect(pick(null)).toBe("");
+    expect(pick({ en: "Read" } as never, "ar")).toBe("Read");
   });
 
   it("every text has both languages", () => {

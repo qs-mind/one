@@ -417,7 +417,7 @@ export function SheetViewer(props: SheetViewerProps) {
           {view.title}
         </h2>
         {readOnly ? (
-          <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t("clientBoqReadOnly")}</span>
+          <span className="rounded-full border border-slate px-2.5 text-xs leading-6 text-slate">{t(view.variant === "file_sheet" ? "fileReadOnly" : "clientBoqReadOnly")}</span>
         ) : (
           <>
             {/* in the workspace, its head line already says the status and the Revision */}

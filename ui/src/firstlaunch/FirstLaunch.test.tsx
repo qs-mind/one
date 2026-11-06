@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { crashReport, reportCrash, resetCrashReports } from "../app/crash";
 import { language, setLanguage, texts } from "../i18n";
+import { perMillion } from "../ui/digits";
 import { ConsentNeeded, resetConsent } from "./ConnectAi";
 import { FirstLaunch, SetupGate } from "./FirstLaunch";
 import { closeSetup, type Setup, type Step, STEPS } from "./parts";
@@ -288,6 +289,36 @@ describe("FirstLaunch", () => {
     expect(screen.getByRole("button", { name: texts.setupNext.en })).toBeEnabled();
   });
 
+  it("another AI provider: Google Gemini fills its name and address, and the checking line comes into view", async () => {
+    const link = { id: "standard:g4", kind: "model", name: "Google Gemini", provider: "google", on_device: false, key_set: true, error: null };
+    let answer: (r: Response) => void = () => {};
+    const fetch = mockCore({
+      "GET /settings/ai-consent": () => Response.json({ at: "2026-11-05T08:00:00+00:00", text_version: 1 }),
+      "POST /settings/ai/standard": () => Response.json(link, { status: 201 }),
+      "POST /settings/ai/check": () => new Promise<Response>((resolve) => (answer = resolve)),
+    });
+    const seen = vi.fn();
+    Element.prototype.scrollIntoView = function (this: Element) {
+      seen(this.textContent);
+    };
+    const user = userEvent.setup();
+    flowAt("ai");
+    await user.click(await screen.findByRole("button", { name: choice(texts.aiLinkStandard.en) }));
+    await user.click(screen.getByRole("button", { name: texts.presetGemini.en }));
+    expect(screen.getByLabelText(texts.providerName.en)).toHaveValue("Google Gemini");
+    expect(screen.getByLabelText(texts.baseUrl.en)).toHaveValue("https://generativelanguage.googleapis.com/v1beta/openai");
+    await user.click(screen.getByLabelText(texts.providerKey.en));
+    await user.paste("sample-google-key-not-real");
+    const checking = await screen.findByText(texts.aiLinkChecking.en, {}, { timeout: 2000 });
+    await waitFor(() => expect(seen).toHaveBeenCalledWith(texts.aiLinkChecking.en));
+    // real walk: the line sat half under the bar's fade; it keeps clear of the bar and its fade
+    expect(checking.closest("[data-feedback]")).toHaveClass("scroll-mb-32");
+    answer(Response.json({ ok: true }));
+    expect(await screen.findByText(texts.aiLinkWorks.en)).toBeInTheDocument();
+    expect(calls(fetch, "POST /settings/ai/standard")[0]).toMatchObject({ name: "Google Gemini" });
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
   it("another AI provider: the model the engineer typed goes with the link (finding 12)", async () => {
     const link = { id: "standard:g3", kind: "model", name: "Gemini - sample", provider: "google", on_device: false, key_set: true, error: null };
     const fetch = mockCore({
@@ -336,10 +367,10 @@ describe("FirstLaunch", () => {
     await user.click(await screen.findByRole("button", { name: texts.setupSkip.en }));
     const line = await screen.findByText((_, el) => el?.tagName === "P" && (el.textContent ?? "").startsWith(texts.roleLead.en));
     expect(line.textContent).toBe(
-      `${texts.roleLead.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens) · ` +
+      `${texts.roleLead.en}: Gemini 3.1 Flash Lite (${perMillion("0.25", "1.5")}) · ` +
         `${texts.roleChecker.en}: gemma-3-27b-it (${texts.priceUnknown.en}) · ` +
-        `${texts.roleSpecialist.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens) · ` +
-        `${texts.roleQuick.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens)`,
+        `${texts.roleSpecialist.en}: Gemini 3.1 Flash Lite (${perMillion("0.25", "1.5")}) · ` +
+        `${texts.roleQuick.en}: Gemini 3.1 Flash Lite (${perMillion("0.25", "1.5")})`,
     );
     expect(screen.getByText(/genai-prices 0\.2\.1/)).toBeInTheDocument(); // every price with its source
     await user.click(screen.getByRole("button", { name: texts.readyRolesChange.en }));

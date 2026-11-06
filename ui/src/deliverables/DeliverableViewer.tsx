@@ -188,6 +188,8 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
         mode={mode}
         onChanged={changed}
         onSelection={onTextSelection}
+        onAccepted={accepted}
+        onRejected={rejected}
         onToggleFullScreen={props.onToggleFullScreen}
         fullScreen={props.fullScreen}
       />

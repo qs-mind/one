@@ -12,6 +12,7 @@ import { send } from "../core";
 import { dir, fill, language, setLanguage, t, useLanguage } from "../i18n";
 import { type Ai, keyOf, type ModelCard, type Role, roleOrder, roleTexts, useAiSettings } from "../settings/AiSettings";
 import { openPanel } from "../shell/FixAction";
+import { perMillion } from "../ui/digits";
 import { useDragDepth } from "../ui/useDragDepth";
 import { Mark } from "../shell/TopBar";
 import { Account } from "./Account";
@@ -254,7 +255,7 @@ function Ready({
 function rolePrice(card: ModelCard | undefined): string {
   if (card?.on_device) return t("onDevice");
   if (card?.price_in == null || card.price_out == null) return t("priceUnknown"); // never a made-up number
-  return fill(t("readyRolePrice"), { in: card.price_in, out: card.price_out });
+  return perMillion(card.price_in, card.price_out);
 }
 
 /** The model for each job in one line, each with its price as the Model Data Sheet has it, the prices' sources under

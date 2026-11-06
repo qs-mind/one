@@ -12,6 +12,7 @@ import type { SelectionItem } from "../project/types";
 import { SelectionText } from "../chat/Chat";
 import { sentFrom, takeSentFrom } from "../chat/sent";
 import { dir, t, type texts, useLanguage } from "../i18n";
+import { useCoreLost } from "../app/CoreDown";
 import { ArchivedLine } from "../records/Archived";
 import { useProject } from "../records/project";
 import { type Ai, keyOf } from "../settings/AiSettings";
@@ -93,6 +94,8 @@ export function CommandBar({
   const queue = useMessageQueue(chat.chatId);
   const project = useProject();
   const archived = Boolean(project?.archived_at) && project?.id === chat.chatId; // read-only: nothing to send
+  const coreLost = useCoreLost() !== null; // the core is restarting: nothing is sent until it is back
+  const canSend = chat.canSend && !coreLost;
 
   /** The words in the box go on the queue, with the selection they were written for. */
   function enqueue() {
@@ -103,28 +106,41 @@ export function CommandBar({
 
   /** The next queued message goes, as if sent now: a new Brief. One that does not go waits at the head. */
   async function sendNext() {
+    if (latestLost.current) return; // the queue waits for the core
     const item = queue.take();
     if (!item) return;
     const model = picked && settings?.sheet.some((x) => keyOf(x) === keyOf(picked)) ? picked : undefined;
-    if (await chat.send(item.text, item.selection, { model, effort })) onSent?.();
+    // the chat as it is now: after a Stop, the one rendered since the Brief ended (never the stopped Brief's, which
+    // would steer it)
+    if (await latest.current.send(item.text, item.selection, { model, effort })) onSent?.();
     else queue.putBack(item);
   }
+  const latest = useRef(chat);
+  latest.current = chat;
+  const latestLost = useRef(coreLost);
+  latestLost.current = coreLost;
 
-  // When the Brief ends (and the queue is not paused by Stop), the next queued message goes by itself.
+  // When the Brief ends (and the queue is not paused), the next queued message goes by itself.
   const wasRunning = useRef(chat.running);
+  const stopping = useRef(false); // a Stop under way: the next message waits for the core to end the Brief
   useEffect(() => {
     const was = wasRunning.current;
     wasRunning.current = chat.running;
-    if (was && !chat.running) void sendNext();
+    if (was && !chat.running && !stopping.current) void sendNext();
   }, [chat.running]); // sendNext reads the queue as it is then
 
-  function stop() {
-    queue.pause(); // the queue waits; «كمّل الطابور» carries on
-    void chat.halt();
+  /** Stop ends the Brief; once the core has, the next queued message goes by itself (the engineer removes it to keep
+   * it from going). A Stop the core did not take leaves the queue waiting: «كمّل الطابور» carries on. */
+  async function stop() {
+    stopping.current = true;
+    const ended = await chat.halt();
+    stopping.current = false;
+    if (ended) void sendNext();
+    else queue.pause();
   }
 
   async function submit(words: string, typed: boolean) {
-    if (!words.trim() || !chat.canSend) return;
+    if (!words.trim() || !canSend) return;
     if (typed) {
       if (text.current) sentFrom(text.current.getBoundingClientRect()); // the chat moves the words on from here
       setDraft("");
@@ -185,7 +201,7 @@ export function CommandBar({
             <button
               key={key}
               type="button"
-              disabled={!chat.canSend}
+              disabled={!canSend}
               onClick={() => void submit(t(key), false)}
               className="rounded-lg border border-ink/15 px-3 py-1 text-sm hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-40"
             >
@@ -268,12 +284,12 @@ export function CommandBar({
       </div>
       <div className={`absolute flex items-center gap-1.5 ${inPanel ? "bottom-[0.3125rem] end-[0.3125rem] [&>button]:size-7" : "bottom-1.5 end-1.5"}`}>
         {chat.running && hasWords && (
-          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
+          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={() => void stop()} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
             <Square />
           </button>
         )}
         {stopOnly ? (
-          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-ink text-paper`}>
+          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={() => void stop()} className={`${round} bg-ink text-paper`}>
             <Square />
           </button>
         ) : (
@@ -281,7 +297,7 @@ export function CommandBar({
             type="submit"
             aria-label={chat.running ? t("queueAdd") : t("send")}
             title={chat.running ? t("queueAdd") : t("send")}
-            disabled={!hasWords || !chat.canSend}
+            disabled={!hasWords || !canSend}
             className={`${round} bg-ink text-paper disabled:cursor-default disabled:opacity-20 disabled:active:scale-100`}
           >
             <Arrow />
