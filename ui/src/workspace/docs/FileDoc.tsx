@@ -9,6 +9,7 @@ import { fileKey, TARGET } from "../../sources/targets";
 import { Segmented } from "../../ui/Segmented";
 import { type SheetHandle, SheetViewer } from "../../viewers/sheet/SheetViewer";
 import { workspaceApi } from "../api";
+import { CompareDoc } from "./CompareDoc";
 
 /** Page images come in two widths: enough for the file on screen, never more (decision 13). */
 export const SMALL = 600;
@@ -80,11 +81,13 @@ export function FilePages({
   state,
   width,
   notice,
+  controls = true,
 }: {
   sources: ProjectSources;
   fileId: string;
   state: FilePage;
   width: number;
+  controls?: boolean;
   /** Said under the page controls, a row of its own: it never covers them. */
   notice?: string | null;
 }) {
@@ -126,7 +129,7 @@ export function FilePages({
 
   return (
     <div className="flex min-h-full flex-col">
-      {pages !== null && pages > 0 && (
+      {controls && pages !== null && pages > 0 && (
         <div className="flex items-center gap-3 bg-stone/60 px-5 py-2">
           <button type="button" className={button} disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
             {t("sheetPreviousPage")}
@@ -278,6 +281,7 @@ export function FileDoc({ projectId, sources, fileId, opened, notice }: {
   notice?: string | null;
 }) {
   useLanguage();
+  const [comparing, setComparing] = useState(false);
   const state = useFilePage(sources, fileId, opened);
   // undefined while asked; null for no sheet (a PDF, a text file, or one the sheet reader cannot open)
   const [sheet, setSheet] = useState<FileSheet | null | undefined>(undefined);
@@ -313,10 +317,12 @@ export function FileDoc({ projectId, sources, fileId, opened, notice }: {
       sizes.disconnect();
     };
   }, []);
+  if (comparing && projectId) return <CompareDoc projectId={projectId} fileId={fileId} sources={sources} onClose={() => setComparing(false)} />;
   if (sheet && projectId)
     return <SheetFile projectId={projectId} sources={sources} fileId={fileId} first={sheet} opened={opened} notice={notice} />;
   return (
     <div ref={root} dir={dir()} className="h-full overflow-auto bg-paper text-ink">
+      {projectId && (state.pages ?? 0) > 0 && <button type="button" className="px-5 py-2 text-copper" onClick={() => setComparing(true)}>{t("compareOpen")}</button>}
       {sheet === null && <FilePages sources={sources} fileId={fileId} state={state} width={width} notice={notice} />}
     </div>
   );

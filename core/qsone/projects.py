@@ -371,7 +371,10 @@ def router(
 ) -> APIRouter:
     """With `meaning`, search uses the search model once it is ready. With `engine`, a
     project whose Brief runs stays open until the Brief ends."""
+    from qsone.compare import router as compare_router
+
     r = APIRouter()
+    r.include_router(compare_router(projects))
 
     def wake() -> None:
         if meaning is not None:

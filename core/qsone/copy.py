@@ -602,6 +602,7 @@ TOOL_WORDS = {
     "use_desk": {"en": "Calling on a Desk", "ar": "بيستعين بقسم"},
     "web_read": {"en": "Reading a web page", "ar": "بيقرا صفحة ويب"},
     "open_tools": {"en": "Getting tools ready", "ar": "بيجهّز أدواته"},
+    "compare_files": {"en": "Comparing file revisions", "ar": "بيقارن نسخ الملفات"},
     "web_search": {"en": "Searching the web", "ar": "بيدوّر على الويب"},
 }
 
@@ -2654,3 +2655,14 @@ def error(text: dict[str, str]) -> dict:
     """A JSON error body: `{"error": text}`, and its `fix` when the screen can add one."""
     fix = fix_of(text)
     return {"error": text} if fix is None else {"error": text, "fix": fix}
+
+
+# Revision comparison: observed words/pixels only, never inferred engineering changes.
+COMPARE_TEXT = {"en": "Page words changed.", "ar": "كلمات الصفحة اتغيّرت."}
+COMPARE_PIXELS = {"en": "Page image changed.", "ar": "صورة الصفحة اتغيّرت."}
+COMPARE_TEXT_PIXELS = {"en": "Page words and image changed.", "ar": "كلمات وصورة الصفحة اتغيّروا."}
+COMPARE_WIDTH = {
+    "en": "Choose a supported page image size.",
+    "ar": "اختار مقاس مدعوم لصورة الصفحة.",
+}
+COMPARE_STEP = {"en": "Comparing file revisions", "ar": "بيقارن نسخ الملفات"}
