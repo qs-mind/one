@@ -1,6 +1,6 @@
 // Plan 4's chat, as the shell wraps it: the General chat and a project's chat, a column beside the document. Moved
 // from Chat.test.tsx; every behaviour there still holds, with the command bar as the composer.
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { D, entry, sheet } from "../deliverables/fixtures";
@@ -533,5 +533,111 @@ describe("the chat in the shell", () => {
     expect(team).toHaveTextContent(texts.roleLead.ar); // the project team: the Lead QS and the Checking QS
     await user.click(desk);
     expect(team.querySelector('[data-agent="est"]')).not.toBeNull();
+  });
+});
+
+/** matchMedia with a window width the test sets, and its change listeners told. */
+function windowWidth(start: number) {
+  let width = start;
+  const listeners = new Set<() => void>();
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    get matches() {
+      const max = Number(/max-width: (\d+)px/.exec(query)?.[1] ?? Infinity);
+      return width <= max;
+    },
+    media: query,
+    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+  }));
+  return (next: number) => {
+    width = next;
+    for (const listener of [...listeners]) listener();
+  };
+}
+
+describe("an unsent draft outlives the chat folding", () => {
+  const chatButton = () => document.querySelector<HTMLElement>("[data-chat-button]")!;
+
+  it("Full screen (Ctrl+Shift+F) folds the chat; the second press brings it back with the words", async () => {
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await user.type(await box(), "سعر الخرسانة - عينة");
+    await user.click(document.body);
+    await user.keyboard("{Control>}{Shift>}F{/Shift}{/Control}");
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: texts.message.ar })).toBeNull());
+    await user.keyboard("{Control>}{Shift>}F{/Shift}{/Control}");
+    expect(await box()).toHaveValue("سعر الخرسانة - عينة");
+  });
+
+  it("the narrow panel's second Esc closes it; opened again, the words are there", async () => {
+    windowWidth(900);
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(chatButton());
+    await user.type(await box(), "سعر الخرسانة - عينة");
+    await user.keyboard("{Escape}"); // out of the box
+    await user.keyboard("{Escape}"); // the panel closes
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: texts.projectChat.ar })).toBeNull());
+    await user.click(chatButton());
+    expect(await box()).toHaveValue("سعر الخرسانة - عينة");
+  });
+
+  it("a Deliverable opened from its card on a narrow window keeps the words for the panel's return", async () => {
+    windowWidth(900);
+    setCurrentProject(P1);
+    const parts = [reply[0]!, { type: "data-deliverable", id: D, data: { id: D } }, ...reply.slice(1)];
+    const d = `/api/projects/p1/deliverables/${D}`;
+    core({
+      routes: {
+        "POST /api/chat": (init) => streamed(parts, init),
+        "GET /api/projects/p1/deliverables": () => Response.json({ deliverables: [entry()] }),
+        [`GET ${d}`]: () => Response.json(sheet()),
+        [`GET ${d}/changes?status=pending`]: () => Response.json({ changes: [] }),
+        [`GET ${d}/changes?status=stale`]: () => Response.json({ changes: [] }),
+        [`GET ${d}/comments`]: () => Response.json({ comments: [] }),
+      },
+    });
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({ deliverables: [entry()] })} />);
+    await screen.findByRole("heading", { level: 1 });
+    await user.click(chatButton());
+    await user.type(await box(), "اعمل المقايسة{enter}");
+    const card = await screen.findByRole("article", { name: "جدول الكميات - عينة" });
+    await user.type(await box(), "وبعدين الخطاب - عينة");
+    await user.click(within(card).getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) }));
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: texts.projectChat.ar })).toBeNull());
+    await user.click(chatButton());
+    expect(await box()).toHaveValue("وبعدين الخطاب - عينة");
+  });
+
+  it("the window crossing 1000 px swaps the column for the panel; the words go with it", async () => {
+    const resize = windowWidth(1440);
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await user.type(await box(), "سعر الخرسانة - عينة");
+    act(() => resize(900));
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: texts.message.ar })).toBeNull());
+    await user.click(chatButton());
+    expect(await box()).toHaveValue("سعر الخرسانة - عينة");
+    act(() => resize(1440));
+    expect(await box()).toHaveValue("سعر الخرسانة - عينة");
+  });
+
+  it("each chat keeps its own words: the General chat's never show in a project's", async () => {
+    core();
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await user.type(await box(), "سؤال عام - عينة");
+    act(() => setCurrentProject(P1));
+    await waitFor(async () => expect(await box()).toHaveValue(""));
+    act(() => setCurrentProject(undefined));
+    await waitFor(async () => expect(await box()).toHaveValue("سؤال عام - عينة"));
   });
 });

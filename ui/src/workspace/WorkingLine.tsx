@@ -4,12 +4,18 @@
 // where a line may show. Moved by `transform` only; placed again on the box's scroll and on resize, in a frame.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { dir, pick, useLanguage } from "../i18n";
+import { useAgents } from "../project/live/activity";
 import type { AgentInfo, DocKey, ViewerHandle } from "../project/types";
 
 type Line = { y: number; h: number; roles: string[] };
 
 const sameLines = (a: Line[], b: Line[]) =>
   a.length === b.length && a.every((l, i) => l.y === b[i]!.y && l.h === b[i]!.h && l.roles.join() === b[i]!.roles.join());
+
+/** The line for the live agents: their events re-render it alone, never the open document under it. */
+export function LiveWorkingLine(props: { handle: ViewerHandle | null; opened: DocKey; box: HTMLElement | null }) {
+  return <WorkingLine {...props} agents={useAgents()} />;
+}
 
 export function WorkingLine(props: {
   handle: ViewerHandle | null;

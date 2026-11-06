@@ -1,0 +1,16 @@
+{
+  "about": "The open document as the screen saves it (ui/src/project/sources.ts saveWorkspace) and the body the core's PUT /projects/{id}/workspace takes. Both sides' tests read this file: ui/src/project/sources.test.ts and core/tests/test_workspace_api.py.",
+  "cases": [
+    { "opened": { "key": "files:all", "anchor": null }, "body": { "open": "files:all", "anchor": null } },
+    { "opened": { "key": "file:f1", "anchor": { "page": 3 } }, "body": { "open": "file:f1", "anchor": { "page": 3 } } },
+    {
+      "opened": { "key": "deliverable:d1", "anchor": { "row": "p3", "column": "rate" } },
+      "body": { "open": "deliverable:d1", "anchor": { "row": "p3", "column": "rate" } }
+    },
+    {
+      "opened": { "key": "deliverable:d2", "anchor": { "row": "b2", "text": [4, 19] } },
+      "body": { "open": "deliverable:d2", "anchor": { "row": "b2", "text": [4, 19] } }
+    },
+    { "opened": { "key": "clientboq:f2", "anchor": null }, "body": { "open": "clientboq:f2", "anchor": null } }
+  ]
+}

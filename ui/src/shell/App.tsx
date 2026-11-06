@@ -39,6 +39,7 @@ import { Palette } from "./Palette";
 import { moveRegion, useNarrow, useSmall } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
 import { showsWaitingCard, useChats } from "./useChats";
+import { useClientBoqSample } from "../workspace/clientBoqSample";
 
 /** The dev-only sample mode (?sample=1): the screen shows sample data, labelled. Release builds drop it. */
 function sampleMode(): boolean {
@@ -55,8 +56,25 @@ const WAITING_SYNC_MS = 1500;
 const WAITING_FRAMES = 30;
 const BRIEF_REREAD_MS = 2000; // after a screen starts a Brief, the chat checks it did not miss the Brief's end
 
+/** Files dragged over or dropped where nothing takes them (the chat, the top bar, the gutters) are refused here, so
+ * the window never opens a dropped file in ONE's place (dragDropEnabled is off: the webview's drop is the page's). */
+function useNoFileOpening() {
+  useEffect(() => {
+    const refuse = (event: globalThis.DragEvent) => {
+      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    };
+    window.addEventListener("dragover", refuse);
+    window.addEventListener("drop", refuse);
+    return () => {
+      window.removeEventListener("dragover", refuse);
+      window.removeEventListener("drop", refuse);
+    };
+  }, []);
+}
+
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
+  useNoFileOpening();
   const project = useProject();
   const narrow = useNarrow();
   const small = useSmall();
@@ -67,8 +85,9 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const documents = useDocuments(sources);
   // sample numbers are said once: in the open Deliverable's facts («الأرقام عينة»), else by the top bar
   const opened = useOpened();
+  const boqSample = useClientBoqSample(opened?.key.startsWith("clientboq:") ? opened.key.slice("clientboq:".length) : null);
   const factsSaySample =
-    !!project && !!documents?.deliverables.some((d) => d.sample && opened?.key === `deliverable:${d.id}`);
+    !!project && (boqSample || !!documents?.deliverables.some((d) => d.sample && opened?.key === `deliverable:${d.id}`));
 
   // AI settings in place of the chat: nothing connected yet, or the first AI just connected (it stays open to say so)
   const [aiMainOpen, setAiMainOpen] = useState(false);

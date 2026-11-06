@@ -9,6 +9,7 @@ import type { ClientBoqInfo, DocKey, FileInfo, Opened } from "../project/types";
 import { FileName } from "../ui/FileName";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { workspaceApi } from "./api";
+import { useClientBoqSample } from "./clientBoqSample";
 
 export type DocumentSwitcherProps = {
   deliverables: readonly DeliverableInfo[];
@@ -42,6 +43,9 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
   const current = kind === "deliverable" ? deliverables.find((d) => d.id === id) : undefined;
   const boq = kind === "clientboq" ? clientBoqs.find((b) => b.file_id === id) : undefined;
   const file = kind === "file" ? files.find((f) => f.id === id) : undefined;
+  // a Deliverable's entry says it holds sample numbers; a client BOQ's view did, when it was read
+  const boqSample = useClientBoqSample(boq ? boq.file_id : null);
+  const sample = (current?.sample ?? false) || boqSample;
 
   const title: ReactNode = current ? (
     <span dir="auto" lang={current.language}>
@@ -134,12 +138,12 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
         {stateWords && (
           <span className="min-w-0 shrink-[100000] truncate whitespace-nowrap text-sm text-slate max-[999px]:hidden">
             {stateWords}
-            {current?.sample && " ·"}
+            {sample && " ·"}
           </span>
         )}
       </div>
       {/* sample numbers are said whole at every width */}
-      {current?.sample && (
+      {sample && (
         <span data-sample-label className={`shrink-0 whitespace-nowrap text-sm text-slate ${stateWords ? "min-[1000px]:-ms-2" : ""}`}>
           {t("sampleNumbers")}
         </span>

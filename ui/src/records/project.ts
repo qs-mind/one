@@ -35,13 +35,43 @@ export function setCurrentProject(project: Project | undefined) {
   for (const listener of listeners) listener();
 }
 
-/** Makes `next` current and closes the one before it in the core, so one project stays open at a time. */
+// What the open project still has to send before the core closes it (its open document, workspace/documents.tsx):
+// a save that came after the close would be refused, and the last document opened lost.
+const unsent = new Set<() => Promise<unknown> | void>();
+
+/** `send` runs as the engineer leaves the project; the project is closed in the core once it is done. */
+export function beforeClose(send: () => Promise<unknown> | void): () => void {
+  unsent.add(send);
+  return () => void unsent.delete(send);
+}
+
+/** Starts what is still to send, now (before the screen moves on), and resolves once it is sent or refused. */
+export function whenSent(): Promise<void> {
+  const sending = [...unsent].map((send) => {
+    try {
+      return Promise.resolve(send()).catch(() => undefined);
+    } catch {
+      return undefined;
+    }
+  });
+  return Promise.all(sending).then(() => undefined);
+}
+
+/** Closes the project in the core once `sent` is done, unless the engineer is back in it by then (left and
+ * reopened before the save was answered): a close then would shut the project now open. */
+export function closeAfter(projectId: string, sent: Promise<void>) {
+  void sent
+    .then(() => (current?.id === projectId ? undefined : api(`/projects/${projectId}/close`, { method: "POST" })))
+    .catch(() => undefined);
+}
+
+/** Makes `next` current and closes the one before it in the core, so one project stays open at a time; what the one
+ * before still had to save goes first. */
 export function switchProject(next: Project) {
   const before = current;
+  const leaving = before && before.id !== next.id ? whenSent() : null;
   setCurrentProject(next);
-  if (before && before.id !== next.id) {
-    void api(`/projects/${before.id}/close`, { method: "POST" }).catch(() => undefined);
-  }
+  if (before && leaving) closeAfter(before.id, leaving);
 }
 
 /** Opens the remembered project in the core. One that no longer opens is forgotten, and the answer is "failed". */

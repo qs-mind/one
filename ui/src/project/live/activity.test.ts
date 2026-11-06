@@ -4,17 +4,13 @@ import { texts } from "../../i18n";
 import { fakeSources } from "../fake";
 import type { AgentInfo, Team } from "../types";
 import {
-  cursorShown,
-  deskCounts,
   leadFromChat,
   NO_NEWS_MS,
   startActivity,
   subscribeChanges,
   useAgent,
   useAgents,
-  useAgentsOn,
   useDeskAgents,
-  useDeskCounts,
   useTeamAgents,
   useWaiting,
 } from "./activity";
@@ -89,15 +85,12 @@ describe("the live store", () => {
     expect(renders - before).toBe(1);
   });
 
-  it("a finished agent has no cursor; a gone one leaves the team", async () => {
+  it("a finished agent is done; a gone one leaves the team", async () => {
     const run = start({ desks: [desk], agents: [agent("est")] });
     stops.push(run.stop);
-    const { result } = renderHook(() => useAgentsOn("deliverable:boq"));
     await settle();
-    expect(result.current).toEqual(["est"]);
     act(() => run.fake.emit({ type: "agent", agent: agent("est", { state: "done" }) }));
     await settle();
-    expect(result.current).toEqual([]);
     const team = renderHook(() => useDeskAgents("pricing"));
     expect(team.result.current.map((a) => a.state)).toEqual(["done"]);
     act(() => run.fake.emit({ type: "agent-gone", id: "est" }));
@@ -117,7 +110,7 @@ describe("the live store", () => {
     expect(result.current[0]?.noNews).toBe(false);
     act(() => vi.advanceTimersByTime(1000));
     expect(result.current[0]?.noNews).toBe(true);
-    expect(cursorShown(result.current[0]!)).toBe(true); // it still points where it was
+    expect(result.current[0]?.focus).not.toBeNull(); // it still points where it was
     expect(result.current[1]?.noNews).toBe(false); // waiting for the engineer is not silence
     act(() => {
       run.fake.emit({ type: "agent", agent: agent("est") });
@@ -170,21 +163,6 @@ describe("the live store", () => {
     const { result } = renderHook(() => useTeamAgents());
     expect(result.current.map((a) => a.id)).toContain("lost");
     expect(result.current.map((a) => a.id)).not.toContain("est");
-  });
-
-  it("Desk counts change only when membership or work changes", async () => {
-    const run = start({ desks: [desk], agents: [agent("est"), agent("idle", { state: "waiting" })] });
-    stops.push(run.stop);
-    await settle();
-    const { result } = renderHook(() => useDeskCounts());
-    const first = result.current;
-    expect(first.get("pricing")).toEqual({ members: 2, working: 1 });
-    act(() => run.fake.emit({ type: "agent", agent: agent("est", { focus: { frame: "deliverable:x", anchor: null } }) }));
-    await settle();
-    expect(result.current).toBe(first);
-    act(() => run.fake.emit({ type: "agent", agent: agent("idle", { state: "thinking" }) }));
-    await settle();
-    expect(deskCounts().get("pricing")).toEqual({ members: 2, working: 2 });
   });
 
   it("counts the cards waiting for the engineer", async () => {

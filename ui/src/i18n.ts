@@ -408,7 +408,7 @@ export const texts = {
   sheetNotNumber: { en: "this is not a number", ar: "ده مش رقم" },
   sheetNotSent: { en: "The change was not sent. Try again.", ar: "التعديل موصلش. جرّب تاني." },
   sheetNoAnswer: { en: "ONE's core did not answer. Try again.", ar: "محرك ONE مردّش. جرّب تاني." },
-  sheetTotal: { en: "Total", ar: "الإجمالي العام" },
+  sheetTotal: { en: "Grand total", ar: "الإجمالي العام" },
   sheetFullScreen: { en: "Full screen", ar: "ملء الشاشة" },
   sheetLeaveFullScreen: { en: "Leave full screen", ar: "اخرج من ملء الشاشة" },
   sheetTheEngineer: { en: "the engineer", ar: "المهندس" },
@@ -584,8 +584,8 @@ export const texts = {
   sourceOpenPage: { en: "Open the page", ar: "افتح الصفحة" },
   supplyOnly: { en: "Supply only, no labour", ar: "توريد بس، من غير مصنعية" },
   sourceNotMarked: {
-    en: "Opened at its page. The exact place on the page isn't stored, so nothing is marked.",
-    ar: "اتفتح على الصفحة. مكان الرقم بالظبط في الصفحة مش متسجّل، فمفيش حاجة متعلّمة.",
+    en: "The file is open, but the number's exact place in it couldn't be shown, so nothing is marked.",
+    ar: "الملف اتفتح، بس مكان الرقم بالظبط فيه مظهرش، فمفيش حاجة متعلّمة.",
   },
   // A formula's terms in words (ui/src/sources/formula.ts): «الكمية × الفئة», not «quantity * rate»
   termQuantity: { en: "Quantity", ar: "الكمية" },
@@ -1125,6 +1125,20 @@ export const counted = {
   boqItems: {
     en: { one: "{n} item", other: "{n} items" },
     ar: { one: "بند واحد", two: "بندين", few: "{n} بنود", other: "{n} بند" },
+  },
+  itemsLeft: {
+    en: { one: "{n} item left", other: "{n} items left" },
+    ar: { one: "فاضل بند واحد", two: "فاضل بندين", few: "فاضل {n} بنود", other: "فاضل {n} بند" },
+  },
+  // a sheet's foot while items wait for their numbers; texts.sheetTotal once all are priced
+  sheetTotalSoFar: {
+    en: { one: "Total so far · {done} of {n} item", other: "Total so far · {done} of {n} items" },
+    ar: {
+      one: "الإجمالي لحد دلوقتي · {done} من بند واحد",
+      two: "الإجمالي لحد دلوقتي · {done} من بندين",
+      few: "الإجمالي لحد دلوقتي · {done} من {n} بنود",
+      other: "الإجمالي لحد دلوقتي · {done} من {n} بند",
+    },
   },
   boqItemsOf: {
     en: { one: "{done} of {n} item", other: "{done} of {n} items" },

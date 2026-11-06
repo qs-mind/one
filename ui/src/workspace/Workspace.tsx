@@ -3,12 +3,15 @@
 // title and switcher are in the top bar (DocumentHead). Alt and the arrow that points back (→ in Arabic, ← in English) go Back, to the same row. A newly shown document fades in
 // over 200 ms (at once with reduced motion). A selection in the document is the composer's chip; a source opened
 // from its card is marked in the file, or said once when its place cannot be.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { dir, t, useLanguage } from "../i18n";
 import { isMod, isTyping } from "../project/keys";
 import { useAgents, type LiveAgent } from "../project/live/activity";
 import { select } from "../project/selection";
 import type { Anchor, DocKey, Opened, ProjectSources, ViewerHandle } from "../project/types";
+import { importInto } from "../import/importer";
+import { holdsFolder } from "../import/walk";
+import { addToRecords } from "../records/RecordsPanel";
 import { revealSource, REVEAL_WAIT_MS } from "../sources/mark";
 import { play } from "../ui/motion";
 import { useOpened, workspaceApi } from "./api";
@@ -16,7 +19,7 @@ import { DocumentSwitcher } from "./DocumentSwitcher";
 import { DocumentView } from "./DocumentView";
 import { titleOf, type Documents } from "./documents";
 import { markFor } from "./reveal";
-import { WorkingLine } from "./WorkingLine";
+import { LiveWorkingLine } from "./WorkingLine";
 
 const FADE_MS = 200;
 const DOC_KINDS = ["deliverable:", "file:", "clientboq:", "files:"];
@@ -68,6 +71,30 @@ function useSourceMark(opened: Opened): boolean {
   return unmarked === opened;
 }
 
+const carriesFiles = (event: DragEvent) => event.dataTransfer?.types?.includes("Files") ?? false;
+
+/** Files or a folder dropped anywhere on the document: a folder (a tender's) goes into the project with its folders,
+ * files go to Project Records (Project files opens to show them come). Taken on the way down (capture), before a
+ * viewer under the pointer (a letter's editor) can take the drop as its own; Project files takes its own drops. */
+function dropHandlers(projectId: string, opened: Opened) {
+  const ours = (event: DragEvent) => carriesFiles(event) && opened.key !== "files:all";
+  return {
+    onDragOverCapture(event: DragEvent) {
+      if (ours(event)) event.preventDefault();
+    },
+    onDropCapture(event: DragEvent) {
+      if (!ours(event)) return;
+      event.preventDefault();
+      event.stopPropagation(); // the editor never inserts it
+      if (holdsFolder(event.dataTransfer.items)) return void importInto(projectId, event.dataTransfer);
+      const files = Array.from(event.dataTransfer.files);
+      if (!files.length) return;
+      workspaceApi.open("files:all"); // Back returns to the document
+      addToRecords(files);
+    },
+  };
+}
+
 /** One document as shown: it fades in as it comes (keyed by the document, so each one starts fresh). */
 function Shown({ children }: { children: ReactNode }) {
   const sheet = useRef<HTMLDivElement>(null);
@@ -114,7 +141,6 @@ export function DocumentHead({ documents }: { documents: Documents }) {
 }
 
 function Open({ projectId, sources, documents, opened }: { projectId: string; sources: ProjectSources; documents: Documents; opened: Opened }) {
-  const agents = useAgents();
   const [handle, setHandle] = useState<ViewerHandle | null>(null);
   const [box, setBox] = useState<HTMLElement | null>(null); // where the document scrolls: the first element that did
   const unmarked = useSourceMark(opened);
@@ -135,14 +161,14 @@ function Open({ projectId, sources, documents, opened }: { projectId: string; so
   };
 
   return (
-    <section data-region="document" aria-label={titleOf(documents, opened.key) ?? t("projectFiles")} tabIndex={-1} className="flex min-h-0 min-w-0 flex-1 flex-col outline-none">
+    <section
+      data-region="document"
+      aria-label={titleOf(documents, opened.key) ?? t("projectFiles")}
+      tabIndex={-1}
+      className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
+      {...dropHandlers(projectId, opened)}
+    >
       <div data-document-sheet className="relative min-h-0 flex-1 overflow-hidden rounded-[10px] bg-paper ring-1 ring-slate/18">
-        {unmarked && (
-          // over the sheet's top edge, not a row of its own: the document keeps its height
-          <p role="status" className="absolute end-3 top-2 z-20 rounded-lg bg-stone px-3 py-1 text-sm text-slate">
-            {t("sourceNotMarked")}
-          </p>
-        )}
         <Shown key={opened.key}>
           <div
             ref={setBox}
@@ -152,8 +178,16 @@ function Open({ projectId, sources, documents, opened }: { projectId: string; so
               if (scrolled instanceof HTMLElement && scrolled !== box) setBox(scrolled);
             }}
           >
-            <DocumentView projectId={projectId} sources={sources} opened={opened} ref={setHandle} onSelection={onSelection} />
-            <WorkingLine handle={handle} agents={agents} opened={opened.key} box={box} />
+            {/* a source whose place cannot be shown is said in the file's own control row, never over its controls */}
+            <DocumentView
+              projectId={projectId}
+              sources={sources}
+              opened={opened}
+              ref={setHandle}
+              onSelection={onSelection}
+              notice={unmarked ? t("sourceNotMarked") : null}
+            />
+            <LiveWorkingLine handle={handle} opened={opened.key} box={box} />
           </div>
         </Shown>
       </div>

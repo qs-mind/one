@@ -160,7 +160,12 @@ def _page(v: dict, offset: int, limit: int) -> dict:
         out["untraced"] = [u for u in v["untraced"] if u["block"] in ids]
         cells = list(out["refs"].values())
     used = {c["source"] for c in cells if c.get("source")}
-    out["sources"] = {s: v["sources"][s] for s in v["sources"] if s in used}
+    # the quoted line is the screen's (its source card): the agent reads the file when it needs to
+    out["sources"] = {
+        s: {k: x for k, x in v["sources"][s].items() if k != "quote"}
+        for s in v["sources"]
+        if s in used
+    }
     return out
 
 

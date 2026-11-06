@@ -6,8 +6,9 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { DeliverableInfo } from "../deliverables/types";
 import { fill, t } from "../i18n";
 import { startActivity } from "../project/live/activity";
+import { beforeClose } from "../records/project";
 import type { ClientBoqInfo, DeskInfo, DocKey, FileInfo, ProjectSources } from "../project/types";
-import { subscribeOpened, workspaceApi } from "./api";
+import { subscribeMoved, subscribeOpened, workspaceApi } from "./api";
 import { createWorkspaceSaver } from "./persist";
 
 export type Documents = {
@@ -79,11 +80,14 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
     const saver = createWorkspaceSaver(sources);
     let lists: Lists | null = null; // null until read: the restore below saves nothing
 
-    const offOpened = subscribeOpened(() => {
+    const changed = () => {
       const opened = workspaceApi.current();
       if (lists && opened) saver.save(opened);
-    });
-    const onHide = () => saver.flush(true);
+    };
+    const offOpened = subscribeOpened(changed);
+    const offMoved = subscribeMoved(changed); // a row selected, a page turned: saved as an opening is
+    const offClose = beforeClose(() => saver.flush()); // the core closes the project only after this save
+    const onHide = () => void saver.flush(true);
     window.addEventListener("pagehide", onHide);
 
     const show = (next: Lists) => {
@@ -110,8 +114,12 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
         (event) => {
           const now = lists!;
           if (event.type === "deliverable") show({ ...now, deliverables: upsert(now.deliverables, event.deliverable, (d) => d.id === event.deliverable.id) });
-          else if (event.type === "file")
-            show({ ...now, files: upsert(now.files, event.file, (f) => f.id === event.file.id || f.id === event.file.replaces) });
+          else if (event.type === "file") {
+            const { id, replaces } = event.file;
+            // a new version of a file: it opens in the old one's place, rather than the old one gone to Project files
+            if (replaces && replaces !== id) workspaceApi.replace(`file:${replaces}`, `file:${id}`);
+            show({ ...now, files: upsert(now.files, event.file, (f) => f.id === id || f.id === replaces) });
+          }
           else if (event.type === "client_boq")
             show({ ...now, clientBoqs: upsert(now.clientBoqs, event.client_boq, (b) => b.file_id === event.client_boq.file_id) });
           else if (event.type === "desk") show({ ...now, desks: upsert(now.desks, event.desk, (d) => d.id === event.desk.id) });
@@ -130,8 +138,10 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
     return () => {
       controller.abort();
       offOpened();
+      offMoved();
+      offClose();
       window.removeEventListener("pagehide", onHide);
-      saver.flush();
+      void saver.flush();
     };
   }, [sources]);
 

@@ -104,21 +104,27 @@ export async function markSource(el: Element, { shape = "box", figures = [], row
 }
 
 /** Keys a mark can go round: a cell, a file's sheet row or line, a chip. Not a whole file, nor a PDF page: no place on a page is known yet. */
-const markable = (key: string) => !/^file:[^#]+$/.test(key) && !/^file:[^#]+#page=[^&]+$/.test(key);
+const markable = (key: string) => !/^file:[^#]+$/.test(key) && !isPage(key);
+/** A PDF page's key: the page shown is the source found, though nothing on it can be marked. */
+const isPage = (key: string) => /^file:[^#]+#page=[^&]+$/.test(key);
+const shown = (keys: string[]) => keys.map((k) => elementsFor(k)[0]).find(Boolean);
 
 /** After a source is opened: waits for it to show (the document switching, its text loading), then marks
- * it and flashes its row. Resolves false when there was nothing to mark. */
+ * it and flashes its row. Resolves false when it was not found: a page-level source counts as found once its page
+ * shows (nothing is marked on it). */
 export async function revealSource(keys: string[], figures: string[] = []): Promise<boolean> {
   const wanted = keys.filter(markable);
-  if (!wanted.length) return false;
+  const pages = keys.filter(isPage);
+  if (!wanted.length && !pages.length) return false;
   const started = Date.now();
   let el: HTMLElement | undefined;
   while (!el) {
-    el = wanted.map((k) => elementsFor(k)[0]).find(Boolean);
+    el = shown(wanted);
     if (el || Date.now() - started > REVEAL_WAIT_MS) break;
+    if (!wanted.length && shown(pages)) return true; // only its page is known: there it is
     await nextFrame();
   }
-  if (!el) return false;
+  if (!el) return !!shown(pages);
   el.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   // still moving (scrolling into view): marked once it has stopped
   let before = el.getBoundingClientRect();

@@ -9,6 +9,8 @@ import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
 import { FileName } from "../ui/FileName";
 import { workspaceApi } from "../workspace/api";
+import { importInto } from "../import/importer";
+import { holdsFolder } from "../import/walk";
 
 type Hit = {
   file_id: string;
@@ -151,6 +153,17 @@ export async function uploadFile(
   return { ok: false, line: await coreLine(response, texts.fileNotAdded) };
 }
 
+// Files dropped on the open document (any document of the workspace): they go to Project Records here, where Project
+// files shows them arrive with what ONE read and any refusal.
+let dropped: File[] = [];
+const takers = new Set<() => void>();
+
+/** Files dropped on the workspace, for Project files to add (it opens for them). */
+export function addToRecords(files: File[]) {
+  dropped.push(...files);
+  for (const take of [...takers]) take();
+}
+
 /** `layout="document"`: Project files as the workspace's open document, with no panel chrome (the workspace names
  * it); a file opens there. */
 type RecordsPanelProps =
@@ -210,6 +223,22 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     setAdding(false);
   }
 
+  // as the open document, it adds the files dropped on the workspace, once its own list is read
+  const listed = files !== undefined || filesFailed !== undefined;
+  const addRef = useRef(add);
+  addRef.current = add;
+  useEffect(() => {
+    if (!asDocument || !id || !listed) return;
+    const take = () => {
+      const now = dropped;
+      dropped = [];
+      if (now.length) void addRef.current(now);
+    };
+    takers.add(take);
+    take();
+    return () => void takers.delete(take);
+  }, [asDocument, id, listed]);
+
   async function search(event: FormEvent) {
     event.preventDefault();
     const q = query.trim();
@@ -238,6 +267,8 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault(); // the window must not open the file itself
+        // a folder (a tender's): its files go into this project with their folders, as on the workspace
+        if (id && holdsFolder(event.dataTransfer.items)) return void importInto(id, event.dataTransfer);
         void add(Array.from(event.dataTransfer.files));
       }}
       className={asDocument ? "h-full overflow-auto bg-paper p-3 text-ink" : "border-b border-stone px-4 py-4"}

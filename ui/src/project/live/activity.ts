@@ -3,7 +3,7 @@
 // however many arrive, and each part of the screen reads only its own slice. Nothing here is kept on disk.
 import { useCallback, useRef, useSyncExternalStore } from "react";
 import { texts } from "../../i18n";
-import type { ActivityEvent, AgentInfo, FrameKey, ProjectSources, Team } from "../types";
+import type { ActivityEvent, AgentInfo, ProjectSources, Team } from "../types";
 
 /** An agent as the screen shows it: `noNews` once it has been silent for a minute while working. */
 export type LiveAgent = AgentInfo & { noNews: boolean };
@@ -14,9 +14,6 @@ export const NO_NEWS_MS = 60_000;
 const TICK_MS = 1000;
 
 const busy = (a: AgentInfo) => a.state === "working" || a.state === "thinking";
-/** A cursor shows while the agent is on something; it goes when the agent finishes. */
-export const cursorShown = (a: LiveAgent) =>
-  a.focus !== null && (a.state === "working" || a.state === "thinking" || a.state === "waiting");
 
 // Before Plan 4 sends a Lead QS, the Lead QS is the chat itself: thinking while a reply streams (leadFromChat).
 const chatLead = (state: "idle" | "thinking"): LiveAgent => ({
@@ -41,8 +38,6 @@ let desks = new Set<string>();
 let waiting: number | null = null;
 let leadState: "idle" | "thinking" = "idle";
 let list: readonly LiveAgent[] = [chatLeads.idle];
-let counts: ReadonlyMap<string, { members: number; working: number }> = new Map();
-let countsKey = "";
 const lastHeard = new Map<string, number>();
 let queue: ActivityEvent[] = [];
 let frame: number | undefined;
@@ -65,17 +60,6 @@ export function subscribeChanges(listener: (changes: Change[]) => void): () => v
 function publish(changes: Change[] = []) {
   const all = [...agents.values()];
   list = all.some((a) => a.kind === "lead") ? all : [chatLeads[leadState], ...all];
-  const next = new Map<string, { members: number; working: number }>();
-  for (const a of all) {
-    if (a.desk_id === null) continue;
-    const c = next.get(a.desk_id) ?? { members: 0, working: 0 };
-    next.set(a.desk_id, { members: c.members + 1, working: c.working + (busy(a) ? 1 : 0) });
-  }
-  const key = [...next].map(([id, c]) => `${id}:${c.members}:${c.working}`).join("|");
-  if (key !== countsKey) {
-    countsKey = key;
-    counts = next;
-  }
   for (const listener of [...listeners]) listener();
   if (changes.length) for (const listener of [...changeListeners]) listener(changes);
 }
@@ -219,20 +203,9 @@ export function leadFromChat(thinking: boolean) {
   publish();
 }
 
-/** Each Desk's members and how many of them are working, for the folded Desk line ("Pricing Desk: 2 working"). */
-export function deskCounts(): ReadonlyMap<string, { members: number; working: number }> {
-  return counts;
-}
-
-/** The frames agents are working on now (their cursors are there). */
-export function workedOn(): readonly string[] {
-  return list.filter(cursorShown).map((a) => a.focus!.frame);
-}
-
 // Hooks -----------------------------------------------------------------------------------------------------------
 
 const getList = () => list;
-const getCounts = () => counts;
 const getWaiting = () => waiting;
 
 /** Everyone on the team now, the Lead QS first when it comes from the chat. */
@@ -260,30 +233,6 @@ function useDerived<T>(compute: () => readonly T[], deps: unknown[]): readonly T
   return useSyncExternalStore(subscribe, get);
 }
 
-/** The ids of the agents whose cursor is on this frame, in a steady order (the cursors stack by it). */
-export function useAgentsOn(key: FrameKey): readonly string[] {
-  return useDerived(
-    () =>
-      list
-        .filter((a) => cursorShown(a) && a.focus!.frame === key)
-        .map((a) => a.id)
-        .sort(),
-    [key],
-  );
-}
-
-/** The ids of every agent with a cursor. */
-export function useCursorIds(): readonly string[] {
-  return useDerived(
-    () =>
-      list
-        .filter(cursorShown)
-        .map((a) => a.id)
-        .sort(),
-    [],
-  );
-}
-
 /** The team frame's members: the Lead QS, the Checking QS, and any agent outside every known Desk. */
 export function useTeamAgents(): readonly LiveAgent[] {
   return useDerived(() => list.filter((a) => a.desk_id === null || !desks.has(a.desk_id)), []);
@@ -291,10 +240,6 @@ export function useTeamAgents(): readonly LiveAgent[] {
 
 export function useDeskAgents(deskId: string): readonly LiveAgent[] {
   return useDerived(() => list.filter((a) => a.desk_id === deskId && desks.has(deskId)), [deskId]);
-}
-
-export function useDeskCounts(): ReadonlyMap<string, { members: number; working: number }> {
-  return useSyncExternalStore(subscribe, getCounts);
 }
 
 /** Cards waiting for the engineer, from the live stream; null until it says. */

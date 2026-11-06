@@ -2,7 +2,7 @@
 walk (gemini-3.1-flash-lite, 5 Nov 2026). Synthetic «عينة» files only."""
 
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from pydantic_ai import ModelRetry
@@ -255,15 +255,27 @@ async def test_a_deliverable_with_a_blank_for_a_value_is_refused(ctx):
         assert c.execute("SELECT count(*) FROM deliverables").fetchone() == (0,)
 
 
+_AR_MONTHS = ("يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+              "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر")  # fmt: skip
+
+
+def _arabic_date(d: date) -> str:
+    return f"{d.day} {_AR_MONTHS[d.month - 1]} {d.year}"
+
+
 async def test_a_letter_takes_its_date_and_terms_from_the_files(ctx):
     add_file(ctx.rec, "05 إيميل العميل - عينة.txt", EMAIL, actor="engineer")
-    wrong = _letter("القاهرة في 6 نوفمبر 2026", "مدة صلاحية العرض 60 يوماً - عينة")
+    # today in Cairo by the project's clock, as the tool reads it; the wrong day is never today
+    # and never the date the email states (18 Nov 2026)
+    today = truth.today(datetime.fromisoformat(ctx.rec.clock()))
+    other = next(d for d in (today + timedelta(days=n) for n in (1, 2)) if d != date(2026, 11, 18))
+    wrong = _letter(f"القاهرة في {_arabic_date(other)}", "مدة صلاحية العرض 60 يوماً - عينة")
     with pytest.raises(ModelRetry) as refused:
         await call("deliverable_create", wrong, ctx)
     said = str(refused.value)
-    assert "6 نوفمبر 2026" in said and "validity 60" in said and "Nothing was saved" in said
+    assert _arabic_date(other) in said and "validity 60" in said and "Nothing was saved" in said
     right = _letter(
-        "القاهرة في 5 نوفمبر 2026",
+        f"القاهرة في {_arabic_date(today)}",
         "مدة سريان العرض 90 يوم، والأسعار غير شاملة ضريبة القيمة المضافة 14% - عينة",
     )
     assert json.loads(await call("deliverable_create", right, ctx))["version"] == 1

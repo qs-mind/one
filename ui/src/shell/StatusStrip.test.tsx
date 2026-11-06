@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectStatus } from "../project/types";
-import { setLanguage, texts } from "../i18n";
-import { StatusStrip } from "./StatusStrip";
+import { count, setLanguage, texts } from "../i18n";
+import { fitting, StatusStrip } from "./StatusStrip";
 
 const boq = (value: string): ProjectStatus => ({
   boq_value: { value, currency: "EGP", deliverable_id: "boq1", revision: 2, status: "checked", sample: true },
@@ -35,5 +35,33 @@ describe("StatusStrip", () => {
     expect(screen.getByRole("button", { name: new RegExp(texts.boqSoFar.ar) })).toHaveTextContent("4 من 325 بند");
     rerender(<StatusStrip status={covers(6)} />);
     expect(screen.getByRole("button", { name: new RegExp(texts.boqSoFar.ar) })).toHaveTextContent("6 بنود");
+  });
+
+  it("says how many items are left to price, and nothing when all are", () => {
+    const left = (priced: number): ProjectStatus => ({ boq_value: { ...boq("1104000.00").boq_value!, items: 5, priced } });
+    setLanguage("ar");
+    const { rerender, container } = render(<StatusStrip status={left(1)} />);
+    expect(container.querySelector('[data-status="left"]')).toHaveTextContent(count("itemsLeft", 4, {}, "ar"));
+    expect(count("itemsLeft", 4, {}, "ar")).toBe("فاضل 4 بنود");
+    rerender(<StatusStrip status={left(5)} />);
+    expect(container.querySelector('[data-status="left"]')).toBeNull();
+  });
+});
+
+describe("what fits in the top bar", () => {
+  // widths in priority order: the submission, the items left, the BOQ so far, the open comments
+  it("all of two that fit; past two, the first two beside More status", () => {
+    expect(fitting([160, 90], 300, 80)).toEqual([0, 1]);
+    expect(fitting([160, 90, 380, 120], 400, 80)).toEqual([0, 1]);
+  });
+
+  it("an item too wide for the room is passed over for the next that fits (1440 px, Arabic)", () => {
+    // no submission date: the BOQ so far is too wide, the items left and the open comments fit
+    expect(fitting([90, 380, 120], 357, 67)).toEqual([0, 2]);
+    expect(fitting([380], 300, 67)).toEqual([]);
+  });
+
+  it("never more than two", () => {
+    expect(fitting([40, 40, 40, 40], 1000, 60)).toEqual([0, 1]);
   });
 });

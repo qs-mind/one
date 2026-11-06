@@ -4,7 +4,10 @@ data only."""
 import json
 
 from qsone.deliverables import store
+from qsone.deliverables import tools as outputs
+from qsone.engine.tools import call
 from qsone.records import ledger
+from tests.fakes_tools import tool_ctx
 
 LINE = "خرسانة C30 3,450 ج.م./م3"
 AT = "2026-11-05T10:00:00+02:00"
@@ -66,14 +69,63 @@ def test_a_place_with_no_text_has_no_quote(rec):
     assert store.sources_of(rec, [sid])[sid]["quote"] is None
 
 
-def test_a_sheets_numbers_carry_it_too(rec):
-    fid = file_with_text(rec, LINE)
-    sid = file_source(rec, fid)
+def priced_sheet(rec, items: int) -> tuple[str, str]:
+    """A Sheet of `items` rows, each one's rate and quantity from the one quoted file source."""
+    sid = file_source(rec, file_with_text(rec, LINE))
+    rows: list[dict] = [{"section": "أعمال - عينة", "level": 1}]
     with rec.write("engineer") as conn:
-        item = ledger.write_item(conn, at=AT, actor="engineer", kind="boq_item", code="3/02")
-        ledger.write_number(
-            conn, at=AT, actor="engineer", item_id=item, name="rate", value="3450",
-            source_id=sid, dated="2026-11-05", unit="م3", currency="EGP",
-        )  # fmt: skip
-        _, sources = store._numbers(conn, [item], AT)
-    assert sources[sid]["quote"] == LINE
+        for n in range(items):
+            item = ledger.write_item(
+                conn, at=AT, actor="engineer", kind="boq_item", code=f"3/{n:02}",
+                fields={"description": f"خرسانة - عينة {n}"},
+            )  # fmt: skip
+            for name, value, currency in (("rate", "3450", "EGP"), ("quantity", "10", None)):
+                ledger.write_number(
+                    conn, at=AT, actor="engineer", item_id=item, name=name, value=value,
+                    source_id=sid, dated="2026-11-05", unit="م3", currency=currency,
+                )  # fmt: skip
+            rows.append({"item_id": item})
+    d = store.create(
+        rec, kind="sheet", variant="boq", title="جدول الكميات - عينة", language="ar",
+        actor="engineer", rows=rows,
+    )  # fmt: skip
+    return d, sid
+
+
+def counting(monkeypatch) -> list[dict]:
+    """Every read of a file's text at a place, as `_quote` asks for it."""
+    asked: list[dict] = []
+    texts_at = store.truth.texts_at
+
+    def counted(conn, file_id, locator):
+        asked.append(locator)
+        return texts_at(conn, file_id, locator)
+
+    monkeypatch.setattr(store.truth, "texts_at", counted)
+    return asked
+
+
+def test_the_screens_view_reads_each_sources_line_once(rec, monkeypatch):
+    d, sid = priced_sheet(rec, 40)  # 80 numbers from one source
+    asked = counting(monkeypatch)
+    v = store.view(rec, d)
+    assert asked == [] and "quote" not in v["sources"][sid]  # the view itself reads no quote
+    shown = store.with_quotes(rec, v)
+    assert shown["sources"][sid]["quote"] == LINE
+    assert len(asked) == 1  # once for the view, not once per number
+
+
+def test_the_list_never_reads_a_quote(rec, monkeypatch):
+    priced_sheet(rec, 5)
+    asked = counting(monkeypatch)
+    assert store.list_deliverables(rec)
+    assert asked == []
+
+
+async def test_the_agents_read_has_no_quote(rec, monkeypatch):
+    d, sid = priced_sheet(rec, 5)
+    asked = counting(monkeypatch)
+    page = json.loads(await call("deliverable_read", {"id": d}, tool_ctx(rec)))
+    assert sid in page["sources"] and "quote" not in page["sources"][sid]
+    assert asked == []
+    assert "deliverable_read" in outputs.OUTPUTS_TOOLS

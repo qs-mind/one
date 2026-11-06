@@ -102,8 +102,28 @@ describe("revealing an opened source", () => {
   it("marks no whole frame and no PDF page (no place on a page is known yet)", async () => {
     reduced(true);
     at(new DOMRect(0, 0, 400, 400)).setAttribute("data-frame", "file:f1");
-    expect(await revealSource(["file:f1#page=3", "file:f1"])).toBe(false);
+    const found = revealSource(["file:f1#page=3", "file:f1"]);
+    await vi.advanceTimersByTimeAsync(2100);
+    expect(await found).toBe(false); // the page never showed
     expect(shape("mark")).toBeNull();
+  });
+
+  it("a page-level source counts as found once its page shows, with nothing marked on it", async () => {
+    reduced(true);
+    const found = revealSource(["file:f1#page=3", "file:f1"], ["3,450"]);
+    await vi.advanceTimersByTimeAsync(100); // the page image is loading
+    at(new DOMRect(0, 0, 600, 800), document.body, "img").setAttribute("data-source-at", "file:f1#page=3");
+    await vi.advanceTimersByTimeAsync(50);
+    expect(await found).toBe(true);
+    expect(shape("mark")).toBeNull();
+  });
+
+  it("another page of the file is not the source's page", async () => {
+    reduced(true);
+    at(new DOMRect(0, 0, 600, 800), document.body, "img").setAttribute("data-source-at", "file:f1#page=1");
+    const found = revealSource(["file:f1#page=3", "file:f1"]);
+    await vi.advanceTimersByTimeAsync(2100);
+    expect(await found).toBe(false);
   });
 
   it("gives up when the source never shows", async () => {

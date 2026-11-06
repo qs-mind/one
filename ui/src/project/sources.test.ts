@@ -1,6 +1,14 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { texts } from "../i18n";
 import { httpSources, PAGE_IMAGES_KEPT, SourceError } from "./sources";
+import type { Opened } from "./types";
+
+/** The open document as the screen saves it and the body the core's route takes (the core's test reads it too). */
+const contract = JSON.parse(readFileSync(resolve(__dirname, "../../../core/tests/contract/workspace_put.json"), "utf8")) as {
+  cases: { opened: Opened; body: unknown }[];
+};
 
 type Route = (url: string, init?: RequestInit) => Response;
 
@@ -53,6 +61,15 @@ describe("the project's sources over /api", () => {
     await s.saveWorkspace({ key: "files:all", anchor: null }, true);
     expect(calls[0]).toMatchObject({ url: "/api/projects/p%201/workspace", init: { method: "PUT", keepalive: true } });
     expect(JSON.parse(calls[0]!.init!.body as string)).toEqual({ open: "files:all", anchor: null });
+  });
+
+  it("saves the open document in the body the core's route takes (the shared contract)", async () => {
+    expect(contract.cases.length).toBeGreaterThan(0);
+    for (const { opened, body } of contract.cases) {
+      const calls = core(() => json({ ok: true }));
+      await httpSources("p1").saveWorkspace(opened);
+      expect(JSON.parse(calls[0]!.init!.body as string)).toEqual(body);
+    }
   });
 
   it("asks for page images by width and keeps at most 64 object URLs", async () => {
