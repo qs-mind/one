@@ -294,3 +294,77 @@ def test_queries_are_cleaned_as_passages_are(brissa):
 
 def test_weights_in_rrf():
     assert rrf([[1], [2]], weights=[1.0, 2.0]) == [(2, 2 / 61), (1, 1 / 61)]
+
+
+@pytest.mark.parametrize(
+    "mode, query, vectors",
+    [
+        ("exact", "retention", False),
+        ("meaning", "retention", False),
+        ("meaning", "unmatched", True),
+        ("meaning", "retention", True),
+    ],
+)
+@pytest.mark.parametrize("repeats", [60, 4100])
+def test_repeated_pdf_pages_do_not_use_up_results(rec, mode, query, vectors, repeats):
+    """Sample Brissa shape: p87 x60, p58 x2, p59 x2; fill the list with other pages."""
+    import json
+
+    from qsone.records.search import index_words
+
+    f = add_file(rec, "Conditions sample.pdf", sample_pdf([["sample"]]), actor="engineer")
+    with rec.write("engineer") as conn:
+        conn.execute("DELETE FROM chunks_fts")
+        conn.execute("DELETE FROM chunks")
+        for seq, page in enumerate([87] * repeats + [58] * 2 + [59] * 2 + [60]):
+            cur = conn.execute(
+                "INSERT INTO chunks(file_id, seq, locator, text) VALUES (?, ?, ?, ?)",
+                (f.id, seq, json.dumps({"page": page}), "retention sample"),
+            )
+            index_words(conn, [(cur.lastrowid, "retention sample")])
+    # Same page number in another file must survive, as must separate spreadsheet rows.
+    other = add_file(rec, "Other sample.pdf", sample_pdf([["retention sample"]]), actor="engineer")
+    add_file(
+        rec,
+        "Rows sample.xlsx",
+        sample_xlsx({"BOQ": [["retention sample"], ["retention sample"]]}),
+        actor="engineer",
+    )
+    emb = FlatEmbedder() if vectors else None
+    if emb:
+        index_vectors(rec, emb)
+    hits = search(rec, query, mode=mode, k=7, embedder=emb).hits
+    assert len(hits) == 7
+    pages = [(h.file_id, h.locator["page"]) for h in hits if "page" in h.locator]
+    assert len(pages) == len(set(pages)) == 5
+    assert (other.id, 1) in pages
+    assert {(f.id, p) for p in (87, 58, 59, 60)} <= set(pages)
+    assert len([h for h in hits if "row" in h.locator]) == 2
+    with rec.read() as conn:
+        best = conn.execute("SELECT min(id) FROM chunks WHERE file_id = ?", (f.id,)).fetchone()[0]
+    assert next(h.chunk_id for h in hits if h.file_id == f.id and h.locator["page"] == 87) == best
+
+
+def test_fusion_keeps_one_page_when_words_and_meaning_prefer_different_chunks(rec, monkeypatch):
+    from qsone.records import search as searches
+
+    f = add_file(
+        rec,
+        "Conditions sample.pdf",
+        sample_pdf([["retention sample"], ["retention other sample"]]),
+        actor="engineer",
+    )
+    with rec.write("engineer") as conn:
+        second = conn.execute(
+            "INSERT INTO chunks(file_id, seq, locator, text) VALUES (?, 2, ?, ?)",
+            (f.id, '{"page": 1}', "another passage sample"),
+        ).lastrowid
+        searches.index_words(conn, [(second, "another passage sample")])
+    emb = FlatEmbedder()
+    index_vectors(rec, emb)
+    # A semantic match to a different passage on the same page must not duplicate that page
+    # after fusion. The more highly ranked word match keeps its actual passage and locator.
+    monkeypatch.setattr(searches, "_meaning", lambda *args: [second])
+    hits = search(rec, "retention", mode="meaning", k=2, embedder=emb).hits
+    assert [h.locator for h in hits] == [{"page": 1}, {"page": 2}]
+    assert hits[0].text == "retention sample"

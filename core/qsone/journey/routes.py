@@ -94,7 +94,8 @@ async def _check_defaults(listed: list, checked: set, found: list) -> None:
     provider lists but refuses (Google's retired ones, finding 12) is noted, so it is no default
     and the next one is checked. Any other failure is left for the Brief to meet."""
     for _ in range(DEFAULT_CHECKS):
-        todo = set(roles.defaults(listed).values()) - checked
+        available = {c.choice for c in listed if not engine_connectors.refused(c.choice)}
+        todo = (set(roles.defaults(listed).values()) & available) - checked
         if not todo:
             return
         checked |= todo

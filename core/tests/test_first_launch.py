@@ -413,8 +413,7 @@ def test_check_a_standard_link_uses_only_the_typed_model(data_dir):
 
 
 def test_a_typed_model_the_list_lacks_is_still_the_one_checked(data_dir):
-    """A preview model a provider serves but does not list: the check asks that model, not the
-    list's first one."""
+    """The engineer can choose a served preview that the provider does not list."""
     settings.save_ai(
         "standard",
         [
@@ -430,6 +429,9 @@ def test_a_typed_model_the_list_lacks_is_still_the_one_checked(data_dir):
     link = google_link()
     preview = link.models["gemini-9-preview"] = scripted(text("OK"))
     first = link.models["models/gemini-pro-latest"] = scripted(text("OK"))
+    for card in link.sheet:
+        if card.choice.model != "models/gemini-pro-latest":
+            link.models[card.choice.model] = scripted(text("OK"))
     with make_client([link]) as client:
         body = {"via": "standard", "connector": "standard:g"}
         assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
@@ -530,3 +532,36 @@ def test_a_retired_checker_model_found_behind_the_check_is_dropped(data_dir):
                 break
             time.sleep(0.05)
     assert connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite"))
+
+
+async def test_background_defaults_only_check_listed_models(data_dir):
+    link = google_link()
+    link.sheet = [c for c in link.sheet if c.choice.model == "models/gemini-3.1-flash-lite"]
+    listed_model = link.models["models/gemini-3.1-flash-lite"] = scripted(text("OK"))
+    absent_model = link.models["models/gemini-2.5-flash-lite"] = scripted(text("OK"))
+    await routes._check_defaults([cards.priced(c) for c in link.sheet], set(), [link])
+    assert listed_model.calls == 1
+    assert absent_model.calls == 0
+
+
+async def test_background_defaults_filter_unlisted_and_refused_choices(data_dir, monkeypatch):
+    link = google_link()
+    available, refused, absent = [c.choice for c in link.sheet[1:]]
+    link.sheet = [c for c in link.sheet if c.choice != absent]
+    connectors.note_refused(refused)
+    models = {choice: scripted(text("OK")) for choice in (available, refused, absent)}
+    link.models.update({choice.model: model for choice, model in models.items()})
+    monkeypatch.setattr(
+        roles,
+        "defaults",
+        lambda listed: {
+            "lead": available,
+            "checker": refused,
+            "quick": absent,
+        },
+    )
+    checked = set()
+    await routes._check_defaults(link.sheet, checked, [link])
+    assert checked == {available}
+    assert models[available].calls == 1
+    assert models[refused].calls == models[absent].calls == 0

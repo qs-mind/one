@@ -45,7 +45,7 @@ def test_a_drop_is_reported_from_the_records(rec):
         "Sheet «BOQ»: 3 items in 2 sections (rows 2–7). Its own total: 115,800 (row 7, column F)."
     )
     assert lines[3].endswith(": Specifications.")
-    assert lines[4] == "Not among the project's files yet: Conditions of contract, Drawings."
+    assert lines[-1] == "Not among the project's files yet: Conditions of contract, Drawings."
     assert found["lines"][2]["ar"] == (
         "شيت «BOQ»: 3 بنود في قسمين (الصفوف 2–7). إجماليه في الملف: 115,800 (صف 7، عمود F)."
     )
@@ -103,3 +103,88 @@ def test_the_report_of_the_real_lahun_boq_and_momah_specs(rec):
     assert lines[2].endswith("Its own total: 640,983.35 (row 66, column H).")
     assert lines[3].endswith(": Specifications.")
     assert lines[-1] == "Not among the project's files yet: Conditions of contract, Drawings."
+
+
+@pytest.mark.parametrize(
+    "pages, missing",
+    [
+        ([["Specifications sample"], [], []], [2, 3]),
+        ([[], []], [1, 2]),
+        ([["Specifications sample"]], []),
+    ],
+)
+def test_pdf_report_names_pages_without_text(rec, pages, missing):
+    f = add_file(rec, "Specifications sample.pdf", sample_pdf(pages), actor="engineer")
+    found = report.make(rec, [f.id])
+    detail = found["files"][0]["pdf"]
+    assert detail == {"pages": len(pages), "needs_reading": missing, "boq_rows": None}
+    for lang in ("en", "ar"):
+        said = " ".join(line[lang] for line in found["lines"])
+        assert str(len(pages)) in said
+        assert all(str(p) in said for p in missing)
+    if missing:
+        assert "No text on pages: " + ", ".join(map(str, missing)) in " ".join(
+            line["en"] for line in found["lines"]
+        )
+    assert report.kept(rec)[0]["lines"] == found["lines"]
+
+
+def test_pdf_report_counts_boq_rows_using_pdf_import(rec):
+    from tests.test_boq_pdf import pdf
+
+    f = add_file(rec, "BOQ sample.pdf", pdf(multipage=True), actor="engineer")
+    found = report.make(rec, [f.id])
+    assert found["files"][0]["pdf"] == {"pages": 2, "needs_reading": [], "boq_rows": 2}
+    assert any("2 BOQ rows" in line["en"] and "2" in line["ar"] for line in found["lines"])
+
+
+def test_pdf_page_report_survives_a_table_reader_failure(rec, monkeypatch):
+    f = add_file(rec, "Specifications sample.pdf", sample_pdf([["sample"], []]), actor="engineer")
+
+    def failed(data):
+        raise ValueError("sample unsupported table")
+
+    monkeypatch.setattr(report.boq_pdf, "sheets", failed)
+    found = report.make(rec, [f.id])
+    assert found["files"][0]["pdf"] == {"pages": 2, "needs_reading": [2], "boq_rows": None}
+    assert any("No text on pages: 2" in line["en"] for line in found["lines"])
+
+
+def test_boq_sheet_reader_dispatches_pdf_to_pdf_reader(rec):
+    from tests.test_boq_pdf import pdf
+
+    f = add_file(rec, "BOQ sample.pdf", pdf(), actor="engineer")
+    sheets, priced = report._boq_sheets(rec, f.id, "BOQ sample.pdf", "pdf")
+    assert len(sheets) == 1 and sheets[0]["items"] == 1
+    assert not priced
+
+
+def test_report_says_when_excel_reader_cannot_read(rec, monkeypatch):
+    from xlrd import XLRDError
+
+    f = add_file(rec, "BOQ sample.xlsx", sample_xlsx({"BOQ": BOQ_ROWS}), actor="engineer")
+
+    def failed(*args):
+        raise XLRDError("sample bad workbook")
+
+    monkeypatch.setattr(report.boq, "_xlsx", failed)
+    found = report.make(rec, [f.id])
+    assert found["files"][0]["label"] is None
+    assert copy.FILE_UNREADABLE["en"] in found["lines"][1]["en"]
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_report_says_when_pdf_table_reader_cannot_read(rec, monkeypatch, wrapped):
+    from pdfminer.pdfparser import PDFSyntaxError
+    from pdfplumber.utils.exceptions import PdfminerException
+
+    f = add_file(rec, "BOQ sample.pdf", sample_pdf([["sample"]]), actor="engineer")
+
+    def failed(*args):
+        raise (PdfminerException if wrapped else PDFSyntaxError)("sample bad table")
+
+    monkeypatch.setattr(report.boq_pdf, "sheets", failed)
+    found = report.make(rec, [f.id])
+    assert found["files"][0]["pdf"]["pages"] == 1
+    assert found["files"][0]["pdf"]["boq_rows"] is None
+    assert any("could not read the tables" in line["en"] for line in found["lines"])

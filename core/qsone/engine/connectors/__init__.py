@@ -147,6 +147,10 @@ async def check(
         return copy.NO_AI
     if connector.kind == "agent":
         return await connector.check()
+    if refused(ModelChoice(connector_id, model_id)):
+        return copy.fill(
+            copy.MODEL_GONE, provider=connector.name, model=model_id.removeprefix("models/")
+        )
     try:
         answer = await asyncio.wait_for(
             model_request(

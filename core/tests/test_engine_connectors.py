@@ -715,3 +715,16 @@ def test_a_refused_claude_key_says_where_to_make_one():
     refused = _status(anthropic.AuthenticationError, 401)
     assert connectors.plain_error(refused, NativeLink.name) == copy.KEY_REFUSED
     assert "console.anthropic.com" in copy.KEY_REFUSED["en"] + copy.KEY_REFUSED["ar"]
+
+
+async def test_a_404_model_is_not_checked_again():
+    calls = []
+
+    def gone(messages, info):
+        calls.append(info)
+        raise ModelHTTPError(404, "gone-sample")
+
+    link = StubConnector(FunctionModel(gone))
+    assert await connectors.check("standard:stub/gone-sample", among=[link]) is not None
+    assert await connectors.check("standard:stub/gone-sample", among=[link]) is not None
+    assert len(calls) == 1

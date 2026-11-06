@@ -1048,6 +1048,20 @@ FILES = Noun(
 REPORT_HEAD = {"en": "ONE read {files}:", "ar": "ONE قرا {files}:"}
 REPORT_FILE = {"en": "{name}: {label}.", "ar": "{name}: {label}."}
 REPORT_NOT_READ = {"en": "{name}: {note}", "ar": "{name}: {note}"}
+REPORT_TABLES_NOT_READ = {
+    "en": "ONE could not read the tables in this file; no BOQ row count is available yet.",
+    "ar": "ONE ماقدرش يقرا الجداول في الملف ده؛ عدد بنود المقايسة لسه مش معروف.",
+}
+REPORT_PDF_PAGES = {"en": "PDF: {pages} pages.", "ar": "ملف PDF: {pages} صفحة."}
+REPORT_PDF_UNREAD = {
+    "en": "No text on pages: {pages}. These pages still need reading from their images.",
+    "ar": "الصفحات دي مفيهاش نص: {pages}. لسه محتاجة تتقري من صورها.",
+}
+REPORT_PDF_BOQ = {
+    "en": "The PDF tables show {rows} BOQ rows; these have not been imported by this report.",
+    "ar": "جداول الـ PDF فيها {rows} بند مقايسة؛ التقرير ده ما استوردش البنود.",
+}
+
 REPORT_BOQ_SHEET = {
     "en": "Sheet «{sheet}»: {items} in {sections} (rows {first}–{last}).",
     "ar": "شيت «{sheet}»: {items} في {sections} (الصفوف {first}–{last}).",
