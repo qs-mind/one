@@ -111,6 +111,15 @@ FILE_EMPTY = {
     "en": "The file is empty.",
     "ar": "الملف فاضي.",
 }
+# After the name dropped (ui: records/RecordsPanel.tsx): the same bytes are kept once.
+FILE_SAME_AS = {
+    "en": "is the same file as {old}; kept once.",
+    "ar": "هو نفس {old}، اتحفظ مرة واحدة.",
+}
+FILE_SAME_AGAIN = {
+    "en": "is already here; kept once.",
+    "ar": "موجود بالفعل، اتحفظ مرة واحدة.",
+}
 
 FILE_NOT_READ_YET = {
     "en": "Kept in Project Records. ONE cannot read this kind of file yet.",

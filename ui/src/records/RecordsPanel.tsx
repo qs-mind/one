@@ -86,8 +86,21 @@ const warningIcon = (
   </svg>
 );
 
-/** The copper hidden-text mark on a flagged file; pressing it lists the flags, read from the core the first time. */
-function HiddenText({ projectId, fileId }: { projectId: string; fileId: string }) {
+// Hidden sheets, rows and columns are normal in a priced BOQ (its build-up): said plainly, never as a warning.
+const LAYOUT = new Set(["hidden_sheet", "hidden_rows", "hidden_columns"]);
+
+/** What a flagged file's mark says: orders to an AI (copper, with why ONE treats them as data), hidden sheets or rows
+ * only (normal in priced BOQs), or text not shown on the page. */
+function hiddenKind(kinds: readonly string[] | undefined): "orders" | "layout" | "unseen" {
+  if (!kinds?.length || kinds.includes("ai_instruction")) return "orders";
+  return kinds.every((kind) => LAYOUT.has(kind)) ? "layout" : "unseen";
+}
+
+/** The hidden-text mark on a flagged file; pressing it lists the flags, read from the core the first time. Copper,
+ * with the prompt-injection words, only when a line looks like an order to an AI. */
+function HiddenText({ projectId, fileId, kinds }: { projectId: string; fileId: string; kinds?: readonly string[] }) {
+  const kind = hiddenKind(kinds);
+  const warn = kind === "orders";
   const [open, setOpen] = useState(false);
   const [flags, setFlags] = useState<Flag[] | "failed">();
 
@@ -108,14 +121,14 @@ function HiddenText({ projectId, fileId }: { projectId: string; fileId: string }
         type="button"
         aria-expanded={open}
         onClick={() => void toggle()}
-        className="flex items-center gap-1 self-start text-copper underline-offset-2 hover:underline"
+        className={`flex items-center gap-1 self-start underline-offset-2 hover:underline ${warn ? "text-copper" : "text-slate"}`}
       >
-        {warningIcon}
-        {t("hiddenText")}
+        {warn && warningIcon}
+        {t(warn ? "hiddenText" : kind === "layout" ? "hiddenLayout" : "hiddenUnseen")}
       </button>
       {open && (
-        <div className="flex flex-col gap-1 rounded-md border border-copper px-3 py-2">
-          <p>{t("hiddenTextWhy")}</p>
+        <div className={`flex flex-col gap-1 rounded-md border px-3 py-2 ${warn ? "border-copper" : "border-stone"}`}>
+          <p>{t(warn ? "hiddenTextWhy" : "hiddenNoOrders")}</p>
           {flags === "failed" && (
             <p role="alert" className="text-copper">
               {t("flagsFailed")}
@@ -224,7 +237,8 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
   const [files, setFiles] = useState<RecordsFile[]>();
   const [filesFailed, setFilesFailed] = useState<Text>();
   const [adding, setAdding] = useState(false);
-  const [problems, setProblems] = useState<{ name: string; line: Text }[]>([]);
+  // a refusal (copper), or a quiet line: the same file dropped under another name (slate)
+  const [problems, setProblems] = useState<{ name: string; line: Text; quiet?: boolean }[]>([]);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState<Found>();
@@ -266,7 +280,11 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     setProblems([]);
     for (const file of chosen) {
       const added = await uploadFile(id, file);
-      if (added.ok) {
+      if (added.ok && added.info.duplicate && added.info.same_as) {
+        // the same bytes under another name (or again): one line on the name dropped; the list keeps the one kept
+        const line = added.info.same_as;
+        setProblems((list) => [...list, { name: file.name, line, quiet: true }]);
+      } else if (added.ok) {
         const { info } = added;
         // the newest first; a new version takes the place of the one it replaces
         setFiles((list = []) => [info, ...list.filter((f) => f.id !== info.id && f.id !== info.replaces)]);
@@ -330,17 +348,30 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
       }}
     />
   );
-  const problemLines = problems.length > 0 && (
-    <div role="alert" className="flex flex-col gap-1 text-copper">
-      {problems.map((problem, index) => (
+  const lines = (quiet: boolean) =>
+    problems
+      .filter((problem) => !!problem.quiet === quiet)
+      .map((problem, index) => (
         <p key={index}>
           <span dir="auto" className="font-semibold">
             {problem.name}
           </span>{" "}
           {pick(problem.line)}
         </p>
-      ))}
-    </div>
+      ));
+  const problemLines = problems.length > 0 && (
+    <>
+      {problems.some((problem) => !problem.quiet) && (
+        <div role="alert" className="flex flex-col gap-1 text-copper">
+          {lines(false)}
+        </div>
+      )}
+      {problems.some((problem) => problem.quiet) && (
+        <div role="status" className="flex flex-col gap-1 text-slate">
+          {lines(true)}
+        </div>
+      )}
+    </>
   );
   // as the open document, nothing until the list is read (never the empty look for a moment), then one drop area
   // while the project has no file
@@ -453,7 +484,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
                       ) : (
                         line
                       )}
-                      {(file.flags ?? 0) > 0 && <HiddenText projectId={project.id} fileId={file.id} />}
+                      {(file.flags ?? 0) > 0 && <HiddenText projectId={project.id} fileId={file.id} kinds={file.flag_kinds} />}
                     </li>
                   );
                 })}

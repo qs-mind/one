@@ -271,9 +271,26 @@ class ProjectIn(BaseModel):
 
 def _file(info: files.FileInfo) -> dict:
     """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair; `note_key`
-    keeps the name (the import report names a locked or an empty file by it)."""
+    keeps the name (the import report names a locked or an empty file by it); `flag_kinds` the
+    kinds of its hidden-text flags (the screen tells hidden rows from orders to an AI)."""
     note = getattr(copy, info.note) if info.note else None
-    return asdict(info) | {"note": note, "note_key": info.note}
+    kinds = info.flag_kinds.split(",") if info.flag_kinds else []
+    return asdict(info) | {"note": note, "note_key": info.note, "flag_kinds": kinds}
+
+
+def _answer(info: files.FileInfo, dropped: str) -> dict:
+    """`_file`, and for bytes already here, `same_as`: the line said after the name dropped
+    («same.xlsx» is the same file as «<the one kept>»; kept once)."""
+    found = _file(info)
+    if info.duplicate:
+        name = re.split(r"[/\\]", dropped)[-1][:255]
+        found["dropped_as"] = name
+        found["same_as"] = (
+            copy.FILE_SAME_AGAIN
+            if name == info.name
+            else copy.fill(copy.FILE_SAME_AS, old=copy.file_name(info.name))
+        )
+    return found
 
 
 def _zip_note(text: dict) -> str:
@@ -289,8 +306,8 @@ def add_upload(rec: Records, name: str, data: bytes, *, folder: str | None) -> t
     note. Each added file reaches the canvas live. Raises what `files.add_file` raises."""
     if not unzip.is_zip(name, data):
         info = files.add_file(rec, name, data, actor=ACTOR, folder=folder)
-        found = _file(info)
-        activity.publish(rec.id, {"type": "file", "file": found})  # the canvas, live
+        found = _answer(info, name)
+        activity.publish(rec.id, {"type": "file", "file": _file(info)})  # the canvas, live
         return found, 200 if info.duplicate else 201
     added: list[dict] = []
     skipped: list[dict] = []
@@ -308,8 +325,8 @@ def add_upload(rec: Records, name: str, data: bytes, *, folder: str | None) -> t
                     raise
                 skipped.append({"name": member, "folder": where, "error": e.text})
                 continue
-            added.append(_file(info))
-            activity.publish(rec.id, {"type": "file", "file": added[-1]})
+            added.append(_answer(info, member))
+            activity.publish(rec.id, {"type": "file", "file": _file(info)})
     except RecordsError as refused:  # kept as it came, not opened
         if refused.text not in (copy.ZIP_TOO_BIG, copy.ZIP_UNSAFE):
             raise  # e.g. an archived project

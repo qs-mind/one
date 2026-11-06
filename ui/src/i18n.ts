@@ -244,6 +244,19 @@ export const texts = {
     en: "This file has hidden text (white, tiny or invisible) or lines that look like orders to an AI. ONE treats them as data only and shows them to you and the Checking QS.",
     ar: "الملف ده فيه نص مخفي (أبيض أو صغير جداً أو مش ظاهر) أو سطور شكلها أوامر لذكاء اصطناعي. ONE بيتعامل معاها كبيانات بس وبيوريها ليك ولمهندس المراجعة.",
   },
+  // a file whose hidden content has no line like an order to an AI: said plainly, not as a warning (real walk, 6 Nov)
+  hiddenLayout: {
+    en: "Hidden sheets/rows (normal in priced BOQs)",
+    ar: "فيه شيتات/صفوف مخفية (عادي في المقايسات المسعّرة)",
+  },
+  hiddenUnseen: {
+    en: "Text not shown on the page (white, tiny or off the page)",
+    ar: "فيه نص مش ظاهر في الصفحة (أبيض أو صغير جداً أو برّه الصفحة)",
+  },
+  hiddenNoOrders: {
+    en: "ONE reads it as data, like the rest of the file. No line in it looks like an order to an AI.",
+    ar: "ONE بيقراه كبيانات زي باقي الملف. مفيش فيه سطر شكله أمر لذكاء اصطناعي.",
+  },
   flagsFailed: { en: "The hidden text could not be loaded. Try again.", ar: "مقدرناش نجيب النص المخفي. جرّب تاني." },
   flagWhite: { en: "White text", ar: "نص أبيض" },
   flagTiny: { en: "Tiny text", ar: "نص صغير جداً" },
