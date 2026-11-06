@@ -287,3 +287,41 @@ A walk may explicitly use `review: close_fixed` after asking the Lead to address
 comments, accepting the linked Suggested changes, and requesting a fresh check. It closes
 only Code C threads with an accepted change carrying their `comment_id` and a current
 Code A/B check. It refuses unresolved comments; it never grants Sign-off.
+
+## Project Map and quieter output
+
+- `map PROJECT [--group PATH] [--file FILE_ID] [--cursor CURSOR]` reads the existing
+  Project Map routes: reading status, groups, file kinds/pages/read method and key
+  pages. Drawing entries include sheets; `--file` gives the full map detail.
+- `map PROJECT --wait [SECONDS]` polls local reading and AI states (default 60
+  seconds). A timeout is reported as a timeout; background work can continue.
+  A pending cost card stops the wait and prints its ID/options; use
+  `card answer CARD_ID yes|no`. Waiting never approves spending.
+- `facts PROJECT` reads every page of the Tender summary, including source file,
+  locator, blank/conflict state and confirmation. `fact confirm PROJECT FACT_ID`
+  and `fact correct PROJECT FACT_ID VALUE` use the screen's existing fact edit
+  route. `links PROJECT` reads all pages of the sourced links.
+- `files add PROJECT PATH...` accepts files and directories. A dropped directory's
+  name and nested folders travel as `folder`, matching the screen. Hidden files,
+  system metadata and directory symlinks are skipped. Inputs are read only.
+  Same-named files in different folders are uploaded separately. Ordinary output
+  summarizes attempted uploads: read, partly read and failed; `--json` retains
+  upload records (including individual failures). Other files continue after a
+  failed upload. ZIP upload records retain the core's nested results in JSON.
+- Ordinary chat output shows the reply, cards with IDs/options, final deduplicated
+  numbered steps, state and recorded costs. `--verbose` shows protocol snapshots;
+  `--json` keeps the unfiltered adapter result and bilingual API content.
+
+Stop retains a session when shutdown exceeds ten seconds and reports that timeout
+separately from an identity mismatch. An already exited process with the recorded
+birth identity needs no signal, including the stat/cmdline zombie teardown race;
+changed birth identities and live command-line mismatches remain refused.
+
+Targeted checks (from this worktree root; use the shared absolute interpreter,
+never create `core/.venv` in a worktree):
+
+```sh
+/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m pytest core/tests/test_cli*.py
+/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m ruff check core
+/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m ruff format core
+```

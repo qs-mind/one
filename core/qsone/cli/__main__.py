@@ -11,13 +11,14 @@ import httpx
 from qsone.cli import session
 from qsone.cli.client import Client
 from qsone.cli.commands import Commands
-from qsone.cli.texts import LABELS, TEXT, CliError
+from qsone.cli.texts import LABELS, TEXT, VALUES, CliError
 
 
 def parser():
     root = argparse.ArgumentParser(prog="qsone-cli", description="ONE local HTTP CLI / أوامر ONE")
     root.add_argument("--session")
     root.add_argument("--json", action="store_true")
+    root.add_argument("--verbose", action="store_true")
     root.add_argument("--lang", choices=["en", "ar"], default="en")
     commands = root.add_subparsers(dest="command", required=True)
 
@@ -56,6 +57,19 @@ def parser():
     location = show.add_mutually_exclusive_group()
     location.add_argument("--sheet", nargs="?", const="")
     location.add_argument("--page", type=int)
+    mapping = command("map")
+    mapping.add_argument("project")
+    mapping.add_argument("--group")
+    mapping.add_argument("--file")
+    mapping.add_argument("--cursor")
+    mapping.add_argument("--wait", nargs="?", const=60, type=float)
+    for name in ("facts", "links"):
+        command(name).add_argument("project")
+    confirm, correct = group("fact", ["confirm", "correct"])
+    for item in (confirm, correct):
+        item.add_argument("project")
+        item.add_argument("fact")
+    correct.add_argument("value")
     ask = command("ask")
     ask.add_argument("project")
     ask.add_argument("text")
@@ -128,9 +142,9 @@ def global_flags(argv):
     index = 0
     while index < len(argv):
         arg = argv[index]
-        if arg in ("--json", "--lang", "--session"):
+        if arg in ("--json", "--verbose", "--lang", "--session"):
             prefix.append(arg)
-            if arg != "--json" and index + 1 < len(argv):
+            if arg not in ("--json", "--verbose") and index + 1 < len(argv):
                 index += 1
                 prefix.append(argv[index])
         elif arg.startswith(("--lang=", "--session=")):
@@ -145,6 +159,12 @@ def plain(value, lang, indent=""):
     if isinstance(value, dict):
         if "en" in value and "ar" in value:
             return indent + str(value[lang])
+        value = dict(value)
+        for key in ("state", "local_state", "ai_state", "read_how"):
+            if isinstance(value.get(key), str) and value[key] in VALUES:
+                value[key] = VALUES[value[key]][lang]
+        if value.get("confirmed_at") and "conflict_with" in value:
+            value["state"] = VALUES["confirmed"][lang]
         return "\n".join(
             indent + LABELS.get(k, {}).get(lang, str(k)) + ":\n" + plain(v, lang, indent + "  ")
             if isinstance(v, (dict, list))
@@ -154,6 +174,43 @@ def plain(value, lang, indent=""):
     if isinstance(value, list):
         return "\n".join(plain(v, lang, indent) for v in value)
     return indent + str(value)
+
+
+def human_result(result):
+    """Keep raw protocol snapshots out of ordinary engineer output."""
+    result = dict(result)
+    events = result.pop("events", [])
+    logs = [e.get("data", {}) for e in events if e.get("type") == "data-worklog"]
+    if logs:
+        steps, seen = {}, set()
+        for step in logs[-1].get("steps", []):
+            key = json.dumps({k: step.get(k) for k in ("agent", "text", "at")}, sort_keys=True)
+            if key not in seen:
+                seen.add(key)
+                steps[f"{len(steps) + 1}."] = step.get("text", "")
+        result["steps"] = steps
+    if "reply" in result:
+        result = {
+            k: v
+            for k, v in result.items()
+            if k in ("reply", "cards", "steps", "state", "costs", "error")
+        }
+    if "uploads" in result:
+        uploads = []
+        for upload in result["uploads"]:
+            if upload.get("zip"):
+                uploads.extend(upload.get("files", []))
+                uploads.extend({"status": "failed"} for _ in upload.get("skipped", []))
+            else:
+                uploads.append(upload)
+        states = [u.get("status") for u in uploads]
+        return {
+            "count": len(uploads),
+            "read": states.count("read"),
+            "partly_read": states.count("partly_read"),
+            "failed": sum(s not in ("read", "partly_read") for s in states),
+        }
+    return result
 
 
 def main(argv=None):
@@ -209,7 +266,7 @@ def main(argv=None):
         print(TEXT["source"][args.lang], datetime.now().astimezone().isoformat(timespec="seconds"))
         if mode == "scripted":
             print(TEXT["sample"][args.lang])
-        print(plain(result, args.lang))
+        print(plain(result if args.verbose else human_result(result), args.lang))
     return code
 
 

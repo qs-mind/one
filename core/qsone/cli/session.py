@@ -227,9 +227,24 @@ def stop(path):
         pid = value["pid"]
         identity = process_identity(pid)
         if identity is not None:
+            # A process can exit between reading stat and cmdline. Zombies keep their
+            # birth identity but have no command line and must never be signalled.
+            stat = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+            if stat[19] != value.get("birth"):
+                raise CliError("identity")
+            if stat[0] == "Z":
+                path.unlink()
+                return {"state": "stopped"}
             expected = command(value["mode"], value["port"], value["data_dir"], value["samples"])
             actual = Path(f"/proc/{pid}/cmdline").read_bytes().decode().rstrip("\0").split("\0")
             if identity != value.get("birth") or actual != expected:
+                try:
+                    ended = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+                except FileNotFoundError:
+                    ended = None
+                if ended is None or (ended[19] == value.get("birth") and ended[0] == "Z"):
+                    path.unlink()
+                    return {"state": "stopped"}
                 raise CliError("identity")
             os.kill(pid, signal.SIGTERM)
             deadline = time.monotonic() + 10
@@ -242,6 +257,6 @@ def stop(path):
                     break
                 time.sleep(0.1)
             else:
-                raise CliError("identity")
+                raise CliError("stop_timeout")
     path.unlink()
     return {"state": "stopped" if value["owned"] else "detached"}

@@ -1,6 +1,10 @@
 """CLI-only copy. Core replies keep their own bilingual copy."""
 
 TEXT = {
+    "stop_timeout": {
+        "en": "The owned core is still shutting down. Session retained; try stop again.",
+        "ar": "ONE لسه بيقفل. بيانات الجلسة موجودة؛ جرّب stop تاني.",
+    },
     "review_unresolved": {
         "en": (
             "A blocking comment needs an accepted linked fix "
@@ -130,4 +134,64 @@ LABELS = {
     "checks": {"en": "Checks", "ar": "الاختبارات"},
     "seconds": {"en": "Seconds", "ar": "الثواني"},
     "limitations": {"en": "Coverage limitations", "ar": "حدود التغطية"},
+}
+
+
+LABELS.update(
+    {
+        "count": {"en": "Files attempted", "ar": "عدد الملفات"},
+        "read": {"en": "Read", "ar": "اتقرا"},
+        "partly_read": {"en": "Partly read", "ar": "اتقرا جزء منه"},
+        "failed": {"en": "Failed", "ar": "فشل"},
+        "reply": {"en": "Reply", "ar": "الرد"},
+        "cards": {"en": "Cards", "ar": "الكروت"},
+        "id": {"en": "ID", "ar": "المعرّف"},
+        "options": {"en": "Options", "ar": "الاختيارات"},
+        "state": {"en": "State", "ar": "الحالة"},
+        "costs": {"en": "Cost", "ar": "التكلفة"},
+        "status": {"en": "Status", "ar": "الحالة"},
+        "groups": {"en": "Groups", "ar": "المجموعات"},
+        "files": {"en": "Files", "ar": "الملفات"},
+        "kind": {"en": "Kind", "ar": "النوع"},
+        "read_how": {"en": "How read", "ar": "طريقة القراءة"},
+        "key_pages": {"en": "Key pages", "ar": "الصفحات المهمة"},
+        "sheets": {"en": "Sheets", "ar": "اللوحات"},
+        "facts": {"en": "Tender summary", "ar": "ملخص المناقصة"},
+        "links": {"en": "Links", "ar": "الروابط"},
+        "folder": {"en": "Folder", "ar": "الفولدر"},
+        "file_id": {"en": "File ID", "ar": "معرّف الملف"},
+        "name": {"en": "Name", "ar": "الاسم"},
+        "value": {"en": "Value", "ar": "القيمة"},
+        "locator": {"en": "Source location", "ar": "مكان المصدر"},
+        "verification": {"en": "Verification", "ar": "التأكيد"},
+        "sheet": {"en": "Sheet", "ar": "اللوحة"},
+        "number": {"en": "Number", "ar": "الرقم"},
+        "local_state": {"en": "Local reading", "ar": "القراءة المحلية"},
+        "ai_state": {"en": "AI mapping", "ar": "تصنيف ONE"},
+        "line": {"en": "Progress", "ar": "التقدم"},
+        "next_cursor": {"en": "Next cursor", "ar": "مؤشر الصفحة الجاية"},
+    }
+)
+
+VALUES = {
+    "found": {"en": "read by ONE, not checked", "ar": "قراه ONE، لسه متراجعش"},
+    "confirmed": {"en": "Confirmed", "ar": "متأكد"},
+    "blank": {"en": "Blank", "ar": "فاضي"},
+    "conflict": {"en": "Conflict", "ar": "تعارض"},
+    "text": {"en": "Text", "ar": "نص"},
+    "ocr": {"en": "OCR", "ar": "قراءة ضوئية"},
+    "mixed": {"en": "Text and OCR", "ar": "نص وقراءة ضوئية"},
+    "stored": {"en": "Stored only", "ar": "محفوظ بس"},
+    "waiting": {"en": "Waiting", "ar": "مستني"},
+    "reading": {"en": "Reading", "ar": "بيقرا"},
+    "done": {"en": "Done", "ar": "خلص"},
+    "failed": {"en": "Failed", "ar": "فشل"},
+    "no_ai": {"en": "No AI connected", "ar": "مفيش ذكاء اصطناعي متوصل"},
+    "local": {"en": "Mapped locally", "ar": "متصنف محلي"},
+    "declined": {"en": "Mapping declined", "ar": "التصنيف اترفض"},
+    "timeout": {
+        "en": "Wait timed out; mapping may continue",
+        "ar": "وقت الانتظار خلص؛ التصنيف ممكن يكمل",
+    },
+    "waiting_engineer": {"en": "Waiting for your decision", "ar": "مستني قرارك"},
 }
