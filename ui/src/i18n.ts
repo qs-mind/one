@@ -69,6 +69,8 @@ export const texts = {
     ar: "أي مزوّد عنده API متوافق مع OpenAI، زي DeepSeek أو Mistral، أو نموذج شغال على الجهاز ده، زي Ollama.",
   },
   providerName: { en: "Name", ar: "الاسم" },
+  presetsLabel: { en: "Fill in for", ar: "املا البيانات لـ" },
+  presetGemini: { en: "Google Gemini", ar: "Google Gemini" },
   baseUrl: { en: "Base URL", ar: "رابط الـ API (Base URL)" },
   providerKey: { en: "Key (optional: models on this computer have none)", ar: "المفتاح (اختياري: النماذج اللي على الجهاز ملهاش مفتاح)" },
   providerModel: {

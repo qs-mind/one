@@ -87,7 +87,8 @@ export function Feedback({ state, children, fade = false }: { state: Progress; c
       ref={line}
       role={state === "failed" ? "alert" : "status"}
       data-feedback={state}
-      className={`${state === "busy" ? "fl-rise-late" : fade ? "fl-fade" : "fl-rise"} flex items-start gap-2.5 ${look}`}
+      // clear of the step's sticky bar and the fade above it, where the line it scrolled to was half hidden
+      className={`${state === "busy" ? "fl-rise-late" : fade ? "fl-fade" : "fl-rise"} flex scroll-mb-32 items-start gap-2.5 ${look}`}
     >
       <span aria-hidden="true" className="flex h-[1lh] shrink-0 items-center">
         {state === "busy" && <WorkDots />}
