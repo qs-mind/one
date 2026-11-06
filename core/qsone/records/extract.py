@@ -1,7 +1,7 @@
 """Text from dropped files: PDF, Excel, CSV, plain text, Word, DXF, IFC and saved web pages, each
-in pieces with where it came from, and flags for text a person does not see. Images, old Word
-files and DWG drawings are kept with a plain note. Everything is read from memory, never from a
-temporary file."""
+in pieces with where it came from, and flags for text a person does not see. Images and DWG
+drawings are kept with a plain note. Readers use memory except optional LibreOffice conversion
+of older Office/OpenDocument files in a disposable folder."""
 
 import csv
 import ctypes
@@ -17,7 +17,7 @@ import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 import xlrd
 
-from qsone.records import hidden
+from qsone.records import hidden, office
 from qsone.records.arabic import display_number, display_text
 from qsone.records.hidden import Flag
 
@@ -50,6 +50,7 @@ _KINDS = {
     "web": "web",
     "docx": "docx",
     "doc": "doc",
+    **{kind: kind for kind in office.READ_TARGETS},
     "dxf": "dxf",
     "dwg": "dwg",
     "ifc": "ifc",
@@ -70,7 +71,7 @@ _MAGIC = {
     "webp": b"RIFF",
 }
 # Kept but not read, each with the note that says what to do.
-_STORED = {"doc": "FILE_OLD_WORD", "dwg": "FILE_DWG_NOT_YET"}
+_STORED = {"dwg": "FILE_DWG_NOT_YET"}
 _IMAGES = {"png", "jpg", "webp"}
 
 
@@ -109,6 +110,34 @@ def _locked(kind: str, data: bytes) -> bool:
 
 def extract(name: str, data: bytes) -> Extracted:
     kind = _KINDS.get(name.rsplit(".", 1)[1].lower()) if "." in name else None
+    native = _reader("xls", data) if kind == "xls" else None
+    if native is not None and native.status == "read":
+        ai = hidden.ai_instruction_flags(native.pieces)
+        return (
+            Extracted(
+                native.kind,
+                native.status,
+                native.pages,
+                native.pieces,
+                native.note,
+                native.flags + ai,
+            )
+            if ai
+            else native
+        )
+    if kind in office.READ_TARGETS:
+        if office.find_soffice() is None:
+            return Extracted(kind, "stored", None, [], "FILE_LIBREOFFICE_MISSING")
+        target = office.READ_TARGETS[kind]
+        converted = office.convert(data, name, target)
+        if converted is None:
+            return native or Extracted(kind, "stored", None, [], "FILE_OFFICE_CONVERSION_FAILED")
+        result = extract(f"converted.{target}", converted)
+        if native is not None and result.status != "read":
+            return native
+        return Extracted(
+            kind, result.status, result.pages, result.pieces, result.note, result.flags
+        )
     if kind is not None and _locked(kind, data):
         return Extracted(kind, "unreadable", None, [], "FILE_LOCKED")
     if kind is None or not _looks_right(kind, data):
