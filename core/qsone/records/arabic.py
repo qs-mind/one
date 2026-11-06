@@ -1,6 +1,7 @@
 """Three forms of text. Display text is what the engineer reads, clean text goes to embeddings, and
 normalised text goes into the word index and is used for queries (the spike's measured rules)."""
 
+import math
 import re
 import unicodedata
 
@@ -33,6 +34,18 @@ def display_text(s: str) -> str:
     s = _KASHIDA.sub("", s).replace("\r\n", "\n").replace("\r", "\n")
     s = _SPACES.sub(" ", _DOT_LEADER.sub(" ", s))
     return _LINE_END_SPACES.sub("\n", s).strip()
+
+
+def display_number(value: float | int) -> str:
+    """A cell's number as Excel shows it in a General cell: at most 15 significant digits, so
+    the noise of a stored double goes (4.7699999999999996 and 0.1 + 0.2 read 4.77 and 0.3).
+    For text made from cells only: an import keeps the exact value (`boq.exact`)."""
+    if isinstance(value, bool) or not isinstance(value, float) or not math.isfinite(value):
+        return str(value)
+    if value.is_integer() and abs(value) < 1e15:
+        return str(int(value))
+    text = format(value, ".15g")
+    return text.rstrip("0").rstrip(".") if "." in text and "e" not in text else text
 
 
 def clean(s: str) -> str:

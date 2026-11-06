@@ -368,6 +368,13 @@ CREATE TABLE workspace (id INTEGER PRIMARY KEY CHECK (id = 1),
   updated_at TEXT NOT NULL)
 """
 
+# The tokens a provider read from, or wrote to, its prompt cache, within `input_tokens`: priced
+# at the cache's own price (`engine.cards.cost`), and shown in Costs.
+CACHE_SQL = """
+ALTER TABLE ai_costs ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ai_costs ADD COLUMN cache_write_tokens INTEGER NOT NULL DEFAULT 0
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -380,4 +387,5 @@ MIGRATIONS: list[str] = [
     WORKLOG_SQL,
     UNDO_SQL,
     WORKSPACE_SQL,
+    CACHE_SQL,
 ]

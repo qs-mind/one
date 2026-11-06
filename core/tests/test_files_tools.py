@@ -213,6 +213,14 @@ async def test_unknown_file_and_sheet_are_model_retries(rec, big_xlsx):
         await call("files_read", {"file_id": big_xlsx, "sheet": "Sheet9"}, ctx_for(rec))
 
 
+async def test_a_sheet_name_with_a_trailing_space_is_read(rec):
+    # real walk, Lahun: «مقايسة » could not be read by "مقايسة"
+    data = sample_xlsx({"مقايسة ": [["1", "بند - عينة", "م2", 5]]})
+    file_id = files.add_file(rec, "مقايسة - عينة.xlsx", data, actor="engineer").id
+    out = await call("files_read", {"file_id": file_id, "sheet": "مقايسة"}, ctx_for(rec))
+    assert '{"sheet": "مقايسة ", "row": 1} 1 | بند - عينة' in out
+
+
 async def test_pages_out_of_range(rec, spec_pdf):
     with pytest.raises(ModelRetry, match="It has 2"):
         await call("files_read", {"file_id": spec_pdf, "pages": "2-9"}, ctx_for(rec))

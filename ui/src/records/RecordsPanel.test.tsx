@@ -232,6 +232,45 @@ describe("RecordsPanel", () => {
     expect(screen.getByText(texts.fileAdded.ar)).toBeInTheDocument();
   });
 
+  it("files added together are reported in the chat once, with every one of them", async () => {
+    const reported: unknown[] = [];
+    core({
+      [`POST ${files}`]: upload,
+      [`POST ${files}/report`]: (_, init) => {
+        reported.push(JSON.parse(String(init.body)));
+        return Response.json({ id: "r1", lines: [] }, { status: 201 });
+      },
+    });
+    const user = userEvent.setup();
+    const { container } = panel();
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(input, [new File(["x"], "a - عينة.pdf"), new File(["y"], "b - عينة.xlsx")]);
+    await waitFor(() => expect(reported).toEqual([{ file_ids: ["f-a - عينة.pdf", "f-b - عينة.xlsx"] }]));
+  });
+
+  it("the same file under another name says so on the new name, once per drop, in slate", async () => {
+    // real walk: same.xlsx showed «موجود بالفعل» on the older row and its own name never came
+    const kept = fileInfo("🏗️ مقايسة - عينة.xlsx");
+    const sameAs = { en: "is the same file as «🏗️ مقايسة - عينة.xlsx»; kept once.", ar: "هو نفس «🏗️ مقايسة - عينة.xlsx»، اتحفظ مرة واحدة." };
+    const fetch = core({
+      [`GET ${files}`]: () => Response.json({ files: [kept] }),
+      [`POST ${files}`]: () => Response.json({ ...kept, duplicate: true, dropped_as: "same.xlsx", same_as: sameAs }, { status: 200 }),
+    });
+    const user = userEvent.setup();
+    const { container } = panel();
+    await screen.findByText(named(kept.name));
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(input, new File(["x"], "same.xlsx"));
+    const status = await screen.findByText(sameAs.ar);
+    expect(status.closest('[role="status"]')).toHaveClass("text-slate");
+    expect(status.parentElement).toHaveTextContent(`same.xlsx ${sameAs.ar}`);
+    expect(screen.queryByText(texts.fileDuplicate.ar)).toBeNull(); // not on the older row
+    expect(screen.queryByRole("alert")).toBeNull();
+    await user.upload(input, new File(["x"], "same.xlsx")); // a second copy: its own drop, its own line
+    await waitFor(() => expect(posts(fetch)).toHaveLength(2));
+    expect(await screen.findByText(sameAs.ar)).toBeInTheDocument();
+  });
+
   it("search shows file name and page or sheet row", async () => {
     const fetch = core({
       [`GET /api/projects/${school.id}/search`]: () =>
@@ -443,6 +482,31 @@ describe("hidden-text warnings", () => {
     expect(within(plain).queryByRole("button", { name: texts.hiddenText.ar })).toBeNull();
   });
 
+  it("hidden sheets or rows alone are said plainly: normal in priced BOQs, no warning", async () => {
+    // real walk: Lahun's, SGH's and madinaty's build-up sheets showed the prompt-injection words
+    const boq = fileInfo(boqName, { flags: 2, flag_kinds: ["hidden_rows", "hidden_sheet"] });
+    const pdf = fileInfo(specName, { kind: "pdf", flags: 1, flag_kinds: ["off_page"] });
+    core({ [`GET ${files}`]: () => Response.json({ files: [boq, pdf] }), [`GET ${flagsUrl}`]: () => Response.json({ flags: [] }) });
+    const user = userEvent.setup();
+    panel();
+    const layout = await screen.findByRole("button", { name: texts.hiddenLayout.ar });
+    expect(layout).toHaveClass("text-slate");
+    expect(layout).not.toHaveClass("text-copper");
+    expect(layout.querySelector("svg")).toBeNull();
+    expect(screen.queryByRole("button", { name: texts.hiddenText.ar })).toBeNull();
+    const unseen = screen.getByRole("button", { name: texts.hiddenUnseen.ar }); // the ministry PDF's «مسودة» off the page
+    await user.click(unseen);
+    expect(await screen.findByText(texts.hiddenNoOrders.ar)).toBeInTheDocument();
+    expect(screen.queryByText(texts.hiddenTextWhy.ar)).toBeNull();
+  });
+
+  it("an order to an AI keeps the copper warning, whatever else is hidden", async () => {
+    const boq = fileInfo(boqName, { flags: 2, flag_kinds: ["ai_instruction", "hidden_sheet"] });
+    core({ [`GET ${files}`]: () => Response.json({ files: [boq] }) });
+    panel();
+    expect(await screen.findByRole("button", { name: texts.hiddenText.ar })).toHaveClass("text-copper");
+  });
+
   it("flags that cannot be loaded say so", async () => {
     core({
       [`GET ${files}`]: () => Response.json({ files: [spec] }),
@@ -458,6 +522,9 @@ describe("hidden-text warnings", () => {
     for (const key of [
       "hiddenText",
       "hiddenTextWhy",
+      "hiddenLayout",
+      "hiddenUnseen",
+      "hiddenNoOrders",
       "flagsFailed",
       "flagWhite",
       "flagTiny",

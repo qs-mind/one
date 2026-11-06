@@ -54,6 +54,8 @@ class NativeLink:
             model_id,
             provider=AnthropicProvider(api_key=key, http_client=self._http),
             settings=AnthropicModelSettings(
-                anthropic_cache_instructions=True, anthropic_cache_tool_definitions=True
+                anthropic_cache_instructions=True,
+                anthropic_cache_tool_definitions=True,
+                anthropic_cache=True,  # the conversation so far: a Brief resends it each step
             ),
         )

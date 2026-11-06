@@ -84,7 +84,7 @@ def test_meaning_finds_the_other_language(boq):
     assert index_vectors(boq, emb) == 5
     r = search(boq, "waterproofing for the foundations", embedder=emb)
     assert r.mode == "hybrid" and r.hits[0].locator == {"sheet": "BOQ", "row": 3}
-    assert r.hits[0].found_by == ("meaning",)
+    assert "meaning" in r.hits[0].found_by  # and words, through the QS terms (qs_terms)
 
 
 def test_also_query_adds_a_words_list(boq):
@@ -163,7 +163,7 @@ def test_vectors_resume_after_a_failed_batch(boq):
 
 def test_search_without_vectors_for_this_model_uses_words(boq):
     r = search(boq, "waterproofing", embedder=ConceptEmbedder())
-    assert r.mode == "hybrid" and r.hits == []
+    assert r.mode == "hybrid" and r.hits and all(h.found_by == ("words",) for h in r.hits)
 
 
 def test_query_text_cannot_inject_fts_syntax(boq):
@@ -229,3 +229,68 @@ def test_vectors_of_another_model_are_dropped_and_made_again(boq):
     assert vector_counts(boq, new) == (0, 5)
     assert index_vectors(boq, new) == 5 and vector_counts(boq, new) == (5, 5)
     assert boq.meta()["embed_dims"] == str(new.dims)
+
+
+@pytest.fixture
+def brissa(rec):
+    """English conditions and an Arabic BOQ, shaped like the real ones (sample text)."""
+    pages = [
+        ["Percentage of Retention 14.3(iii) 10% of each payment - sample"],
+        ["Delay damages for the Works 8.8 0.2% of the Contract Price per day - sample"],
+        ["Section 09 Painting - sample", "Two coats of emulsion paint on plastered walls."],
+        ["Bidder Technical Offer - sample", "The bidder shall submit his offer."],
+    ]
+    add_file(rec, "Conditions - sample.pdf", sample_pdf(pages), actor="engineer")
+    rows = [["1", "غرامات التأخير ٠٫١٪ عن كل يوم - عينة"], ["2", "دهانات بلاستيك - عينة"]]
+    add_file(rec, "شروط - عينة.xlsx", sample_xlsx({"شروط": rows}), actor="engineer")
+    return rec
+
+
+def test_an_arabic_question_finds_the_english_clause_by_its_qs_terms(brissa):
+    """The real walk (6 Nov): «نسبة المحتجز من المستخلصات» never reached the retention table,
+    «غرامة التأخير» found "Bidder Technical Offer" and "Painting". Words alone now find them."""
+    hits = search(brissa, "نسبة المحتجز من المستخلصات").hits
+    assert hits[0].locator == {"page": 1} and hits[0].file_name == "Conditions - sample.pdf"
+    hits = search(brissa, "غرامة التأخير").hits
+    assert {"page": 2} in [h.locator for h in hits[:2]]
+    assert {"page": 4} not in [h.locator for h in hits] and {"page": 3} not in [
+        h.locator for h in hits
+    ]
+
+
+def test_an_english_question_finds_the_arabic_row(brissa):
+    hits = search(brissa, "delay damages").hits
+    assert {"sheet": "شروط", "row": 1} in [h.locator for h in hits[:2]]
+
+
+class Recording(ConceptEmbedder):
+    def __init__(self):
+        super().__init__()
+        self.queries = []
+
+    def embed_query(self, text):
+        self.queries.append(text)
+        return super().embed_query(text)
+
+
+def test_meaning_also_embeds_the_terms_in_the_other_language(brissa):
+    emb = Recording()
+    index_vectors(brissa, emb)
+    search(brissa, "نسبة المحتجز من المستخلصات", embedder=emb)
+    assert emb.queries == ["نسبة المحتجز من المستخلصات", "retention, interim payment certificate"]
+    emb.queries.clear()  # the agent wrote both languages: nothing more to translate
+    search(brissa, "غرامة التأخير", also=["delay damages"], embedder=emb)
+    assert emb.queries == ["غرامة التأخير", "delay damages"]
+
+
+def test_queries_are_cleaned_as_passages_are(brissa):
+    """Embedded queries get the same clean text as passages (the "query: " and "passage: "
+    prefixes are the model's own, meaning/onnx.py)."""
+    emb = Recording()
+    index_vectors(brissa, emb)
+    search(brissa, "غرامــة التأخير ١٤٫٣", embedder=emb)  # kashida, Arabic-Indic digits
+    assert emb.queries[0] == "غرامة التأخير 14.3"
+
+
+def test_weights_in_rrf():
+    assert rrf([[1], [2]], weights=[1.0, 2.0]) == [(2, 2 / 61), (1, 1 / 61)]

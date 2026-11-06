@@ -15,6 +15,7 @@ and the Brief Budget.
 Money is `Decimal`, and goes out as text.
 """
 
+import logging
 import math
 import re
 from collections.abc import Callable
@@ -28,7 +29,7 @@ from uuid import uuid4
 from pydantic_ai.models.wrapper import WrapperModel
 
 from qsone import copy, settings
-from qsone.engine import cards
+from qsone.engine import cards, request_size
 from qsone.engine.store import CostBook
 from qsone.engine.types import (
     Card,
@@ -40,6 +41,8 @@ from qsone.engine.types import (
     Text,
     choice_of,
 )
+
+log = logging.getLogger("qsone.engine.costs")
 
 Scope = Literal["brief", "day", "month"]
 
@@ -374,6 +377,8 @@ class Spending:
             basis=basis,
             at=self.clock(),
             effort=effort,
+            cache_read=cache_read,
+            cache_write=cache_write,
         )
         return usd
 
@@ -432,7 +437,9 @@ class CostedModel(WrapperModel):
         self.card = card
         self.effort = effort  # the run's own `thinking` setting, recorded with each cost
 
-    async def _before(self) -> None:
+    async def _before(self, messages, params) -> None:
+        sizes = request_size.parts(messages, params)  # what this request sends, by part
+        log.info("request in run %s, estimated tokens: %s", self.run_id, sizes)
         # a price entered in the card counts from this request on
         self.card = await self.spending.before_request(
             self.host, brief_id=self.brief_id, card=self.card
@@ -453,7 +460,7 @@ class CostedModel(WrapperModel):
         )
 
     async def request(self, messages, model_settings, model_request_parameters):
-        await self._before()
+        await self._before(messages, model_request_parameters)
         response = await super().request(messages, model_settings, model_request_parameters)
         self._record(response.usage)
         return response
@@ -462,7 +469,7 @@ class CostedModel(WrapperModel):
     async def request_stream(
         self, messages, model_settings, model_request_parameters, run_context=None
     ):
-        await self._before()
+        await self._before(messages, model_request_parameters)
         async with self.wrapped.request_stream(
             messages, model_settings, model_request_parameters, run_context
         ) as stream:
@@ -499,7 +506,7 @@ def summary(book: CostBook | None, *, brief_id: str | None, now: datetime) -> di
     def tokens() -> tuple[dict, dict]:
         """Every response's tokens, priced or not, and how many had no known price: Costs shows
         the real tokens and says a price is unknown, never a false 0 (audit B6)."""
-        none = {"input": 0, "output": 0, "unpriced": 0}
+        none = {"input": 0, "output": 0, "cached": 0, "unpriced": 0}
         if book is None:
             found = {"brief": None if brief_id is None else none, "today": none, "month": none}
         else:
@@ -510,7 +517,7 @@ def summary(book: CostBook | None, *, brief_id: str | None, now: datetime) -> di
                 "month": book.tokens(month=(today.year, today.month)),
             }
         counts = {
-            k: None if v is None else {"input": v["input"], "output": v["output"]}
+            k: None if v is None else {key: v[key] for key in ("input", "output", "cached")}
             for k, v in found.items()
         }
         return counts, {k: None if v is None else v["unpriced"] for k, v in found.items()}

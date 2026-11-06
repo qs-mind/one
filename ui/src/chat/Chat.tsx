@@ -155,6 +155,15 @@ function BriefReply({
       <ProgressLine items={progress} worklog={partsOf(parts, "worklog").at(-1)?.data} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
       {inOrder}
+      {partsOf(parts, "files_read").map((found) => (
+        <div key={found.id} role="status" className="flex flex-col gap-1">
+          {found.data.lines.map((line, index) => (
+            <p key={index} dir="auto">
+              {pick(line, said)}
+            </p>
+          ))}
+        </div>
+      ))}
       {partsOf(parts, "facts").map((facts) => (
         <FactsLine key={facts.id} facts={facts.data} lang={said} />
       ))}

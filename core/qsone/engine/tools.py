@@ -300,6 +300,51 @@ def say_refused(ctx: ToolContext, text: dict) -> None:
 
 # The PydanticAI toolset -------------------------------------------------------------------------
 
+# What only `call`'s check needs: it validates against the whole model, and a refusal names the
+# field and shows the example. Every request carries every schema, so they cost on each step.
+_CHECK_ONLY = frozenset({"title", "minLength", "maxLength", "minItems", "maxItems", "pattern"})
+_NAMED = frozenset({"properties", "patternProperties", "$defs", "definitions"})  # name -> schema
+_NULL = {"type": "null"}
+
+
+def _optional(schema: dict) -> dict:
+    """A field that may be left out is sent without its "or null" and its null default."""
+    either = schema.get("anyOf")
+    if not (isinstance(either, list) and _NULL in either):
+        return schema
+    rest = [s for s in either if s != _NULL]
+    out = {k: v for k, v in schema.items() if k != "anyOf"}
+    if out.get("default", 0) is None:
+        del out["default"]
+    return (rest[0] | out) if len(rest) == 1 else (out | {"anyOf": rest})
+
+
+def _shape(schema):
+    if isinstance(schema, list):
+        return [_shape(s) for s in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out = {}
+    for k, v in schema.items():
+        if k in _NAMED and isinstance(v, dict):  # its keys are names, not keywords
+            out[k] = {name: _shape(s) for name, s in v.items()}
+        elif k not in _CHECK_ONLY and not (k == "additionalProperties" and v is False):
+            out[k] = _shape(v)
+    fields = out.get("properties")
+    if isinstance(fields, dict):
+        needed = set(out.get("required", ()))
+        out["properties"] = {
+            name: s if name in needed or not isinstance(s, dict) else _optional(s)
+            for name, s in fields.items()
+        }
+    return out
+
+
+def sent_schema(tool: Tool) -> dict:
+    """The tool's argument schema as a model is sent it: its shape, without titles, length and
+    count limits, patterns, "no other fields" or "or null" for an optional field."""
+    return _shape(tool.args.model_json_schema())
+
 
 def toolset(names: Sequence[str], ctx: ToolContext):
     """A PydanticAI `FunctionToolset` of the named tools, all run through `call` with `ctx`.
@@ -330,7 +375,7 @@ def toolset(names: Sequence[str], ctx: ToolContext):
                 function(REGISTRY[name]),
                 name=name,
                 description=REGISTRY[name].description,
-                json_schema=REGISTRY[name].args.model_json_schema(),
+                json_schema=sent_schema(REGISTRY[name]),
             )
             for name in names
         ]

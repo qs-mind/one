@@ -125,10 +125,23 @@ async function understand(projectId: string): Promise<Pick<Job, "understanding" 
   return { understanding: await coreLine(response, texts.importFailed) };
 }
 
+/** Once per drop, after its files landed: ONE says in the project chat what it found in them, from the core's own
+ * reading (POST /files/report), no model and no question; the chat opens on it. */
+export async function reportDrop(projectId: string, ids: string[]) {
+  if (ids.length === 0) return;
+  const response = await api(`/projects/${encodeURIComponent(projectId)}/files/report`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ file_ids: ids }),
+  }).catch(() => undefined);
+  if (response?.status === 201) briefStarted(projectId);
+}
+
 async function run(job: Job, picked: Picked[], { understandAfter }: { understandAfter: boolean }) {
   const id = job.projectId!;
   const report = await upload(id, picked, (done, total) => update(job.key, { done, total }));
   update(job.key, { report });
+  if (!job.old) await reportDrop(id, report.ids);
   if (job.old) {
     const archived = await send(`/projects/${encodeURIComponent(id)}/archive`, "POST");
     update(job.key, { archived: archived?.ok === true });

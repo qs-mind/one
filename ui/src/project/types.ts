@@ -29,6 +29,10 @@ export type FileInfo = {
   note: Text | null;
   replaces: string | null;
   duplicate?: boolean;
+  /** Bytes already here: the line said after the name dropped ("same.xlsx is the same file as …; kept once"). */
+  same_as?: Text;
+  /** The kinds of its hidden-text flags (core/qsone/records/hidden.py): hidden rows are not orders to an AI. */
+  flag_kinds?: string[];
 };
 
 /** A client BOQ imported from a file (GET /projects/{id}/workspace -> client_boqs): one read-only document each. `at` is the
