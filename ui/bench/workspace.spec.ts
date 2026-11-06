@@ -5,7 +5,8 @@
 // sample data, and the screen says «الأرقام عينة». The PNGs (boq-ar-1440.png, letter-en-640.png, …) go to this
 // test's output folder, and to $QSONE_WORKSPACE_SHOTS when it is set. ONE's scale (ui/src/ui/scale.ts): the empty
 // project at 1366×768 and 1920×1080, and the priced BOQ at 1280×720, 1366×768, 1536×864 and 1920×1080
-// (empty-ar-1366x768.png, boq-en-1536x864.png, …), to $QSONE_SCALE_SHOTS when it is set.
+// (empty-ar-1366x768.png, boq-en-1536x864.png, …), and both at 1280×720 zoomed to 150 % and 80 %
+// (boq-ar-1280x720-150.png, …), to $QSONE_SCALE_SHOTS when it is set.
 import { copyFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type { Page, TestInfo } from "@playwright/test";
@@ -46,6 +47,25 @@ const words = {
   },
 } as const;
 
+/** The engineer's zoom on the smallest window (1280×720): 150 % and 80 % (…-1280x720-150.png). */
+const ZOOM_SHOTS = [
+  { zoom: 1.5, keys: ["Equal", "Equal", "Equal", "Equal", "Equal"] },
+  { zoom: 0.8, keys: ["Minus", "Minus"] },
+];
+
+/** Sets the zoom with its keys (from 100 %), and shoots the screen at it; back to 100 % after. */
+async function zoomShots(page: Page, info: TestInfo, name: string) {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  for (const { zoom, keys } of ZOOM_SHOTS) {
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // the keys are a field's in one
+    for (const key of keys) await page.keyboard.press(`Control+${key}`);
+    await expect.poll(() => page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize) / 16)).toBeCloseTo(0.8 * zoom, 3);
+    await page.waitForTimeout(400);
+    await save(page, info, `${name}-1280x720-${zoom * 100}`, process.env.QSONE_SCALE_SHOTS);
+    await page.keyboard.press("Control+Digit0");
+  }
+}
+
 async function save(page: Page, info: TestInfo, name: string, extra = process.env.QSONE_WORKSPACE_SHOTS) {
   const file = info.outputPath(`${name}.png`);
   await page.screenshot({ path: file });
@@ -75,6 +95,7 @@ for (const lang of ["ar", "en"] as const) {
       await expect(walk.chat).toContainText(texts.emptyProject[lang]);
       await save(page, info, `empty-${lang}-${size.width}x${size.height}`, process.env.QSONE_SCALE_SHOTS);
     }
+    await zoomShots(page, info, `empty-${lang}`);
     await page.setViewportSize(SIZES[0]!);
     await walk.addFiles(FILES, false);
 
@@ -128,6 +149,7 @@ for (const lang of ["ar", "en"] as const) {
       else await save(page, info, `boq-${lang}-${size.width}`);
     }
     await page.keyboard.press("Escape");
+    await zoomShots(page, info, `boq-${lang}`);
 
     // the decision answered, the Brief ends; (b) the bid letter, nothing waiting
     await page.setViewportSize(SIZES[0]!);

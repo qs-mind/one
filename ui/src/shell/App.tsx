@@ -118,7 +118,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
 
   // The import reports and the backup question are cards at the chat's foot (Notices), never over the document: a
   // new one opens a folded chat, so it is seen.
-  const notices = useNoticeCount();
+  const notices = useNoticeCount(documents);
   const noticesSeen = useRef(notices);
   useEffect(() => {
     if (notices > noticesSeen.current) setChatShown(true);

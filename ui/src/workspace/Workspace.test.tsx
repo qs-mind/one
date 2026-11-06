@@ -15,6 +15,7 @@ import { leaveProject } from "../records/ProjectPicker";
 import { App } from "../shell/App";
 import { core, P1, P2 } from "../shell/testing";
 import { importInto } from "../import/importer";
+import { askForBackupFolder, stopAsking } from "../backup/ask";
 import { workspaceApi } from "./api";
 import { markFor, openSourceFile } from "./reveal";
 import { sourceKeys } from "../sources/targets";
@@ -543,6 +544,61 @@ describe("an empty project", () => {
     expect(within(region()).getByRole("searchbox", { name: texts.search.ar })).toBeInTheDocument();
     act(() => sources.emit({ type: "file", file: info(name) as never })); // the core's live event for it
     expect(await screen.findByText(texts.empty.ar)).toBeInTheDocument();
+  });
+
+  it("the chat asks for the tender files only once the list is read and empty: not while it is read, not when it failed", async () => {
+    setCurrentProject(P1);
+    core();
+    let answer!: (files: never[]) => void;
+    const reading = { ...fakeSources({}), files: () => new Promise<never[]>((resolve) => (answer = resolve)) };
+    const { unmount } = render(<App sourcesFor={() => reading} />);
+    expect(await screen.findByText(texts.empty.ar)).toBeInTheDocument(); // the usual line while the list is read
+    expect(screen.queryByText(texts.emptyProject.ar)).toBeNull();
+    act(() => answer([]));
+    expect(await screen.findByText(texts.emptyProject.ar)).toBeInTheDocument();
+    unmount();
+
+    const failed = { ...fakeSources({}), files: () => Promise.reject(new TypeError("down")) };
+    render(<App sourcesFor={() => failed} />);
+    expect(await screen.findByText(texts.empty.ar)).toBeInTheDocument();
+    await act(async () => {}); // the lists are read
+    expect(screen.queryByText(texts.emptyProject.ar)).toBeNull();
+  });
+
+  it("the chat stops asking for the files as soon as Choose files starts adding them", async () => {
+    setCurrentProject(P1);
+    const name = "مقايسة - عينة.xlsx";
+    let land!: () => void;
+    core({
+      routes: {
+        [`POST /api/projects/p1/files?name=${encodeURIComponent(name)}`]: () =>
+          new Promise<Response>((resolve) => (land = () => resolve(Response.json(info(name), { status: 201 })))),
+      },
+    });
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await screen.findByRole("heading", { name: texts.emptyFilesTitle.ar });
+    expect(await screen.findByText(texts.emptyProject.ar)).toBeInTheDocument();
+    fireEvent.change(region().querySelector<HTMLInputElement>('input[type="file"]')!, { target: { files: [new File(["a"], name)] } });
+    // still uploading: the drop area says it is adding, and the chat already has its usual line
+    expect(await within(region()).findByRole("status")).toHaveTextContent(texts.adding.ar);
+    expect(screen.queryByText(texts.emptyProject.ar)).toBeNull();
+    expect(screen.getByText(texts.empty.ar)).toBeInTheDocument();
+    await act(async () => land());
+    expect(await within(region()).findByText(/مقايسة - عينة/)).toBeInTheDocument();
+  });
+
+  it("holds the first project's backup question until its first file lands", async () => {
+    setCurrentProject(P1);
+    core({ routes: { "GET /api/projects": () => Response.json({ projects: [{ ...P1, open: true }] }), "GET /api/backup": () => Response.json({ folder: null }) } });
+    const sources = fakeSources({});
+    render(<App sourcesFor={() => sources} />);
+    await screen.findByRole("heading", { name: texts.emptyFilesTitle.ar });
+    await act(() => askForBackupFolder()); // after the first project
+    expect(screen.queryByRole("region", { name: texts.backupTitle.ar })).toBeNull();
+    expect(await screen.findByText(texts.emptyProject.ar)).toBeInTheDocument();
+    act(() => sources.emit({ type: "file", file: info("مواصفات - عينة.pdf") as never }));
+    expect(await screen.findByRole("region", { name: texts.backupTitle.ar })).toBeInTheDocument();
+    stopAsking();
   });
 
   it("a file that came another way (a tender folder) shows in the list too", async () => {

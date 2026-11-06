@@ -26,7 +26,7 @@ import { BidiText, baseDirection } from "./bidi";
 import { Reply } from "./Reply";
 import { takeSentFrom } from "./sent";
 import { useScrollEdges } from "../ui/useScrollEdges";
-import { DocumentsContext } from "../workspace/documents";
+import { DocumentsContext, useUploading } from "../workspace/documents";
 
 // The core sends a model error as an {en, ar} pair in the error text, with the `fix` the chat can offer (a refused
 // key: Open AI settings); any other failure gets the plain line.
@@ -238,9 +238,11 @@ export function ChatLog({
   const reduced = useReducedMotion();
   const busy = working(chat);
   const lastReply = messages.findLastIndex((message) => message.role === "assistant");
-  // a project with no file yet: the chat asks for the tender files, in one line (no fixed suggestions: ONE is AI-driven)
+  // a project with no file yet: the chat asks for the tender files, in one line (no fixed suggestions: ONE is AI-driven);
+  // only once the list is read and empty (never while it loads or when it failed), and no longer once files upload
   const documents = useContext(DocumentsContext);
-  const noFilesYet = !!projectId && documents?.files.length === 0;
+  const uploading = useUploading();
+  const noFilesYet = !!projectId && !!documents && !documents.filesFailed && documents.files.length === 0 && !uploading;
   const sent = useRef<string | undefined>(undefined); // the newest message of the engineer's already in place
 
   const toEnd = () => {

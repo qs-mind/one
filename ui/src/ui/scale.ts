@@ -1,8 +1,9 @@
 // ONE's one size scale: the root font-size follows the window, so every rem-based size (Tailwind's text, spacing,
-// radii, the top bar, the chat, the sheet's rows) grows and shrinks together. At a window of 1920×1080 or larger every
-// size is what it was at 100 % (no growth on huge screens); between 1280 and 1920 wide, and 720 and 1080 tall, it
+// radii, the top bar, the chat, the sheet's rows) grows and shrinks together. At a window of 1920×1000 or larger every
+// size is what it was at 100 % (no growth on huge screens); between 1280 and 1920 wide, and 650 and 1000 tall, it
 // scales linearly down to 80 %, by the smaller of the two, so a short window shrinks too; below that it stays at
-// 80 %. Text has a floor: body text never under 12.5 px in English or 13.5 px in Arabic (its dots and marks), so
+// 80 %. The heights are the window's, not the screen's: a maximised window on a 1080p screen is about 1009 px tall
+// (taskbar and title bar) and is 100 %; one on a 1366×768 screen (about 698 px) is at about its width's scale. Text has a floor: body text never under 12.5 px in English or 13.5 px in Arabic (its dots and marks), so
 // every text size stops shrinking at that ratio (styles.css --ui-text-floor). The engineer's own zoom (Ctrl/Cmd with
 // = - 0, or More) multiplies the window's scale, 80 % to 150 % in 10 % steps; it is kept in ONE's settings in the
 // core (GET/PUT /settings/zoom), never in web storage, and read before the screen opens (app/CoreDown.tsx).
@@ -13,9 +14,9 @@ import { type Language, useLanguage } from "../i18n";
 import { isMod, isTyping } from "../project/keys";
 
 /** The window at which (and above which) every size is 100 %. */
-export const FULL = { width: 1920, height: 1080 };
+export const FULL = { width: 1920, height: 1000 };
 /** The window at which (and below which) every size is SMALLEST. */
-export const SMALL = { width: 1280, height: 720 };
+export const SMALL = { width: 1280, height: 650 };
 export const SMALLEST = 0.8;
 /** The engineer's zoom steps: 80 % to 150 %. */
 export const ZOOMS = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5] as const;
@@ -25,7 +26,7 @@ export const TEXT_FLOOR: Record<Language, number> = { en: 12.5 / 14, ar: 13.5 / 
 const along = (size: number, small: number, full: number) =>
   SMALLEST + (1 - SMALLEST) * Math.min(1, Math.max(0, (size - small) / (full - small)));
 
-/** The window's scale: 1 at 1920×1080 and up, 0.8 at 1280×720 and down, the smaller of width's and height's. */
+/** The window's scale: 1 at 1920×1000 and up, 0.8 at 1280×650 and down, the smaller of width's and height's. */
 export function fluidScale(width: number, height: number): number {
   return Math.min(along(width, SMALL.width, FULL.width), along(height, SMALL.height, FULL.height));
 }
@@ -107,12 +108,28 @@ function setZoomShown(next: number) {
   for (const listener of [...listeners]) listener(); // the zoom changed even where the scale came out the same
 }
 
+let saving = false; // a save in flight
+let unsaved: number | undefined; // the newest zoom not sent yet
+
+/** Saves the zoom in order: one save in flight, then only the newest, so fast presses never leave an older one. */
+async function save(step: number) {
+  unsaved = step;
+  if (saving) return;
+  saving = true;
+  while (unsaved !== undefined) {
+    const next = unsaved;
+    unsaved = undefined;
+    await send("/settings/zoom", "PUT", { zoom: next });
+  }
+  saving = false;
+}
+
 /** The engineer's zoom: shown at once and kept in the core (a failed save keeps it for this session). */
 export function setZoom(next: number) {
   const step = nearest(next);
   if (step === zoom) return;
   setZoomShown(step);
-  void send("/settings/zoom", "PUT", { zoom: step });
+  void save(step);
 }
 
 export const zoomIn = () => setZoom(stepZoom(zoom, 1));
@@ -170,6 +187,8 @@ export function useSizes(): { space: number; text: number } {
 export function resetScale() {
   zoom = 1;
   scale = 1;
+  saving = false;
+  unsaved = undefined;
   document.documentElement.style.fontSize = "";
   for (const listener of [...listeners]) listener();
 }

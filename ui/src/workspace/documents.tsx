@@ -2,7 +2,7 @@
 // team list read the lists; the open document is restored when the project opens, saved as it changes (flushed on a
 // project switch and on pagehide), and closed when its document goes (a live event or a reload no longer lists it).
 // The live team (project/live/activity.ts) runs while the project is open.
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import type { DeliverableInfo } from "../deliverables/types";
 import { fill, t } from "../i18n";
 import { startActivity } from "../project/live/activity";
@@ -16,6 +16,8 @@ export type Documents = {
   clientBoqs: readonly ClientBoqInfo[];
   files: readonly FileInfo[];
   desks: readonly DeskInfo[];
+  /** The file list could not be read: `files` is then empty, not known to be. */
+  filesFailed?: boolean;
 };
 
 /** The lists as read; null for one that could not be read (its documents are not taken for gone). */
@@ -26,7 +28,40 @@ const documentsOf = (lists: Lists): Documents => ({
   files: lists.files ?? [],
   clientBoqs: lists.clientBoqs ?? [],
   desks: lists.desks ?? [],
+  ...(lists.files ? {} : { filesFailed: true }),
 });
+
+// Files on their way into the open project (chosen or dropped on Project files, while they upload): the chat stops
+// asking for them as soon as they go, when the drop area starts showing them being added.
+let uploading = 0;
+const uploadListeners = new Set<() => void>();
+
+/** Marks an upload begun; the function it answers marks it ended. */
+export function startUpload(): () => void {
+  let ended = false;
+  const tell = () => {
+    for (const listener of [...uploadListeners]) listener();
+  };
+  uploading += 1;
+  tell();
+  return () => {
+    if (ended) return;
+    ended = true;
+    uploading -= 1;
+    tell();
+  };
+}
+
+/** Whether files are uploading now. */
+export function useUploading(): boolean {
+  return useSyncExternalStore(
+    (listener) => {
+      uploadListeners.add(listener);
+      return () => void uploadListeners.delete(listener);
+    },
+    () => uploading > 0,
+  );
+}
 
 const split = (key: string) => [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)] as const;
 

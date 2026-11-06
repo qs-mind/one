@@ -146,7 +146,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
         key: column.key,
         name: column.label,
         width: shownWidth(column.width, sizes),
-        minWidth: 40,
+        minWidth: 40 * sizes.space,
         frozen: column.frozen,
         editable: (g: GridRow<R>) => canEdit(g.row, column),
         renderCell: ({ row: g, rowIdx, tabIndex }) => {

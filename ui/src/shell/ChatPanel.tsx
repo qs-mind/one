@@ -10,7 +10,7 @@ import { ConsentNeeded } from "../firstlaunch/ConnectAi";
 import { dir, t, useLanguage } from "../i18n";
 import { TeamNow } from "../project/live/TeamNow";
 import { type Ai, AiSettings } from "../settings/AiSettings";
-import { currentScale } from "../ui/scale";
+import { currentScale, SMALLEST } from "../ui/scale";
 import { useScrollEdges } from "../ui/useScrollEdges";
 import { Notices } from "./Notices";
 import type { ChatState } from "./useChats";
@@ -19,8 +19,11 @@ import type { ChatState } from "./useChats";
 export const CHAT_WIDTH = { min: 280, max: 480, start: 320, step: 16 };
 
 const clamp = (width: number) => Math.min(CHAT_WIDTH.max, Math.max(CHAT_WIDTH.min, Math.round(width)));
-/** A width kept at 100 %, drawn at the screen's scale (ui/scale.ts). */
-const rem = (px: number) => `${px / 16}rem`;
+/** A width kept at 100 %, drawn at the screen's scale (ui/scale.ts), never under its size at 80 %: the chat's words
+ * stop shrinking at their floor however far the engineer zooms out, so their column does too. */
+const rem = (px: number) => `max(${px * SMALLEST}px, ${px / 16}rem)`;
+/** The scale the chat's width is drawn at now. */
+const widthScale = () => Math.max(currentScale(), SMALLEST);
 
 export type ChatBodyProps = {
   chat: ChatState;
@@ -166,7 +169,7 @@ export function ChatPanel({
             const from = drag.current;
             if (!from) return;
             // the pointer moves in screen px; the width is kept at 100 % (it follows the scale)
-            const moved = (rtl ? event.clientX - from.x : from.x - event.clientX) / currentScale();
+            const moved = (rtl ? event.clientX - from.x : from.x - event.clientX) / widthScale();
             onWidth(clamp(from.width + moved));
           }}
           onPointerUp={() => (drag.current = null)}

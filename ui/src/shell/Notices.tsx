@@ -4,7 +4,7 @@
 // work on the canvas, and read in the same place as the Brief an import starts. Many at once scroll in their own
 // strip, so the conversation keeps its room. The shell opens a folded chat when a new import report or question
 // comes (App.tsx); the other chat's line never does: the top bar's mark says it too.
-import { useRef, useState } from "react";
+import { useContext, useRef, useState } from "react";
 import { useBackupAsk } from "../backup/ask";
 import { BackupAsk } from "../backup/BackupPanel";
 import { quiet } from "../firstlaunch/parts";
@@ -13,12 +13,19 @@ import { ImportReports } from "../import/ImportReport";
 import { useImports } from "../import/importer";
 import { openChat } from "../records/ProjectPicker";
 import { useScrollEdges } from "../ui/useScrollEdges";
+import { type Documents, DocumentsContext } from "../workspace/documents";
 import { ActivityMark } from "./ActivityMark";
 import { type ActivityNotice, dismissNotice, GENERAL, useActivityNotice } from "./chatActivity";
 
+/** The first project's backup question, held until the open project has its first file: an empty project shows
+ * only the drop area and the chat's one line. */
+function useBackupShown(documents: Documents | null): boolean {
+  return useBackupAsk() && (documents?.files.length ?? 0) > 0;
+}
+
 /** How many notices there are now (the other chat's line is not counted: it never opens the chat). */
-export function useNoticeCount(): number {
-  return useImports().length + (useBackupAsk() ? 1 : 0);
+export function useNoticeCount(documents: Documents | null): number {
+  return useImports().length + (useBackupShown(documents) ? 1 : 0);
 }
 
 const NOTICE_LINE = { done: "activityNoticeDone", failed: "activityNoticeFailed", waiting: "activityNoticeWaiting" } as const;
@@ -67,9 +74,10 @@ function OtherChat({ notice }: { notice: ActivityNotice }) {
 export function Notices() {
   const strip = useRef<HTMLDivElement>(null);
   useScrollEdges(strip);
-  const asking = useBackupAsk();
+  const documents = useContext(DocumentsContext);
+  const asking = useBackupShown(documents);
   const other = useActivityNotice();
-  if (!useNoticeCount() && !other) return null;
+  if (!useNoticeCount(documents) && !other) return null;
   return (
     <div ref={strip} data-notices className="scroll-fade flex max-h-[45%] shrink-0 flex-col gap-3 overflow-y-auto px-5 pb-3 pt-1">
       {other && <OtherChat key={`${other.chatId}:${other.state}`} notice={other} />}

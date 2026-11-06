@@ -7,14 +7,17 @@
    The type scale (dense, 5 Nov): 13 px for meta, 14 px body (15 px on an Arabic page), 18 px frame titles, 22 px page titles; nothing
    under 12 px at 100%. The spacing scale is Tailwind's 1, 2, 3, 4, 6, 8 (4, 8, 12, 16, 24, 32 px).
    Every size is in rem and follows the root font-size, which follows the window and the engineer's zoom
-   (ui/src/ui/scale.ts): 100 % at 1920×1080 and up, 80 % at 1280×720. Text stops shrinking at --ui-text-floor, so body
-   text is never under 12.5 px (English) or 13.5 px (Arabic), and the other text sizes keep their ratio to it. Borders
+   (ui/src/ui/scale.ts): 100 % at 1920×1000 and up, 80 % at 1280×650. Text stops shrinking at --ui-text-floor, so body
+   text is never under 12.5 px (English) or 13.5 px (Arabic), and the other text sizes keep their ratio to it; the two
+   smallest have floors of their own: text-xs never under 12 px, and text-sm never under 13 px in Arabic. Borders
    and hairlines stay in px. */
 :root {
   --ui-text-floor: 0.892857; /* 12.5 / 14 */
+  --ui-sm-floor: 12.5px;
 }
 html:lang(ar) {
   --ui-text-floor: 0.9; /* 13.5 / 15 */
+  --ui-sm-floor: 13px;
 }
 @theme {
   --color-*: initial;
@@ -24,14 +27,13 @@ html:lang(ar) {
   --color-slate: #6e6a64;
   --color-copper: #a6491b;
   --font-sans: "Kumbh Sans Variable", "Zain", system-ui, sans-serif;
-  --text-xs: max(calc(13px * var(--ui-text-floor)), 0.8125rem); /* 13 px: meta */
+  --text-xs: max(12px, 0.8125rem); /* 13 px: meta */
   --text-xs--line-height: 1.5;
-  --text-sm: max(calc(14px * var(--ui-text-floor)), 0.875rem);
+  --text-sm: max(var(--ui-sm-floor), 0.875rem);
   --text-sm--line-height: 1.55;
   --text-base: max(calc(16px * var(--ui-text-floor)), 1rem);
   --text-lg: max(calc(18px * var(--ui-text-floor)), 1.125rem); /* 18 px: frame titles */
   --text-lg--line-height: 1.45;
-  --text-xl: max(calc(20px * var(--ui-text-floor)), 1.25rem);
   --text-2xl: max(calc(22px * var(--ui-text-floor)), 1.375rem); /* 22 px: page titles */
   --text-2xl--line-height: 1.35;
 }
