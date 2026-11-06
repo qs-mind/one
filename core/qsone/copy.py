@@ -2975,3 +2975,30 @@ MODEL_STOPPED = {
     "en": "ONE stopped using {model}: {provider} says it is no longer available.",
     "ar": "ONE بطل يستخدم {model}: {provider} بيقول إنه مبقاش متاح.",
 }
+
+MAP_FACTS_EMPTY = {
+    "en": (
+        "Tender facts pass returned no grounded facts. "
+        "Check candidate pages and model output; remap to retry."
+    ),
+    "ar": (
+        "استخراج بيانات المناقصة ما رجعش بيانات مرتبطة بمصدر. "
+        "راجع الصفحات المرشحة ورد النموذج، وأعد الخريطة للمحاولة."
+    ),
+}
+
+MAP_ROLE_RECEIVED = {"en": "Received tender document", "ar": "مستند مناقصة مستلم"}
+MAP_ROLE_WORKING = {"en": "Our submission / working file", "ar": "ملف عرضنا أو شغلنا"}
+MAP_ROLE_UNKNOWN = {"en": "Role unconfirmed", "ar": "دور الملف لسه مش مؤكد"}
+MAP_LOCAL_KEY_PAGE = {"en": "Key source page", "ar": "صفحة بيانات مهمة"}
+MAP_LOCAL_KEY_REASON = {
+    "en": "Local terms, dates or contents",
+    "ar": "مصطلحات أو تواريخ أو فهرس في الملف",
+}
+
+MAP_PASS_FACTS = {"en": "Tender facts", "ar": "بيانات المناقصة"}
+MAP_PASS_LINKS = {"en": "Document links", "ar": "روابط المستندات"}
+MAP_PASS_FAILED = {
+    "en": "{stage} could not finish after one retry: {reason}",
+    "ar": "{stage} ما خلصتش بعد إعادة المحاولة مرة: {reason}",
+}

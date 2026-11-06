@@ -416,5 +416,6 @@ async def test_approved_facts_searches_existing_files_too(rec):
     async def request(*args):
         return facts.Result(facts=[])
 
-    await facts.run_approved(rec, read=read, request=request, file_ids={added.id})
+    with pytest.raises(facts.NoTenderFacts):
+        await facts.run_approved(rec, read=read, request=request, file_ids={added.id})
     assert seen == {existing.id, added.id}

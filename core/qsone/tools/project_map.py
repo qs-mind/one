@@ -9,12 +9,13 @@ from qsone import copy
 from qsone.engine.tools import ModelRetry, Tool, register
 from qsone.records.arabic import normalise
 from qsone.records.mapping import store
+from qsone.records.mapping.roles import file_role
 
 
 class MapArgs(BaseModel):
     page: int = Field(1, ge=1)
     counts_page: int = Field(1, ge=1)
-    mode: Literal["overview", "file", "facts", "links", "find"] = "overview"
+    mode: Literal["overview", "file", "facts", "links", "find", "sheets", "counts"] = "overview"
     file_id: str | None = None
     label: str | None = Field(None, max_length=200)
     parent: str | None = None
@@ -29,7 +30,7 @@ def local_evidence(rec, row, args):
     with rec.read() as c:
         base = store.rows(
             c,
-            "SELECT f.name,f.folder,f.kind,f.pages,m.read_how,m.structure FROM files f "
+            "SELECT f.name,f.folder,f.kind,f.pages,m.ai_kind,m.read_how,m.structure FROM files f "
             "LEFT JOIN map_files m ON m.file_id=f.id WHERE f.id=? AND f.valid_until IS NULL",
             (fid,),
         )
@@ -38,6 +39,7 @@ def local_evidence(rec, row, args):
         fields = store.decoded(base[0])
         structure = fields.pop("structure") or {}
         row.update(fields)
+        row["role"] = file_role(fields.get("folder"), row.get("ai_kind"))
         row["headings"] = structure.get("headings", [])[:10]
         tables = store.rows(
             c,
@@ -71,7 +73,9 @@ def local_evidence(rec, row, args):
 async def read_map(ctx, args):
     if ctx.rec is None:
         raise ModelRetry(copy.FILE_NOT_IN_PROJECT["en"])
-    if args.mode in ("facts", "links"):
+    if args.mode in ("sheets", "counts"):
+        result = drawing_evidence(ctx.rec, args)
+    elif args.mode in ("facts", "links"):
         result = store.entries(ctx.rec, args.mode, cursor=args.cursor, limit=args.limit)
     elif args.mode == "file":
         # Exclude full structure/page text and keep all child collections paged.
@@ -120,13 +124,24 @@ async def read_map(ctx, args):
     else:
         result = store.list_map(ctx.rec, parent=args.parent, cursor=args.cursor, limit=args.limit)
         result["files"] = [local_evidence(ctx.rec, row, args) for row in result["files"]]
+    if "facts" in result:
+        with ctx.rec.read() as c:
+            for fact in result["facts"]:
+                row = c.execute(
+                    "SELECT f.folder,m.ai_kind FROM files f LEFT JOIN map_files m "
+                    "ON m.file_id=f.id WHERE f.id=?",
+                    (fact["file_id"],),
+                ).fetchone()
+                fact["role"] = file_role(*row) if row else file_role(None)
     return json.dumps(result, ensure_ascii=False)
 
 
 register(
     Tool(
         "project_map",
-        "Read first: overview; file(file_id); find(label); facts; links. Local headings, BOQ "
+        "Read first: overview; file(file_id); find(label); facts; links; sheets lists drawings "
+        "sorted by number; counts(label optional block-name filter) gives sourced sheet/file "
+        "counts and project_total. file_id filters either mode; page paginates. Headings, BOQ "
         "tables, drawing sheets and block counts include sources. cursor pages files/facts/links; "
         "page pages sheets/tables; counts_page pages blocks. Read cited prose with files_read.",
         MapArgs,
@@ -139,3 +154,58 @@ register(
         example={"mode": "overview"},
     )
 )
+
+
+def drawing_evidence(rec, args):
+    with rec.read() as c:
+        rows = [
+            store.decoded(r)
+            for r in store.rows(
+                c,
+                "SELECT s.id,s.file_id,s.sheet,s.number,s.title,s.revision,s.scale,s.discipline,"
+                "s.counts,s.source,f.name AS file,f.folder,m.ai_kind FROM map_sheets s "
+                "JOIN files f ON f.id=s.file_id LEFT JOIN map_files m ON m.file_id=f.id "
+                "WHERE s.valid_until IS NULL AND f.valid_until IS NULL "
+                "ORDER BY coalesce(s.number,''),s.file_id,s.sheet,s.id",
+            )
+        ]
+    project_total, file_totals, entries = 0, {}, []
+    for row in rows:
+        row["layout"] = row["sheet"]
+        row["source"] = {"file_id": row["file_id"], "sheet": row["sheet"]}
+
+        row["role"] = file_role(row.pop("folder", None), row.pop("ai_kind", None))
+        if args.mode == "sheets":
+            row.pop("counts", None)
+            if args.file_id is None or row["file_id"] == args.file_id:
+                entries.append(row)
+            continue
+        counts = {
+            name: count
+            for name, count in row["counts"].items()
+            if not args.label or normalise(args.label) in normalise(name)
+        }
+        total = sum(counts.values())
+        project_total += total
+        file_totals[row["file_id"]] = file_totals.get(row["file_id"], 0) + total
+        if counts and (args.file_id is None or row["file_id"] == args.file_id):
+            entries.extend(
+                {
+                    k: row[k]
+                    for k in ("file_id", "file", "sheet", "layout", "number", "title", "source")
+                }
+                | {"counts": {name: count}, "total": count, "sheet_total": total}
+                for name, count in sorted(counts.items())
+            )
+    start = (args.page - 1) * args.limit
+    result = {
+        args.mode: entries[start : start + args.limit],
+        "total": len(entries),
+        "next_page": args.page + 1 if start + args.limit < len(entries) else None,
+    }
+    if args.mode == "counts":
+        result.update(
+            project_total=project_total,
+            file_totals={row["file_id"]: file_totals[row["file_id"]] for row in result["counts"]},
+        )
+    return result

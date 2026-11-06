@@ -165,6 +165,23 @@ def list_map(rec, *, parent=None, cursor=None, limit=100):
                 count=str(ai_failed),
                 reason=json.loads(reason) if reason else copy.MAP_AI_FAILED_REASON,
             )
+        status["passes"] = _pass_summary(c)
+        pass_failed = False
+        for name, outcome in status["passes"].items():
+            if outcome["state"] != "failed":
+                continue
+            line = copy.fill(
+                copy.MAP_PASS_FAILED,
+                stage=copy.MAP_PASS_FACTS if name == "facts" else copy.MAP_PASS_LINKS,
+                reason=outcome["note"],
+            )
+            if ai_failed or pass_failed:
+                status["line"] = {
+                    lang: status["line"][lang] + " " + line[lang] for lang in ("en", "ar")
+                }
+            else:
+                status["line"] = line
+            pass_failed = True
         # Return immediate child groups, bounded and keyset-paged alongside the files.
         prefix = (parent.rstrip("/") + "/") if parent else ""
         groups = rows(
@@ -260,3 +277,47 @@ def _group_label(rec, path, fallback):
             ("$." + json.dumps(path), "$." + json.dumps(path)),
         ).fetchone()
     return json.loads(row[0]) if row else {"en": fallback, "ar": fallback}
+
+
+def pass_status(rec, name, file_ids, *, state, attempts, note=None):
+    """Persist project-pass outcomes independently of per-file classification state."""
+    key = "project_map_passes"
+    batch = "project" if name == "facts" else ",".join(sorted(file_ids))
+    with rec.write(ACTOR) as c:
+        raw = c.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        before = json.loads(raw[0]) if raw else {}
+        after = {stage: dict(runs) for stage, runs in before.items()}
+        after.setdefault(name, {})[batch] = {
+            "state": state,
+            "attempts": attempts,
+            "note": note,
+            "at": rec.clock(),
+        }
+        rec.set_meta(c, key, json.dumps(after, ensure_ascii=False))
+        audit.record(
+            c,
+            at=rec.clock(),
+            actor=ACTOR,
+            action="update" if raw else "create",
+            table="meta",
+            row_id=key,
+            before=before,
+            after=after,
+        )
+
+
+def _pass_summary(c):
+    raw = c.execute("SELECT value FROM meta WHERE key='project_map_passes'").fetchone()
+    result = {}
+    for name, runs in (json.loads(raw[0]) if raw else {}).items():
+        records = list(runs.values())
+        failed = [r for r in records if r["state"] == "failed"]
+        pending = [r for r in records if r["state"] in ("running", "retrying")]
+        latest = max(failed or pending or records, key=lambda r: r["at"])
+        result[name] = {
+            "state": latest["state"],
+            "note": latest["note"],
+            "attempts": max(r["attempts"] for r in records),
+            "failed_batches": len(failed),
+        }
+    return result
