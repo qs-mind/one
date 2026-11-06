@@ -99,6 +99,15 @@ describe("press-and-hold", () => {
 });
 
 describe("a decided card", () => {
+  it("truncates the end of a Latin filename inside an Arabic question, not its beginning", () => {
+    const { container } = render(<ApprovalCard id="sample" card={card("استورد المقايسة من sample-boq-priced.xlsx", { status: "settled", choice: "yes" })} />);
+    const question = container.querySelector("[data-card-question]")!;
+    expect(question).toHaveAttribute("dir", "rtl");
+    expect(question).toHaveClass("flex");
+    expect(question.querySelector("[data-file-name]")).toHaveAttribute("dir", "ltr");
+    expect(question.querySelector("[data-cut]")).toHaveTextContent("sample-boq-priced");
+  });
+
   it("folds to a short trace: what it asked, then the answer given in words, and when", () => {
     const at = "2026-11-05T08:42:00.000Z";
     render(<ApprovalCard id="c1" card={{ ...outside, status: "settled", choice: "yes", settled_at: at }} />);

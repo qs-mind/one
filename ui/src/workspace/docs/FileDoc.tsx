@@ -287,16 +287,17 @@ function SheetFile({ projectId, sources, fileId, first, opened, notice }: {
       live = false;
     };
   }, [opened, view]);
-  // each row's first cell carries the place a source names, so the source mark finds the row
+  // Every visible cell carries its row target: horizontal virtualization may remove the first column.
   const shown = useMemo<FileSheet>(() => {
     const place = (row: string): Record<string, string> => (view.sheet ? { sheet: view.sheet, row } : { line: row });
     return {
       ...view,
-      rows: view.rows.map((row) => {
-        const [key, cell] = Object.entries(row.cells)[0] ?? [];
-        if (!key || !cell || isNumber(cell)) return row;
-        return { ...row, cells: { ...row.cells, [key]: { ...cell, at: fileKey(fileId, place(row.code ?? "")) } } };
-      }),
+      rows: view.rows.map((row) => ({
+        ...row,
+        cells: Object.fromEntries(Object.entries(row.cells).map(([key, cell]) => [
+          key, !cell || isNumber(cell) ? cell : { ...cell, at: fileKey(fileId, place(row.code ?? "")) },
+        ])),
+      })),
     };
   }, [view, fileId]);
   const tab = "whitespace-nowrap rounded-t-md border border-b-0 px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ink";

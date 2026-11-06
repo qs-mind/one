@@ -11,6 +11,7 @@ import { currentProject, setCurrentProject } from "../records/project";
 import { askForBackupFolder, stopAsking } from "../backup/ask";
 import { workspaceApi } from "../workspace/api";
 import { App } from "./App";
+import { setZoom } from "../ui/scale";
 import { bodyOf, calls, core, P1, P2, reply, streamed } from "./testing";
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
@@ -554,4 +555,43 @@ describe("the import reports and the backup question", () => {
     await user.click(within(question).getByRole("button", { name: texts.backupLater.ar }));
     expect(within(chat).queryByRole("region", { name: texts.backupTitle.ar })).toBeNull();
   });
+});
+
+it("keeps a visible opener and the draft when a 1280 by 720 window zooms to 150 percent", async () => {
+  core();
+  setCurrentProject(P1);
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: 1280 <= Number(/max-width: (\d+)px/.exec(query)?.[1] ?? 0),
+    media: query, addEventListener() {}, removeEventListener() {},
+  }));
+  const sources = fakeSources({});
+  render(<App sourcesFor={() => sources} />);
+  expect(await screen.findByRole("complementary", { name: texts.projectChat.ar })).toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.type(await box(), "مسودة عينة");
+  act(() => setZoom(1.5));
+  expect(screen.queryByRole("complementary", { name: texts.projectChat.ar })).toBeNull();
+  const opener = screen.getByRole("button", { name: texts.projectChat.ar });
+  expect(opener).toBeVisible();
+  expect(opener).toHaveClass("shrink-0");
+  expect(opener).toHaveAttribute("aria-expanded", "false");
+  await user.click(opener);
+  expect(await box()).toHaveValue("مسودة عينة");
+  expect(opener).toHaveAttribute("aria-expanded", "true");
+});
+
+it("Tab cycles from the last chat control to the top bar without a body stop", async () => {
+  core();
+  const user = userEvent.setup();
+  render(<App />);
+  await box();
+  const buttons = screen.getAllByRole("button").filter((button) => !button.hasAttribute("disabled"));
+  const first = buttons[0]!;
+  const last = buttons.at(-1)!;
+  last.focus();
+  await user.tab();
+  expect(document.activeElement).toBe(first);
+  await user.tab({ shift: true });
+  // Leaving the composer folds its model tools; the message field is then its last control.
+  expect(document.activeElement).toBe(screen.getByRole("textbox", { name: texts.message.ar }));
 });

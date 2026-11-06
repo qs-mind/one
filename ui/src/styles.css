@@ -38,6 +38,8 @@ html:lang(ar) {
   --text-2xl--line-height: 1.35;
 }
 
+/* Zain draws Arabic-Indic digit codepoints as Western glyphs. Exclude those ranges so typed digits
+   (including project titles) use the system Arabic font. ONE formats its own figures separately. */
 /* Arabic in Zain, matched to Kumbh Sans beside it. Zain's letters are drawn smaller, so they are set 3% larger; and its
    strokes are darker than Kumbh's at the same weight, so each weight takes Zain's next lighter cut: body (400) uses
    Zain 300, semibold (600) uses Zain 400, bold (700) Zain 700. Before (108% and 400 / 700) Arabic read bigger and
@@ -49,7 +51,7 @@ html:lang(ar) {
   font-weight: 100 450;
   size-adjust: 103%;
   src: url("../../node_modules/@fontsource/zain/files/zain-arabic-300-normal.woff2") format("woff2");
-  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
+  unicode-range: U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
     U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 @font-face {
@@ -59,7 +61,7 @@ html:lang(ar) {
   font-weight: 451 650;
   size-adjust: 103%;
   src: url("../../node_modules/@fontsource/zain/files/zain-arabic-400-normal.woff2") format("woff2");
-  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
+  unicode-range: U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
     U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 @font-face {
@@ -69,7 +71,7 @@ html:lang(ar) {
   font-weight: 651 900;
   size-adjust: 103%;
   src: url("../../node_modules/@fontsource/zain/files/zain-arabic-700-normal.woff2") format("woff2");
-  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
+  unicode-range: U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
     U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 

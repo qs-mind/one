@@ -5,6 +5,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod core;
+mod folder;
 mod shim;
 mod update;
 
@@ -38,6 +39,41 @@ async fn save_export(app: tauri::AppHandle, name: String, bytes: Vec<u8>) -> Res
     let path = chosen.into_path().map_err(|e| e.to_string())?;
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(true)
+}
+
+// Pick and enumerate on the Rust side so selected paths never depend on an asset-protocol
+// feature or a path supplied by the page. The core still receives bytes, never disk paths.
+#[tauri::command]
+async fn folder_pick(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
+    let Some(chosen) = app.dialog().file().blocking_pick_folder() else {
+        return Ok(None);
+    };
+    let root = chosen
+        .into_path()
+        .map_err(|e| e.to_string())?
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    let files = folder::files(&root)?;
+    app.state::<folder::Selection>().remember(&files)?;
+    Ok(Some(serde_json::Value::Array(
+        files
+            .into_iter()
+            .map(|file| {
+                serde_json::json!({
+                    "path": file.path, "name": file.name, "folder": file.folder, "size": file.size,
+                })
+            })
+            .collect(),
+    )))
+}
+
+#[tauri::command]
+async fn folder_read(app: tauri::AppHandle, path: String) -> Result<tauri::ipc::Response, String> {
+    let bytes = app
+        .state::<folder::Selection>()
+        .read(std::path::Path::new(&path))?;
+    // Raw IPC avoids serializing large tender files into JSON arrays of numbers.
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 /// The pages One shows: its own origin, and in development the Vite server. A `blob:` made by the page
@@ -106,10 +142,13 @@ fn main() {
                 })
                 .build(),
         )
+        .manage(folder::Selection::default())
         .manage(shim::Calls::default())
         .manage(update::Updates::default())
         .invoke_handler(tauri::generate_handler![
             save_export,
+            folder_pick,
+            folder_read,
             shim::core_fetch,
             shim::core_cancel,
             shim::core_upload,

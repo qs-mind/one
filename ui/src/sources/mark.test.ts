@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe("the source mark", () => {
-  it("draws a Copper box round the figure from the left in English, then fades after about 1.5 s", async () => {
+  it("draws a solid Copper box round the figure from the left in English, then fades after the hold", async () => {
     reduced(false);
     const animate = vi.fn(() => ({ finished: Promise.resolve(), finish() {} }));
     SVGElement.prototype.animate = animate as unknown as typeof SVGElement.prototype.animate;
@@ -36,7 +36,7 @@ describe("the source mark", () => {
     const pen = shape("mark")!;
     expect(pen.getAttribute("d")).toBe("M 97 47 H 183 V 73 H 97 Z");
     expect(pen.style.stroke).toContain("--color-copper");
-    expect(animate).toHaveBeenCalledWith([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: DUR.roll, easing: EASE });
+    expect(pen.style.strokeDasharray).toBe("none");
     await vi.advanceTimersByTimeAsync(MARK_HOLD_MS - 1);
     expect(shape("mark")).not.toBeNull();
     await vi.advanceTimersByTimeAsync(1);
@@ -131,5 +131,44 @@ describe("revealing an opened source", () => {
     const found = revealSource(["number:n9"]);
     await vi.advanceTimersByTimeAsync(2100);
     expect(await found).toBe(false);
+  });
+});
+
+
+describe("real-walk sheet source (sample data)", () => {
+  it("finds 80,640 in the row's 80640 cell, centers it, and paints a solid mark for two seconds", async () => {
+    reduced(true);
+    const row = at(new DOMRect(0, 45, 800, 30));
+    row.setAttribute("role", "row");
+    const first = at(new DOMRect(10, 50, 50, 20), row);
+    first.textContent = "20";
+    first.setAttribute("data-source-at", "file:sample#sheet=BOQ&row=20");
+    const amount = at(cell, row);
+    amount.textContent = "80640";
+    amount.scrollIntoView = vi.fn();
+    const found = revealSource(["file:sample#sheet=BOQ&row=20"], ["80,640"]);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await found).toBe(true);
+    expect(amount.scrollIntoView).toHaveBeenCalledWith({ block: "center", inline: "center" });
+    expect(shape("mark")!.getAttribute("d")).toBe("M 97 47 H 183 V 73 H 97 Z");
+    expect(shape("mark")!.style.strokeDasharray).toBe("none");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(shape("mark")).not.toBeNull();
+  });
+
+  it("does not match the figure 15 inside the different number 115", async () => {
+    reduced(true);
+    const row = at(new DOMRect(0, 45, 800, 30));
+    row.setAttribute("role", "row");
+    const first = at(new DOMRect(10, 50, 50, 20), row);
+    first.textContent = "115";
+    first.setAttribute("data-source-at", "file:sample#row=17");
+    const amount = at(cell, row);
+    amount.textContent = "15.00";
+    amount.scrollIntoView = vi.fn();
+    const found = revealSource(["file:sample#row=17"], ["15"]);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await found).toBe(true);
+    expect(amount.scrollIntoView).toHaveBeenCalled();
   });
 });

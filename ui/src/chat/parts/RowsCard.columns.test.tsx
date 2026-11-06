@@ -84,3 +84,16 @@ describe("the BOQ columns card", () => {
     expect(screen.queryByText(/الصفوف/)).toBeNull();
   });
 });
+
+it("shows only the header after a repeated tender title, without stripping distinct bilingual headings", () => {
+  const card: CardData = { ...boq, payload: { ...boq.payload, rows: [
+    { column: "D", header: "مقايسة عينة · الكمية الأصلية", meaning: "quantity" },
+    { column: "F", header: "مقايسة عينة · إجمالي الكمية", meaning: "quantity" },
+    { column: "G", header: "مقايسة عينة · الفئة", meaning: "rate" },
+    { column: "I", header: "مقايسة عينة", meaning: "none" },
+  ] } };
+  render(<ApprovalCard id="sample-heading" card={card} />);
+  expect(screen.queryAllByText(/مقايسة عينة ·/)).toHaveLength(0);
+  expect(screen.getByText("الكمية الأصلية")).toBeInTheDocument();
+  expect(screen.getByText("إجمالي الكمية")).toBeInTheDocument();
+});

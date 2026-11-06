@@ -60,3 +60,26 @@ export function useNarrow(): boolean {
 export function useSmall(): boolean {
   return useBelow(SMALL);
 }
+
+/** Keep desktop Tab navigation on controls when it reaches the end of the app, rather than the webview body.
+ * Popovers and dialogs outside the app root retain their own focus handling. */
+export function cycleTab(event: KeyboardEvent): void {
+  if (event.key !== "Tab" || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+  const root = document.querySelector<HTMLElement>("[data-app-focus]");
+  if (!root || !(event.target instanceof Element) || !root.contains(event.target)) return;
+  const controls = [...root.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex], [contenteditable="true"]')]
+    .filter((el) => {
+      if (el.tabIndex < 0 || el.matches(":disabled") || el.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+      for (let node: HTMLElement | null = el; node && node !== root; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+      }
+      return true;
+    });
+  const boundary = event.shiftKey ? controls[0] : controls.at(-1);
+  const target = event.shiftKey ? controls.at(-1) : controls[0];
+  if (target && document.activeElement === boundary) {
+    event.preventDefault();
+    target.focus();
+  }
+}

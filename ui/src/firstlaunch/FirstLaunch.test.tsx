@@ -798,3 +798,17 @@ describe("crash reports", () => {
     await expect(reportCrash(error())).resolves.toBeUndefined();
   });
 });
+
+it("Ready keeps the import help in a compact, non-clipping content flow at laptop height", async () => {
+  mockCore();
+  const setup = fresh();
+  for (const step of STEPS) setup.steps[step] = "done";
+  render(<FirstLaunch initial={setup} onDone={vi.fn()} onImport={vi.fn()} />);
+  await screen.findByRole("heading", { name: texts.readyTitle.en });
+  const help = screen.getByText(texts.readyImportOldHelp.en);
+  const content = help.closest("[data-step-content]");
+  expect(content).not.toBeNull();
+  expect(content).toHaveClass("shrink-0");
+  expect(document.querySelector("[data-step]")).toHaveClass("gap-4");
+  expect(screen.getByText(texts.readyDrop.en).parentElement).toHaveClass("py-6");
+});

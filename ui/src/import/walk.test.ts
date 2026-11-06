@@ -149,3 +149,13 @@ describe("uploading", () => {
     });
   });
 });
+
+
+it("preserves lazy native reading when splitting an old-work folder into projects", async () => {
+  const bytes = new File(["sample"], "sample.txt");
+  const read = vi.fn(async () => bytes);
+  const groups = oldProjects([{file:{name:"sample.txt",size:6},folder:"Archive/Project/sub",read}]);
+  expect(groups[0]!.picked[0]!.read).toBe(read);
+  expect(await groups[0]!.picked[0]!.read!()).toBe(bytes);
+  expect(groups[0]!.picked[0]!.folder).toBe("Project/sub");
+});

@@ -38,3 +38,16 @@ describe("workspaceApi", () => {
     expect(workspaceApi.current()?.key).toBe("files:all");
   });
 });
+
+it("keeps separate project histories for a leave and reopen in this session", () => {
+  workspaceApi.reset({ key: "file:a", anchor: { page: 3 } }, exists, "sample-one");
+  workspaceApi.open("deliverable:x", { row: "7" });
+  workspaceApi.reset(null, exists, "sample-two");
+  workspaceApi.open("file:b");
+  workspaceApi.reset({ key: "deliverable:x", anchor: { row: "7" } }, exists, "sample-one");
+  expect(workspaceApi.back()).toBe(true);
+  expect(workspaceApi.current()).toEqual({ key: "file:a", anchor: { page: 3 } });
+  workspaceApi.reset({ key: "file:b", anchor: null }, exists, "sample-two");
+  expect(workspaceApi.back()).toBe(true);
+  expect(workspaceApi.current()?.key).toBe("files:all");
+});

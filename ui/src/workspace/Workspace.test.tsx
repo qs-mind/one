@@ -674,3 +674,19 @@ describe("an empty project", () => {
     expect(await screen.findByText(texts.emptyProject.en)).toBeInTheDocument();
   });
 });
+
+it("Back survives leaving a sample project and reopening it", async () => {
+  setCurrentProject(P1);
+  core();
+  const sources = fakeSources({ deliverables: [A, B], workspace: { key: "deliverable:dA", anchor: null } });
+  render(<App sourcesFor={() => sources} />);
+  await screen.findByTestId("viewer-dA");
+  act(() => workspaceApi.open("deliverable:dB"));
+  await screen.findByTestId("viewer-dB");
+  act(() => setCurrentProject(undefined));
+  await screen.findByRole("textbox", { name: texts.message.ar });
+  act(() => setCurrentProject(P1));
+  await waitFor(() => expect(document.querySelector('[data-region="document"]')).not.toBeNull());
+  act(() => { expect(workspaceApi.back()).toBe(true); });
+  expect(workspaceApi.current()?.key).toBe("deliverable:dA");
+});

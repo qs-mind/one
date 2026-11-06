@@ -16,6 +16,8 @@ export type CardAnswer = { answers?: Record<string, string>; rows_ok?: number[] 
 export type CardKindProps = {
   /** The card as it stands: settled with its answers as soon as the core took them. */
   card: CardData;
+  /** Rows shown in chat and document share this draft. */
+  stateId?: string;
   onAnswer: (choice: string, answer?: CardAnswer) => void;
   /** An answer is on its way to the core. */
   sending: boolean;

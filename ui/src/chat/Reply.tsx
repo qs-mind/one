@@ -4,7 +4,7 @@
 import { createElement, useMemo, type ReactNode } from "react";
 import Markdown, { type Components, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { fill, t, useLanguage } from "../i18n";
+import { dir, fill, t, useLanguage, type Language } from "../i18n";
 import { sourceLineHandlers } from "../sources/line";
 import { useSourceCard } from "../sources/useSourceCard";
 import { isolateOtherScript } from "./bidi";
@@ -12,13 +12,13 @@ import { useDocumentNames, withoutIds } from "./ids";
 import { westernNumbers } from "../ui/digits";
 import type { SourcedData } from "./parts/types";
 
-type BlockProps = ExtraProps & { className?: string; children?: ReactNode };
+type BlockProps = ExtraProps & { className?: string; children?: ReactNode; dir?: string };
 
-// Each block takes the direction of its own first letters, so English reads left to right inside the Arabic page; the
-// runs in the other script inside a block are isolated (./bidi).
+// The remark step supplies the prose direction, ignoring leading names and ONE. Structural
+// blocks keep auto direction; code remains LTR.
 function block(tag: string, className?: string) {
   return function Block({ node: _node, className: given, ...props }: BlockProps) {
-    return createElement(tag, { ...props, dir: "auto", className: [given, className].filter(Boolean).join(" ") });
+    return createElement(tag, { ...props, dir: props.dir ?? "auto", className: [given, className].filter(Boolean).join(" ") });
   };
 }
 
@@ -105,8 +105,11 @@ export function Reply({
   unsourced: written = [],
   sourced: writtenSourced = {},
   projectId,
+  lang: replyLanguage,
 }: {
   text: string;
+  /** The Brief language recorded by the core; independent of the current UI language. */
+  lang?: Language;
   unsourced?: string[];
   sourced?: SourcedData["numbers"];
   /** A number opens into its source card only inside its project. */
@@ -125,9 +128,9 @@ export function Reply({
       remarkGfm,
       ...(values.length ? [markNumbers(values, () => ({ hName: "mark", hProperties: { title: t("noSource") } }))] : []),
       ...(opened.length ? [markNumbers(opened, (written) => ({ hName: "data", hProperties: { value: written } }))] : []),
-      isolateOtherScript(),
+      isolateOtherScript(replyLanguage ? dir(replyLanguage) : undefined),
     ];
-  }, [key, sourcedKey, lang]);
+  }, [key, sourcedKey, lang, replyLanguage]);
   const source = useSourceCard(projectId ?? "");
   const names = useDocumentNames(); // an id the Lead QS wrote reads as its document's name, or goes
   const shown: Components = {

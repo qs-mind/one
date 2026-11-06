@@ -108,7 +108,7 @@ const upsert = <T,>(list: T[] | null, item: T, same: (a: T) => boolean): T[] | n
 
 /** The documents of `sources`' project once read (null until then), with the open document restored, saved and
  * kept in line with them. */
-export function useDocuments(sources: ProjectSources | undefined): Documents | null {
+export function useDocuments(sources: ProjectSources | undefined, projectId?: string): Documents | null {
   const [state, setState] = useState<{ sources: ProjectSources; docs: Documents } | null>(null);
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
     void read().then(([deliverables, files, saved, team]) => {
       if (signal.aborted) return;
       const next: Lists = { deliverables, files, clientBoqs: saved?.client_boqs ?? null, desks: team?.desks ?? null };
-      workspaceApi.reset(saved?.open ? { key: saved.open, anchor: saved.anchor } : null, (key) => exists(lists ?? next, key));
+      workspaceApi.reset(saved?.open ? { key: saved.open, anchor: saved.anchor } : null, (key) => exists(lists ?? next, key), projectId);
       show(next);
       startActivity(sources, signal, team ?? undefined);
       sources.activity(
@@ -182,7 +182,7 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
       window.removeEventListener("pagehide", onHide);
       void saver.flush();
     };
-  }, [sources]);
+  }, [sources, projectId]);
 
   return state && state.sources === sources ? state.docs : null;
 }

@@ -21,7 +21,7 @@ describe("Reply", () => {
   it("each block finds its own direction: English left to right, Arabic right to left", () => {
     render(<Reply text={"The price is from the supplier.\n\nالسعر من المورد.\n\n- بند\n\n| Item | Qty |\n|---|---|\n| Steel | 5 |"} />);
     for (const text of ["The price is from the supplier.", "السعر من المورد.", "بند", "Steel"]) {
-      expect(screen.getByText(text)).toHaveAttribute("dir", "auto");
+      expect(screen.getByText(text)).toHaveAttribute("dir", /[ا-ي]/.test(text) ? (text === "بند" ? "auto" : "rtl") : "ltr");
     }
     expect(screen.getByRole("list")).toHaveAttribute("dir", "auto");
   });
@@ -56,7 +56,7 @@ describe("Reply", () => {
     const line = "إجمالي البنود في ملف boq-priced.xls: 100,912,880.78 جنيه، من الخلية H18 في Project Records.";
     const { container } = render(<Reply text={`**${line}**`} />);
     const p = container.querySelector("p")!;
-    expect(p).toHaveAttribute("dir", "auto");
+    expect(p).toHaveAttribute("dir", "rtl");
     expect(p.textContent).toBe(line); // nothing lost or moved in the text itself
     expect([...p.querySelectorAll("bdi")].map((b) => b.textContent)).toEqual(["boq-priced.xls", "H18", "Project Records"]);
     // the colon and the number are outside every isolate, so they take the Arabic paragraph's direction

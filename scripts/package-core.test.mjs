@@ -119,7 +119,8 @@ test("bytecode only: no .py left, every module has a .pyc beside its name, and i
   const site = path.join(lib, "site-packages");
   put(lib, ["os_like.py", "site-packages/x/__init__.py", "site-packages/x/mod.py", "site-packages/qsone/app.py"]);
   put(lib, ["site-packages/qsone/sandbox/guest/one_io.py", "site-packages/qsone/engine/instructions/lead_qs.txt"]);
-  const python = corePython();
+  // Worktrees use the existing core interpreter without creating core/.venv.
+  const python = process.env.QSONE_TEST_PYTHON || corePython();
 
   bytecodeOnly(python, lib);
 

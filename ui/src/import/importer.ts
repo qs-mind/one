@@ -152,8 +152,9 @@ async function run(job: Job, picked: Picked[], { understandAfter }: { understand
 }
 
 /** A dropped or chosen tender folder (old: false), or old work (old: true), each folder its own project. */
-export async function importFolders(source: DataTransfer | FileList | File[] | Picked[], { old }: { old: boolean }) {
-  const { picked, chosen } = await picking(source);
+export async function importFolders(source: DataTransfer | FileList | File[] | Picked[], { old, chosen: fromChooser }: { old: boolean; chosen?: boolean }) {
+  const { picked, chosen: fromInput } = await picking(source);
+  const chosen = fromChooser ?? fromInput;
   if (!picked.length) return;
   const open = currentProject();
   if (!old && open && !open.archived_at) return importInto(open.id, picked); // the tender open now takes it

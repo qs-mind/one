@@ -22,13 +22,25 @@ beforeEach(() => {
 });
 
 describe("the report of a drop", () => {
+  it("uses the Brief language from progress for an Arabic reply, even on an English page", async () => {
+    setLanguage("en");
+    const message = { id: "reply-sample", role: "assistant", parts: [
+      { type: "data-progress", id: "sample", data: { agent: { en: "Lead QS", ar: "كبير مهندسي الكميات" }, text: { en: "Read", ar: "قرا" }, lang: "ar" } },
+      { type: "text", text: "BOQ قرا الملف." },
+    ] };
+    core({ routes: { "GET /api/chat/p1/messages": () => Response.json({ messages: [message] }) } });
+    render(<App />);
+    const paragraph = await screen.findByText((_, el) => el?.tagName === "P" && el.textContent === "BOQ قرا الملف.");
+    expect(paragraph).toHaveAttribute("dir", "rtl");
+  });
+
   it("shows each line in the page language, as ONE's own message", async () => {
     core({ routes: { "GET /api/chat/p1/messages": () => Response.json({ messages: [report] }) } });
     render(<App />);
-    const line = await screen.findByText(lines[1]!.ar);
-    expect(line).toHaveAttribute("dir", "auto");
+    const line = await screen.findByText((_, el) => el?.tagName === "P" && el.textContent === lines[1]!.ar);
+    expect(line).toHaveAttribute("dir", "rtl");
     expect(line.closest('[role="status"]')).toHaveTextContent(lines[0]!.ar);
     setLanguage("en");
-    expect(await screen.findByText(lines[1]!.en)).toBeInTheDocument();
+    expect(await screen.findByText((_, el) => el?.tagName === "P" && el.textContent === lines[1]!.en)).toBeInTheDocument();
   });
 });

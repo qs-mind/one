@@ -8,7 +8,7 @@
 // table (which scrolls sideways inside the card if it must). Each cell finds its own direction, and a long value shows
 // two lines with the whole of it as the cell's title. Table roles are set by hand: a stacked table keeps them. A row
 // whose number the core gives a source (`number_column`, `row_sources`) opens that number into its source card.
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { baseDirection, BidiText } from "../bidi";
 import type { Source } from "../../deliverables/types";
 import { fill, pick, t } from "../../i18n";
@@ -16,6 +16,7 @@ import { sourceLineHandlers } from "../../sources/line";
 import { sourceKeys } from "../../sources/targets";
 import { useSourceCard } from "../../sources/useSourceCard";
 import type { CardKindProps } from "./cardKinds";
+import { useRowState } from "./rowState";
 
 const REFUSE = "no"; // takes nothing: no rows (core/qsone/engine/types.py)
 
@@ -39,13 +40,19 @@ function Cell({ value, label, main, children }: { value: string; label: string; 
   );
 }
 
-export function RowsCard({ card, onAnswer, sending, label, lang }: CardKindProps) {
-  const [ticked, setTicked] = useState<number[]>([]);
+export function RowsCard({ card, onAnswer, sending, label, lang, stateId }: CardKindProps) {
+  const [ticked, setTicked] = useRowState<number[]>(stateId, "ticked", []);
   const payload = card.payload ?? {};
   const columns = payload.columns ?? [];
-  const rows = payload.rows ?? [];
+  const rawRows = payload.rows ?? [];
+  // Older BOQ cards concatenate a merged title above every column heading. Strip only
+  // a shared prefix across all populated headings; differing/bilingual headings stay intact.
+  const headers = payload.meanings?.length ? rawRows.map((row) => row.header).filter((header): header is string => Boolean(header)) : [];
+  const prefix = headers[0]?.includes(" · ") ? `${headers[0].split(" · ")[0]} · ` : "";
+  const repeatedTitle = headers.length >= 3 && prefix && headers.every((header) => header === prefix.slice(0, -3) || header.startsWith(prefix));
+  const rows: Record<string, string>[] = repeatedTitle ? rawRows.map((row) => ({ ...row, header: row.header?.slice(prefix.length) ?? "" })) : rawRows;
   const meaningKey = payload.meanings?.length ? payload.meaning_column : undefined;
-  const [meanings, setMeanings] = useState<Record<string, string>>(() =>
+  const [meanings, setMeanings] = useRowState<Record<string, string>>(stateId, "meanings", () =>
     meaningKey ? Object.fromEntries(rows.map((r) => [r.column ?? "", r[meaningKey] ?? "none"])) : {},
   );
   const tickable = Boolean(payload.tick && rows.length);

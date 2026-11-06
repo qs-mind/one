@@ -13,7 +13,7 @@ const files = `/api/projects/${school.id}/files`;
 const boqName = "جدول الكميات - عينة.xlsx";
 // A file name is shown in its own isolate (ui/FileName.tsx), its extension in an inner one: match the whole name.
 const named = (name: string) => (_: string, el: Element | null) =>
-  el?.tagName === "BDI" && el.getAttribute("dir") === "auto" && el.textContent === name;
+  el?.tagName === "BDI" && el.getAttribute("dir") === (/^[A-Za-z]/.test(name) ? "ltr" : "rtl") && el.textContent === name;
 
 // A file as the core describes it after an upload or in its list.
 function fileInfo(name: string, more: object = {}) {
@@ -100,7 +100,7 @@ describe("RecordsPanel", () => {
     });
     panel();
     const name = await screen.findByText(named(boqName));
-    expect(name).toHaveAttribute("dir", "auto");
+    expect(name).toHaveAttribute("dir", "rtl");
     expect(screen.getByText(texts.fileRead.ar)).toBeInTheDocument();
     expect(screen.getByText(texts.filePartlyRead.ar)).toBeInTheDocument();
     expect(screen.getByText(scanned.ar)).toBeInTheDocument();
@@ -296,7 +296,7 @@ describe("RecordsPanel", () => {
     expect(await screen.findByText("صفحة 3")).toBeInTheDocument();
     expect(screen.getByText("ورقة BOQ، صف 23")).toBeInTheDocument();
     expect(screen.getByText("03/02 | خرسانة")).toHaveAttribute("dir", "auto");
-    expect(screen.getByText(named("مواصفات - عينة.pdf"))).toHaveAttribute("dir", "auto");
+    expect(screen.getByText(named("مواصفات - عينة.pdf"))).toHaveAttribute("dir", "rtl");
     const search = fetch.mock.calls.find(([url]) => String(url).includes("/search"))!;
     expect(search[0]).toBe(`/api/projects/${school.id}/search?q=${encodeURIComponent("03/02")}&k=10`);
 
