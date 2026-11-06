@@ -1,0 +1,58 @@
+name: brissa
+needs:
+- '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+max_usd: 3
+real:
+- project: brissa {run}
+- files:
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+- ask: What are the retention conditions in this tender? Cite the clause and page.
+- check:
+    reply_contains: ['14.3', '(iii)']
+    cited:
+      value: '14.3'
+      page: 58
+    no_raw: true
+    max_usd: 1
+- ask: What are the delay damages per day? Cite the clause and source page.
+- check:
+    reply_contains: 0.2%
+    no_raw: true
+    max_usd: 1
+- ask: What is the bid security amount and currency? Cite the page.
+- check:
+    reply_contains:
+    - 350,000
+    - USD
+    cited:
+      value: 350,000
+      page: 26
+    no_raw: true
+    max_usd: 1
+scripted:
+- project: CLI sample {run}
+- files:
+  - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
+- ask: bench:question What do you need?
+  answer:
+    question:
+      choice: sent
+      answers:
+        q1: Ready-mix
+        q2: Sample note
+- check:
+    reply_contains: bench reply
+    no_raw: true
+    max_usd: 1
+- ask: bench:boq Import the BOQ
+  answer:
+    rows: keep
+- boq: show
+- check:
+    boq_items: 4
+    boq_sections: 2
+    no_raw: true
+- ask: bench:chat Hello
+- boq: show
+- check:
+    items_unchanged: true
