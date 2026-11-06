@@ -86,7 +86,8 @@ def _has_unit(before: list[str], after: str) -> bool:
     if unit_after and unit_after.group().lower() in _UNITS:
         return True
     near = [_word(t) for t in after.split()[:2]] + [_word(t) for t in before[-2:]]
-    return any(w in _UNITS for w in near)
+    # a rate per a unit is a unit too: «12 جنيه/م3», "450 SAR/m2"
+    return any(w in _UNITS or w.split("/")[0] in _UNITS for w in near)
 
 
 def _counted(text: str):

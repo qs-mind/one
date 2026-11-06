@@ -414,6 +414,7 @@ def _unsourced(data: dict, known: set[str]) -> list[str]:
 # The tool ---------------------------------------------------------------------------------------
 
 _retried: set[str] = set()  # the Briefs whose one retry on a view is used
+_shown: dict[tuple[str, str], str] = {}  # (Brief, the view's arguments) -> the view shown
 
 
 def _refuse(ctx: ToolContext, text: str) -> str:
@@ -428,6 +429,10 @@ async def _show(ctx: ToolContext, parsed: BaseModel) -> str:
     if ctx.rec is None:
         raise RecordsError(copy.PROJECT_NOT_OPEN)
     args = dict(parsed.model_extra or {})
+    key = (ctx.brief_id, json.dumps(args, sort_keys=True, ensure_ascii=False))
+    if key in _shown:  # the breakdown showed twice in one reply (6 Nov 2026)
+        note = "This view is already on the engineer's screen; it is not shown again."
+        return json.dumps({"shown": _shown[key], "note": note}, ensure_ascii=False)
     at = ctx.rec.clock()
     try:
         data, cells, dropped = _build(ctx.rec, args, at)
@@ -437,6 +442,7 @@ async def _show(ctx: ToolContext, parsed: BaseModel) -> str:
     data["unsourced"] = _unsourced(data, known)
     view_id = uuid4().hex
     ctx.host.emit(Data(ctx.brief_id, "view", view_id, data))
+    _shown[key] = view_id
     out = {
         "shown": view_id,
         "at": at,
@@ -444,6 +450,7 @@ async def _show(ctx: ToolContext, parsed: BaseModel) -> str:
         "sample": data["sample"],
         "unsourced": data["unsourced"],
         "dropped": dropped,
+        "note": "The engineer sees this view; do not write it again, as a table or as JSON.",
     }
     return json.dumps(out, ensure_ascii=False)
 

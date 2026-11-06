@@ -22,6 +22,7 @@ import asyncio
 import json
 import re
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 from uuid import uuid4
 
@@ -303,6 +304,87 @@ def _numbers(rec: Records, ref: str) -> str:
 
 async def _ledger_numbers(ctx: ToolContext, args: ItemArgs) -> str:
     return await asyncio.to_thread(_numbers, _project(ctx), args.item)
+
+
+class RankArgs(_Args):
+    name: str = Field("amount", min_length=1, max_length=64)
+    top: int = Field(10, ge=1, le=50)
+    order: Literal["highest", "lowest"] = "highest"
+    kind: str = Field("boq_item", min_length=1, max_length=64)
+    code_prefix: str | None = Field(None, min_length=1, max_length=100)
+
+
+_RANK_EXAMPLE = {"name": "amount", "top": 5}
+
+_RANK_DOC = f"""The items with the highest (or lowest) current number of one name, in \
+one call: the top items of the BOQ by amount, the dearest rates. Each comes with its code, \
+description, number_id, exact value, unit, currency and source; and how many items have no \
+such number (with their first codes).
+- name: amount by default; rate, quantity, or another. top: 1 to 50. order: highest or lowest.
+- kind: boq_item by default. code_prefix: one section only.
+A total is worked out with calculate, from the number_ids.
+Example:
+{_json(_RANK_EXAMPLE)}"""
+
+_MISSING_SHOWN = 10
+
+
+def _rank(rec: Records, args: RankArgs) -> str:
+    where, values = ["i.kind = ?"], [args.kind]
+    if args.code_prefix is not None:
+        where.append("substr(i.code, 1, ?) = ?")
+        values += [len(args.code_prefix), args.code_prefix]
+    sql = " AND ".join(where)
+    with rec.read() as conn:
+        rows = conn.execute(
+            "SELECT i.id, i.code, i.fields, n.id, n.value, n.unit, n.currency, n.dated,"
+            " s.id, s.kind, s.title, s.file_id, s.locator FROM items i"
+            " JOIN numbers n ON n.item_id = i.id AND n.name = ? AND n.valid_until IS NULL"
+            f" JOIN sources s ON s.id = n.source_id WHERE {sql}",
+            (args.name, *values),
+        ).fetchall()
+        missing = conn.execute(
+            f"SELECT i.code FROM items i WHERE {sql} AND NOT EXISTS (SELECT 1 FROM numbers n"
+            " WHERE n.item_id = i.id AND n.name = ? AND n.valid_until IS NULL)"
+            " ORDER BY i.code COLLATE NOCASE, i.rowid",
+            (*values, args.name),
+        ).fetchall()
+
+    def size(row) -> Decimal:
+        try:
+            return Decimal(str(row[4]))
+        except ArithmeticError:
+            return Decimal("-Infinity") if args.order == "highest" else Decimal("Infinity")
+
+    rows.sort(key=size, reverse=args.order == "highest")
+    found = []
+    for item_id, code, fields, n_id, value, unit, currency, dated, *source in rows[: args.top]:
+        s_id, kind, title, f_id, loc = source
+        found.append(
+            {
+                "item_id": item_id,
+                "code": code,
+                "description": json.loads(fields).get("description"),
+                "number_id": n_id,
+                "value": value,
+                "unit": unit,
+                "currency": currency,
+                "dated": dated,
+                "source": {
+                    "id": s_id,
+                    "kind": kind,
+                    "title": title,
+                    "file_id": f_id,
+                    "locator": json.loads(loc),
+                },
+            }
+        )
+    gaps = {"count": len(missing), "codes": [c for (c,) in missing[:_MISSING_SHOWN]]}
+    return _json({"items": found, "with_number": len(rows), "missing": gaps})
+
+
+async def _rank_items(ctx: ToolContext, args: RankArgs) -> str:
+    return await asyncio.to_thread(_rank, _project(ctx), args)
 
 
 # Writing to the Source Ledger ------------------------------------------------------------------
@@ -618,6 +700,9 @@ async def _add_source_tool(ctx: ToolContext, args: SourceArgs) -> str:
     return _json(out | {"where": args.where})
 
 
+_CLIENT_KINDS = ("boq_item", "boq_heading")  # the client's BOQ: from an import or a change
+
+
 class NewItemArgs(_Args):
     kind: str = Field(min_length=1, max_length=64)
     code: str | None = Field(None, min_length=1, max_length=100)
@@ -633,7 +718,8 @@ _ITEM_EXAMPLE = {
 
 _ITEM_DOC = f"""Add an item to the Source Ledger: a BOQ item, a resource (a material, labour, \
 plant) or a section. Look for it first with find_items: an item is added once.
-- kind: boq_item, resource, section, or another word. Units are defined with define_unit.
+- kind: resource, section, extra_item (not in the client's BOQ), or another; boq_item \
+only before an import. Units: define_unit.
 - code: its code as written in the BOQ. fields: its description and other words, never its \
 numbers: those go in record_number, each with its source.
 - where: engineer to keep it for every project (asks the engineer once).
@@ -649,10 +735,23 @@ def _add_item(rec: Records, args: NewItemArgs, fields: dict, actor: str) -> str:
         return ledger.write_item(conn, at=rec.clock(), actor=actor, **values)
 
 
+def _imported(rec: Records) -> bool:
+    """Whether the project has a client BOQ from the engineer's import."""
+    with rec.read() as c:
+        found = c.execute(
+            "SELECT 1 FROM items WHERE kind IN ('boq_item', 'boq_heading')"
+            " AND json_extract(fields, '$.import_id') IS NOT NULL LIMIT 1"
+        ).fetchone()
+    return found is not None
+
+
 async def _add_item_tool(ctx: ToolContext, args: NewItemArgs) -> str:
     if args.kind == resolve.UNIT_KIND:
         raise ModelRetry("add_item: a unit is defined with define_unit, not as an item.")
     target = _target(ctx, args.where)
+    if args.kind in _CLIENT_KINDS and await asyncio.to_thread(_imported, target):
+        # an answer wrote a breakdown's parts and a contract's data as client items (6 Nov 2026)
+        raise RecordsError(copy.CLIENT_ITEMS_IMPORTED, status=422, field="kind")
     if args.where == "engineer" and not await _engineer_ok(ctx, copy.TOOL_ADD_ITEM):
         return _ENGINEER_REFUSED
     fields, dropped = await keep.apply(ctx, args.fields)
@@ -745,6 +844,11 @@ def _check_number(conn, item: dict, name: str, value: str, unit: str | None, sou
             f"has {', '.join(seen) or 'no numbers'}. Record the value as written there. A number "
             "you worked out (a total, an average, a price with waste or a margin) is not read "
             "from a file: record its inputs, then calculate it with its formula."
+        )
+    if truth.per_day_at(conn, source_id, value) and not truth.says_per_day(unit or ""):
+        raise ModelRetry(
+            f"record_number: its source writes {value} per day, and the unit «{unit or ''}» "
+            "leaves the day out. Give the unit as the source has it, e.g. «% per day»."
         )
     if name.lower() not in _RATES:
         return
@@ -939,6 +1043,15 @@ for _tool in (
         example=_NUMBERS_EXAMPLE,
     ),
     Tool(
+        "rank_items",
+        _RANK_DOC,
+        RankArgs,
+        "read",
+        _rank_items,
+        lambda a: copy.fill(copy.TOOL_RANK_ITEMS, top=str(a.top), name=_field(a.name)),
+        example=_RANK_EXAMPLE,
+    ),
+    Tool(
         "add_source",
         _SOURCE_DOC,
         SourceArgs,
@@ -987,6 +1100,7 @@ RECORDS_TOOLS: tuple[str, ...] = (
     "read_chunk",
     "find_items",
     "ledger_numbers",
+    "rank_items",
     "add_source",
     "add_item",
     "record_number",

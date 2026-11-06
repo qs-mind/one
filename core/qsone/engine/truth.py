@@ -49,14 +49,70 @@ _PLACEHOLDER = re.compile(
 _LETTERS = re.compile(r"[^\W\d_]{2,}")
 
 
+# A letter's field the engineer fills (bidder, tender number, signature): never invented.
+FOR_ENGINEER = re.compile(r"يملأه\s+المهندس|يملاه\s+المهندس|to be filled by the engineer", re.I)
+# ONE's insides are no blank: a record id, or a bit of JSON (the Brissa reply, 6 Nov 2026).
+_ID = re.compile(r"\b[0-9a-f]{32}\b")
+_JSONISH = re.compile(r"[{}\"]|^\s*\w+\s*:")
+
+
 def placeholders(text: str) -> list[str]:
     """Each blank left for a value in `text`, as written, once."""
     found: list[str] = []
     for m in _PLACEHOLDER.finditer(text or ""):
         inside = m.group("square") or m.group("curly") or m.group("angle") or ""
+        if _ID.search(inside) or (m.group("square") and _JSONISH.search(inside)):
+            continue
+        if FOR_ENGINEER.search(inside):  # a field marked for the engineer to fill is no blank
+            continue
         if _LETTERS.search(inside) and m.group(0) not in found:
             found.append(m.group(0))
     return found
+
+
+# JSON a model wrote into its reply: a fenced block, or an object or array on its own lines.
+_JSON_FENCE = re.compile(r"```(?:json)?\s*\n?[\[{].*?```", re.S)
+_JSON_START = re.compile(r'^\s*(?:\{\s*"|\[\s*[{"])')
+
+
+def _json_lines(text: str) -> list[tuple[int, int]]:
+    """The (start, end) line ranges of the JSON objects and arrays standing on their own lines."""
+    lines = text.split("\n")
+    out, i = [], 0
+    while i < len(lines):
+        if not _JSON_START.match(lines[i]):
+            i += 1
+            continue
+        for j in range(i, min(len(lines), i + 200)):
+            try:
+                json.loads("\n".join(lines[i : j + 1]))
+            except ValueError:
+                continue
+            out.append((i, j + 1))
+            i = j
+            break
+        i += 1
+    return out
+
+
+def has_json(text: str) -> bool:
+    return bool(_JSON_FENCE.search(text or "") or _json_lines(text or "") or _ID.search(text or ""))
+
+
+def clean_reply(text: str, *, shown: bool) -> str:
+    """The reply as the engineer reads it: no JSON, no record ids; and, when the Brief showed a
+    view, no typed table of numbers beside it (the breakdown showed twice, 6 Nov 2026)."""
+    out = _JSON_FENCE.sub("", text or "")
+    lines = out.split("\n")
+    for start, end in reversed(_json_lines(out)):
+        del lines[start:end]
+    if shown:
+        table = [k for k, line in enumerate(lines) if _TABLE_ROW.fullmatch(line)]
+        if len(table) >= 3 and numbers_guard.numbers_in("\n".join(lines[k] for k in table)):
+            lines = [line for k, line in enumerate(lines) if k not in set(table)]
+    out = _ID.sub("", "\n".join(lines))
+    out = re.sub(r"[ \t]+\n", "\n", out)
+    return re.sub(r"\n{3,}", "\n\n", out).strip()
 
 
 def placeholders_in(value) -> list[str]:
@@ -123,6 +179,11 @@ class Brief:
     specialists: tuple[str, ...] = ()  # the names of the specialists it built (en and ar)
     supply_only: tuple[str, ...] = ()  # the titles of supply-only quotes it cited
     tool_names: frozenset[str] = field(default_factory=frozenset)
+    done: set[str] = field(default_factory=set)  # the tools with a call that went through
+    refused: dict[str, dict] = field(default_factory=dict)  # tool: why ({en, ar}), when its last
+    # call was refused (a retry or a "not done") and none went through after
+    item_rows: int | None = None  # item rows in the Deliverables it made, and numbers it set or
+    # recorded on items; None when it made no Deliverable
 
 
 # The reply -----------------------------------------------------------------------------------
@@ -275,9 +336,121 @@ def overclaim(text: str, cov: Coverage | None, did: Brief) -> list[Problem]:
     return found
 
 
-def promise(text: str) -> str | None:
+# Claims of done work, each with the tools that do it: «استوردت البنود» with 0 items imported (the
+# import was refused), «أضفت البنود» after deliverable_propose was refused (6 Nov 2026).
+_IMPORTED = re.compile(
+    r"استورد(?:ت|نا)\b|اتستورد|تم\s+(?:ال)?استيراد|\b(?:i(?:'ve| have)?\s+)?imported\b", re.I
+)
+_ADDED = re.compile(
+    r"(?:^|[\s«(])(?:أ|ا)?ضف(?:ت|نا)\b|اتضاف(?:ت)?\b|تم[ّ]?\s+(?:إضافة|اضافة|تسجيل|إدراج|ادراج)"
+    r"|سج[ّ]?ل(?:ت|نا)\b|اتسج[ّ]?ل(?:ت)?\b|حط[ّ]?(?:يت|ينا)\b"
+    r"|\b(?:i(?:'ve| have)?\s+)?(?:added|recorded|inserted)\b|\bhave been (?:added|recorded)\b",
+    re.I,
+)
+_PRICED_DONE = re.compile(
+    # first person only: «اتسعّر 8 بنود من 325» reports the project, not this Brief's work
+    r"تم\s+(?:وضع|تسعير)|سع[ّ]?ر(?:ت|نا)\b|\bi(?:'ve| have)?\s+priced\b",
+    re.I,
+)
+# A sentence that says it was not done is no claim: «ماقدرتش أضيف», "could not import".
+_NOT = re.compile(
+    r"(?<![؀-ۿ])ما?[؀-ۿ]{2,}ش(?![؀-ۿ])|(?<![؀-ۿ])(?:مش|لم|لن|لا|ماتم|رفض\w*|مفيش)(?![؀-ۿ])"
+    r"|\b(?:not|no|never|couldn'?t|cannot|can'?t|unable|failed|refused|wasn'?t|didn'?t)\b",
+    re.I,
+)
+_CLAIMS = (  # (words, the tools that do it, what it is in the engineer's words)
+    (_IMPORTED, frozenset({"boq_import"}), copy.CLAIM_IMPORT),
+    (
+        _ADDED,
+        frozenset(
+            {"deliverable_create", "deliverable_propose", "make_deliverable", "record_number",
+             "add_item", "add_source", "correct_number", "boq_import", "note_lesson"}
+        ),
+        copy.CLAIM_ADD,
+    ),
+    (
+        _PRICED_DONE,
+        frozenset(
+            {"record_number", "correct_number", "deliverable_create", "deliverable_propose",
+             "make_deliverable", "calculate", "prices_propose"}
+        ),
+        copy.CLAIM_PRICED,
+    ),
+)  # fmt: skip
+
+
+def undone(text: str, cov: Coverage | None, did: Brief) -> list[Problem]:
+    """Claims of work done (imported, added, priced) that this Brief's tool calls do not show:
+    none of the tools that do it went through, or one was refused. A refusal's reason is in the
+    engineer's flag, in their words. A Deliverable this Brief made that holds no item is no
+    pricing."""
+    found: list[Problem] = []
+    seen: set[str] = set()
+    for s in _sentences(text):
+        if _NOT.search(s):
+            continue
+        for words, tools, what in _CLAIMS:
+            if what["en"] in seen or not words.search(s) or did.done & tools:
+                continue
+            refused = [t for t in sorted(tools) if t in did.refused]
+            if not refused and (did.writes or (words is _IMPORTED and cov and cov.items)):
+                continue  # something else was done, or an earlier Brief imported
+            seen.add(what["en"])
+            if refused:
+                why = did.refused[refused[0]]
+                fix = (
+                    f"Your reply says it was done («{s[:120]}»), but ONE refused {refused[0]}: "
+                    f"{why['en']} Nothing was done by it. Fix the call and make it again, or tell "
+                    "the engineer plainly that it was not done, why, and what is needed."
+                )
+                found.append(Problem("refused", fix, copy.fill(copy.TRUTH_REFUSED, why=why)))
+            else:
+                fix = (
+                    f"Your reply says it was done («{s[:120]}»), but no tool did it in this Brief. "
+                    "Do it with the tools now, or say plainly that it is not done yet."
+                )
+                found.append(Problem("undone", fix, copy.fill(copy.TRUTH_NOT_DONE, what=what)))
+    if did.item_rows == 0 and "record_number" not in did.done:
+        if any(PRICED.search(s) and not _NOT.search(s) for s in _sentences(text)):
+            found.append(
+                Problem(
+                    "empty",
+                    "Your reply speaks of priced items, but the Deliverable you made has no item "
+                    "rows (only headings). Add the items with their numbers (rows of item_id, or "
+                    "deliverable_propose), or say plainly that nothing is priced yet.",
+                    copy.TRUTH_EMPTY_DELIVERABLE,
+                )
+            )
+    return found
+
+
+# Work said to be under way or about to start when nothing ran: «بدأت في العمل على نسخة جديدة
+# … دلوقتي، أنا بجهز المسودة … هل حابب أبعتلك الجدول؟» after 3 s and no tool (6 Nov 2026).
+_UNDER_WAY = re.compile(
+    r"(?<![؀-ۿ])(?:بدأت|بدات|ابتديت)\s+(?:في|ب|أ|ا)|(?<![؀-ۿ])(?:بجه[ّ]?ز|بحض[ّ]?ر|بشتغل|بنشتغل"
+    r"|بنجه[ّ]?ز|بسعّر|بطابق)(?![؀-ۿ])|جار[يٍ]\s|(?<![؀-ۿ])ه(?:قوم|بدأ|سع[ّ]?ر|طابق|حسب"
+    r"|جه[ّ]?ز|بعت|بلغ|كم[ّ]?ل|ضيف|راجع|حض[ّ]?ر|سج[ّ]?ل|عمل|ربط|نف[ّ]?ذ)\w*"
+    r"|\b(?:i(?:'ve| have) started|i am (?:now )?(?:preparing|working|building|pricing)"
+    r"|i'm (?:now )?(?:preparing|working|building|pricing)|i will|i'll|starting now)\b",
+    re.I,
+)
+# Work that waits on the engineer is no promise: «لو بعتلي العرض هسعّره», "once you send it".
+_CONDITION = re.compile(
+    r"(?<![؀-ۿ])(?:لو|إذا|اذا|أول\s+ما|اول\s+ما|لما|بعد\s+ما)(?![؀-ۿ])"
+    r"|\b(?:if|once|when|after you)\b",
+    re.I,
+)
+
+
+def promise(text: str, did: Brief | None = None) -> str | None:
     """The promise a reply ends on (work said to be under way, or about to start), or None. An
-    offer ("if you want, I'll …", a question) is not a promise."""
+    offer ("if you want, I'll …", a question) is not a promise, unless `did` shows that the
+    Brief wrote nothing and the reply says work has begun or will be done: then the first such
+    words are the promise, whatever the reply ends on."""
+    if did is not None and not did.writes:
+        for s in _sentences(text):
+            if _UNDER_WAY.search(s) and not (_OFFER.search(s) or _CONDITION.search(s)):
+                return s
     tail = _sentences(text)[-2:]
     for s in reversed(tail):
         if _OFFER.search(s):
@@ -297,6 +470,15 @@ def reply_problems(
 ) -> list[Problem]:
     """Everything in a final reply the core sends back once for the model to fix."""
     found: list[Problem] = []
+    if has_json(text):
+        found.append(
+            Problem(
+                "json",
+                "Your reply has JSON or ONE's record ids in it. The engineer reads words: a view "
+                "you showed is on the screen already. Answer in plain words, with no JSON, no "
+                "ids and no copy of a view.",
+            )
+        )
     blanks = placeholders(text)
     if blanks:
         found.append(
@@ -308,7 +490,7 @@ def reply_problems(
                 copy.fill(copy.TRUTH_PLACEHOLDER, blanks=copy.listed(blanks)),
             )
         )
-    said = promise(text)
+    said = promise(text, did)
     if said is not None:
         found.append(
             Problem(
@@ -320,6 +502,8 @@ def reply_problems(
             )
         )
     found += overclaim(text, cov, did)
+    kinds = {p.kind for p in found}
+    found += [p for p in undone(text, cov, did) if not (p.kind == "undone" and "changed" in kinds)]
     if understand_brief and not did.understood and _CARD.search(text or ""):
         why = f" It refused: {did.understood_refused}" if did.understood_refused else ""
         found.append(
@@ -358,6 +542,14 @@ def reply_problems(
             )
         )
     rows = _TABLE_ROW.findall(text or "")
+    if did.shown and len(rows) >= 3 and numbers_guard.numbers_in("\n".join(rows)):
+        found.append(
+            Problem(
+                "table_twice",
+                "Your reply types a table of numbers beside the view you showed, so the engineer "
+                "sees it twice. Leave the table to the view; say in words what it shows.",
+            )
+        )
     if not did.shown and len(rows) >= 3 and numbers_guard.numbers_in("\n".join(rows)):
         found.append(
             Problem(
@@ -445,6 +637,262 @@ def value_in(conn, file_id: str, place: dict, value: str) -> tuple[bool, str, li
     where = ", ".join(f"{k} {place[k]}" for k in _PLACE_KEYS if k in place)
     shown = sorted(have, key=lambda v: (len(v), v))[:12]
     return bool(wanted) and wanted <= have, f"{name}, {where}", shown
+
+
+# A number's unit: «0.2 %» lost "per day" (the delay damages, Brissa, 6 Nov 2026).
+_PER_DAY = re.compile(
+    r"\bper\s+(?:calendar\s+)?day\b|\bdaily\b|\ba\s+day\b|يومي[اًا]?|يوميا|عن\s+كل\s+يوم"
+    r"|في\s+اليوم|لكل\s+يوم|كل\s+يوم|/\s*(?:day|يوم)",
+    re.I,
+)
+_NEAR = 60  # characters after a number where its "per day" is written
+
+
+def per_day(texts: list[str], value: str) -> bool:
+    """Whether the texts write `value` as so much per day («0.2% of the price per day»)."""
+    wanted = numbers_guard.known_values([value])
+    for text in texts:
+        for m in numbers_guard._ANY_NUMBER.finditer(text):
+            if numbers_guard.known_values([m.group()]) != wanted:
+                continue
+            after = text[m.end() : m.end() + _NEAR]
+            stop = re.search(r"[0-9٠-٩]", after)  # up to the next number
+            if _PER_DAY.search(after[: stop.start()] if stop else after):
+                return True
+    return False
+
+
+def says_per_day(text: str) -> bool:
+    return bool(_PER_DAY.search(text or ""))
+
+
+def per_day_at(conn, source_id: str, value: str) -> bool:
+    """Whether the place a file source cites writes `value` as so much per day."""
+    row = conn.execute("SELECT file_id, locator FROM sources WHERE id = ?", (source_id,))
+    row = row.fetchone()
+    if row is None or row[0] is None:
+        return False
+    return per_day(texts_at(conn, row[0], json.loads(row[1])) or [], value)
+
+
+# Citations in a reply's words: is each number where the reply says it is? --------------------
+#
+# The real walk (6 Nov 2026): «السعر 12 جنيه/م3 (من شيت "تسعير"، صف 16)» for an item the BOQ does
+# not have, ceramic 72 cited to row 18 (a different, empty item), the retention limit to page 59
+# (it is on page 58); and the bid security «350,000 دولار … الصفحة: 26» marked "no source yet"
+# although page 26 has it.
+
+_Q = "\"'«»“”‘’"
+_SHEET_ROW = re.compile(
+    rf"(?:شيت|الشيت|ورق[ةه]|الورق[ةه]|sheet)\s*[:：]?\s*[{_Q}]?(?P<sheet>[^{_Q}\n،,()\[\]:]{{1,40}}?)"
+    rf"[{_Q}]?\s*[،,]?\s*(?:في\s+)?(?:صف|الصف|سطر|row)\s*[:：]?\s*"
+    r"(?P<rows>[0-9٠-٩]+(?:\s*(?:[/،,-]|و)\s*[0-9٠-٩]+)*)",
+    re.I,
+)
+_ROW_SHEET = re.compile(  # "row 8 of sheet Electrical"
+    rf"\brow\s*(?P<rows>[0-9]+(?:\s*[/,-]\s*[0-9]+)*)\s+(?:of|in|on)\s+(?:the\s+)?sheet\s*"
+    rf"[{_Q}]?(?P<sheet>[^{_Q}\n,()\[\]:]{{1,40}}?)[{_Q}]?(?=[\s,.;)]|$)",
+    re.I,
+)
+_PAGE = re.compile(
+    r"(?<![؀-ۿ\w])(?:صفح[ةه]|الصفح[ةه]|ص\.|page|pages|pp?\.)\s*[:：]?\s*(?P<pages>[0-9٠-٩]+"
+    r"(?:\s*(?:[/،,-]|و)\s*[0-9٠-٩]+)*)"
+    r"|\((?:p|pp)\.?\s*(?P<pp>[0-9]+)",
+    re.I,
+)
+# A segment: a line, or a sentence of one; a decimal point («0.2», «17.1») never ends one.
+_SEGMENT = re.compile(r"(?<=[!?؟])\s+|(?<=\.)(?![0-9])\s+|\n+")
+_NUMS = re.compile(r"[0-9٠-٩]+")
+
+
+@dataclass(frozen=True)
+class Place:
+    """A place a reply cites: a sheet's rows, or pages."""
+
+    sheet: str | None
+    rows: tuple[int, ...] = ()
+    pages: tuple[int, ...] = ()
+
+    def words(self) -> dict:
+        if self.sheet is not None:
+            rows = "/".join(map(str, self.rows))
+            return {
+                "en": f"sheet «{self.sheet}», row {rows}",
+                "ar": f"شيت «{self.sheet}»، صف {rows}",
+            }
+        pages = "/".join(map(str, self.pages))
+        return {"en": f"page {pages}", "ar": f"صفحة {pages}"}
+
+
+def _numbers_of(text: str) -> tuple[int, ...]:
+    return tuple(int(n.translate(_DIGITS)) for n in _NUMS.findall(text))
+
+
+def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]:
+    """Each segment of a reply that cites a place, with its places and the numbers it gives
+    there: (segment, places, [(written, value)]). The citation's own numbers do not count."""
+    found = []
+    for segment in _SEGMENT.split(text or ""):
+        places: list[Place] = []
+        blank = segment
+        for pattern in (_SHEET_ROW, _ROW_SHEET):
+            for m in pattern.finditer(segment):
+                places.append(Place(m["sheet"].strip(), rows=_numbers_of(m["rows"])))
+                blank = blank.replace(m[0], " " * len(m[0]))
+        for m in _PAGE.finditer(blank):
+            places.append(Place(None, pages=_numbers_of(m["pages"] or m["pp"])))
+            blank = blank.replace(m[0], " " * len(m[0]))
+        if places:
+            found.append((segment, places, list(numbers_guard._counted(blank))))
+    return found
+
+
+def _sheet_names(conn) -> dict[str, list[str]]:
+    """{normalised name: [names as written]} of the current files' sheets."""
+    from qsone.records.arabic import normalise
+
+    rows = conn.execute(
+        "SELECT DISTINCT json_extract(c.locator, '$.sheet') FROM chunks c JOIN files f"
+        " ON f.id = c.file_id WHERE f.valid_until IS NULL"
+        " AND json_extract(c.locator, '$.sheet') IS NOT NULL"
+    ).fetchall()
+    out: dict[str, list[str]] = {}
+    for (name,) in rows:
+        out.setdefault(normalise(str(name)), []).append(str(name))
+    return out
+
+
+def _sheet_of(conn, cited: str) -> list[str]:
+    """The sheets a cited name names: the same name, trimmed and folded; else the one sheet whose
+    name holds it, or that it holds."""
+    from qsone.records.arabic import normalise
+
+    names = _sheet_names(conn)
+    key = normalise(cited)
+    if key in names:
+        return names[key]
+    near = [n for k, ns in names.items() if key and (key in k or k in key) for n in ns]
+    return near if len(near) == 1 else []
+
+
+def place_text(conn, place: Place) -> list[str] | None:
+    """The current files' text at `place`; None when no file has that place."""
+    if place.sheet is not None:
+        sheets = _sheet_of(conn, place.sheet)
+        if not sheets:
+            return None
+        rows = conn.execute(
+            "SELECT c.text FROM chunks c JOIN files f ON f.id = c.file_id"
+            " WHERE f.valid_until IS NULL AND json_extract(c.locator, '$.sheet') IN"
+            " (SELECT value FROM json_each(?)) AND json_extract(c.locator, '$.row') IN"
+            " (SELECT value FROM json_each(?))",
+            (json.dumps(sheets), json.dumps(list(place.rows))),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT c.text FROM chunks c JOIN files f ON f.id = c.file_id"
+            " WHERE f.valid_until IS NULL AND json_extract(c.locator, '$.page') IN"
+            " (SELECT value FROM json_each(?))",
+            (json.dumps(list(place.pages)),),
+        ).fetchall()
+    return [t for (t,) in rows] or None
+
+
+_ITEM_CODE = re.compile(
+    r"(?:(?<![؀-ۿ])(?:بند|البند)\s*(?:رقم\s*)?|\bitem\s+(?:no\.?\s*)?)"
+    r"(?P<code>[0-9٠-٩A-Za-z][0-9٠-٩A-Za-z./-]*[0-9٠-٩A-Za-z]|[0-9٠-٩])",
+    re.I,
+)
+
+
+def _tokens(text: str) -> set[str]:
+    return set(re.split(r"[\s|،,:;()«»\"']+", text.translate(_DIGITS)))
+
+
+def _item_codes(conn, segment: str) -> list[str]:
+    """The client BOQ codes a segment names as items («بند 17», "item 03/02")."""
+    named = [m["code"].translate(_DIGITS) for m in _ITEM_CODE.finditer(segment)]
+    if not named:
+        return []
+    found = conn.execute(
+        "SELECT code FROM items WHERE kind = 'boq_item' AND code IN"
+        " (SELECT value FROM json_each(?))",
+        (json.dumps(named),),
+    ).fetchall()
+    return sorted({c for (c,) in found})
+
+
+def miscited(conn, text: str) -> list[Problem]:
+    """Each number a reply gives at a cited place (a sheet's row, a page) that the place does not
+    have, and each cited place no project file has. One Problem for the model, with a flag for
+    the engineer for each of the first three."""
+    wrong: list[tuple[str, dict]] = []  # (the model's line, the engineer's flag)
+    for segment, places, numbers in citations(text):
+        if not numbers:
+            continue
+        texts: list[str] = []
+        missing = []
+        for place in places:
+            found = place_text(conn, place)
+            if found is None:
+                missing.append(place)
+            else:
+                texts += found
+        if missing and not texts:
+            for place in missing:
+                where = place.words()
+                line = f"«{segment[:100]}» cites {where['en']}, which no project file has."
+                wrong.append((line, copy.fill(copy.TRUTH_NO_PLACE, place=where)))
+            continue
+        rows = [p for p in places if p.sheet is not None]
+        for code in _item_codes(conn, segment) if rows else ():
+            if not any(code in _tokens(t) for t in texts):  # the row of another item
+                where = rows[0].words()
+                line = (
+                    f"«{segment[:100]}» prices item {code} from {where['en']}, which is not "
+                    f"item {code}'s row."
+                )
+                wrong.append((line, copy.fill(copy.TRUTH_OTHER_ROW, code=code, place=where)))
+        have = numbers_guard.known_values(texts)
+        for written, value in numbers:
+            if value in have and per_day(texts, value) and not says_per_day(segment):
+                where = places[0].words()
+                line = (
+                    f"«{segment[:100]}» gives {written} without its unit: {where['en']} has it "
+                    "per day. Keep the unit with the number."
+                )
+                wrong.append((line, copy.fill(copy.TRUTH_PER_DAY, value=written, place=where)))
+                continue
+            if value in have:
+                continue
+            where = (
+                places[0].words()
+                if len(places) == 1
+                else copy.listed([p.words()["en"] for p in places])
+            )
+            shown = sorted(have, key=lambda v: (len(v), v))[:8]
+            has = copy.listed(shown) if shown else copy.NO_NUMBERS
+            line = f"«{segment[:100]}» gives {written} at {where['en']}, which has {has['en']}."
+            flag = copy.fill(copy.TRUTH_MISCITED, value=written, place=where, have=has)
+            wrong.append((line, flag))
+    guide = (
+        " Cite the row or page that has the number (search_records, read_chunk), or say plainly "
+        "that ONE has no source for it. An item that is not in the BOQ is not priced as one."
+    )
+    return [
+        Problem("cited", line + (guide if i == 0 else ""), flag)
+        for i, (line, flag) in enumerate(wrong[:5])
+    ]
+
+
+def cited_values(conn, text: str) -> set[str]:
+    """Every number at the places a reply cites (normalised): a number read from a cited page
+    carries that source."""
+    found: set[str] = set()
+    for _, places, _ in citations(text):
+        for place in places:
+            found |= numbers_guard.known_values(place_text(conn, place) or [])
+    return found
 
 
 # Quotes: what they cover ----------------------------------------------------------------------
@@ -593,4 +1041,37 @@ def letter_problems(conn, text: str, *, day: date, has_total: bool, said: str = 
                 f"The project's files state VAT ({places}); the letter quotes a price and does "
                 "not say whether VAT is in it. Say it, citing the file."
             )
+        if term == "vat" and stated and has_total and said:
+            if not (_VAT_AMOUNT.search(text or "") and _WITH_VAT.search(text or "")):
+                wrong.append(
+                    "A priced letter gives the VAT amount and the total with VAT beside the "
+                    "total: each worked out with calculate (the total × the file's VAT rate, "
+                    'cited to it) and put in as {"type": "num"}.'
+                )
+    if has_total:
+        missing = [name for name, words in _BID_FIELDS if not words.search(text or "")]
+        if missing:
+            wrong.append(
+                f"A priced letter has the bid fields: {', '.join(missing)}. ONE never invents "
+                "them: write each as a field the engineer fills, e.g. «مقدم العطاء: [يملأه "
+                'المهندس: اسم مقدم العطاء]» or "Bidder: [to be filled by the engineer]".'
+            )
     return wrong
+
+
+_VAT_AMOUNT = re.compile(r"قيم[ةه]\s+(?:ال)?ضريب[ةه]|مبلغ\s+(?:ال)?ضريب[ةه]|\bvat\s+amount\b", re.I)
+_WITH_VAT = re.compile(
+    r"شامل(?:ا|ًا|اً)?\s+(?:ال)?ضريب[ةه]|شامل(?:ة)?\s+ضريب[ةه]|\b(?:incl(?:uding|\.)?|with)\s+vat\b",
+    re.I,
+)
+_BID_FIELDS = (
+    (
+        "bidder",
+        re.compile(r"مقد[ّ]?م\s+العطاء|اسم\s+(?:الشركة|المقاول)|\b(?:bidder|tenderer)\b", re.I),
+    ),
+    (
+        "tender number",
+        re.compile(r"رقم\s+(?:المناقص[ةه]|العطاء|الممارس[ةه])|\btender\s+(?:no|number|ref)", re.I),
+    ),
+    ("signature", re.compile(r"التوقيع|توقيع|\bsignature\b|\bsigned\b", re.I)),
+)
