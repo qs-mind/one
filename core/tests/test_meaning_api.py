@@ -19,7 +19,8 @@ from qsone.meaning import download
 from qsone.meaning.manifest import RETIRED
 from qsone.meaning.service import SETTING, Meaning
 from qsone.projects import Projects
-from qsone.records import search
+from qsone.records import db, search
+from qsone.records.project import RecordsError
 from tests.conftest import AUTH, SECRET
 from tests.doubles import ConceptEmbedder, GateEmbedder
 from tests.hub import FakeHub
@@ -245,6 +246,45 @@ def test_projects_without_text_download_nothing_at_startup(app_with, hub):
         time.sleep(0.3)
         assert model_state(client) == "off" and hub.requests == []
         assert client.app.state.projects.opened() == []  # looked at, then closed again
+
+
+def test_a_damaged_or_locked_project_is_passed_over_at_startup(app_with, hub, monkeypatch):
+    with TestClient(app_with(available=lambda: False)) as client:
+        pids = []
+        for name in ("مدرسة - عينة", "مستشفى - عينة", "برج - عينة"):
+            pids.append(client.post("/projects", json={"name": name}, headers=AUTH).json()["id"])
+            assert upload(client, pids[-1], BOQ_ROWS).status_code == 201
+    damaged, locked, good = sorted(pids)  # looked at in this order, the good one last
+    real = search.vector_counts
+
+    def counts(rec, embedder):
+        if rec.id == damaged:  # a page found damaged only when it is read
+            raise RecordsError(copy.PROJECT_DAMAGED)
+        if rec.id == locked:  # the raw error of a file another program holds
+            raise db.DatabaseError("database is locked")
+        return real(rec, embedder)
+
+    monkeypatch.setattr(search, "vector_counts", counts)
+    with TestClient(app_with()) as client:
+        wait_for(lambda: model_state(client) == "ready")  # the good project started it
+        assert client.app.state.projects.opened() == []
+        assert client.post(f"/projects/{good}/open", headers=AUTH).status_code == 200
+        wait_for(lambda: indexed(client, good, total=len(BOQ_ROWS)))  # the worker goes on
+
+
+def test_a_failed_startup_look_leaves_the_worker_running(app_with, monkeypatch):
+    with TestClient(app_with(available=lambda: False)) as client:
+        pid = new_project(client, BOQ_ROWS)
+
+    def broken(self):
+        raise OSError("the projects folder cannot be read")
+
+    monkeypatch.setattr(Meaning, "_any_text", broken)
+    with TestClient(app_with()) as client:
+        time.sleep(0.2)
+        assert model_state(client) == "off"
+        assert client.post(f"/projects/{pid}/open", headers=AUTH).status_code == 200
+        wait_for(lambda: indexed(client, pid, total=len(BOQ_ROWS)))
 
 
 def test_an_app_without_a_fake_hub_fails_at_once_and_quits_at_once(data_dir):

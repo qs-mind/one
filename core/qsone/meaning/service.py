@@ -240,10 +240,13 @@ class Meaning:
             return self._quit.is_set() or self._state != "ready"
 
     def _work(self) -> None:
-        with self._lock:
-            off = self._state == "off"
-        if off and self._any_text():
-            self._want()
+        try:
+            with self._lock:
+                off = self._state == "off"
+            if off and self._any_text():
+                self._want()
+        except Exception as error:  # the look at startup never stops the worker
+            log.warning("search by meaning: the startup look failed (%s)", type(error).__name__)
         while not self._quit.is_set():
             self._wake.clear()
             self._host.unload_idle()
@@ -255,7 +258,7 @@ class Meaning:
 
     def _any_text(self) -> bool:
         """Has any project here text? Each file is opened on its own and closed again; one that
-        will not open is passed over."""
+        will not open or read (damaged, locked) is passed over."""
         for project in self._projects.list():
             if self._quit.is_set():
                 return False
@@ -269,6 +272,8 @@ class Meaning:
             try:
                 if search.vector_counts(rec, self._embedder)[1]:
                     return True
+            except Exception as error:
+                log.warning("project %s: not looked at (%s)", project["id"], type(error).__name__)
             finally:
                 rec.close()
         return False
