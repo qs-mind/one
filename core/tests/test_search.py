@@ -368,3 +368,68 @@ def test_fusion_keeps_one_page_when_words_and_meaning_prefer_different_chunks(re
     hits = search(rec, "retention", mode="meaning", k=2, embedder=emb).hits
     assert [h.locator for h in hits] == [{"page": 1}, {"page": 2}]
     assert hits[0].text == "retention sample"
+
+
+def test_repeated_lines_are_index_only_and_footer_chunks_are_absent(rec):
+    import json
+
+    from qsone.records.search import index_words
+
+    f = add_file(
+        rec,
+        "Tender sample.pdf",
+        sample_pdf([[f"sample page {i}"] for i in range(6)]),
+        actor="engineer",
+    )
+    original = {}
+    with rec.write("engineer") as c:
+        c.execute("DELETE FROM chunks_fts")
+        c.execute("DELETE FROM chunks")
+        for page in range(1, 7):
+            footer = f"https://tenders.example/Print?TenderId=123 {page}/6"
+            body = (
+                "فتح العروض 16/04/1448" if page == 4 else f"sample unique section {chr(64 + page)}"
+            )
+            for text in (f"كراسة الشروط 9/3/26 صفحة {page}\n{body}", footer):
+                i = c.execute(
+                    "INSERT INTO chunks(file_id,seq,locator,text) VALUES (?,?,?,?)",
+                    (f.id, len(original), json.dumps({"page": page}), text),
+                ).lastrowid
+                original[i] = text
+        index_words(c, original.items())
+
+    class Capture(FlatEmbedder):
+        def embed_documents(self, texts):
+            assert all("https" not in text and "كراسة" not in text for text in texts)
+            return super().embed_documents(texts)
+
+    emb = Capture()
+    assert index_vectors(rec, emb) == 6
+    assert search(rec, "فتح العروض", embedder=emb).hits[0].locator == {"page": 4}
+    assert not search(rec, "https", mode="exact").hits
+    with rec.read() as c:
+        assert dict(c.execute("SELECT id,text FROM chunks")) == original
+        assert c.execute("SELECT count(*) FROM chunks_fts").fetchone()[0] == 6
+
+
+def test_complete_query_bonus_beats_isolated_terms(rec):
+    add_file(rec, "partial sample.txt", ("opening " * 20).encode(), actor="engineer")
+    f = add_file(rec, "complete sample.txt", b"opening of offers sample", actor="engineer")
+    assert search(rec, "opening offers").hits[0].file_id == f.id
+
+
+def test_index_version_rebuild_is_once_and_never_changes_originals(boq):
+    from qsone.records.search import INDEX_VERSION
+
+    with boq.read() as c:
+        original = c.execute("SELECT id,text FROM chunks").fetchall()
+    index_vectors(boq, FlatEmbedder())
+    with boq.write("one") as c:
+        boq.set_meta(c, "search_index_version", "old")
+    ensure_index(boq)
+    assert boq.meta()["search_index_version"] == INDEX_VERSION
+    assert index_vectors(boq, FlatEmbedder()) == len(original)
+    ensure_index(boq)
+    assert index_vectors(boq, FlatEmbedder()) == 0
+    with boq.read() as c:
+        assert c.execute("SELECT id,text FROM chunks").fetchall() == original

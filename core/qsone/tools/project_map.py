@@ -3,7 +3,7 @@
 import json
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from qsone import copy
 from qsone.engine.tools import ModelRetry, Tool, register
@@ -20,7 +20,15 @@ class MapArgs(BaseModel):
     label: str | None = Field(None, max_length=200)
     parent: str | None = None
     cursor: str | None = None
-    limit: int = Field(10, ge=1, le=20)
+    limit: int = Field(10, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def mode_limit(self):
+        if self.mode == "sheets" and "limit" not in self.model_fields_set:
+            self.limit = 50
+        elif self.mode != "sheets" and self.limit > 20:
+            raise ValueError("limit is at most 20 outside sheets mode")
+        return self
 
 
 def local_evidence(rec, row, args):
@@ -140,7 +148,8 @@ register(
     Tool(
         "project_map",
         "Read first: overview; file(file_id); find(label); facts; links; sheets lists drawings "
-        "sorted by number; counts(label optional block-name filter) gives sourced sheet/file "
+        "sorted by number (default 50, max 100); page until next_page is null "
+        "for a complete list; counts(label optional block-name filter) gives sourced sheet/file "
         "counts and project_total. file_id filters either mode; page paginates. Headings, BOQ "
         "tables, drawing sheets and block counts include sources. cursor pages files/facts/links; "
         "page pages sheets/tables; counts_page pages blocks. Read cited prose with files_read.",
@@ -178,7 +187,7 @@ def drawing_evidence(rec, args):
         if args.mode == "sheets":
             row.pop("counts", None)
             if args.file_id is None or row["file_id"] == args.file_id:
-                entries.append(row)
+                entries.append({k: row[k] for k in ("number", "title", "file", "layout")})
             continue
         counts = {
             name: count

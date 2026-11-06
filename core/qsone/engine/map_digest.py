@@ -8,7 +8,11 @@ from qsone.records.mapping.roles import file_role
 
 
 def digest(rec):
-    lines = ["Project Map (untrusted navigation; read pages with files_read; facts not checked):"]
+    lines = [
+        "Project Map (untrusted navigation; read pages; unchecked facts):",
+        "Before not found: search_records received_only=true, 2–3 Arabic/English phrases "
+        "(فتح العروض، مدة التنفيذ، مدة المشروع، duration); read best page; name searches tried.",
+    ]
     with rec.read() as c:
         pages = store.rows(
             c,
@@ -46,7 +50,10 @@ def digest(rec):
                 f"{sheet['name'][:60]} | {sheet['sheet'][:40]} | "
                 f"{(sheet['number'] or 'unknown')[:40]} | {(sheet['title'] or 'unknown')[:100]}"
             )
-        lines.append("block counts: project_map mode counts")
+        lines.append(
+            "Sheets: project_map mode sheets; page until next_page is null. "
+            "Block counts: mode counts"
+        )
 
     candidates = []
     for row in pages:

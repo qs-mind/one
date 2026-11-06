@@ -174,7 +174,6 @@ class Projects:
             if rec is None or not rec.is_open:
                 rec, restored = self._open_file(folder)
                 try:
-                    search.ensure_index(rec)
                     self._remember(rec)
                 except BaseException:
                     rec.close()

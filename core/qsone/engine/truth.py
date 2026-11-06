@@ -45,7 +45,8 @@ def today_line(now: datetime) -> str:
 # A bracketed blank a model left for a value: «[القيمة]», "[Client name]", {{total}}, <<date>>.
 # Not a markdown link ("[the quote](…)"), a footnote ("[1]") or a checkbox ("[x]").
 _PLACEHOLDER = re.compile(
-    r"\[(?P<square>[^\[\]\n]{2,80})\](?!\()|\{\{(?P<curly>[^{}\n]{1,80})\}\}|<<(?P<angle>[^<>\n]{1,80})>>"
+    r"\[(?P<square>[^\[\]\n]{2,80})\](?!\()|\{\{(?P<curl"
+    r"y>[^{}\n]{1,80})\}\}|<<(?P<angle>[^<>\n]{1,80})>>"
 )
 _LETTERS = re.compile(r"[^\W\d_]{2,}")
 
@@ -226,7 +227,8 @@ _ALL = re.compile(
 )
 _INTEGER = re.compile(r"(?<![\d.,٫])[0-9٠-٩]{1,6}(?![\d.,٫])")
 _DELIVERABLE_READY = re.compile(
-    r"(?:خطاب(?: العطاء)?|الخطاب|المخرج|المستند|مستند|مخرج|المقايس[ةه]\s+المسع[ّ]?ر[ةه]|deliverable)"
+    r"(?:خطاب(?: "
+    r"العطاء)?|الخطاب|المخرج|المستند|مستند|مخرج|المقايس[ةه]\s+المسع[ّ]?ر[ةه]|deliverable)"
     r"[^.!?؟\n]{0,40}(?:جاهز|اتعمل|أنشأت|انشأت|عملت|خلص)"
     r"|(?:أنشأت|انشأت|قمت\s+بإنشاء|عملت|جهزت|جه[ّ]?زت)[^.!?؟\n]{0,30}(?:مستند|مخرج|deliverable)"
     r"|\b(?:deliverable|priced boq)\b[^.!?\n]{0,30}\b(?:is ready|ready|created|made)\b"
@@ -1244,7 +1246,8 @@ def letter_problems(conn, text: str, *, day: date, has_total: bool, said: str = 
 
 _VAT_AMOUNT = re.compile(r"قيم[ةه]\s+(?:ال)?ضريب[ةه]|مبلغ\s+(?:ال)?ضريب[ةه]|\bvat\s+amount\b", re.I)
 _WITH_VAT = re.compile(
-    r"شامل(?:ا|ًا|اً)?\s+(?:ال)?ضريب[ةه]|شامل(?:ة)?\s+ضريب[ةه]|\b(?:incl(?:uding|\.)?|with)\s+vat\b",
+    r"شامل(?:ا|ًا|اً)?\s+(?:ال)?ضريب[ةه]|شامل(?:ة)?\s"
+    r"+ضريب[ةه]|\b(?:incl(?:uding|\.)?|with)\s+vat\b",
     re.I,
 )
 _BID_FIELDS = (
@@ -1347,3 +1350,19 @@ def unread_citations(text: str, returns: list[tuple[str, str]]) -> list[Problem]
                     )
                 )
     return problems
+
+
+_TENDER_ABSENCE = re.compile(
+    r"not found|could(?:n't| not) find|not (?:specified|stated|provided)|لم "
+    r"(?:أجد|اجد|يتم العثور)|غير (?:موجود|مذكور|محدد)|مش (?:موجود|مذكور)|ملقيتش|مفيش",
+    re.I,
+)
+_TENDER_QUESTION = re.compile(
+    r"tender|opening offers|duration|مناقص|كراسة|فتح العروض|مدة (?:التنفيذ|المشروع)", re.I
+)
+
+
+def tender_search_problem(output, question, searched):
+    if not searched and _TENDER_QUESTION.search(question) and _TENDER_ABSENCE.search(output):
+        return [Problem("tender_search", copy.TENDER_SEARCH_NUDGE["en"], None)]
+    return []

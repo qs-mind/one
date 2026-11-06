@@ -402,3 +402,50 @@ def test_trim_history_keeps_ids_and_errors():
     assert kept_error.content == "value: send 39850.50"
     assert out[4].parts[0].content == big  # the latest result stays whole
     assert messages[2].parts[0].content == big  # the saved history is not changed in place
+
+
+@pytest.mark.parametrize("reply", ["The date was not found.", "ميعاد فتح العروض مش موجود."])
+def test_tender_absence_requires_a_search_but_other_questions_do_not(reply):
+    from qsone.engine.truth import tender_search_problem
+
+    [problem] = tender_search_problem(reply, "Opening offers date per tender?", False)
+    assert problem.flag is None
+    assert "received_only=true" in problem.fix and "files_read" in problem.fix
+    assert "فتح العروض" in problem.fix
+    assert not tender_search_problem(reply, "Opening offers date per tender?", True)
+    assert not tender_search_problem(reply, "Which provider is connected?", False)
+
+
+async def test_tender_search_excludes_company_working_files(ctx, rec):
+    from qsone.records import files
+
+    tender = files.add_file(
+        rec,
+        "Sample tender.txt",
+        "فتح العروض 16/04/1448".encode(),
+        actor="engineer",
+        folder="received",
+    )
+    files.add_file(
+        rec,
+        "Sample programme.txt",
+        "فتح العروض 01/01/1449".encode(),
+        actor="engineer",
+        folder="working",
+    )
+
+    def unfence(text):
+        return json.loads(text.split("\n", 1)[1].rsplit("\n", 1)[0])
+
+    result = unfence(
+        await call("search_records", {"query": "فتح العروض", "received_only": True}, ctx)
+    )
+    assert [hit["file_id"] for hit in result["hits"]] == [tender.id]
+    exact = unfence(
+        await call(
+            "search_records",
+            {"query": "فتح العروض", "all_terms": ["1448"], "received_only": True},
+            ctx,
+        )
+    )
+    assert [hit["file_id"] for hit in exact["hits"]] == [tender.id]

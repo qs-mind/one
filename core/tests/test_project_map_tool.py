@@ -206,3 +206,28 @@ async def test_tool_call_keeps_its_own_sheet_pagination(rec):
         "project_map", {"mode": "file", "file_id": f.id, "page": 2, "limit": 2}, tool_ctx(rec)
     )
     assert '"number": "E-2"' in answer
+
+
+@pytest.mark.anyio
+async def test_sheet_default_lists_thirty_sheets_across_ten_files(rec):
+    from qsone.tools.project_map import MapArgs, read_map
+
+    for file in range(10):
+        f = files.add_file(rec, f"sample {file}.txt", f"sample {file}".encode(), actor="engineer")
+        with rec.write("one") as c:
+            for sheet in range(3):
+                store.write(
+                    c,
+                    rec,
+                    "map_sheets",
+                    {
+                        "file_id": f.id,
+                        "sheet": str(sheet),
+                        "number": f"EL-{file * 3 + sheet:03}",
+                        "title": "Sample electrical",
+                    },
+                )
+    result = json.loads(await read_map(SimpleNamespace(rec=rec), MapArgs(mode="sheets")))
+    assert len(result["sheets"]) == 30 and result["next_page"] is None
+    assert set(result["sheets"][0]) == {"number", "title", "file", "layout"}
+    assert MapArgs(mode="sheets", limit=100).limit == 100

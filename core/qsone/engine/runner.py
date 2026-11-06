@@ -1713,6 +1713,13 @@ class _Brief:
             engineer_text=self.text,
             understand_brief=self.instruction == understand.INSTRUCTION,
         )
+        if rec is not None:
+            searched = any(
+                name == "search_records" and ok
+                for run in self.store.runs(self.brief_id)
+                for name, ok, _ in outcomes(run["history"])
+            )
+            found += truth.tender_search_problem(output, self.text, searched)
         if rec is not None:  # each number at the row or page the reply cites for it
             with rec.read() as c:
                 found += truth.miscited(c, output)

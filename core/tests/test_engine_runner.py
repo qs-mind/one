@@ -1116,3 +1116,104 @@ async def test_retired_model_retries_new_default_in_same_brief(make_engine, proj
         and e.text == copy.fill(copy.MODEL_STOPPED, model=OPUS.choice.model, provider="Claude")
         for e in events
     )
+
+
+async def test_tender_absence_gets_one_silent_search_nudge(make_engine, project, registry):
+    from qsone.records import files
+    from tests.samples import sample_pdf
+
+    rec = registry.get(project)
+    f = files.add_file(
+        rec,
+        "Tender sample.pdf",
+        sample_pdf([[f"Sample section {i}"] for i in range(1, 8)]),
+        actor="engineer",
+        folder="Received tender documents",
+    )
+    with rec.write("engineer") as c:
+        c.execute(
+            "UPDATE chunks SET text='فتح العروض 16/04/1448' WHERE file_id=? "
+            "AND json_extract(locator,'$.page')=7",
+            (f.id,),
+        )
+        from qsone.records.search import index_words
+
+        index_words(c, c.execute("SELECT id,text FROM chunks WHERE file_id=?", (f.id,)).fetchall())
+
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+
+    def nudged(messages, info):
+        assert "فتح العروض" in str(messages) and "received" in str(messages).lower()
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    "search_records",
+                    {
+                        "query": "فتح العروض",
+                        "also": ["opening offers", "مدة التنفيذ"],
+                        "received_only": True,
+                    },
+                )
+            ]
+        )
+
+    lead = scripted(
+        said("The opening offers date was not found in the tender documents."),
+        nudged,
+        call("files_read", {"file_id": f.id, "pages": "7"}),
+        said("Opening offers: 16/04/1448 (Tender sample.pdf, p7)."),
+    )
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, "Date for opening offers per the tender documents?")
+    await asyncio.wait_for(finish(engine, brief), 10)
+    assert "16/04/1448" in str(await engine.result(brief))
+    assert lead.calls == 4
+
+
+async def test_lead_lists_all_thirty_electrical_sheets(make_engine, project, registry):
+    from qsone.records import files
+    from qsone.records.mapping import store
+
+    rec = registry.get(project)
+    for file in range(10):
+        f = files.add_file(
+            rec, f"Sample electrical {file}.txt", f"sample {file}".encode(), actor="engineer"
+        )
+        with rec.write("one") as c:
+            for sheet in range(3):
+                store.write(
+                    c,
+                    rec,
+                    "map_sheets",
+                    {
+                        "file_id": f.id,
+                        "sheet": str(sheet),
+                        "number": f"EL-{file * 3 + sheet:03}",
+                        "title": "Sample electrical",
+                    },
+                )
+
+    def answer(messages, info):
+        from pydantic_ai.messages import ModelRequest, ToolReturnPart
+
+        returned = [
+            p.content
+            for m in messages
+            if isinstance(m, ModelRequest)
+            for p in m.parts
+            if isinstance(p, ToolReturnPart) and p.tool_name == "project_map"
+        ][-1]
+        # Tool data is fenced; keep only the compact, sourced sheet rows.
+        import re
+
+        numbers = re.findall(r'"number": "(EL-\d+)"', str(returned))
+        assert len(numbers) == 30
+        assert '"next_page": null' in str(returned)
+        return "\n".join(f"{number}: Sample electrical" for number in numbers)
+
+    lead = scripted(call("project_map", {"mode": "sheets"}), answer)
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, "List the electrical sheets with number and title.")
+    await asyncio.wait_for(finish(engine, brief), 10)
+    result = await engine.result(brief)
+    assert all(f"EL-{i:03}" in result for i in range(30))
