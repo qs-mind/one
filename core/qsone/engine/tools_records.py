@@ -845,6 +845,11 @@ def _check_number(conn, item: dict, name: str, value: str, unit: str | None, sou
             "you worked out (a total, an average, a price with waste or a margin) is not read "
             "from a file: record its inputs, then calculate it with its formula."
         )
+    if truth.per_day_at(conn, source_id, value) and not truth.says_per_day(unit or ""):
+        raise ModelRetry(
+            f"record_number: its source writes {value} per day, and the unit «{unit or ''}» "
+            "leaves the day out. Give the unit as the source has it, e.g. «% per day»."
+        )
     if name.lower() not in _RATES:
         return
     fields = item["fields"]

@@ -159,6 +159,10 @@ SPECIALIST_RULES = (
     "- A rate says what it includes: supply, or supply and installation. A supply-only quote "
     "never covers labour; an installed item's rate adds labour from its own source, with "
     "calculate. A rate is per the item's own unit.\n"
+    "- When the files have a build-up (rate analysis) or a materials price sheet, read them "
+    "first (search_records with the item's words, then read_chunk): an item's unit rate = "
+    "materials + labour + waste, as its build-up row has them, never one material alone. A "
+    "material is missing only when no sheet has it.\n"
     "- A value you do not have is missing: say so; never leave a blank for it."
 )
 _RECORD_ID = re.compile(r"\b[0-9a-f]{32}\b")  # an item, file or number id in a tool's words

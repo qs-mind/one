@@ -626,6 +626,42 @@ def value_in(conn, file_id: str, place: dict, value: str) -> tuple[bool, str, li
     return bool(wanted) and wanted <= have, f"{name}, {where}", shown
 
 
+# A number's unit: «0.2 %» lost "per day" (the delay damages, Brissa, 6 Nov 2026).
+_PER_DAY = re.compile(
+    r"\bper\s+(?:calendar\s+)?day\b|\bdaily\b|\ba\s+day\b|يومي[اًا]?|يوميا|عن\s+كل\s+يوم"
+    r"|في\s+اليوم|لكل\s+يوم|كل\s+يوم|/\s*(?:day|يوم)",
+    re.I,
+)
+_NEAR = 60  # characters after a number where its "per day" is written
+
+
+def per_day(texts: list[str], value: str) -> bool:
+    """Whether the texts write `value` as so much per day («0.2% of the price per day»)."""
+    wanted = numbers_guard.known_values([value])
+    for text in texts:
+        for m in numbers_guard._ANY_NUMBER.finditer(text):
+            if numbers_guard.known_values([m.group()]) != wanted:
+                continue
+            after = text[m.end() : m.end() + _NEAR]
+            stop = re.search(r"[0-9٠-٩]", after)  # up to the next number
+            if _PER_DAY.search(after[: stop.start()] if stop else after):
+                return True
+    return False
+
+
+def says_per_day(text: str) -> bool:
+    return bool(_PER_DAY.search(text or ""))
+
+
+def per_day_at(conn, source_id: str, value: str) -> bool:
+    """Whether the place a file source cites writes `value` as so much per day."""
+    row = conn.execute("SELECT file_id, locator FROM sources WHERE id = ?", (source_id,))
+    row = row.fetchone()
+    if row is None or row[0] is None:
+        return False
+    return per_day(texts_at(conn, row[0], json.loads(row[1])) or [], value)
+
+
 # Citations in a reply's words: is each number where the reply says it is? --------------------
 #
 # The real walk (6 Nov 2026): «السعر 12 جنيه/م3 (من شيت "تسعير"، صف 16)» for an item the BOQ does
@@ -806,6 +842,14 @@ def miscited(conn, text: str) -> list[Problem]:
                 wrong.append((line, copy.fill(copy.TRUTH_OTHER_ROW, code=code, place=where)))
         have = numbers_guard.known_values(texts)
         for written, value in numbers:
+            if value in have and per_day(texts, value) and not says_per_day(segment):
+                where = places[0].words()
+                line = (
+                    f"«{segment[:100]}» gives {written} without its unit: {where['en']} has it "
+                    "per day. Keep the unit with the number."
+                )
+                wrong.append((line, copy.fill(copy.TRUTH_PER_DAY, value=written, place=where)))
+                continue
             if value in have:
                 continue
             where = (

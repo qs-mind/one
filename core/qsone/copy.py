@@ -2552,6 +2552,10 @@ TRUTH_NO_PLACE = {
     "en": "The reply cites {place}, which no project file has.",
     "ar": "الرد بيستشهد بـ{place}، ومفيش ملف في المشروع فيه المكان ده.",
 }
+TRUTH_PER_DAY = {
+    "en": "The reply gives {value} without its unit: {place} has it per day.",
+    "ar": "الرد بيقول {value} من غير وحدته: {place} كاتبه عن كل يوم.",
+}
 TRUTH_OTHER_ROW = {
     "en": "The reply prices item {code} from {place}, which is another item's row.",
     "ar": "الرد بيسعّر البند {code} من {place}، والصف ده بتاع بند تاني.",
