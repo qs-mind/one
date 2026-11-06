@@ -34,7 +34,7 @@ from qsone.engine.costs import CallRefused, CapReached
 from qsone.engine.oneshot import OneShotFailed
 from qsone.engine.tools import Denied, ModelRetry, Tool, ToolContext, register
 from qsone.engine.types import Card, Progress
-from qsone.records import files, render
+from qsone.records import boq, files, render
 from qsone.records.files import FileInfo
 from qsone.records.project import Records, RecordsError
 from qsone.tools import cite
@@ -333,8 +333,8 @@ def _select(rec: Records, info: FileInfo, args: ReadArgs) -> _Selection:
             sel.sheet = sheets[0]
             if len(sheets) > 1:
                 sel.defaults["sheet"] = f'"{sheets[0]}" (the first; sheets: {", ".join(sheets)})'
-        elif args.sheet in sheets:
-            sel.sheet = args.sheet
+        elif boq.match_sheet(sheets, args.sheet) is not None:
+            sel.sheet = boq.match_sheet(sheets, args.sheet)  # «مقايسة » for "مقايسة"
         else:
             text = copy.fill(copy.BOQ_NO_SHEET, sheets=", ".join(sheets))
             raise RecordsError(text, status=422, field="sheet")

@@ -15,7 +15,7 @@ import pypdfium2 as pdfium
 import xlrd
 
 from qsone.records import hidden
-from qsone.records.arabic import display_text
+from qsone.records.arabic import display_number, display_text
 from qsone.records.hidden import Flag
 
 Status = Literal["read", "partly_read", "stored", "unreadable"]
@@ -248,8 +248,8 @@ def _xls_value(cell: xlrd.sheet.Cell, datemode: int):
 
 
 def _cell(value) -> str:
-    if isinstance(value, float) and value.is_integer():
-        return str(int(value))
+    if isinstance(value, float):
+        return display_number(value)  # as Excel shows it: 4.77, never 4.7699999999999996
     if isinstance(value, dt.datetime):
         return value.date().isoformat()
     if isinstance(value, dt.date):
