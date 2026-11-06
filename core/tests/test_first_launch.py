@@ -7,6 +7,7 @@ never the real one. Synthetic «عينة» data only."""
 import asyncio
 import json
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -383,8 +384,8 @@ def gone(messages, info):
 
 
 def test_check_a_standard_link_uses_only_the_typed_model(data_dir):
-    """Finding 12 and the real walk: the check runs on the model the engineer typed, once, and
-    every role uses it; a retired model on the list is never called (it took 20 s, with a 404)."""
+    """Finding 12 and the real walk: the engineer waits on one call to the model they typed (a
+    retired model took 20 s with a 404); the Checking QS is another model, checked behind."""
     settings.save_ai(
         "standard",
         [
@@ -399,14 +400,16 @@ def test_check_a_standard_link_uses_only_the_typed_model(data_dir):
     )
     link = google_link()
     typed = link.models["models/gemini-3.1-flash-lite"] = scripted(text("OK"))
-    retired = link.models["models/gemini-2.5-flash-lite"] = scripted(text("OK"))
+    link.models["models/gemini-2.5-flash-lite"] = scripted(text("OK"))
     with make_client([link]) as client:
         body = {"via": "standard", "connector": "standard:g"}
         assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
-        assert typed.calls == 1 and retired.calls == 0
+        assert typed.calls == 1
     lite = ModelChoice("standard:g", "models/gemini-3.1-flash-lite")
     sheet = [cards.priced(c) for c in link.sheet]
-    assert roles.chosen(sheet) == {role: lite for role in roles.ROLES}  # never Pro Latest
+    chosen = roles.chosen(sheet)
+    assert chosen["lead"] == chosen["specialist"] == lite  # never Pro Latest
+    assert chosen["checker"] != lite  # the Checking QS is never the model it checks
 
 
 def test_a_typed_model_the_list_lacks_is_still_the_one_checked(data_dir):
@@ -495,3 +498,35 @@ def test_open_link_only_opens_fixed_urls(client, no_browser):
         assert client.post("/app/open", json=bad, headers=AUTH).status_code == 422
     assert len(no_browser) == 4
     assert set(routes.LINKS) == {"terms", "privacy", "releases", "sign_in"}
+
+
+def test_a_retired_checker_model_found_behind_the_check_is_dropped(data_dir):
+    """The answer waits on the typed model only; the Checking QS's model is checked behind, and
+    one the provider refuses (Google's retired ones) is noted, so it is no default."""
+    settings.save_ai(
+        "standard",
+        [
+            {
+                "id": "g",
+                "name": "Google",
+                "base_url": GOOGLE_URL,
+                "provider": "google",
+                "model": "gemini-3.1-flash-lite",
+            }
+        ],
+    )
+    link = google_link()
+    link.models["models/gemini-3.1-flash-lite"] = scripted(text("OK"))
+
+    async def gone(messages, info):
+        raise ModelHTTPError(404, "models/gemini-2.5-flash-lite", {"error": "not found"})
+
+    link.models["models/gemini-2.5-flash-lite"] = FunctionModel(gone)
+    with make_client([link]) as client:
+        body = {"via": "standard", "connector": "standard:g"}
+        assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
+        for _ in range(50):
+            if connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite")):
+                break
+            time.sleep(0.05)
+    assert connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite"))

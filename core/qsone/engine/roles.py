@@ -3,8 +3,7 @@
 Ranking is by `price_in + price_out`. A card with no price is never a default and never a
 fallback: only the engineer can pick it. An on-device card (price 0) can be both. Nor is a model
 its provider refused, one the price book marks deprecated, or a "-latest" alias (finding 12).
-The model the engineer typed with a Standard Link is their own pick: it does every job, priced or
-not.
+The model the engineer typed with a Standard Link is their own pick: it leads, priced or not.
 """
 
 from decimal import Decimal
@@ -48,11 +47,36 @@ def typed_card(sheet: list[ModelCard]) -> ModelCard | None:
     return None
 
 
+def _around(typed: ModelCard, sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
+    """The typed model leads and does the specialists' work; no role goes to a costlier model.
+
+    - Checking QS: the most expensive model of another provider at or under its price; else
+      another model of its provider at or under it (a Same-provider check); else the typed model.
+    - quick: the cheapest model of its provider under its price; else the typed model.
+    A typed model of unknown price does every job: nothing can be said to cost less."""
+    limit = _price(typed)
+    under = [
+        c
+        for c in _ranked(sheet)
+        if limit is not None and _eligible(c) and c.choice != typed.choice and _price(c) <= limit
+    ]
+    checker = next((c for c in under if c.provider != typed.provider), next(iter(under), typed))
+    quick = next(
+        (c for c in reversed(under) if c.provider == typed.provider and _price(c) < limit), typed
+    )
+    return {
+        "lead": typed.choice,
+        "checker": checker.choice,
+        "specialist": typed.choice,
+        "quick": quick.choice,
+    }
+
+
 def defaults(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
     """The Recommended Settings; empty when no card ONE may pick has a price.
 
-    With a model the engineer typed: it does every job (the real walk: a Checking QS on another
-    model surprised the engineer, and its check met a retired one). Otherwise:
+    With a model the engineer typed: `_around` it, so the Checking QS is never the model whose
+    work it checks (decisions: a same-provider check uses another model). Otherwise:
     - Lead QS: `LEAD_MODEL`, else the most expensive model.
     - Checking QS: the most expensive model of another provider; with one provider, the most
       expensive other model (a Same-provider check); with one model, that model.
@@ -60,7 +84,7 @@ def defaults(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
     """
     typed = typed_card(sheet)
     if typed is not None:
-        return dict.fromkeys(ROLES, typed.choice)
+        return _around(typed, sheet)
     ranked = _ranked([c for c in sheet if _eligible(c)])
     if not ranked:
         return {}

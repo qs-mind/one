@@ -86,6 +86,9 @@ def _not_saved() -> JSONResponse:
 DEFAULT_CHECKS = 3  # rounds: a provider that refused one model may refuse the next one too
 
 
+_BEHIND: set = set()  # checks still running after the answer, kept from the collector
+
+
 async def _check_defaults(listed: list, checked: set, found: list) -> None:
     """The same tiny check, once, on each other role's default on the link: a model the
     provider lists but refuses (Google's retired ones, finding 12) is noted, so it is no default
@@ -177,8 +180,13 @@ def router(engine: Any) -> APIRouter:
             card = next((c for c in listed if c.choice == model), None)
             if used and card is not None:
                 _count_check(card, used[0])
-            if typed is None:  # a typed model does every job: one call is the whole check
+            if typed is None:
                 await _check_defaults(listed, {model}, found)
+            else:  # the engineer waits on the typed model only; the other roles' models (the
+                # Checking QS is another model) are checked behind, so a retired one is dropped
+                task = asyncio.create_task(_check_defaults(listed, {model}, found))
+                _BEHIND.add(task)
+                task.add_done_callback(_BEHIND.discard)
             usage.track("ai_link", via="standard")
             return JSONResponse({"ok": True})
         saved = claude_link.saved()["path"]
