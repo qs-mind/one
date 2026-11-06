@@ -1898,7 +1898,34 @@ FILE_HIDDEN_TEXT = {
     ),
 }
 
-# Scanned pages, read by the engineer's AI.
+# Scanned pages: local OCR first, then the engineer's AI.
+OCR_TESSERACT_MISSING = {
+    "en": (
+        "Tesseract is not installed. Get it at "
+        "https://tesseract-ocr.github.io/tessdoc/Installation.html. "
+        "ONE can still use your AI reader."
+    ),
+    "ar": (
+        "Tesseract مش متثبت. نزّله من "
+        "https://tesseract-ocr.github.io/tessdoc/Installation.html. "
+        "ONE لسه يقدر يقرا عن طريق نموذجك."
+    ),
+}
+OCR_TESSERACT_FAILED = {
+    "en": "The local OCR reader or its language download failed. ONE can still use your AI reader.",
+    "ar": "القراية المحلية أو تنزيل لغاتها ماكملش. ONE لسه يقدر يقرا عن طريق نموذجك.",
+}
+OCR_LOW_CONFIDENCE = {
+    "en": (
+        "Low-confidence OCR: the Lead QS must check this page against its image "
+        "before using its numbers."
+    ),
+    "ar": (
+        "الثقة في قراية الصفحة قليلة: كبير مهندسي الكميات لازم يراجعها على الصورة "
+        "قبل استخدام أرقامها."
+    ),
+}
+
 OCR_NEEDS_MODEL = {
     "en": (
         "Reading scanned pages needs an AI model that can read images. Connect one, then ask again."

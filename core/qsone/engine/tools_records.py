@@ -20,6 +20,7 @@ Plan 5 (Task 7) extends them:
 
 import asyncio
 import json
+import math
 import re
 from datetime import datetime
 from decimal import Decimal
@@ -456,22 +457,37 @@ def _place(locator: dict) -> dict:
     """The locator, with a page or row given as text ("3", "٣") read as its number."""
     place = {}
     for key, value in locator.items():
+        # Page geometry is measured in PDF points, not a sourced financial number.
         if key == "box":
-            import math
-
             if (
                 not isinstance(value, list | tuple)
                 or len(value) != 4
-                or not all(
-                    isinstance(n, int | float) and not isinstance(n, bool) and math.isfinite(n)
-                    for n in value
+                or any(
+                    isinstance(v, bool)
+                    or not isinstance(v, int | float)
+                    or not math.isfinite(v)
+                    or v < 0
+                    for v in value
                 )
-                or not 0 <= value[0] < value[2]
-                or not 0 <= value[1] < value[3]
+                or value[0] >= value[2]
+                or value[1] >= value[3]
                 or "page" not in locator
             ):
                 raise _no_evidence("locator")
             place[key] = list(value)
+            continue
+        if key == "ocr_low_confidence" and isinstance(value, bool):
+            place[key] = value
+            continue
+        if key == "confidence":
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int | float)
+                or not math.isfinite(value)
+                or not 0 <= value <= 100
+            ):
+                raise _no_evidence("locator")
+            place[key] = value
             continue
         if not _KEY.match(str(key)) or not isinstance(value, str | int) or isinstance(value, bool):
             raise _no_evidence("locator")
