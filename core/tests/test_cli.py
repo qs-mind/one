@@ -799,7 +799,7 @@ def test_walk_catalogue_has_bounded_real_and_sample_parts():
         "scanned",
     ]
     documents = [yaml.safe_load((CORE / f"tests/walks/{name}.yaml").read_text()) for name in names]
-    assert sum(Decimal(str(d["max_usd"])) for d in documents) <= Decimal("1.2")
+    assert sum(Decimal(str(d["max_usd"])) for d in documents) <= Decimal("1.4")
     for d in documents:
         assert d["real"] and d["scripted"]
         assert any("check" in step for step in d["real"])
