@@ -68,6 +68,9 @@ export function CompareDoc({ projectId, fileId, sources, onClose }: { projectId:
     {result && <>
       <p className="py-2 text-sm text-slate">{t("compareScope")} {result.compared_at}</p>
       <p>{t("compareUnchanged")}: {result.unchanged}</p>
+      {result.pairs.filter((pair) => pair.pairing_note).map((pair) => <p key={`${pair.old.page}-${pair.new.page}`} className="py-2 text-copper">
+        {cite(pair.old)} → {cite(pair.new)}: {pair.pairing_note?.[lang]}
+      </p>)}
       {result.changed.length === 0 && <p>{t("compareNoChanges")}</p>}
       <ul className="my-3 flex flex-col gap-2">{result.changed.map((change, index) => <li key={`${change.old.page}-${change.new.page}`}>
         <button type="button" aria-pressed={selected === index} onClick={() => setSelected(index)} className="text-start underline">

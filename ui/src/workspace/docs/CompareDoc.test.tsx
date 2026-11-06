@@ -49,3 +49,17 @@ it("opens comparison from the PDF viewer and preselects the previous revision", 
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(await screen.findByRole("button", { name: "Compare revisions" })).toBeInTheDocument();
 });
+
+it.each(["en", "ar"] as const)("shows ambiguous sheet pairing warning even on unchanged pages in %s", async (lang) => {
+  setLanguage(lang);
+  const old = { file_id: "old", name: "Sample old.pdf", date: "2026-11-06", page: 1 };
+  const newer = { file_id: "new", name: "Sample new.pdf", date: "2026-11-06", page: 2 };
+  const note = { en: "This sheet pairing needs a look.", ar: "ربط اللوحتين محتاج نظرة." };
+  vi.mocked(compareApi.files).mockResolvedValue([
+    { id: "old", name: old.name, added_at: old.date },
+    { id: "new", name: newer.name, added_at: newer.date, replaces: "old" },
+  ]);
+  vi.mocked(compareApi.compare).mockResolvedValue({ old, new: newer, compared_at: "2026-11-06", pairs: [{ old, new: newer, method: "sheet", pairing_note: note }], changed: [], unchanged: 1, unpaired_old: [], unpaired_new: [] });
+  render(<CompareDoc projectId="p" fileId="new" sources={fakeSources({})} onClose={() => {}} />);
+  expect(await screen.findByText(new RegExp(note[lang].replaceAll(".", "\\.")))).toHaveTextContent("Sample old.pdf");
+});

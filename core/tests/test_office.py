@@ -77,7 +77,7 @@ def test_real_open_document_is_read_and_original_is_kept(rec, source, target):
     x = extract(f.name, original)
     assert "concrete" in x.pieces[0].text
     assert x.pieces[0].locator == (
-        {"page": 1} if target == "odt" else {"sheet": "Sample", "row": 1}
+        {"paragraph": 1} if target == "odt" else {"sheet": "Sample", "row": 1}
     )
     pdf = office.to_pdf(original, f.name)
     assert pdf and pdf.startswith(b"%PDF-")
@@ -160,7 +160,7 @@ def test_converted_reading_retains_original_kind_and_locator(monkeypatch, suffix
     assert result.kind == suffix and result.status == "read"
     assert "12" in result.pieces[0].text
     assert result.pieces[0].locator == (
-        {"sheet": "Sample", "row": 1} if target == "xlsx" else {"page": 1}
+        {"sheet": "Sample", "row": 1} if target == "xlsx" else {"paragraph": 1}
     )
 
 
@@ -251,3 +251,17 @@ def test_failed_xls_conversion_keeps_native_failure(monkeypatch):
     assert native.status == "unreadable"
     assert extract("sample.xls", data) == native
     assert calls == [(data, "sample.xls", "xlsx")]
+
+
+@pytest.mark.parametrize("suffix", ["doc", "ppt", "rtf", "odt"])
+def test_legacy_text_uses_paragraph_sources_across_converted_page_breaks(monkeypatch, suffix):
+    from tests.samples import sample_pdf
+
+    monkeypatch.setattr(office, "find_soffice", lambda: "sample-soffice")
+    converted = sample_pdf([["Sample first paragraph"], ["Sample second paragraph"]])
+    monkeypatch.setattr(office, "convert", lambda *args: converted)
+    result = extract(f"sample.{suffix}", b"original sample")
+    assert result.pages is None
+    assert [piece.locator for piece in result.pieces] == [{"paragraph": 1}, {"paragraph": 2}]
+    assert "first" in result.pieces[0].text
+    assert "second" in result.pieces[1].text

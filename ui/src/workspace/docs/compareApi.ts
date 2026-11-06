@@ -4,13 +4,15 @@ import { texts, type Text } from "../../i18n";
 import { SourceError } from "../../project/sources";
 
 export type Citation = { file_id: string; name: string; date: string; page: number };
-export type ChangedPage = {
-  old: Citation; new: Citation; method: "sheet" | "title" | "order";
+export type PagePair = {
+  old: Citation; new: Citation; method: "sheet" | "title" | "order"; pairing_note?: Text;
+};
+export type ChangedPage = PagePair & {
   added: string[]; removed: string[]; pixels_changed: number; overlay: boolean; summary: Text;
 };
 export type Comparison = {
   old: Omit<Citation, "page">; new: Omit<Citation, "page">; compared_at: string;
-  pairs: unknown[]; changed: ChangedPage[]; unchanged: number;
+  pairs: PagePair[]; changed: ChangedPage[]; unchanged: number;
   unpaired_old: Citation[]; unpaired_new: Citation[];
 };
 export type CompareFile = { id: string; name: string; added_at: string; replaces?: string | null; kind?: string };

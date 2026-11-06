@@ -5,12 +5,14 @@ without reversing strings (which would corrupt digits and mixed-language descrip
 """
 
 import io
+import re
 import unicodedata
 from itertools import groupby
 
 import pdfplumber
 
 from qsone import copy
+from qsone.records import regions
 from qsone.records.arabic import display_text
 from qsone.records.project import RecordsError
 
@@ -29,10 +31,19 @@ def cell_text(chars):
     ]
     if not any(_arabic(c) for c in chars):
         return display_text(pdfplumber.utils.extract_text(chars))
-    rtl = [c for c in chars if _arabic(c) or c["text"].isspace()]
-    ltr = [c for c in chars if not _arabic(c)]
-    words = pdfplumber.utils.extract_words(rtl, char_dir="rtl")
-    words += pdfplumber.utils.extract_words(ltr, char_dir="ltr")
+    # Form spatial words using every character; direction never divides a word.
+    words = pdfplumber.utils.extract_words(chars, return_chars=True)
+    for word in words:
+        arabic = any(_arabic(c) for c in word["chars"])
+        word["direction"] = "rtl" if arabic else "ltr"
+        if arabic:
+            text = "".join(c["text"] for c in sorted(word["chars"], key=lambda c: -c["x0"]))
+            # A numeric span still reads left-to-right within a whole Arabic word.
+            word["text"] = (
+                re.sub(r"[0-9٠-٩۰-۹]+(?:[.,٫٬][0-9٠-٩۰-۹]+)*", lambda m: m[0][::-1], text)
+                if all(len(c["text"]) == 1 for c in word["chars"])
+                else text  # OCR records already contain intact logical words.
+            )
     lines = []
     for word in sorted(words, key=lambda w: w["top"]):
         if not lines or abs(word["top"] - lines[-1][0]["top"]) > 4:
@@ -46,23 +57,27 @@ def cell_text(chars):
         ):
             run = list(run)
             if direction == "ltr":
-                run.reverse()  # words, not letters; keep Latin phrases and digits intact
+                run.reverse()
             parts.extend(w["text"] for w in run)
         ordered.append(" ".join(parts))
     return display_text("\n".join(ordered))
 
 
-def sheets(data):
+def sheets(data, *, ocr_words=None):
     from qsone.records.boq import Cell, Sheet, guess
 
     result, missing = [], []
     previous = None
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages:
+            if not page.chars and ocr_words:
+                page.objects["char"] = _ocr_chars(page, ocr_words.get(page.page_number, []))
             if not page.chars:
                 missing.append(page.page_number)
                 previous = None
                 continue
+            crop_x, crop_y = page.cropbox[:2]
+            numbers = regions.pdf_numbers(data, page.page_number)["numbers"]
             tables = page.find_tables()
             borderless = not tables
             if borderless:
@@ -97,6 +112,21 @@ def sheets(data):
                                 max(ch["x1"] for ch in printed),
                                 max(ch["bottom"] for ch in printed),
                             )
+                        box = [box[0] - crop_x, box[1] - crop_y, box[2] - crop_x, box[3] - crop_y]
+                        # Reuse the displayed glyph bounds used by number highlighting.
+                        matches = (
+                            [
+                                n["box"]
+                                for n in numbers
+                                if regions._number(n["text"]) == regions._number(text)
+                                and box[0] - 1 <= (n["box"][0] + n["box"][2]) / 2 <= box[2] + 1
+                                and box[1] - 1 <= (n["box"][1] + n["box"][3]) / 2 <= box[3] + 1
+                            ]
+                            if regions._number(text) is not None
+                            else []
+                        )
+                        if len(matches) == 1:
+                            box = matches[0]
                         candidate.cells.setdefault(r, {})[c] = Cell(
                             text, None, {"page": page.page_number, "box": list(box)}
                         )
@@ -140,8 +170,8 @@ def sheets(data):
     return result, missing
 
 
-def read(data, name):
-    found, missing = sheets(data)
+def read(data, name, *, ocr_words=None):
+    found, missing = sheets(data, ocr_words=ocr_words)
     if not found:
         raise RecordsError(
             copy.FILE_SCANNED_PAGES if missing else copy.BOQ_PDF_NO_TABLES,
@@ -149,3 +179,43 @@ def read(data, name):
             field="file_id",
         )
     return [(s.name, False) for s in found], next((s for s in found if s.name == name), None)
+
+
+def _ocr_chars(page, words):
+    """Keep an OCR word intact while adapting CropBox points to pdfplumber's frame."""
+    left, top, _, _ = page.cropbox
+    chars = []
+    for word in words:
+        x0, y0, x1, y1 = word["box"]
+        chars.append(
+            {
+                "text": word["text"],
+                "x0": x0 + left,
+                "x1": x1 + left,
+                "top": y0 + top,
+                "bottom": y1 + top,
+                "doctop": y0 + top + page.initial_doctop,
+                "width": x1 - x0,
+                "height": y1 - y0,
+                "upright": True,
+            }
+        )
+    return chars
+
+
+def read_stored(rec, file_id, name):
+    """Read a PDF table using the already-kept local OCR word boxes when needed."""
+    import json
+
+    from qsone.records.files import read_original
+
+    words = {}
+    with rec.read() as conn:
+        rows = conn.execute(
+            "SELECT locator, text FROM chunks WHERE file_id = ? ORDER BY seq", (file_id,)
+        ).fetchall()
+    for locator, text in rows:
+        locator = json.loads(locator)
+        if locator.get("read_by") and "box" in locator and text.strip():
+            words.setdefault(locator["page"], []).append({"text": text, "box": locator["box"]})
+    return read(read_original(rec, file_id), name, ocr_words=words)

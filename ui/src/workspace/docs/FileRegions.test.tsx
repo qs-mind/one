@@ -52,3 +52,20 @@ it('does not reuse a source box on another page', async () => {
   await screen.findByRole('img');
   expect(container.querySelector('rect')).toBeNull();
 });
+
+it('shows every open region on its page before a thread is clicked', async () => {
+  const sources = fakeSources({pages: {f1: 2}});
+  const other: FileRegion = {...region, page: 2, box: [200, 300, 250, 350]};
+  const second: FileRegion = {...region, box: [300, 80, 350, 160]};
+  sources.pageBoxes = vi.fn().mockResolvedValue({width:600, height:800, boxes:[]});
+  sources.fileComments = vi.fn().mockResolvedValue([
+    thread('open1', {anchor:region, anchor_now:region}),
+    thread('open2', {anchor:second, anchor_now:second}),
+    thread('other-page', {anchor:other, anchor_now:other}),
+    thread('closed', {anchor:region, anchor_now:region, status:'closed'}),
+  ]);
+  const {container, rerender} = render(<FilePages projectId="p1" sources={sources} fileId="f1" state={state} width={600} />);
+  await waitFor(() => expect([...container.querySelectorAll('rect')].map(rect => rect.getAttribute('x'))).toEqual(['60', '300']));
+  rerender(<FilePages projectId="p1" sources={sources} fileId="f1" state={{...state, page:2}} width={600} />);
+  await waitFor(() => expect([...container.querySelectorAll('rect')].map(rect => rect.getAttribute('x'))).toEqual(['200']));
+});

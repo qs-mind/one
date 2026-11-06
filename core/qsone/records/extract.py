@@ -135,6 +135,27 @@ def extract(name: str, data: bytes) -> Extracted:
         result = extract(f"converted.{target}", converted)
         if native is not None and result.status != "read":
             return native
+        if target == "pdf":
+            # These originals have no PDF page viewer. Number the extracted text
+            # paragraphs continuously, never cite LibreOffice's print pagination.
+            pieces, first = [], {}
+            for piece in result.pieces:
+                first[piece.locator.get("page")] = len(pieces) + 1
+                for text in re.split(r"\n\s*\n", piece.text):
+                    if text.strip():
+                        pieces.append(Piece({"paragraph": len(pieces) + 1}, text.strip()))
+            flags = [
+                Flag(
+                    flag.kind,
+                    {"paragraph": first[flag.locator["page"]]}
+                    if flag.locator.get("page") in first
+                    else {},
+                    flag.excerpt,
+                    flag.count,
+                )
+                for flag in result.flags
+            ]
+            return Extracted(kind, result.status, None, pieces, result.note, flags)
         return Extracted(
             kind, result.status, result.pages, result.pieces, result.note, result.flags
         )

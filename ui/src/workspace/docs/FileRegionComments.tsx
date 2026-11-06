@@ -6,12 +6,13 @@ import type { ProjectSources } from "../../project/types";
 import { ThreadItem } from "../../review/CommentsPanel";
 
 /** Uses the same thread UI and reply/close routes as Deliverable comments. */
-export function FileRegionComments({ sources, projectId, fileId, selection, onAdded }: {
+export function FileRegionComments({ sources, projectId, fileId, selection, onAdded, onThreads }: {
   sources: ProjectSources;
   projectId: string;
   fileId: string;
   selection: FileRegion | null;
   onAdded: () => void;
+  onThreads: (threads: Thread[]) => void;
 }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [body, setBody] = useState("");
@@ -22,11 +23,11 @@ export function FileRegionComments({ sources, projectId, fileId, selection, onAd
   useEffect(() => {
     let live = true;
     void sources.fileComments?.(fileId).then(
-      (got) => { if (live) setThreads(got); },
+      (got) => { if (live) { setThreads(got); onThreads(got); } },
       () => { if (live) setFailed(t("documentFailed")); },
     );
-    return () => { live = false; };
-  }, [sources, fileId, revision]);
+    return () => { live = false; onThreads([]); };
+  }, [sources, fileId, revision, onThreads]);
 
   async function add() {
     if (!selection || !body.trim() || !sources.addFileComment || busy) return;

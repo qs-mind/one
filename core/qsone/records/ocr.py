@@ -98,31 +98,19 @@ class Page:
         from qsone.records.extract import Piece
 
         common = {"page": page, "read_by": "tesseract"}
-        lines: dict[tuple[int, int, int], list[Word]] = {}
-        # TSV words already follow Tesseract's reading order, including RTL and mixed
-        # text. Preserve that order instead of sorting by x or reversing Arabic letters.
-        for word in self.words:
-            lines.setdefault(word.line, []).append(word)
-        pieces = []
-        for words in lines.values():
-            confidence = min(w.confidence for w in words)
-            box = [
-                min(w.box[0] for w in words),
-                min(w.box[1] for w in words),
-                max(w.box[2] for w in words),
-                max(w.box[3] for w in words),
-            ]
-            pieces.append(
-                Piece(
-                    common
-                    | {
-                        "box": box,
-                        "confidence": confidence,
-                        "ocr_low_confidence": confidence < MIN_CONFIDENCE,
-                    },
-                    " ".join(w.text for w in words),
-                )
+        # TSV already supplies reading order. Each citable piece owns exactly one box.
+        pieces = [
+            Piece(
+                common
+                | {
+                    "box": word.box,
+                    "confidence": word.confidence,
+                    "ocr_low_confidence": word.confidence < MIN_CONFIDENCE,
+                },
+                word.text,
             )
+            for word in self.words
+        ]
         return pieces or [Piece(common | {"ocr_low_confidence": True}, "")]
 
 

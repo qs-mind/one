@@ -8,7 +8,7 @@ import { REVEAL_WAIT_MS } from "../../sources/mark";
 import { fileKey, TARGET } from "../../sources/targets";
 import { Segmented } from "../../ui/Segmented";
 import { type SheetHandle, SheetViewer } from "../../viewers/sheet/SheetViewer";
-import type { FileRegion, PdfBox } from "../../deliverables/types";
+import type { FileRegion, PdfBox, Thread } from "../../deliverables/types";
 import { PdfRegions } from "./PdfRegions";
 import { FileRegionComments } from "./FileRegionComments";
 import { workspaceApi } from "../api";
@@ -110,6 +110,7 @@ export function FilePages({
   const [regionFailed, setRegionFailed] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selection, setSelection] = useState<FileRegion | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
   const asked = opened?.anchor?.page === page ? opened.anchor : null;
   const sourceBox = asked?.box;
   const value = sourceBox ? undefined : asked?.value;
@@ -127,7 +128,13 @@ export function FilePages({
     }
     return () => { live = false; };
   }, [sources, fileId, pages, page, value, opened]);
-  const boxes = selection ? [selection.box] : sourceBox ? [sourceBox] : geometry?.boxes ?? [];
+  const commentBoxes = threads.flatMap((thread) => {
+    const anchor = thread.anchor_now;
+    return thread.status === "open" && "kind" in anchor && anchor.kind === "file_region" && anchor.file_id === fileId && anchor.page === page
+      ? [anchor.box] : [];
+  });
+  const boxes = [...commentBoxes, ...(selection ? [selection.box] : sourceBox ? [sourceBox] : geometry?.boxes ?? [])]
+    .filter((box, index, all) => all.findIndex((other) => other.every((n, i) => n === box[i])) === index);
 
   const showImage = pages !== null && pages > 0 && mode === "image";
   useEffect(() => {
@@ -222,7 +229,7 @@ export function FilePages({
         ))}
       {projectId && pages !== null && pages > 0 && (
         <FileRegionComments key={fileId} sources={sources} projectId={projectId} fileId={fileId}
-          selection={selection} onAdded={() => setSelection(null)} />
+          selection={selection} onAdded={() => setSelection(null)} onThreads={setThreads} />
       )}
       {showText &&
         pieces &&
