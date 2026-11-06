@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from qsone import copy, settings
 from qsone.engine import cards, oneshot, request_size
 from qsone.engine.types import Card, choice_of
-from qsone.records.mapping import store
+from qsone.records.mapping import facts, links, store
 
 
 class Text(BaseModel):
@@ -143,7 +143,7 @@ def batches(digests):
         yield digests[start : start + 4]
 
 
-async def run(rec, models, *, file_ids=None, request=None):
+async def run(rec, models, *, file_ids=None, request=None, passes=None):
     """Map ready files once. Unknown prices require approval too; a refusal sends no text."""
     request = request or (
         lambda prompt, schema, instructions: oneshot.map_text(models, prompt, schema, instructions)
@@ -192,6 +192,21 @@ async def run(rec, models, *, file_ids=None, request=None):
         estimate = None if estimate is None or cost is None else estimate + cost
     tree_cost = cards.cost(card, input_tokens=len(digests) * 1500, output_tokens=len(digests) * 700)
     estimate = None if estimate is None or tree_cost is None else estimate + tree_cost
+    if passes is not None:
+        # Reserve the bounded fact pages before key-page AI runs; these may differ
+        # from the local candidates. The same card covers all subsequent requests.
+        page_count = min(15, sum(max(1, d.get("pages") or 1) for d in digests))
+        # Reserve Unicode text at the normal estimator's bytes/token rate.
+        fact_tokens = page_count * request_size.estimate("م" * facts.PAGE_CHARS)
+        fact_tokens += request_size.estimate(
+            json.dumps(facts.Result.model_json_schema()) + facts.GUIDE
+        )
+        fact_cost = cards.cost(card, input_tokens=fact_tokens, output_tokens=10000)
+        estimate = None if estimate is None or fact_cost is None else estimate + fact_cost
+        for batch in batches(digests):
+            link_tokens = request_size.estimate(json.dumps(batch, ensure_ascii=False)) + 2000
+            link_cost = cards.cost(card, input_tokens=link_tokens, output_tokens=4000)
+            estimate = None if estimate is None or link_cost is None else estimate + link_cost
     if estimate is None or estimate > settings.map_auto_usd():
         cost_text = "?" if estimate is None else format(estimate.quantize(Decimal(".01")), "f")
         approval = Card(
@@ -241,7 +256,7 @@ async def run(rec, models, *, file_ids=None, request=None):
                         "ai_title": item.title.model_dump(),
                         "ai_group": item.group,
                         "key_pages": valid_pages(item, allowed[item.file_id]),
-                        "ai_state": "done",
+                        "ai_state": "summarising" if passes is not None else "done",
                         "note": None,
                     },
                 )
@@ -263,4 +278,12 @@ async def run(rec, models, *, file_ids=None, request=None):
                     store.write(
                         c, rec, "map_files", {"file_id": group.file_id, "ai_group": group.path}
                     )
+    if mapped and passes is not None:
+        await facts.run_approved(
+            rec, read=passes["read"], request=request, file_ids={m["file_id"] for m in mapped}
+        )
+        await links.run_approved(rec, digests, request=request)
+        with rec.write(store.ACTOR) as c:
+            for item in mapped:
+                store.write(c, rec, "map_files", {"file_id": item["file_id"], "ai_state": "done"})
     return bool(mapped)

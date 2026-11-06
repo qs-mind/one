@@ -7,6 +7,9 @@ scripted:
 - map: {}
 - check:
     map_total: 1
+    map_fact_sources: true
+    map_fact_states: [found, blank]
+    map_links_min: 1
     map_key_pages:
     - {label: Contract data, page: 58}
     - {label: Bid data, page: 26}

@@ -2900,6 +2900,21 @@ REPORT_DRAWING = {
 
 REPORT_DRAWING_REV = {"en": "rev {revision}", "ar": "مراجعة {revision}"}
 
+MAP_FACT_UNCHECKED = {"en": "Read by ONE, not checked", "ar": "ONE قراها، لسه ما اتراجعتش"}
+MAP_FACT_CONFIRMED = {"en": "Confirmed", "ar": "اتراجعت"}
+MAP_FACT_INVALID = {
+    "en": "Choose a current fact and confirm it or enter a correction.",
+    "ar": "اختار معلومة حالية وأكّدها أو اكتب التصحيح.",
+}
+MAP_FACT_GATE = {
+    "en": "Confirm {fact} ({page}) before Sign-off or export.",
+    "ar": "أكّد {fact} ({page}) قبل الاعتماد أو التصدير.",
+}
+MAP_REFERS_TO = {"en": "Refers to", "ar": "بيشير لـ"}
+
+MAP_FACT_PAGE = {"en": "page {page}", "ar": "صفحة {page}"}
+MAP_FACT_SHEET = {"en": "sheet {sheet}, row {row}", "ar": "شيت {sheet}، صف {row}"}
+MAP_FACT_LINE = {"en": "line {line}", "ar": "سطر {line}"}
 MAP_REVISION = {"en": "Drawing revisions", "ar": "إصدارات اللوحة"}
 MAP_AI_LABEL = {"en": "Project Map", "ar": "خريطة المشروع"}
 MAP_AI_COST = {

@@ -38,12 +38,17 @@ def rows(conn, sql, args=()):
 
 
 def decoded(row):
-    return {
+    result = {
         k: json.loads(v)
         if (k in JSON_FIELDS or (k == "name" and "conflict_with" in row)) and v is not None
         else v
         for k, v in row.items()
     }
+    if "conflict_with" in row:
+        from qsone.records.mapping.facts import shown
+
+        return shown(result)
+    return result
 
 
 def write(conn, rec, table, row, *, actor=ACTOR):
@@ -160,7 +165,7 @@ def list_map(rec, *, parent=None, cursor=None, limit=100):
             c,
             "SELECT f.id AS file_id,f.name,f.folder,f.kind,f.pages,"
             "coalesce(m.read_how,'stored') AS read_how,m.ai_title,m.ai_group,"
-            "coalesce(m.key_pages,'[]') AS key_pages,"
+            "coalesce(m.key_pages,'[]') AS key_pages,m.ai_state,"
             "coalesce(m.local_state,'waiting') AS local_state "
             "FROM files f LEFT JOIN map_files m ON m.file_id=f.id "
             f"WHERE f.valid_until IS NULL AND f.id>? AND (? IS NULL OR {group}=?) "
@@ -211,14 +216,20 @@ def detail(rec, file_id):
     return out
 
 
-def entries(rec, name, *, cursor=None, limit=100):
+def entries(rec, name, *, cursor=None, limit=100, file_id=None):
     assert name in ("facts", "links")
     limit = max(1, min(limit, 200))
+    filter_ = ""
+    args = [cursor or ""]
+    if file_id is not None:
+        filter_ = " AND (from_file_id=? OR to_file_id=?)" if name == "links" else " AND file_id=?"
+        args.extend([file_id, file_id] if name == "links" else [file_id])
     with rec.read() as c:
         found = rows(
             c,
-            f"SELECT * FROM map_{name} WHERE valid_until IS NULL AND id>? ORDER BY id LIMIT ?",
-            (cursor or "", limit + 1),
+            f"SELECT * FROM map_{name} WHERE valid_until IS NULL AND id>?{filter_} "
+            "ORDER BY id LIMIT ?",
+            (*args, limit + 1),
         )
     return {
         name: [decoded(r) for r in found[:limit]],

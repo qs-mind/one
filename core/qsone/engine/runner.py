@@ -550,6 +550,7 @@ class _Brief:
         self.found: dict[str, Any] = {}
         self._given_sheet = sheet
         self.lead_run_id: str | None = None
+        self.mapping_passes = None
         self.lead_ctx: ToolContext | None = None
         self.truth_retried = False  # the reply went back once to be fixed (engine.truth)
         self.changes = 0  # the writes this Brief made to the records since it started (`wrote`)
@@ -873,6 +874,34 @@ class _Brief:
         found = tools.toolset(spec.tools, ctx)
         found.max_retries = TOOL_RETRIES
         return found
+
+    async def mapping_read(self, file_id, locator):
+        """Normal files_read tool calls, mirrored in this mapping Brief's history."""
+        args = {"file_id": file_id}
+        if "page" in locator:
+            args["pages"] = locator["page"]
+        if "sheet" in locator:
+            args["sheet"] = locator["sheet"]
+            if "row" in locator:
+                args["rows"] = locator["row"]
+        history = _load(self.store.run(self.lead_run_id)["history"])
+        parts = []
+        for part in range(1, 101):
+            call_args = args | {"part": part}
+            call_id = "map-read-" + uuid4().hex
+            text = await tools.call("files_read", call_args, self.lead_ctx)
+            history.append(
+                ModelResponse(parts=[ToolCallPart("files_read", call_args, tool_call_id=call_id)])
+            )
+            history.append(
+                ModelRequest(parts=[ToolReturnPart("files_read", text, tool_call_id=call_id)])
+            )
+            self._save(self.lead_run_id, history)
+            parts.append(text)
+            count = re.search(r"part \d+ of (\d+)", text)
+            if count is None or part >= int(count[1]) or sum(map(len, parts)) >= 12000:
+                break
+        return "\n".join(parts)
 
     def _save(self, run_id: str, messages: list) -> None:
         if self.cancel_mode != "crash":
@@ -1741,6 +1770,7 @@ class _Brief:
                             self.place.rec,
                             self.models(self.lead_run_id),
                             file_ids=self.mapping_files,
+                            passes=self.mapping_passes(self) if self.mapping_passes else None,
                         )
                         output = ""
                     else:
@@ -1963,7 +1993,7 @@ class Engine:
                 mapping = b.brief_id
         return mapping if include_mapping else None
 
-    async def map_project(self, project_id: str, file_ids: list[str]) -> bool:
+    async def map_project(self, project_id: str, file_ids: list[str], *, passes=None) -> bool:
         """Use a normal chat Brief for automatic mapping, approvals, events and spending."""
         from qsone.records.mapping import store as map_store
 
@@ -1997,7 +2027,11 @@ class Engine:
             }
         ]
         bid = place.store.new_brief(project_id, copy.MAP_AI_LABEL["en"], selection)
-        self._launch(_Brief(self, place, place.store.brief(bid), sheet=sheet))
+        from qsone.records.mapping.facts import mapping_passes
+
+        brief = _Brief(self, place, place.store.brief(bid), sheet=sheet)
+        brief.mapping_passes = passes or mapping_passes
+        self._launch(brief)
         return True
 
     async def start_brief(

@@ -10,7 +10,7 @@ import pdf_inspector
 
 from qsone import copy
 from qsone.records import boq, files, ocr
-from qsone.records.mapping import store
+from qsone.records.mapping import facts, links, store
 
 log = logging.getLogger(__name__)
 
@@ -258,7 +258,16 @@ def _pending(rec):
         )
 
 
-def step(rec, *, cancelled=lambda: False, original=None):
+def step(
+    rec,
+    *,
+    cancelled=lambda: False,
+    original=None,
+    fact_read=None,
+    fact_propose=None,
+    link_digests=None,
+    link_propose=None,
+):
     """Resume waiting/reading records, with no in-memory queue. Returns whether work existed."""
     original = original if original is not None else FilePass()
     if cancelled():
@@ -372,6 +381,8 @@ def step(rec, *, cancelled=lambda: False, original=None):
             },
             tables,
         )
+        links.step(rec, file_id, digests=link_digests, propose=link_propose)
+        facts.step(rec, read=fact_read, propose=fact_propose)
         original.clear()
     except Exception as error:
         # Exception messages and traceback source lines may contain private file text.

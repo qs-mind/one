@@ -308,6 +308,15 @@ class Walk:
                 )
                 for wanted in expected
             )
+        if name == "map_fact_sources":
+            facts = self.observed.get("map_facts", [])
+            return bool(facts) and all(
+                f.get("file_id") and f.get("locator", {}).get("page") for f in facts
+            )
+        if name == "map_fact_states":
+            return set(expected) <= {f["state"] for f in self.observed.get("map_facts", [])}
+        if name == "map_links_min":
+            return len(self.observed.get("map_links", [])) >= int(expected)
         if name == "map_total":
             return self.observed.get("map", {}).get("status", {}).get("total") == int(expected)
         if name == "map_page_fast":
@@ -505,14 +514,23 @@ class Walk:
                     for p in m.get("parts", [])
                     if p.get("type") == "data-card"
                 ]
-                mapped = found.get("files") and all(f.get("ai_title") for f in found["files"])
+                mapped = found.get("files") and all(
+                    f.get("ai_title") and f.get("ai_state") in ("done", "local")
+                    for f in found["files"]
+                )
                 has_card = any(
                     c.get("kind") == "cost" and c.get("title") == copy.MAP_AI_LABEL for c in cards
                 )
                 if (
                     has_card if wanted.get("cost_card") else mapped
                 ) or time.monotonic() >= deadline:
-                    self.observed = {"map": found, "map_seconds": elapsed, "map_cards": cards}
+                    self.observed = {
+                        "map": found,
+                        "map_seconds": elapsed,
+                        "map_cards": cards,
+                        "map_facts": self.c.get(f"/projects/{self.project}/map/facts")["facts"],
+                        "map_links": self.c.get(f"/projects/{self.project}/map/links")["links"],
+                    }
                     return self.observed
                 time.sleep(0.1)
         if "review" in step:

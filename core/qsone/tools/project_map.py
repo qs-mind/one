@@ -38,6 +38,13 @@ async def read_map(ctx, args):
         if not rows:
             raise ModelRetry(copy.FILE_NOT_IN_PROJECT["en"])
         result = store.decoded(rows[0])
+        for name in ("facts", "links"):
+            child = store.entries(
+                ctx.rec, name, cursor=args.cursor, limit=args.limit, file_id=args.file_id
+            )
+            result[name] = child[name]
+            result[name + "_next_cursor"] = child["next_cursor"]
+
     elif args.mode == "find":
         if not args.label:
             raise ModelRetry("Supply label for find.")

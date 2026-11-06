@@ -217,7 +217,9 @@ async def test_2000_files_card_before_any_call(rec, monkeypatch):
     assert len(asked) == 1 and "2000" in asked[0].detail["en"]
 
 
-def test_replaced_fact_is_revalidated_unconfirmed(rec):
+def test_replaced_fact_is_reextracted_unconfirmed(rec):
+    from qsone.records.mapping import facts as fact_pass
+
     old = files.add_file(
         rec, "sample.pdf", sample_pdf([["Sample security 350000 USD"]]), actor="engineer"
     )
@@ -238,18 +240,46 @@ def test_replaced_fact_is_revalidated_unconfirmed(rec):
                 "confirmed_at": rec.clock(),
             },
         )
+    unchanged = files.add_file(rec, "other.txt", b"Retention 10%", actor="engineer")
+    unchanged_id = fact_pass.accept(
+        rec,
+        [
+            dict(
+                name={"en": "Retention", "ar": "المحتجز"},
+                value="10%",
+                file_id=unchanged.id,
+                locator={"line": 1},
+            )
+        ],
+    )[0]
+    fact_pass.update(rec, unchanged_id, confirm=True)
     new = files.add_file(
         rec, "sample.pdf", sample_pdf([["Sample security is still 350000 USD"]]), actor="engineer"
     )
     drain(rec)
-    facts = store.entries(rec, "facts")["facts"]
+    remaining = store.entries(rec, "facts")["facts"]
+    assert len(remaining) == 1 and remaining[0]["confirmed_by"] == "engineer"
+    fact_pass.accept(
+        rec,
+        [
+            dict(
+                name={"en": "Sample security", "ar": "تأمين العينة"},
+                value="350000",
+                file_id=new.id,
+                locator={"page": 1},
+            )
+        ],
+    )
+    facts = [f for f in store.entries(rec, "facts")["facts"] if f["file_id"] == new.id]
     assert len(facts) == 1 and facts[0]["file_id"] == new.id
     assert facts[0]["confirmed_by"] is None
     files.add_file(
         rec, "sample.pdf", sample_pdf([["Sample security is 1350000 USD"]]), actor="engineer"
     )
     drain(rec)
-    assert store.entries(rec, "facts")["facts"] == []
+    remaining = store.entries(rec, "facts")["facts"]
+    assert len(remaining) == 1 and remaining[0]["id"] == unchanged_id
+    assert remaining[0]["confirmed_by"] == "engineer"
 
 
 @pytest.mark.anyio
@@ -263,7 +293,7 @@ async def test_background_brief_records_map_and_finishes(data_dir):
     projects = Projects(data_dir)
     pid = projects.create("Sample map project", "engineer")["id"]
     rec = projects.get(pid)
-    f = files.add_file(rec, "sample.pdf", sample_pdf([["Sample conditions"]]), actor="engineer")
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Retention 10%"]]), actor="engineer")
     drain(rec)
     engine = Engine(projects=projects, data_dir=data_dir, connectors=connectors)
     try:
@@ -274,6 +304,13 @@ async def test_background_brief_records_map_and_finishes(data_dir):
         await asyncio.wait_for(engine.result(brief), timeout=10)
         assert store.detail(rec, f.id)["ai_state"] == "done"
         assert engine.active(pid) is None
+        mapped_facts = store.entries(rec, "facts")["facts"]
+        assert mapped_facts and mapped_facts[0]["value"] == "10%"
+        assert mapped_facts[0]["file_id"] == f.id
+        assert mapped_facts[0]["locator"] == {"page": 1}
+        assert mapped_facts[0]["confirmed_at"] is None
+        runs = engine._place(pid).store.runs(brief)
+        assert any("files_read" in str(run["history"]) for run in runs)
     finally:
         await engine.shutdown()
         projects.close_all()
@@ -327,3 +364,87 @@ async def test_background_cost_card_waits_for_engine_answer(data_dir):
     finally:
         await engine.shutdown()
         projects.close_all()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("approved", [False, True])
+async def test_joined_passes_share_drop_approval(rec, monkeypatch, approved):
+    from qsone.records.mapping import facts, links
+
+    f = files.add_file(
+        rec,
+        "sample.pdf",
+        sample_pdf([["Retention 10%. See Clause 14.3"], ["14.3 Payment 30 days"]]),
+        actor="engineer",
+    )
+    drain(rec)
+    calls, reads, asks = [], [], []
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **k: Decimal("0.2"))
+
+    async def ask(card):
+        asks.append(card)
+        return "yes" if approved else "no"
+
+    async def read(fid, loc):
+        reads.append((fid, loc))
+        return "Retention 10%. See Clause 14.3"
+
+    async def request(prompt, schema, instructions):
+        calls.append(schema)
+        if schema is ai.Batch:
+            return ai.Batch(
+                files=[
+                    ai.FileMap(
+                        file_id=f.id,
+                        kind="contract",
+                        title={"en": "Sample", "ar": "عينة"},
+                        group="Tender",
+                        key_pages=[
+                            ai.KeyPage(
+                                label={"en": "Data", "ar": "بيانات"},
+                                page=1,
+                                why={"en": "Terms", "ar": "الشروط"},
+                            )
+                        ],
+                    )
+                ]
+            )
+        if schema is ai.Groups:
+            return ai.Groups(groups=[])
+        if schema is facts.Result:
+            return facts.Result(
+                facts=[
+                    facts.Fact(
+                        name={"en": "Retention", "ar": "المحتجز"},
+                        value="10%",
+                        file_id=f.id,
+                        locator={"page": 1},
+                        state="found",
+                        evidence="Retention 10%",
+                    )
+                ]
+            )
+        return links.Result(
+            links=[
+                links.Link(
+                    from_file_id=f.id,
+                    from_locator={"page": 1},
+                    to_file_id=f.id,
+                    to_locator={"page": 2},
+                    kind="changes",
+                    words={"en": "Sample changes", "ar": "تغييرات العينة"},
+                    evidence={"text": "Clause 14.3"},
+                )
+            ]
+        )
+
+    await ai.run(
+        rec, SimpleNamespace(host=SimpleNamespace(ask=ask)), request=request, passes={"read": read}
+    )
+    assert len(asks) == 1
+    assert len(calls) == (4 if approved else 0)
+    assert bool(reads) == approved
+    assert bool(store.entries(rec, "facts")["facts"]) == approved
+
+    assert any(r["by"] == "ai" for r in store.entries(rec, "links")["links"]) == approved

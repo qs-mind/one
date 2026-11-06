@@ -12,13 +12,13 @@ import pytest
 CORE = Path(__file__).resolve().parents[1]
 
 
-def cli(session, *args, ok=0):
+def cli(session, *args, ok=0, timeout=90):
     result = subprocess.run(
         [sys.executable, "-m", "qsone.cli", "--session", str(session), "--json", *map(str, args)],
         cwd=CORE,
         capture_output=True,
         text=True,
-        timeout=90,
+        timeout=timeout,
     )
     assert result.returncode == ok, result.stdout + result.stderr
     return json.loads(result.stdout)

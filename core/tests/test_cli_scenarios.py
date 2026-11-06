@@ -42,9 +42,10 @@ def test_all_scripted_precontract_walks(running, tmp_path):  # noqa: F811
         "--scripted-only",
         "--report",
         tmp_path / "walks.json",
+        timeout=900,
     )
     assert result["status"] == "PASS"
-    assert len(result["walks"]) == 12
+    assert len(result["walks"]) == 14
     assert all(w["status"] == "PASS" for w in result["walks"])
     assert all(s["status"] == "PASS" for w in result["walks"] for s in w["steps"])
 
