@@ -37,6 +37,7 @@ from qsone.engine.tools import Denied, ModelRetry, Tool, ToolContext, register
 from qsone.engine.types import Card, Progress
 from qsone.records import boq, files, ocr, render
 from qsone.records.files import FileInfo
+from qsone.records.mapping import drawing_evidence
 from qsone.records.project import Records, RecordsError
 from qsone.tools import cite
 from qsone.tools.cite import SourceRef
@@ -160,10 +161,18 @@ def _shown(name: str, kind: str) -> str:
 def _list(rec: Records, include_old: bool) -> str:
     found = files.list_files(rec, include_old=include_old)
     lines = [f"{len(found)} files, newest first." if found else "No files yet."]
+    with rec.read() as c:
+        sheet_counts = dict(
+            c.execute(
+                "SELECT file_id,count(*) FROM map_sheets WHERE valid_until IS NULL GROUP BY file_id"
+            ).fetchall()
+        )
     for f in found:
         parts = [f"file:{f.id}", _shown(f.name, f.kind), f.kind, f.status]
         if f.folder:  # the folder of the engineer's tender folder it came from
             parts.insert(2, f"in folder {_shown(f.folder, 'folder')}")
+        if f.kind in {"dwg", "dxf"} or f.id in sheet_counts:
+            parts.append(f"{sheet_counts.get(f.id, 0)} sheets")
         if f.pages:
             parts.append(f"{f.pages} page" + ("" if f.pages == 1 else "s"))
         parts.append(f"added {_when(f.added_at)}")
@@ -543,7 +552,7 @@ def _next(rec: Records, info: FileInfo, sel: _Selection) -> dict | None:
 
 
 def _render(rec: Records, info: FileInfo, args: ReadArgs, sel: _Selection, notes: list) -> str:
-    chunks = _chunks(rec, info, sel)
+    chunks = drawing_evidence.chunks(rec, info) + _chunks(rec, info, sel)
     uncertain = sorted({loc["page"] for loc, _ in chunks if loc.get("ocr_low_confidence")})
     if uncertain:
         notes.append(f"{_ranges(uncertain)}: {copy.OCR_LOW_CONFIDENCE['en']}")

@@ -56,3 +56,85 @@ def test_scanned_drawing_uses_stored_words(rec, monkeypatch):
     assert sheet["number"] == "A-101" and sheet["title"] == "SAMPLE FLOOR PLAN"
     assert sheet["source"]["number"]["box"] == [400, 750, 580, 760]
     assert sheet["source"]["page"] == 1
+
+
+async def test_drawing_read_tools_surface_local_map(rec):
+    from pathlib import Path
+
+    from qsone.engine.map_digest import digest
+    from qsone.engine.tools import call
+    from tests.fakes_tools import tool_ctx
+
+    f = files.add_file(
+        rec,
+        "sample.dwg",
+        (Path(__file__).parent / "fixtures/drawings/test-plan.dwg").read_bytes(),
+        actor="engineer",
+    )
+    with rec.write("one") as c:
+        store.write(
+            c,
+            rec,
+            "map_sheets",
+            {
+                "file_id": f.id,
+                "sheet": "SLD1",
+                "number": "EL-504",
+                "title": "Sample main single line diagram",
+                "revision": "A",
+                "scale": "NTS",
+                "counts": {"MCCB": 339},
+            },
+        )
+        chunk = c.execute("SELECT id FROM chunks WHERE file_id=? LIMIT 1", (f.id,)).fetchone()[0]
+    ctx = tool_ctx(rec)
+    for name, args in (("files_read", {"file_id": f.id}), ("read_chunk", {"chunk_id": chunk})):
+        answer = await call(name, args, ctx)
+        assert "EL-504" in answer and "Sample main single line diagram" in answer
+        assert "MCCB × 339" in answer and "SLD1" in answer and "sample.dwg" in answer
+    assert "1 sheets" in await call("files_list", {}, ctx)
+    assert "EL-504" in digest(rec) and "Sample main single line diagram" in digest(rec)
+
+
+def test_drawing_header_pages_before_original_text(rec):
+    from pathlib import Path
+
+    from qsone.tools.files import PART_BYTES, ReadArgs, _render, _select
+
+    f = files.add_file(
+        rec,
+        "sample.dxf",
+        (Path(__file__).parent / "fixtures/drawings/title.dxf").read_bytes(),
+        actor="engineer",
+    )
+    with rec.write("one") as c:
+        for i in range(40):
+            store.write(
+                c,
+                rec,
+                "map_sheets",
+                {
+                    "file_id": f.id,
+                    "sheet": f"SLD{i}",
+                    "number": f"EL-{504 + i}",
+                    "title": "Sample diagram",
+                    "counts": {"MCCB": i + 1},
+                },
+            )
+    args = ReadArgs(file_id=f.id)
+    sel = _select(rec, f, args)
+    result = _render(rec, f, args, sel, [])
+    assert "part 1 of" in result and "call files_read" in result
+    assert len(result.encode()) < PART_BYTES + 2048
+    gathered = [result]
+    while "call files_read" in gathered[-1]:
+        args = ReadArgs(file_id=f.id, part=len(gathered) + 1)
+        gathered.append(_render(rec, f, args, sel, []))
+        assert len(gathered) < 100
+    joined = "\n".join(gathered)
+    assert "EL-543" in joined and "MCCB × 820" in joined
+    with rec.read() as c:
+        text = c.execute(
+            "SELECT text FROM chunks WHERE file_id=? ORDER BY seq LIMIT 1", (f.id,)
+        ).fetchone()[0]
+    assert " ".join(text.split()) in joined
