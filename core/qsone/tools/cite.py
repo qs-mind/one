@@ -36,6 +36,7 @@ class SourceRef:
     read: str
     dated: str | None = None
     link: str | None = None
+    # box: [x0, y0, x1, y1], PDF points, origin top-left; page is one-based.
     locator: dict | None = None
 
 
@@ -63,7 +64,14 @@ def _json(value) -> str:
 
 
 def source_line(source: SourceRef) -> str:
-    where = source.link or (_json(source.locator) if source.locator else None)
+    locator = source.locator
+    if locator and "box" in locator:
+        # Geometry may be fractional; money and quantities still pass _exact.
+        checked = _exact({k: v for k, v in locator.items() if k != "box"})
+        checked["box"] = locator["box"]
+        where = source.link or json.dumps(checked, ensure_ascii=False, allow_nan=False)
+    else:
+        where = source.link or (_json(locator) if locator else None)
     parts = [source.ref, _one_line(source.title)]
     if where:
         parts.append(_one_line(where))

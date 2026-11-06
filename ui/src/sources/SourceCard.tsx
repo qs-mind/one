@@ -1,3 +1,4 @@
+import type { SourceLocator } from "../project/types";
 // A number opened in place into its source card: the number and what it is glide into the card's header, then the
 // source fades in under it: who quoted it or which document, the date, the file and its cell or page, who entered it,
 // and "Open source". For a calculated number, the formula, each input with its own source, and the steps (Plan 3's
@@ -63,7 +64,7 @@ export const SINK_MS = 240;
 /** A level under the top one: smaller, a little up, faded. */
 export const SUNK = "translateY(-8px) scale(0.96)";
 
-function where(locator: Record<string, string | number> | undefined): string | undefined {
+function where(locator: SourceLocator | undefined): string | undefined {
   const { page, sheet, row, line } = locator ?? {};
   if (page !== undefined) return fill(t("page"), { page });
   if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet: String(sheet).trim(), row }); // «مقايسة » had a space

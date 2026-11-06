@@ -1,5 +1,5 @@
-"""A client BOQ from Excel into the Source Ledger (Plan 5, Task 9). The AI maps the columns; code
-reads every row.
+"""A client BOQ from Excel or PDF into the Source Ledger (Plan 5, Task 9).
+The AI maps the columns; code reads every row.
 
 - `preview` shows a sheet's first rows with their row numbers, a guessed header row and the
   columns its headings name.
@@ -52,7 +52,7 @@ MAX_DECIMALS = 6
 PREVIEW_ROWS = 30
 EXAMPLE_ROWS = 40  # rows below the header read for each column's first values
 SECTION_CHARS = 80  # a heading longer than this is an item's lead-in, not a section's title
-KINDS = ("xlsx", "xls")
+KINDS = ("xlsx", "xls", "pdf")
 ITEM, HEADING = "boq_item", "boq_heading"
 
 Hidden = Literal["skip", "include"]
@@ -147,6 +147,7 @@ def column(letters_: str) -> int:
 class Cell:
     value: object
     fmt: str | None
+    locator: dict | None = None
 
 
 @dataclass
@@ -156,6 +157,7 @@ class Sheet:
 
     name: str
     hidden: bool
+    needs_reading: list[int] = field(default_factory=list)
     cells: dict[int, dict[int, Cell]] = field(default_factory=dict)
     hidden_rows: set[int] = field(default_factory=set)
     hidden_columns: set[int] = field(default_factory=set)
@@ -255,7 +257,7 @@ class Workbook:
 
 
 def workbook(rec: Records, file_id: str) -> Workbook:
-    """The file, if it is an Excel workbook. Raises `RecordsError`: FILE_NOT_IN_PROJECT,
+    """The file, if it is an Excel workbook or PDF. Raises `RecordsError`: FILE_NOT_IN_PROJECT,
     BOQ_NOT_EXCEL (field file_id)."""
     with rec.read() as conn:
         row = conn.execute("SELECT name, kind FROM files WHERE id = ?", (file_id,)).fetchone()
@@ -285,7 +287,9 @@ def match_sheet(names: list[str], asked: str) -> str | None:
 def read(book: Workbook, sheet: str | None) -> tuple[list[str], Sheet]:
     """The sheet names and one sheet: `sheet` (`match_sheet`), or the first one Excel shows.
     Raises `RecordsError` BOQ_NO_SHEET (field sheet) with the sheet names."""
-    reader = _xlsx if book.kind == "xlsx" else _xls
+    from qsone.records import boq_pdf
+
+    reader = {"xlsx": _xlsx, "xls": _xls, "pdf": boq_pdf.read}[book.kind]
     listed, _ = reader(book.data, None)
     names = [n for n, _ in listed]
     if sheet is None:
@@ -466,6 +470,7 @@ def preview(rec: Records, file_id: str, sheet: str | None, *, rows: int = PREVIE
         "merged_rows": [r for r in shown if r in set(merged)],
         "last_row": ws.last_row,
         "overview": overview(rec, book, ws, header, columns),
+        **({"needs_reading": ws.needs_reading} if book.kind == "pdf" else {}),
     }
 
 
@@ -574,6 +579,7 @@ class Plan:
     already: int  # rows of this file version and sheet imported before
     sheet_hidden: bool
     hidden_columns: list[str]  # mapped columns hidden in Excel
+    locators: dict = field(default_factory=dict)
 
     @property
     def items(self) -> int:
@@ -802,6 +808,12 @@ def plan_sheet(
         already=already,
         sheet_hidden=ws.hidden,
         hidden_columns=[letters(c) for f, c in cols.items() if c in ws.hidden_columns],
+        locators={
+            (r, letters(c)): cell.locator
+            for r, cells in ws.cells.items()
+            for c, cell in cells.items()
+            if cell.locator is not None
+        },
     )
 
 
@@ -873,7 +885,10 @@ def write(
                 conn, at=at, actor=actor, kind=row.kind, code=row.code, fields=fields
             )
             for name, (text, col) in row.numbers.items():
-                src = source({"sheet": p.sheet, "row": row.row, "column": col})
+                src = source(
+                    {"sheet": p.sheet, "row": row.row, "column": col}
+                    | p.locators.get((row.row, col), {})
+                )
                 source_id = ledger.write_source(conn, at=at, actor=actor, **src)
                 ledger.write_number(
                     conn,

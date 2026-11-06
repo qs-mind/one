@@ -1,3 +1,4 @@
+import type { SourceLocator } from "../project/types";
 // What the core sends about Deliverables (Plan 6, Tasks 2–7). Numbers are always decimal strings, never floats.
 import type { Language, Text } from "../i18n";
 
@@ -30,7 +31,7 @@ export type Source = {
   file_name?: string | null;
   /** The file in Project Records, for the jump to its frame. */
   file_id?: string | null;
-  locator: Record<string, string | number>;
+  locator: SourceLocator;
   url?: string | null;
   dated?: string | null;
   /** Who quoted it, when a card's row says (a price to keep). */
@@ -278,7 +279,7 @@ export type Explained = {
     replaced_by: string | null;
     reason: string | null;
   };
-  source: { id: string; kind: string; title: string; file_id: string | null; locator: Record<string, string | number>; url: string | null; dated: string | null };
+  source: { id: string; kind: string; title: string; file_id: string | null; locator: SourceLocator; url: string | null; dated: string | null };
   calculation: {
     id: string;
     formula: string;

@@ -1964,8 +1964,12 @@ DOING_BOQ_PREVIEW = {
     "ar": "يبص على أعمدة المقايسة في {name}",
 }
 BOQ_NOT_EXCEL = {
-    "en": "This file is not an Excel workbook (.xlsx or .xls); files_read reads it.",
-    "ar": "الملف ده مش ملف Excel (.xlsx أو .xls)؛ files_read بيقراه.",
+    "en": "This file is not an Excel workbook or PDF BOQ; files_read reads it.",
+    "ar": "الملف ده مش ملف Excel أو مقايسة PDF؛ files_read بيقراه.",
+}
+BOQ_PDF_NO_TABLES = {
+    "en": "No tables were found in this PDF; files_read reads its text.",
+    "ar": "مالقيناش جداول في ملف PDF ده؛ files_read بيقرا النص اللي فيه.",
 }
 BOQ_NO_ROWS = {
     "en": "No BOQ rows were found below the header row with these columns. Check the header row "

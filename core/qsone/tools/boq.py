@@ -153,7 +153,7 @@ _IMPORT_EXAMPLE = {
     "currency": "EGP",
 }
 
-_PREVIEW_DOC = f"""Look at a client BOQ in Excel before importing it: the first rows of a sheet \
+_PREVIEW_DOC = f"""Preview an Excel or PDF BOQ: the first rows of a sheet \
 with their row numbers and column letters, the header row it guesses, the columns its headings \
 name, and rows hidden in Excel or merged.
 - file_id: from files_list or a search. sheet: by name; the first shown sheet when left out. \
@@ -202,6 +202,9 @@ async def _preview(ctx: ToolContext, args: PreviewArgs) -> str:
     span = f"{shown[0]}-{shown[-1]}" if shown else "1-1"
     data = {k: p[k] for k in ("sheets", "sheet", "header_guess", "columns_guess", "last_row")}
     data |= {"hidden_rows": p["hidden_rows"], "merged_rows": p["merged_rows"]}
+    if p.get("needs_reading"):
+        data["needs_reading"] = p["needs_reading"]
+        notes.append(copy.FILE_SCANNED_PAGES["en"])
     whole = p["overview"]
     if whole is not None:  # counted by code over every row, not from the rows shown
         data["whole_sheet"] = whole | {"sections": [s["title"] for s in whole["sections"]][:20]}
@@ -230,7 +233,7 @@ def _now(rec: Records) -> str:
 
 # boq_import -------------------------------------------------------------------------------------
 
-_IMPORT_DOC = f"""Import a client BOQ sheet from Excel into the Source Ledger after boq_preview: \
+_IMPORT_DOC = f"""Import an Excel or PDF BOQ into the Source Ledger after boq_preview: \
 each row below the header becomes an item, a heading, or a row left out and why. Each \
 quantity, rate and amount keeps its cell as its source.
 - columns: letters for description, unit and quantity (needed), and code, rate, amount, \

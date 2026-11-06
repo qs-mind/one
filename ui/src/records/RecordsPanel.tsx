@@ -1,3 +1,4 @@
+import type { SourceLocator } from "../project/types";
 // Project Records for the open project: drop or add files, see what One could read in each, and search them.
 // Files go to the core one at a time as their raw bytes; the page never sends a file path.
 import { type FormEvent, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
@@ -17,7 +18,7 @@ import { holdsFolder } from "../import/walk";
 type Hit = {
   file_id: string;
   file_name: string;
-  locator: Record<string, string | number>;
+  locator: SourceLocator;
   text: string;
 };
 type Found = { state: "found"; note: Text | null; results: Hit[] } | { state: "failed"; line: Text };
