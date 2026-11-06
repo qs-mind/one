@@ -49,11 +49,13 @@ async def run(ctx, name: str, args: dict) -> dict:
 def test_the_team_has_the_outputs_tools_and_the_checker_has_none():
     for name in outputs.OUTPUTS_TOOLS:
         tool = REGISTRY[name]
-        assert tool.group == "outputs" and tool.roles == {"lead", "specialist"}, name
+        roles = {"lead"} if name == "pack_propose" else {"lead", "specialist"}
+        assert tool.group == "outputs" and tool.roles == roles, name
     assert {REGISTRY[n].risk for n in ("deliverable_read", "client_file_read")} == {"read"}
     assert REGISTRY["client_file_read"].untrusted  # the client's cells are file text
     assert set(outputs.OUTPUTS_TOOLS) <= set(lead_spec().tools)
-    assert set(outputs.OUTPUTS_TOOLS) <= set(specialist_tools())
+    assert set(outputs.OUTPUTS_TOOLS) - {"pack_propose"} <= set(specialist_tools())
+    assert "pack_propose" not in specialist_tools()
     assert not set(outputs.OUTPUTS_TOOLS) & set(checker_spec().tools)
     assert "deliverable_create" in lead_spec().instructions
     assert words(lead_spec().instructions) <= 600

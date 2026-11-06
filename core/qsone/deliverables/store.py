@@ -89,6 +89,10 @@ def _template(kind: str, columns, rows, blocks) -> dict:
         raise RecordsError(copy.COLUMN_NOT_ALLOWED, status=422, field="columns")
     if rows is not None:
         raise RecordsError(copy.ROW_NOT_FOUND, status=422, field="rows")
+    if kind == "pack":
+        if blocks is not None:
+            raise RecordsError(copy.PACK_INVALID, status=422, field="blocks")
+        return {**base, "base": base["version"]}
     for i, block in enumerate(blocks or []):
         try:
             template.check_node(block)
@@ -403,7 +407,20 @@ def _view(conn, head: dict, version: int | None) -> dict:
         if revision is None
         else {"no": revision[0], "version": revision[1], "signed_off": bool(revision[2])},
     }
-    if head["kind"] == "sheet":
+    if head["kind"] == "pack":
+        from qsone.deliverables.pack import file_labels
+
+        steps = json.loads(then)["template"]["steps"]
+        body = {
+            "steps": steps,
+            "files": file_labels(conn, steps),
+            "sources": {},
+            "sample": False,
+            "records_moved": False,
+            "progress": None,
+            "total": None,
+        }
+    elif head["kind"] == "sheet":
         body = _sheet_view(conn, d, head["total_item_id"], json.loads(then)["template"], at)
     else:
         body = _document_view(conn, d, at)

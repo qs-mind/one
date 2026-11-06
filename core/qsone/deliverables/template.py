@@ -17,7 +17,7 @@ from qsone import copy
 from qsone.deliverables import calc
 from qsone.records.project import RecordsError
 
-KINDS = ("sheet", "document")
+KINDS = ("sheet", "document", "pack")
 _KEY = re.compile(r"[a-z][a-z0-9_]{0,31}")
 _NAME = r"[^\W\d]\w{0,63}"
 _FROM = re.compile(rf"code|field:(?P<field>{_NAME})|number:(?P<number>{_NAME})(?P<unit>\.unit)?")
@@ -33,7 +33,7 @@ def _load(kind: str) -> str:
     return (files("qsone.deliverables") / "templates" / f"{kind}.json").read_text("utf-8")
 
 
-def base(kind: Literal["sheet", "document"]) -> dict:
+def base(kind: Literal["sheet", "document", "pack"]) -> dict:
     """The base Template Data Sheet of `kind`, a fresh copy. TEMPLATE_UNKNOWN for any other."""
     if kind not in KINDS:
         raise RecordsError(copy.TEMPLATE_UNKNOWN, status=422, field="kind")

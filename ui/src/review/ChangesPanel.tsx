@@ -1,3 +1,4 @@
+import { PackSteps } from "../viewers/pack/PackViewer";
 // The Suggested changes of one Deliverable, the BOQ change review: "Update from Project Records" first, then each
 // pending change with who made it, why, the source of its new number, its new value in Copper over the old one struck
 // in Slate, what the QS Calc Engine would recalculate with it, and ✓ ✗. The engineer decides; nothing here computes.
@@ -140,6 +141,8 @@ function What({ view, change, onLocate }: { view: View; change: Change; onLocate
     </button>
   );
   switch (op.op) {
+    case "set_pack":
+      return <PackSteps steps={op.steps} files={change.after && "steps" in change.after ? change.after.files : undefined} />;
     case "update_from_records":
       return <Cells view={view} cells={op.cells} onLocate={onLocate} />;
     case "set_number":

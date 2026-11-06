@@ -6,5 +6,5 @@ import type { DeliverableInfo, ViewerProps } from "../project/types";
 import { DeliverableViewer } from "../deliverables/DeliverableViewer";
 
 export function viewerFor(kind: DeliverableInfo["kind"]): ComponentType<ViewerProps> | null {
-  return kind === "sheet" || kind === "document" ? DeliverableViewer : null;
+  return kind === "sheet" || kind === "document" || kind === "pack" ? DeliverableViewer : null;
 }

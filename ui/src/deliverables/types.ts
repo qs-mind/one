@@ -8,7 +8,7 @@ export type Code = "A" | "B" | "C";
 /** One entry of GET /projects/{p}/deliverables: Plan 7's DeliverableInfo plus pending, total and sample. */
 export type DeliverableInfo = {
   id: string;
-  kind: "sheet" | "document" | "markup" | "board" | "page";
+  kind: "sheet" | "document" | "pack" | "markup" | "board" | "page";
   title: string;
   language: Language;
   status: Status;
@@ -123,11 +123,20 @@ export type DocumentView = ViewHead & {
   untraced: { block: string; text: string }[];
 };
 
-export type View = SheetView | DocumentView;
+export type PackStep = { title?: Text } & (
+  | { kind: "file"; file_id: string; ranges: [number, number][] }
+  | { kind: "cover" | "divider"; text: Text }
+  | { kind: "stamp"; text: Text; position: "top" | "center" | "bottom"; pages: number[] }
+  | { kind: "page_numbers" | "seal" }
+);
+export type PackFiles = Record<string, { name: string; added_at: string }>;
+export type PackView = ViewHead & { kind: "pack"; steps: PackStep[]; files?: PackFiles };
+export type View = SheetView | DocumentView | PackView;
 
 /** One typed operation, held as a Suggested change until the engineer accepts it. */
 export type NumberIn = { name: string; value: string; unit?: string; currency?: string; source_id?: string; dated?: string };
 export type Op =
+  | { op: "set_pack"; steps: PackStep[]; expect?: number }
   | { op: "set_number"; row: string; name: string; value: string; unit?: string; currency?: string; source_id?: string; dated?: string; expect: string | null }
   | { op: "set_field"; row: string; key: string; value: string; expect: number | null }
   | { op: "add_item_row"; after: string | null; code: string; fields: Record<string, string>; numbers: NumberIn[] }
@@ -173,7 +182,7 @@ export type Change = {
   sources?: Record<string, Source>;
 };
 
-export type Shown = ViewCell | Block | ViewRow | { columns: ViewColumn[] };
+export type Shown = ViewCell | Block | ViewRow | { columns: ViewColumn[] } | { steps: PackStep[]; files?: PackFiles };
 
 /** The cell a change shows, or null when it shows a block, a row or the columns. */
 export const asCell = (shown: Shown | null | undefined): ViewCell | null =>

@@ -79,6 +79,8 @@ const query = (values: Record<string, string | number | null | undefined>) => {
 };
 
 export const deliverablesApi = {
+  buildPack: (p: string, d: string, version: number, page: number) =>
+    call<{ pages: number; page: number; image: string }>(`${base(p)}/deliverables/${id(d)}/pack/build${query({ version, page })}`, "POST"),
   list: (p: string) => call<{ deliverables: DeliverableInfo[] }>(`${base(p)}/deliverables`),
   view: (p: string, d: string, at: { version?: number; revision?: number } = {}) =>
     call<View>(`${base(p)}/deliverables/${id(d)}${query(at)}`),

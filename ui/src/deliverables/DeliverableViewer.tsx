@@ -1,3 +1,4 @@
+import { PackViewer } from "../viewers/pack/PackViewer";
 // One Deliverable, as the viewer registry gives it to the workspace and the chat's side panel. It loads its own data
 // and loads it again when the project's live stream says the Deliverable changed. In `mode="full"` it is the review board: the viewer, then
 // Changes, Comments, Versions and Close-out, with the exports; `mode="workspace"` is the same board as the open
@@ -162,7 +163,9 @@ export function DeliverableViewer(props: DeliverableViewerProps) {
   }
 
   const viewer =
-    view.kind === "sheet" ? (
+    view.kind === "pack" ? (
+      <PackViewer projectId={projectId} view={view} />
+    ) : view.kind === "sheet" ? (
       <SheetViewer
         ref={sheet}
         projectId={projectId}
