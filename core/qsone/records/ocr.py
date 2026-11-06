@@ -1,13 +1,13 @@
 """Local word OCR, using the external Apache-2.0 Tesseract program.
 
-Page images stay in memory. Models use the search downloader's size, SHA-256,
-resume, free-space and atomic publication checks; no project data is sent to it.
+Page images stay in memory. Missing languages use ONE's verified model downloader.
 """
 
 import csv
 import io
 import math
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -63,6 +63,54 @@ def ensure_models() -> Path:
             with download.default_client() as client:
                 download.download((MODELS,), root, client=client, stop=threading.Event())
     return download.folder(MODELS, root)
+
+
+def model_folder() -> Path:
+    return download.folder(MODELS, settings.data_dir() / "models")
+
+
+def system_folders(executable: str) -> list[Path]:
+    # Ask the installed binary for its compiled-in folder, ignoring the user's override.
+    env = {k: v for k, v in os.environ.items() if k != "TESSDATA_PREFIX"}
+    try:
+        result = subprocess.run(
+            [executable, "--list-langs"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+            env=env,
+        )
+        match = re.search(r'List of available languages in "([^"]+)"', result.stdout)
+        if match:
+            return [Path(match[1])]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return [
+        Path(executable).parent / "tessdata",
+        Path("/usr/share/tessdata"),
+        Path("/usr/share/tesseract-ocr/5/tessdata"),
+        Path("/usr/local/share/tessdata"),
+        Path("/opt/homebrew/share/tessdata"),
+    ]
+
+
+def find_languages(executable: str) -> tuple[Path, str] | None:
+    folders = []
+    if prefix := os.environ.get("TESSDATA_PREFIX"):
+        folders.append(Path(prefix))
+    folders.append(model_folder())
+    system = system_folders(executable)
+    folders.extend(system)
+    for folder in folders:
+        if all((folder / f"{lang}.traineddata").is_file() for lang in ("ara", "eng")):
+            return folder, "ara+eng"
+    try:
+        return ensure_models(), "ara+eng"
+    except (download.DownloadError, OSError):
+        # Offline or no space: keep reading English with installed system data.
+        english = next((p for p in system if (p / "eng.traineddata").is_file()), None)
+        return (english, "eng") if english is not None else None
 
 
 def find_tesseract() -> str | None:

@@ -611,7 +611,7 @@ async def _ask_cost(ctx: ToolContext, info: FileInfo, reader, pages: list[int]) 
         raise Denied("files_read")
 
 
-def _local_page(data: bytes, kind: str, page: int, executable: str, tessdata):
+def _local_page(data: bytes, kind: str, page: int, executable: str, tessdata, languages):
     with _OCR_IMAGES:
         png = _image(kind, data, page)
         if kind == "pdf":
@@ -638,7 +638,9 @@ def _local_page(data: bytes, kind: str, page: int, executable: str, tessdata):
         else:
             # Standalone images use one point per original pixel (no PDF page dimensions).
             points = ocr.png_size(data)
-    return ocr.read_image(png, points=points, executable=executable, tessdata=tessdata)
+    return ocr.read_image(
+        png, points=points, executable=executable, tessdata=tessdata, languages=languages
+    )
 
 
 async def _ocr(ctx: ToolContext, rec: Records, info: FileInfo, sel: _Selection) -> str | list:
@@ -661,13 +663,20 @@ async def _ocr(ctx: ToolContext, rec: Records, info: FileInfo, sel: _Selection) 
         notes.append(copy.OCR_TESSERACT_MISSING["en"])
     else:
         try:
-            tessdata = await asyncio.to_thread(ocr.ensure_models)
+            found = await asyncio.to_thread(ocr.find_languages, executable)
+            if found is None:
+                raise FileNotFoundError("No local English OCR language data")
+            tessdata, languages = found
+            if languages == "eng":
+                notes.append(
+                    copy.fill(copy.OCR_ARABIC_MISSING, folder=str(ocr.model_folder()))["en"]
+                )
             data = await asyncio.to_thread(files.read_original, rec, info.id)
             pending = []
             for page in missing:
                 try:
                     got = await asyncio.to_thread(
-                        _local_page, data, info.kind, page, executable, tessdata
+                        _local_page, data, info.kind, page, executable, tessdata, languages
                     )
                     await asyncio.to_thread(
                         files.add_ocr_pages,

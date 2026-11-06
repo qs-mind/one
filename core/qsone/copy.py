@@ -1927,8 +1927,11 @@ OCR_TESSERACT_MISSING = {
     ),
 }
 OCR_TESSERACT_FAILED = {
-    "en": "The local OCR reader or its language download failed. ONE can still use your AI reader.",
-    "ar": "القراية المحلية أو تنزيل لغاتها ماكملش. ONE لسه يقدر يقرا عن طريق نموذجك.",
+    "en": (
+        "The local OCR reader or its language data could not be used. ONE can still use your "
+        "AI reader."
+    ),
+    "ar": "القراية المحلية أو بيانات لغاتها مش متاحة. ONE لسه يقدر يقرا عن طريق نموذجك.",
 }
 OCR_LOW_CONFIDENCE = {
     "en": (
@@ -2822,3 +2825,26 @@ COMPARE_WIDTH = {
     "ar": "اختار مقاس مدعوم لصورة الصفحة.",
 }
 COMPARE_STEP = {"en": "Comparing file revisions", "ar": "بيقارن نسخ الملفات"}
+
+BOQ_SCAN_NEEDS_READING = {
+    "en": (
+        "These scanned BOQ pages need reading first. Ask ONE to read them, or call files_read "
+        "with ocr=true, then preview the BOQ again."
+    ),
+    "ar": (
+        "صفحات المقايسة المتصورة دي محتاجة تتقري الأول. اطلب من ONE يقراها، أو استخدم "
+        "files_read مع ocr=true، وبعدها اعرض المقايسة تاني."
+    ),
+}
+OCR_ARABIC_MISSING = {
+    "en": (
+        "ONE read with English OCR only. Arabic reading needs the Arabic model "
+        "(ara.traineddata). ONE could not download it to {folder}. "
+        "It will download when online, with enough free space, the next time a page needs OCR."
+    ),
+    "ar": (
+        "ONE قرا بالإنجليزي بس. قراية العربي محتاجة نموذج العربي (ara.traineddata). "
+        "ONE مقدرش ينزّله في {folder}. هينزّله لما الإنترنت يرجع وتبقى فيه مساحة كفاية، "
+        "أول ما صفحة تحتاج قراية من الصورة."
+    ),
+}
