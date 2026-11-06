@@ -148,7 +148,9 @@ quantity sourced to D for every row. It fails rather than hiding a missing impor
 Before each AI step and every five seconds while following (even without stream
 heartbeats), the runner reads `/costs`. Month spend minus the initial baseline
 at or above the cap stops the active Brief and marks remaining steps `NOT_RUN`.
-New unpriced usage in real mode or unavailable cost records also stop it.
+New unpriced usage in real mode also stops it as CAP. An unavailable cost read
+fails the current step and stops active real-AI work without asserting CAP; later
+steps and walks can recover with fresh cost reads.
 Cost reads have a five-second timeout. The final response is checked too.
 This is a recorded-spend stop, not a reservation: an in-flight provider request
 can finish above the threshold before its cost is recorded. The core's own caps
@@ -172,3 +174,111 @@ core/.venv/bin/python -m ruff format --check core
 
 All CLI tests use scripted AI and free local ports. Real launcher selection is
 inspected without launching real mode. No real provider is called.
+
+## Pre-contract CLI extension (6 November 2026)
+
+Additional commands (shared `--json` and `--lang en|ar` still apply):
+
+- `deliverable check P D` asks the core's Lead QS to submit the current Deliverable
+  to the Checking QS through chat, then reads closeout. It reports failure if a
+  settled reply did not record a check on the current saved version. A check can
+  cost money; it does not grant sign-off or bypass blocking review comments.
+- `deliverable signoff P D` uses the screen's Sign-off route. `show` now includes
+  version history. Ordinary Sheet/Document exports follow `DRAFT_EXPORTS = True`:
+  exports before Sign-off are allowed and marked «مسودة — غير معتمد» / "Draft — not
+  signed off". The CLI adds no refusal. Pack exports have their own signed-only gate.
+- `pack show P D`; `pack build P D --out FILE.pdf` invokes the screen's build step,
+  then downloads the signed export. An unsigned pack can be previewed by the core
+  but cannot be downloaded by this command. PDF results include actual page count
+  and bookmark titles/page destinations read from the returned bytes.
+- `compare P OLD_FILE NEW_FILE` preserves changed pages, word differences and
+  pairing explanations from the core.
+- `region add P F --page N --box x0,y0,x1,y1 COMMENT`; `region list P F` use file
+  comments with the screen's region anchor. Coordinates are displayed PDF points.
+- `file pdf P F --out FILE.pdf` uses the office conversion route; core bilingual
+  LibreOffice refusals are preserved and a failed download leaves existing output
+  untouched.
+- `changes list P D` reads pending changes including old values and proposed ops.
+- `costs --today` selects today's recorded cost/token fields; `--brief` remains.
+
+Additional checks: `reply_not_contains` (`reply_lacks` remains), `reply_numbers`
+(exact decimal tokens with Arabic digit normalization), `no_promise` (core truth
+function), `deliverable` (kind/variant/title_contains and content),
+`deliverable_numbers` (each expected value has a source), `boq_total` (a calculated
+Deliverable total), `changes_count`, `export_ok` (`pages` is a minimum),
+`pack_pages` (exact), `compare_pages` (exact changed new-page set), `max_steps`
+(latest worklog snapshot), `max_input_tokens` (latest Brief's recorded inputs),
+`rates_cited`, `boq_units`, `boq_sources`, `changes_target`, `calculated_numbers`,
+`scan_report`, `ocr_boxes`, and `pack_integrity`. Item/change counts accept `{min: N}`.
+`cited` requires the reply to name the expected page, DOCX paragraph, or sheet/row
+(bare row for CSV) as well as finding the value at that location. A requested
+column restricts evidence to that cell. Numeric matching is exact, including a
+number followed by a sentence period. Check evaluation is pure; the runner fetches
+source evidence separately before calling it.
+
+New walk steps:
+
+```yaml
+- deliverable: {kind: sheet, variant: boq}
+- check: {deliverable: {kind: sheet, variant: boq}, boq_total: '1810000'}
+- command: [changes, list, '{project}', '{deliverable}']
+- make: {source: '{samples}/../workspace/عرض أسعار المورد - عينة.pdf', page: 2}
+- files: ['{revision}']
+```
+
+The number above is **sample data**, from the bench sample BOQ's four item amounts.
+`command` reuses the CLI parser/adapters. Dynamic variables are `{project}`,
+`{file0}` etc. in upload order, `{deliverable}`, `{undo}`, `{revision}`, and
+`{scratch}`. `make` makes only a fixed SAMPLE REVISION text addition on one page,
+writing a uniquely named copy in the run scratch folder; it never edits the input
+and never executes YAML-provided Python. Scratch artifacts are retained for review.
+
+`walk --all DIR --scripted-only --report /tmp/one-walks.json` runs YAML files in
+filename order. A real/attached session is refused with `--scripted-only` (it never
+silently labels a real provider scripted). A failed action invalidates its evidence; following checks fail until another
+action succeeds. A failed check does not erase evidence for independent checks.
+Subsequent actions continue. Set `stop_on_fail: true` on a step to stop that walk on failure (including a step inside a capability branch).
+Later walks still run. Only confirmed recorded spending or unknown real-AI prices
+produce CAP. Transient cost-read failures do not latch the folder budget.
+The folder guard uses the sum of the YAML caps, or the smaller explicit `--max-usd`, in addition to each walk's own cap.
+`--report` writes JSON and a sibling `.txt` report. `needs` may be a mapping with
+separate `real` and `scripted` path lists, so missing private inputs do not skip
+sample tests. These are recorded-spend caps; in-flight requests can overshoot.
+
+### Scenario coverage and verification limits
+
+The eleven requested walks have separate real and scripted branches. Each real
+cap is $0.10 ($1.10 total); bench adds $0.10 to a folder run. Limits are not cost
+forecasts. No real AI is used by CLI tests or scripted walks.
+
+The scripted branches use fresh, labelled sample files and the bench model's
+scripted tool calls. They exercise their own jobs: pricing sourced rates and
+concrete-only changes/undo plus a letter (Lahun); ranked BOQ values and unchanged
+items (SGH); cited conditions/PDF import (Brissa); PDF BOQ import; native XLS and
+DOCX paragraph sources/conversion; pack proposal/accept/check/sign-off/build;
+page revision comparison and region comments; CSV prices and sourced pricing;
+Calc Engine estimates; conditions citations; and scan reporting/missing OCR.
+They never read private tender fixtures. Sample numbers are not real prices.
+
+`changes_target` requires exactly one pending rate change per matching concrete
+item and rejects all other targets/operations. `calculated_numbers` requires each
+expected number's calculation source and calculation identifier. `pack_integrity`
+reads the actual export: exact bookmarks/destinations, one correct footer on every
+page, identical duplicated content after stripping overlays, and the populated
+ONEIntegritySeal signature field. Seal presence is not a cryptographic trust
+verdict; core seal tests cover signature validity.
+
+Known real assertions include Lahun's counts/total/D54–D64/pricing-sheet sources,
+concrete-only rate-change targets and letter numbers; SGH's top five/division total
+and M8–P8 breakdown sources; Brissa's cited tender terms; DOCX currency at paragraph
+293; GASTAT September 2026 at CSV start line/row 1902 column H (record 952, with quoted newlines); and SCAD rebar at row 42.
+The real pack asks for exactly a cover, two copies of the first form page and a
+divider, with four named bookmarks, page numbers and the free seal; all are checked.
+
+The supplied Mansoura summary is blank and Giza's printed total is not established.
+Their total checks are deliberately omitted, documented in the walk's YAML comment.
+No expected total is invented. Real benchmark-scope/range and item-cost-analysis
+build-up expectations remain unestablished; scripted estimates/pricing exercise
+those routes with labelled sample inputs instead. Real walks have not been run
+with a paid provider, so passing scripted walks is not a certification of real-AI
+accuracy on every tender. New dependencies: none.

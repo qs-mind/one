@@ -1,0 +1,124 @@
+name: pack
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+real:
+- project: pack {run}
+- files:
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+- ask: Prepare a tender pack using only the first form-of-tender page from the uploaded
+    volume, repeated once. Put a FOR TENDER / للمناقصة cover first, the two form copies
+    next, and a divider last. Give those four sections the bookmarks Cover, Original,
+    Repeated, Divider. Add page numbers and the free ONE seal.
+- deliverable:
+    kind: pack
+- command:
+  - changes
+  - accept
+  - '{project}'
+  - '{deliverable}'
+- deliverable:
+    kind: pack
+- check:
+    deliverable:
+      kind: pack
+- command:
+  - deliverable
+  - check
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - deliverable
+  - signoff
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - pack
+  - build
+  - '{project}'
+  - '{deliverable}'
+  - --out
+  - '{scratch}/tender-pack.pdf'
+- check:
+    export_ok:
+      pages: 4
+    pack_pages: 4
+    pack_integrity:
+      bookmarks:
+      - title: Cover
+        page: 1
+      - title: Original
+        page: 2
+      - title: Repeated
+        page: 3
+      - title: Divider
+        page: 4
+      seal: true
+      page_numbers: true
+      duplicates:
+      - - 2
+        - 3
+scripted:
+- project: Sample tender pack {run}
+- files:
+  - '{samples}/sample-conditions.pdf'
+- ask: bench:pack Prepare the sample tender pack with a duplicated source page.
+- deliverable:
+    kind: pack
+    variant: tender
+- command:
+  - changes
+  - list
+  - '{project}'
+  - '{deliverable}'
+- check:
+    changes_count: 1
+- command:
+  - changes
+  - accept
+  - '{project}'
+  - '{deliverable}'
+- deliverable:
+    kind: pack
+    variant: tender
+- command:
+  - pack
+  - show
+  - '{project}'
+  - '{deliverable}'
+- check:
+    deliverable:
+      kind: pack
+- command:
+  - deliverable
+  - check
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - deliverable
+  - signoff
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - pack
+  - build
+  - '{project}'
+  - '{deliverable}'
+  - --out
+  - '{scratch}/sample-pack.pdf'
+- check:
+    pack_pages: 4
+    export_ok:
+      pages: 4
+    pack_integrity:
+      bookmarks:
+      - Sample cover
+      - Original
+      - Repeated
+      - Divider
+      duplicates:
+      - - 2
+        - 3
+      seal: true
+      page_numbers: true

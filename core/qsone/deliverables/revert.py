@@ -92,10 +92,13 @@ def _plan(conn, deliverable_id: str, n: int, audit_from: int) -> dict:
         elif table == "deliverables" and action == "update" and row_id == deliverable_id:
             template = [template[0] if template else before["template"], after["template"]]
         elif table == "numbers" and action == "create":
-            (kind,) = conn.execute(
-                "SELECT kind FROM sources WHERE id = ?", (after["source_id"],)
+            # An accepted input may cite a calculation without being its output:
+            # e.g. rate copied from proposed_rate. Restore that input normally.
+            # Only actual calculation outputs can be regenerated from inputs below.
+            (derived,) = conn.execute(
+                "SELECT EXISTS (SELECT 1 FROM calculations WHERE output = ?)", (after["id"],)
             ).fetchone()
-            chains = calculated if kind == "calculation" else numbers
+            chains = calculated if derived else numbers
             key = (after["item_id"], after["name"])
             chains.setdefault(key, [after["replaces"], None])[1] = after["id"]
     # The QS Calc Engine's own are brought up to date again from the inputs; only an amount or a

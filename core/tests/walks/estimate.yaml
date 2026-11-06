@@ -1,0 +1,39 @@
+name: estimate
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/uae/stonehaven-cost-benchmark-2025/stonehaven_uae_cost_benchmark_2025.pdf'
+real:
+- project: estimate {run}
+- files:
+  - '{test_files}/uae/stonehaven-cost-benchmark-2025/stonehaven_uae_cost_benchmark_2025.pdf'
+- ask: Estimate a 5,000 m² mid-range office in Dubai. State your scope assumption
+    and give a benchmark-based range with sources, using calculate for every computed
+    number.
+- check:
+    no_promise: true
+    reply_contains:
+    - AED
+scripted:
+- project: Sample early estimate {run}
+- files:
+  - '{samples}/sample-estimate.xlsx'
+- ask: bench:estimate Prepare the sample office cost estimate range from this benchmark.
+  answer:
+    rows: keep
+- deliverable:
+    kind: sheet
+    variant: boq
+- check:
+    deliverable:
+      kind: sheet
+    deliverable_numbers:
+    - '29500000'
+    - '36500000'
+    calculated_numbers:
+    - '29500000'
+    - '36500000'
+limitations:
+- Benchmark table verified on PDF page 9, but mid-range office is ambiguous (mid-rise
+  shell/core versus medium fit-out). Scope-specific range and calculate provenance
+  assertions remain pending.

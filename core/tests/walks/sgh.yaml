@@ -1,7 +1,8 @@
 name: sgh
+max_usd: 0.1
 needs:
-- '{test_files}/saudi/sgh-makkah-opd-fitout/sgh-makkah-opd-fitout-boq.xlsx'
-max_usd: 3
+  real:
+  - '{test_files}/saudi/sgh-makkah-opd-fitout/sgh-makkah-opd-fitout-boq.xlsx'
 real:
 - project: sgh {run}
 - files:
@@ -9,50 +10,84 @@ real:
 - ask: Import this BOQ.
   answer:
     rows: keep
-    question:
-      choice: sent
-      answers:
-        currency: SAR
 - boq: show
 - check:
     boq_items: 53
 - ask: What are the five biggest items by amount?
+- check:
+    reply_numbers:
+    - 127000
+    - 88290
+    - 80000
+    - 78750
+    - 75100
+    no_promise: true
+- ask: What is the total for division 16.16?
+- check:
+    reply_numbers:
+    - 204852
+- ask: Break down the rate of item 16.1-1, with each component source.
+- check:
+    reply_numbers:
+    - 11700
+    - 200
+    - 1600
+    - 500
+    - 14000
+- check:
+    cited:
+      value: 11700
+      sheet: Electrical
+      row: 8
+      column: M
+- check:
+    cited:
+      value: 200
+      sheet: Electrical
+      row: 8
+      column: N
+- check:
+    cited:
+      value: 1600
+      sheet: Electrical
+      row: 8
+      column: O
+- check:
+    cited:
+      value: 500
+      sheet: Electrical
+      row: 8
+      column: P
+- ask: Do we have supplier quotes?
+- check:
+    reply_not_contains:
+    - supplier quotes are available
+    no_promise: true
 - boq: show
 - check:
-    reply_contains:
-    - 127,000
-    - 88,290
-    - 80,000
-    - 78,750
-    - 75,100
     boq_items: 53
     items_unchanged: true
-    no_raw: true
-    max_usd: 3
 scripted:
-- project: CLI sample {run}
+- project: Sample ranking {run}
 - files:
   - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
-- ask: bench:question What do you need?
-  answer:
-    question:
-      choice: sent
-      answers:
-        q1: Ready-mix
-        q2: Sample note
-- check:
-    reply_contains: bench reply
-    no_raw: true
-    max_usd: 1
-- ask: bench:boq Import the BOQ
+- ask: bench:summary Import the sample BOQ, rank its largest amounts, and total its
+    concrete section.
   answer:
     rows: keep
 - boq: show
 - check:
     boq_items: 4
-    boq_sections: 2
-    no_raw: true
-- ask: bench:chat Hello
+    reply_numbers:
+    - '1312000'
+    - '360000'
+    - '102000'
+    - '36000'
+    - '1672000'
+- ask: bench:chat Keep the imported sample items unchanged.
 - boq: show
 - check:
     items_unchanged: true
+limitations:
+- Supplier-quote honesty still needs a semantic assertion beyond the negative phrase
+  check.

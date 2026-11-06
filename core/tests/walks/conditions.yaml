@@ -1,0 +1,52 @@
+name: conditions
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/saudi/mof-standard/contract-general-construction.pdf'
+  - '{test_files}/uae/dubai-municipality-conditions-1999/dm_conditions_of_contract_civil_1999.pdf'
+real:
+- project: conditions {run}
+- files:
+  - '{test_files}/saudi/mof-standard/contract-general-construction.pdf'
+  - '{test_files}/uae/dubai-municipality-conditions-1999/dm_conditions_of_contract_civil_1999.pdf'
+- ask: What are the delay damages and caps in each contract? Distinguish filled values
+    from template blanks and cite the pages.
+- check:
+    reply_contains:
+    - Appendix
+    reply_numbers:
+    - 20
+    no_promise: true
+- check:
+    cited:
+      file: 0
+      page: 50
+      value: 20
+- check:
+    cited:
+      file: 1
+      page: 93
+      value: '47.1'
+scripted:
+- project: Sample conditions {run}
+- files:
+  - '{samples}/sample-conditions.pdf'
+- ask: bench:conditions What are the sample delay damages and cap?
+- check:
+    reply_numbers:
+    - '0.2'
+    - 10
+    cited:
+      file: 0
+      page: 1
+      value: '0.2'
+- check:
+    cited:
+      file: 0
+      page: 1
+      value: 10
+    no_promise: true
+limitations:
+- Verified MOF pp49–50 leaves the delay formula/cap blank; clause 82 has a bracketed
+  20% overall cap. Dubai p93 refers both rate and cap to the Appendix, rather than
+  specifying percentages.

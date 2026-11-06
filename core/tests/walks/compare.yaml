@@ -1,0 +1,56 @@
+name: compare
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+real:
+- project: compare {run}
+- files:
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+- make:
+    source: '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+    page: 2
+- files:
+  - '{revision}'
+- command:
+  - compare
+  - '{project}'
+  - '{file0}'
+  - '{file1}'
+- check:
+    compare_pages:
+    - 2
+scripted:
+- project: Sample revisions {run}
+- files:
+  - '{samples}/../workspace/عرض أسعار المورد - عينة.pdf'
+- make:
+    source: '{samples}/../workspace/عرض أسعار المورد - عينة.pdf'
+    page: 2
+- files:
+  - '{revision}'
+- command:
+  - compare
+  - '{project}'
+  - '{file0}'
+  - '{file1}'
+- check:
+    compare_pages:
+    - 2
+- command:
+  - region
+  - add
+  - '{project}'
+  - '{file0}'
+  - --page
+  - '1'
+  - --box
+  - 10,10,30,30
+  - Sample region / منطقة عينة
+- command:
+  - region
+  - list
+  - '{project}'
+  - '{file0}'
+limitations:
+- Revision mutation is fixed sample text and always writes to run scratch.

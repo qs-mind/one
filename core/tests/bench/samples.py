@@ -64,6 +64,7 @@ def write_spec(path: Path) -> Path:
 
 def write(folder: Path) -> list[Path]:
     folder.mkdir(parents=True, exist_ok=True)
+    write_cli_samples(folder)
     return [write_boq(folder / BOQ_NAME), write_spec(folder / SPEC_NAME)]
 
 
@@ -140,3 +141,60 @@ def write_old(root: Path) -> Path:
         (folder / name).mkdir(parents=True, exist_ok=True)
         write_spec(folder / name / SPEC_NAME)
     return folder
+
+
+def write_cli_samples(folder: Path) -> None:
+    """Small job-specific inputs. Every value is sample data, never a tender copy."""
+    import typst
+
+    from tests.samples import sample_pdf, sample_xls
+
+    rows = [["Item", "Description", "Unit", "Quantity", "Rate", "Amount"]]
+    rows += [
+        [
+            code,
+            desc,
+            unit,
+            float(qty) if qty else "",
+            float(rate) if rate else "",
+            float(amount) if amount else "",
+        ]
+        for code, desc, unit, qty, rate, amount in BOQ_ROWS
+    ]
+    (folder / "sample-boq.xls").write_bytes(sample_xls({"Sample": rows}))
+    (folder / "sample-conditions.pdf").write_bytes(
+        sample_pdf(
+            [
+                ["Sample contract data: delay damages 0.2% per day; cap 10%."],
+                ["Sample tender data: bid validity 180 days; bid security 350000 USD."],
+            ]
+        )
+    )
+    (folder / "sample-scan.pdf").write_bytes(sample_pdf([[]]))
+    (folder / "sample-market.csv").write_text(
+        "Month,Material,Price,Unit\n2026-09,Sample rebar,3200,EGP/t\n"
+        "2026-08,Sample cement,1500,EGP/t\n"
+    )
+    doc = Document()
+    doc.add_paragraph("Sample booklet: offers must be submitted electronically.")
+    doc.save(folder / "sample-booklet.docx")
+    estimate = openpyxl.Workbook()
+    ws = estimate.active
+    ws.title = "Sample benchmark"
+    ws.append(["Item", "Description", "Unit", "Quantity", "Rate", "Amount"])
+    ws.append(["LOW", "Sample office low", "m2", 5000, 5900, 29500000])
+    ws.append(["HIGH", "Sample office high", "m2", 5000, 7300, 36500000])
+    estimate.save(folder / "sample-estimate.xlsx")
+    source = "\n".join(
+        [
+            "#set page(width: 650pt, height: 500pt, margin: 30pt)",
+            '#set text(font: "DejaVu Sans", size: 10pt)',
+            "Sample BOQ: invented test quantities and prices.",
+            "#table(columns: (45pt, 170pt, 45pt, 70pt, 70pt, 80pt), inset: 6pt,",
+            "[Item], [Description], [Unit], [Quantity], [Rate], [Amount],",
+            "[], [Concrete works sample], [], [], [], [],",
+            "[1], [Concrete sample], [m3], [12.50], [20.00], [250.00],",
+            "[2], [Concrete sample], [m3], [2.00], [30.00], [60.00])",
+        ]
+    )
+    (folder / "sample-boq.pdf").write_bytes(typst.compile(source.encode()))

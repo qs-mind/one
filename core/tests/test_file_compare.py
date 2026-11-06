@@ -199,3 +199,23 @@ def test_concrete_grade_is_not_used_to_pair_pages(rec):
     new = add(rec, ["C-30 TO BS-8110"], "new-sample.pdf")
     result = compare_files(rec, old, new)
     assert result["pairs"][0]["method"] != "sheet"
+
+
+def test_bench_quote_revision_keeps_pages_without_title_block_words(rec, tmp_path):
+    from qsone.cli.walk import make_revision
+    from qsone.records.compare import _file
+    from tests.bench.samples import write_quote
+
+    original = write_quote(tmp_path / "samples")
+    revision = make_revision(original, tmp_path / "scratch", page=2)
+    old = files.add_file(rec, original.name, original.read_bytes(), actor="engineer").id
+    new = files.add_file(rec, revision.name, revision.read_bytes(), actor="engineer").id
+    for file_id in (old, new):
+        _, pages, _, titles = _file(rec, file_id)
+        assert len(pages) == len(titles) == 2
+        assert titles == [None, None]
+    result = compare_files(rec, old, new)
+    assert [(p["old"]["page"], p["new"]["page"]) for p in result["pairs"]] == [(1, 1), (2, 2)]
+    assert [p["new"]["page"] for p in result["changed"]] == [2]
+    assert result["changed"][0]["pixels_changed"] > 0
+    assert result["unchanged"] == 1

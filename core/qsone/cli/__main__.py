@@ -11,7 +11,7 @@ import httpx
 from qsone.cli import session
 from qsone.cli.client import Client
 from qsone.cli.commands import Commands
-from qsone.cli.texts import TEXT, CliError
+from qsone.cli.texts import LABELS, TEXT, CliError
 
 
 def parser():
@@ -47,7 +47,10 @@ def parser():
     for item in (add, report, listing):
         item.add_argument("project")
     add.add_argument("paths", nargs="+", type=Path)
-    (show,) = group("file", ["show"])
+    show, pdf = group("file", ["show", "pdf"])
+    pdf.add_argument("project")
+    pdf.add_argument("file")
+    pdf.add_argument("--out", required=True, type=Path)
     show.add_argument("project")
     show.add_argument("file")
     location = show.add_mutually_exclusive_group()
@@ -68,15 +71,17 @@ def parser():
     steer.add_argument("text")
     (show,) = group("boq", ["show"])
     show.add_argument("project")
-    listing, show, export = group("deliverable", ["list", "show", "export"])
-    for item in (listing, show, export):
+    listing, show, export, check, signoff = group(
+        "deliverable", ["list", "show", "export", "check", "signoff"]
+    )
+    for item in (listing, show, export, check, signoff):
         item.add_argument("project")
-    for item in (show, export):
+    for item in (show, export, check, signoff):
         item.add_argument("deliverable")
-    export.add_argument("--format", required=True)
+    export.add_argument("--format", required=True, choices=["pdf", "xlsx", "docx"])
     export.add_argument("--out", required=True, type=Path)
-    accept, reject = group("changes", ["accept", "reject"])
-    for item in (accept, reject):
+    accept, reject, listing = group("changes", ["accept", "reject", "list"])
+    for item in (accept, reject, listing):
         item.add_argument("project")
         item.add_argument("deliverable")
         item.add_argument("--ids")
@@ -90,9 +95,28 @@ def parser():
     (explain,) = group("number", ["explain"])
     explain.add_argument("project")
     explain.add_argument("number")
-    command("costs").add_argument("--brief")
+    costs = command("costs").add_mutually_exclusive_group()
+    costs.add_argument("--brief")
+    costs.add_argument("--today", action="store_true")
+    show, build = group("pack", ["show", "build"])
+    for item in (show, build):
+        item.add_argument("project")
+        item.add_argument("deliverable")
+    build.add_argument("--out", required=True, type=Path)
+    compare = command("compare")
+    for name in ("project", "old_file", "new_file"):
+        compare.add_argument(name)
+    add, listing = group("region", ["add", "list"])
+    for item in (add, listing):
+        item.add_argument("project")
+        item.add_argument("file")
+    add.add_argument("--page", required=True, type=int)
+    add.add_argument("--box", required=True)
+    add.add_argument("comment")
     walk = command("walk")
-    walk.add_argument("file", type=Path)
+    walk.add_argument("file", type=Path, nargs="?")
+    walk.add_argument("--all", type=Path, dest="directory")
+    walk.add_argument("--scripted-only", action="store_true")
     walk.add_argument("--max-usd", default=None)
     walk.add_argument("--report", type=Path)
     return root
@@ -122,9 +146,9 @@ def plain(value, lang, indent=""):
         if "en" in value and "ar" in value:
             return indent + str(value[lang])
         return "\n".join(
-            indent + str(k) + ":\n" + plain(v, lang, indent + "  ")
+            indent + LABELS.get(k, {}).get(lang, str(k)) + ":\n" + plain(v, lang, indent + "  ")
             if isinstance(v, (dict, list))
-            else indent + f"{k}: {v}"
+            else indent + f"{LABELS.get(k, {}).get(lang, str(k))}: {v}"
             for k, v in value.items()
         )
     if isinstance(value, list):
@@ -152,9 +176,18 @@ def main(argv=None):
             client = Client(saved)
             commands = Commands(client, saved, path, args.lang)
             if args.command == "walk":
-                from qsone.cli.walk import run
+                from qsone.cli.walk import run, run_all
 
-                result = run(commands, args.file, max_usd=args.max_usd, report=args.report)
+                if bool(args.file) == bool(args.directory):
+                    raise CliError("walk")
+                runner = run_all if args.directory else run
+                result = runner(
+                    commands,
+                    args.directory or args.file,
+                    max_usd=args.max_usd,
+                    report=args.report,
+                    scripted_only=args.scripted_only,
+                )
                 code = int(result["status"] not in ("PASS", "SKIPPED"))
             else:
                 result = commands.run(args)

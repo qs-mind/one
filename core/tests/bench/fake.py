@@ -46,6 +46,18 @@ SCENARIOS = (
     *("chat", "question", "boq", "deliverable", "team", "full", "understand", "lessons", "view"),
     "weak",  # the tender day's weak model: the guards must catch each of its mistakes
     "workspace",
+    "pricing",
+    "letter",
+    "pack",
+    "estimate",
+    "conditions",
+    "oldoffice",
+    "pdfboq",
+    "scanned",
+    "market",
+    "revise",
+    "summary",
+    "checkonly",
 )
 _KEYWORD = re.compile(r"bench:(\w+)")
 _ARABIC = re.compile(r"[؀-ۿ]")
@@ -117,6 +129,8 @@ def read(messages: list, info: AgentInfo) -> Seen:
         scenario = "understand"
     elif brief in copy.LESSONS_BRIEF.values():  # the one closing a project starts
         scenario = "lessons"
+    if "submit_for_check" in brief and re.search(r"deliverable [0-9a-f]{32}", brief):
+        scenario = "checkonly"
     offered = {t.name for t in info.function_tools}
     tools = offered | openable(info)
     model = _MODEL.search(info.instructions or "")
@@ -556,8 +570,284 @@ def _decide(seen: Seen) -> Step:
     return _call("decide", "ask_engineer", {"questions": [question]})
 
 
+# CLI pre-contract scenarios. These are model scripts over the real tools, not QS logic.
+def _target(seen):
+    match = re.search(r"(?:target:|deliverable )([0-9a-f]{32})", seen.brief)
+    return match.group(1) if match else None
+
+
+def _read_target(seen):
+    target = _target(seen)
+    return (
+        _call(
+            "target",
+            "deliverable_read",
+            {"id": target, **({"offset": 3, "limit": 2} if seen.scenario == "revise" else {})},
+        )
+        if target
+        else None
+    )
+
+
+def _check_target(seen):
+    target = _target(seen)
+    return _call("checktarget", "submit_for_check", {"deliverable_id": target}) if target else None
+
+
+def _priced_letter(seen):
+    view = _data(seen.done.get("target", ("", False))[0])
+    if not view.get("total"):
+        return None
+    blocks = [
+        {"type": "h1", "children": [{"text": "Tender letter (bench sample)"}]},
+        {
+            "type": "p",
+            "children": [
+                {"text": "Sample offer total: "},
+                {
+                    "type": "cell",
+                    "deliverable": view["id"],
+                    "row": "total",
+                    "column": "amount",
+                    "children": [{"text": ""}],
+                },
+            ],
+        },
+        {
+            "type": "p",
+            "children": [
+                {
+                    "text": "Bidder: [to be filled by the engineer]. "
+                    "Tender number: [to be filled by the engineer]. "
+                    "Signature: [to be filled by the engineer]."
+                }
+            ],
+        },
+    ]
+    return _call(
+        "pricedletter",
+        "deliverable_create",
+        {
+            "kind": "document",
+            "variant": "letter",
+            "title": "Tender letter (bench sample)",
+            "language": "en",
+            "blocks": blocks,
+        },
+    )
+
+
+def _preview_pdf(seen):
+    found = _file(seen, ("pdf",))
+    return _call("preview", "boq_preview", {"file_id": found}) if found else None
+
+
+def _read_any(seen):
+    found = _files(seen)
+    return _call("spec", "files_read", {"file_id": found[0][0]}) if found else None
+
+
+def _rank_sample(seen):
+    return _call("rank", "rank_items", {"name": "amount", "top": 4})
+
+
+def _section_total(seen):
+    return _call(
+        "sectiontotal",
+        "calculate",
+        {
+            "formula": "sum(amounts)",
+            "inputs": {"amounts": {"each": {"code_prefix": "02/"}, "name": "amount"}},
+            "result": {"unit": "EGP"},
+        },
+    )
+
+
+def _sample_pack(seen):
+    source = _file(seen, ("pdf",))
+    if source is None:
+        return None
+
+    def pair(en, ar):
+        return {"en": en, "ar": ar}
+
+    steps = [
+        {
+            "kind": "cover",
+            "text": pair("FOR TENDER — sample", "للمناقصة — عينة"),
+            "title": pair("Sample cover", "غلاف عينة"),
+        },
+        {"kind": "file", "file_id": source, "ranges": [[1, 1]], "title": pair("Original", "الأصل")},
+        {"kind": "file", "file_id": source, "ranges": [[1, 1]], "title": pair("Repeated", "مكرر")},
+        {
+            "kind": "divider",
+            "text": pair("Sample divider", "فاصل عينة"),
+            "title": pair("Divider", "فاصل"),
+        },
+        {"kind": "page_numbers"},
+        {"kind": "seal"},
+    ]
+    return _call(
+        "pack",
+        "pack_propose",
+        {
+            "steps": steps,
+            "reason": "Sample tender pack",
+            "title": "Sample tender pack",
+            "language": "en",
+        },
+    )
+
+
+def _price_steps():
+    """The fixture's input rates only; computed amounts are left to the Calc Engine."""
+    steps = []
+    for index, (code, row, rate) in enumerate(
+        (("01/01", 4, "85"), ("01/02", 5, "45"), ("02/01", 7, "2400"), ("02/02", 8, "4100"))
+    ):
+
+        def source(seen, index=index, row=row):
+            file = _file(seen, ("xlsx", "excel"))
+            if file is None:
+                return None
+            return _call(
+                f"ratesource{index}",
+                "add_source",
+                {
+                    "kind": "sample",
+                    "file_id": file,
+                    "locator": {"sheet": "المقايسة", "row": row},
+                    "title": "Sample workbook rate",
+                    "dated": samples.QUOTE_DATED,
+                },
+            )
+
+        def number(seen, index=index, code=code, rate=rate):
+            source = _data(seen.done.get(f"ratesource{index}", ("", False))[0]).get("source_id")
+            if source is None:
+                return None
+            return _call(
+                f"rate{index}",
+                "record_number",
+                {
+                    "item": code,
+                    "name": "rate",
+                    "value": rate,
+                    "unit": "م3",
+                    "currency": "EGP",
+                    "source_id": source,
+                },
+            )
+
+        steps += [(source, f"ratesource{index}"), (number, f"rate{index}")]
+    return steps
+
+
+PRICING_STEPS = _price_steps()
+
+
+def _revise_steps():
+    steps = []
+    for index, code in enumerate(("02/01", "02/02")):
+
+        def calculate(seen, index=index, code=code):
+            return _call(
+                f"increase{index}",
+                "calculate",
+                {
+                    "formula": "rate * (1 + increase)",
+                    "item": code,
+                    "inputs": {
+                        "increase": {
+                            "constant": "5",
+                            "unit": "%",
+                            "why": "Engineer requested sample increase",
+                        }
+                    },
+                    "result": {"unit": "EGP/م3"},
+                    "save": {"name": "proposed_rate"},
+                },
+            )
+
+        steps.append((calculate, f"increase{index}"))
+    return steps
+
+
+REVISE_STEPS = _revise_steps()
+
+
+def _revise_open(seen):
+    return _call(
+        "reviseopen",
+        tool_groups.OPEN,
+        {"open": ["calculate", "ledger_numbers", "deliverable_read", "deliverable_propose"]},
+    )
+
+
+def _revise_inputs(seen):
+    # Read saved calculation results and rows in one batch, so history compaction
+    # cannot replace an input with a summary before the proposal is assembled.
+    calls = [
+        _call(f"revised{index}", "ledger_numbers", {"item": code}).parts[0]
+        for index, code in enumerate(("02/01", "02/02"))
+    ]
+    calls.extend(_read_target(seen).parts)
+    return Step(tuple(calls), USAGE)
+
+
+def _revise_propose(seen):
+    view = _data(seen.done.get("target", ("", False))[0])
+    ops = []
+    for index, code in enumerate(("02/01", "02/02")):
+        result = [
+            n
+            for n in _data(seen.done.get(f"revised{index}", ("", False))[0]).get("numbers", [])
+            if n["name"] == "proposed_rate"
+        ]
+        row = next((r for r in view.get("rows", []) if r.get("code") == code), None)
+        if row and result:
+            ops.append(
+                {
+                    "op": "set_number",
+                    "row": row["id"],
+                    "name": "rate",
+                    "value": result[0]["value"],
+                    "source_id": result[0]["source"]["id"],
+                    "dated": result[0]["dated"],
+                }
+            )
+    return (
+        _call(
+            "revise",
+            "deliverable_propose",
+            {"id": view["id"], "ops": ops, "reason": "Sample concrete-only increase"},
+        )
+        if ops
+        else None
+    )
+
+
 BOQ = (_files_step, _preview, _import, _items)
 LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
+    "pricing": (
+        _files_step,
+        _preview,
+        _import_unpriced,
+        _items,
+        *(f for f, _ in PRICING_STEPS),
+        _sheet,
+    ),
+    "letter": (_read_target, _priced_letter),
+    "pack": (_files_step, _sample_pack),
+    "estimate": (*BOQ, _sheet),
+    "summary": (*BOQ, _rank_sample, _section_total),
+    "oldoffice": (*BOQ, _read_spec, _sheet),
+    "pdfboq": (_files_step, _preview_pdf, _import, _items, _sheet),
+    "conditions": (_files_step, _read_any),
+    "market": (_files_step, _read_any),
+    "scanned": (_files_step, _read_any),
+    "revise": (_revise_open, *(f for f, _ in REVISE_STEPS), _revise_inputs, _revise_propose),
+    "checkonly": (_check_target,),
     "chat": (),
     "question": (_ask,),
     "boq": BOQ,
@@ -595,6 +885,19 @@ LEAD_SCENARIOS: dict[str, tuple[Callable[[Seen], Step | None], ...]] = {
     ),
 }
 _STEP_OF = {
+    **dict(PRICING_STEPS),
+    **dict(REVISE_STEPS),
+    _revise_inputs: "target",
+    _revise_open: "reviseopen",
+    _read_target: "target",
+    _check_target: "checktarget",
+    _priced_letter: "pricedletter",
+    _preview_pdf: "preview",
+    _read_any: "spec",
+    _rank_sample: "rank",
+    _section_total: "sectiontotal",
+    _sample_pack: "pack",
+    _revise_propose: "revise",
     _files_step: "files",
     _read_spec: "spec",
     _preview: "preview",
@@ -650,10 +953,11 @@ def lead(seen: Seen) -> Step:
         found = step(seen)
         if found is None or found.parts[0].tool_name not in seen.tools:
             continue
-        name = found.parts[0].tool_name
-        opening = "open" + name.replace("_", "")
-        if name not in seen.offered and opening not in seen.done:  # as a real Lead: open it first
-            return _call(opening, tool_groups.OPEN, {"open": [name]})
+        for part in found.parts:
+            name = part.tool_name
+            opening = "open" + name.replace("_", "")
+            if name not in seen.offered and opening not in seen.done:
+                return _call(opening, tool_groups.OPEN, {"open": [name]})
         return found
     if seen.scenario == "weak":
         return _say(WEAK_CLAIM)
@@ -668,7 +972,26 @@ def lead(seen: Seen) -> Step:
                 f"{seen.effort or 'الافتراضي'}.",
             )
         )
-    return _say(_report(seen))
+    reply = _report(seen)
+    if seen.scenario == "conditions" and seen.done.get("spec", ("", False))[1]:
+        reply += (
+            " Sample delay damages: 0.2% per day, cap 10%, page 1. "
+            "Sample bid validity: 180 days and security: 350000 USD, page 2."
+        )
+    if seen.scenario == "market" and seen.done.get("spec", ("", False))[1]:
+        reply += " Sample rebar price: 3200 EGP/t, row 2."
+    if seen.scenario == "oldoffice" and seen.done.get("spec", ("", False))[1]:
+        reply += " Sample offers must be submitted electronically, paragraph 1."
+    if seen.scenario == "scanned" and seen.done.get("spec", ("", False))[1]:
+        reply += " The sample scan needs OCR before BOQ import; no items were imported."
+    if seen.scenario == "summary":
+        ranked = _data(seen.done.get("rank", ("", False))[0])
+        values = [str(r.get("value", "")) for r in ranked.get("items", [])]
+        total = _data(seen.done.get("sectiontotal", ("", False))[0]).get("results", [])
+        reply += " Sample highest amounts: " + ", ".join(values) + "."
+        if total:
+            reply += " Sample concrete total: " + total[0]["value"] + "."
+    return _say(reply)
 
 
 # The other agents ----------------------------------------------------------------------------

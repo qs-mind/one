@@ -47,9 +47,9 @@ def _sheet_candidates(text: str) -> list[str]:
     return [value for _, value in sorted(candidates)]
 
 
-def identity(text: str, title_block: str = "") -> tuple[str, str]:
+def identity(text: str, title_block: str | None = None) -> tuple[str, str]:
     normalized = _normalized(text)
-    matches = _sheet_candidates(title_block) or _sheet_candidates(normalized)
+    matches = _sheet_candidates(title_block or "") or _sheet_candidates(normalized)
     sheet = matches[-1] if matches else ""
     lines = [" ".join(line.split()).casefold() for line in normalized.splitlines() if line.strip()]
     title = next((line for line in lines if not _sheet_candidates(line)), "")
@@ -57,9 +57,12 @@ def identity(text: str, title_block: str = "") -> tuple[str, str]:
 
 
 def pair_pages(
-    old: list[str], new: list[str], *, title_blocks: tuple[list[str], list[str]] | None = None
+    old: list[str],
+    new: list[str],
+    *,
+    title_blocks: tuple[list[str | None], list[str | None]] | None = None,
 ) -> list[tuple[int, int, str]]:
-    blocks = title_blocks or ([""] * len(old), [""] * len(new))
+    blocks = title_blocks or ([None] * len(old), [None] * len(new))
     ids = [
         [identity(t, block) for t, block in zip(pages, titles, strict=True)]
         for pages, titles in zip((old, new), blocks, strict=True)
@@ -146,8 +149,12 @@ def _images(old: bytes, new: bytes, before: int, after: int, width: int):
                 doc.close()
 
 
-def _title_blocks(data: bytes, chunks: list[tuple[str, str]]) -> list[str]:
-    """Words in the bottom-right quarter of the displayed page, in reading order."""
+def _title_blocks(data: bytes, chunks: list[tuple[str, str]], count: int) -> list[str | None]:
+    """One slot per displayed page; no title-block words means no identity evidence.
+
+    PDFium owns displayed page numbers. A page with no pdfplumber title-block text
+    must retain its slot rather than shifting later pages' identities forward.
+    """
     ocr_words: dict[int, list[dict]] = {}
     for locator, text in chunks:
         loc = json.loads(locator)
@@ -156,7 +163,7 @@ def _title_blocks(data: bytes, chunks: list[tuple[str, str]]) -> list[str]:
                 [{"text": text, "box": loc["box"]}] if "box" in loc else []
             )
             ocr_words.setdefault(loc["page"], []).extend(words)
-    blocks = []
+    blocks: list[str | None] = [None] * count
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages:
             x0, y0, x1, y1 = page.cropbox or page.bbox
@@ -182,7 +189,7 @@ def _title_blocks(data: bytes, chunks: list[tuple[str, str]]) -> list[str]:
                 and (y1 - y0) / 2 <= (w["box"][1] + w["box"][3]) / 2 <= y1 - y0
             ]
             selected.sort(key=lambda w: (w["box"][1], w["box"][0]))
-            blocks.append(" ".join(w["text"] for w in selected))
+            blocks[page.page_number - 1] = " ".join(w["text"] for w in selected) or None
     return blocks
 
 
@@ -201,7 +208,7 @@ def _file(rec: Records, file_id: str):
     data = files.read_original(rec, file_id)
     try:
         count = render.page_count(data)
-        title_blocks = _title_blocks(data, chunks)
+        title_blocks = _title_blocks(data, chunks, count)
     except Exception:
         raise RecordsError(copy.FILE_UNREADABLE, status=409, field="file") from None
     texts = [""] * count
