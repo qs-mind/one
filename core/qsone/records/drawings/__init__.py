@@ -13,25 +13,35 @@ from collections import Counter
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
-from shapely.geometry import Point, Polygon
+from shapely.geometry import LineString, Point, Polygon
 from shapely.strtree import STRtree
+
+from .arabic import decode_text
 
 
 @dataclass
 class Drawing:
+    name: str = ""
     format: str = ""
     version: str = ""
     units: int = 0
+    extents: list[float] = field(default_factory=list)
+    styles: list[dict] = field(default_factory=list)
+    embedded: list[dict] = field(default_factory=list)
+    entity_kinds: dict = field(default_factory=dict)
     summary_info: dict = field(default_factory=dict)
     layers: list[dict] = field(default_factory=list)
     layouts: list[dict] = field(default_factory=list)
     texts: list[dict] = field(default_factory=list)
     inserts: list[dict] = field(default_factory=list)
+    segments: list[dict] = field(default_factory=list)
     dimensions: list[dict] = field(default_factory=list)
     hatches: list[dict] = field(default_factory=list)
     closed: list[dict] = field(default_factory=list)
     xrefs: list[dict] = field(default_factory=list)
     problems: list = field(default_factory=list)
+    omitted: dict = field(default_factory=dict)
+    traversal_limited: bool = False
     totals: dict = field(default_factory=dict)
     note: str | None = None
     repaired: bool = False
@@ -54,7 +64,12 @@ class Sheet:
     revision: str | None = None
     date: str | None = None
     scale: str | None = None
+    project: str | None = None
+    client: str | None = None
+    consultant: str | None = None
     discipline_hint: str | None = None
+    counts_complete: bool = True
+    rooms_complete: bool = True
     counts: dict[str, int] = field(default_factory=dict)
     rooms: list[Room] = field(default_factory=list)
     texts: list[dict] = field(default_factory=list)
@@ -73,6 +88,11 @@ def find_binary() -> Path | None:
             candidates.append(parent / "drawings" / "target" / "release" / name)
             break
     return next((p for p in candidates if p.is_file() and os.access(p, os.X_OK)), None)
+
+
+def _display_text(row: dict) -> dict:
+    row = decode_text(row)
+    return {**row, "text": re.sub(r"%%[uUoOkK]", "", row["text"]).strip()}
 
 
 def read_drawing(name: str, data: bytes) -> Drawing:
@@ -97,7 +117,17 @@ def read_drawing(name: str, data: bytes) -> Drawing:
         drawing = Drawing(**{k: v for k, v in raw.items() if k in allowed})
         if not isinstance(drawing.texts, list) or not isinstance(drawing.inserts, list):
             return Drawing(note="FILE_UNREADABLE")
-        drawing.repaired = result.returncode == 2
+        drawing.name = name
+        drawing.texts = [_display_text(t) for t in drawing.texts]
+        decoded_attributes = {t.get("handle"): t for t in drawing.texts}
+        for insert in drawing.inserts:
+            for attr in insert.get("attributes", []):
+                attr["raw_value"] = attr["value"]
+                attr["value"] = decoded_attributes.get(attr.get("handle"), {}).get(
+                    "text", re.sub(r"%%[uUoOkK]", "", attr["value"]).strip()
+                )
+        _embedded_texts(drawing)
+        drawing.repaired = result.returncode == 2 or bool(drawing.problems)
         if drawing.repaired:
             drawing.note = "FILE_DRAWINGS_REPAIRED"
         return drawing
@@ -111,19 +141,26 @@ _DISCIPLINES = {
     "S": "structure",
     "M": "mechanical",
     "E": "electrical",
+    "EL": "electrical",
     "P": "plumbing",
     "C": "civil",
     "L": "landscape",
 }
 _LABELS = {
     "number": (
-        r"(?:sheet[\s_]*(?:no\.?|number)|drawing[\s_]*(?:no\.?|number)"
-        r"|dwg[\s_]*no|رقم\s*اللوح[ةه]|لوح[ةه]\s*رقم)"
+        r"(?:sheet[\s_-]*(?:no\.?|number)|drawing[\s_-]*(?:no\.?|number)"
+        r"|dwg[\s_-]*no|رقم\s*المخطط|رقم\s*اللوح[ةه]|لوح[ةه]\s*رقم)"
     ),
-    "title": r"(?:title|sheet[\s_]*title|drawing[\s_]*title|عنوان\s*اللوح[ةه])",
-    "revision": r"(?:rev(?:ision)?\.?|المراجع[ةه]|رقم\s*المراجع[ةه]|تعديل)",
+    "title": (
+        r"(?:title|sheet[\s_-]*title|drawing[\s_-]*title|عنوان\s*اللوح[ةه]"
+        r"|اسم\s*اللوح[ةه]|(?:top|bottom)[- ]title)"
+    ),
+    "revision": r"(?:rev(?:ision)?\.?|المراجع[ةه]|رقم\s*المراجع[ةه]|الإصدار|تعديل)",
     "date": r"(?:date|التاريخ|تاريخ)",
     "scale": r"(?:scale|مقياس\s*الرسم|المقياس)",
+    "project": r"(?:project(?: name)?|المشروع|اسم المشروع)",
+    "client": r"(?:client|owner|المالك)",
+    "consultant": r"(?:consultant|الاستشاري)",
 }
 _SCALE = re.compile(r"(?<!\d)(\d+)\s*[:/]\s*(\d+)(?!\d)")
 _SHEET_NO = re.compile(r"(?:[A-Za-z]{1,4}|[\u0621-\u064a]{1,3})\s*[-–]\s*\d+[A-Za-z]?", re.I)
@@ -132,17 +169,36 @@ _SHEET_NO = re.compile(r"(?:[A-Za-z]{1,4}|[\u0621-\u064a]{1,3})\s*[-–]\s*\d+[A
 def _source(row: dict) -> dict:
     if "box" in row:
         return {"page": row.get("page", 1), "box": row["box"]}
-    return {k: row[k] for k in ("layout", "handle", "x", "y", "block") if k in row}
+    return {
+        k: row[k]
+        for k in ("layout", "handle", "x", "y", "block", "table_cell", "embedded_sheet", "context")
+        if k in row
+    }
 
 
 def _value(key: str, text: str) -> str | None:
     text = text.translate(_DIGITS).strip(" :：=\t\n")
+    if any(re.fullmatch(pattern, text, re.I) for pattern in _LABELS.values()):
+        return None
     if key == "scale":
-        m = _SCALE.search(text)
-        return f"{m[1]}:{m[2]}" if m and int(m[2]) else None
+        if text.upper() == "NTS" or text == "لا يوجد مقياس":
+            return text
+        m = _SCALE.fullmatch(text)
+        if m and (
+            (int(m[1]) == 1 and 1 <= int(m[2]) <= 100000)
+            or (int(m[2]) == 1 and 1 <= int(m[1]) <= 100000)
+        ):
+            return f"{int(m[1])}:{int(m[2])}"
+        return None
     if key == "number":
         m = _SHEET_NO.fullmatch(text)
-        return re.sub(r"\s+", "", m[0]).replace("–", "-") if m else None
+        if m and not re.match(r"(?:RJ|CAT|IP|ISO|BS|DIN|IEC|EN|RS|USB|DB|RG)[ -]", text, re.I):
+            return re.sub(r"\s+", "", m[0]).replace("–", "-")
+        return None
+    if key == "revision":
+        return text if re.fullmatch(r"[A-Za-z0-9]{1,4}(?:[.-][A-Za-z0-9]{1,2})?", text) else None
+    if key == "title" and (_value("number", text) or _value("scale", text)):
+        return None
     if key == "date":
         return text if re.fullmatch(r"\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}", text) else None
     return text or None
@@ -154,79 +210,154 @@ def _assign(sheet: Sheet, key: str, value: str | None, row: dict):
         sheet.source[key] = _source(row)
 
 
-def _title(sheet: Sheet, rows: list[dict], inserts: list[dict], bounds: tuple):
+_FRAME = re.compile(r"frame|title|paper[ _-]*layout|لوح[ةه]|اطار", re.I)
+_EXCLUDE = re.compile(
+    r"frame|title|paper[ _-]*layout|legend|schedule|table|hatch|border|جدول|مفتاح", re.I
+)
+
+
+def _label(text: str) -> str | None:
+    return next(
+        (k for k, p in _LABELS.items() if re.fullmatch(p, text.strip(" :：\n"), re.I)), None
+    )
+
+
+def _title(
+    sheet: Sheet,
+    rows: list[dict],
+    inserts: list[dict],
+    bounds: tuple,
+    outlines=None,
+    file_number=None,
+    segments=None,
+):
     left, bottom, right, top = bounds
     width, height = max(right - left, 1), max(top - bottom, 1)
-
-    # CAD origin is lower left; PDF words are converted to that convention.
-    def corner(r):
-        return ((right - r.get("x", right)) / width) ** 2 + (
-            (r.get("y", bottom) - bottom) / height
-        ) ** 2
-
+    frame_names = {i["block"] for i in inserts if _FRAME.search(i["block"])}
+    if not frame_names:
+        bordered = []
+        for i in inserts:
+            box = i.get("bounds", [])
+            if len(box) == 4:
+                x0, y0, x1, y1 = box
+                if (
+                    x1 - x0 >= width * 0.5
+                    and y1 - y0 >= height * 0.5
+                    and (abs(x0 - left) < width * 0.1 or abs(x1 - right) < width * 0.1)
+                ):
+                    bordered.append(((x1 - x0) * (y1 - y0), i["block"]))
+        if bordered:
+            frame_names.add(max(bordered)[1])
+    structured = [
+        r for r in rows if r.get("block") in frame_names or _FRAME.search(r.get("block", ""))
+    ]
+    # A frame's attributes belong to that instance, even if their positions are
+    # outside the sheet extents because the source CAD attribute is malformed.
     attributed = [
         i
         for i in inserts
-        if any(
-            any(re.fullmatch(pattern, a["tag"], re.I) for pattern in _LABELS.values())
-            for a in i.get("attributes", [])
-        )
+        if i["block"] in frame_names or any(_label(a["tag"]) for a in i.get("attributes", []))
     ]
-    if attributed:
-        insert = min(attributed, key=corner)
-        for a in insert["attributes"]:
-            for key, pattern in _LABELS.items():
-                if re.fullmatch(pattern, a["tag"], re.I):
-                    _assign(sheet, key, _value(key, a["value"]), {**insert, **a})
-    corner_rows = [
+    for insert in attributed:
+        for attr in insert.get("attributes", []):
+            key = _label(attr["tag"])
+            value = attr.get("value", "")
+            if key:
+                _assign(sheet, key, _value(key, value), {**insert, **attr})
+            # Some legacy blocks misname their attribute; syntax is evidence.
+            if re.fullmatch(r"drawing[ _-]*title", attr["tag"], re.I) and not file_number:
+                _assign(sheet, "number", _value("number", value), {**insert, **attr})
+            if key == "title":
+                _assign(sheet, "scale", _value("scale", value), {**insert, **attr})
+    # Without an explicit frame, use the region with the densest title labels.
+    labels = [
         r
         for r in rows
-        if r.get("x", 0) >= right - width * 0.4 and r.get("y", 0) <= bottom + height * 0.4
+        if _label(r["text"])
+        or any(
+            re.match(rf"^\s*{pattern}\s*[:：=]", r["text"], re.I) for pattern in _LABELS.values()
+        )
     ]
-    for row in sorted(corner_rows, key=corner):
-        text = row["text"].translate(_DIGITS)
+    if structured:
+        candidates = structured
+    elif labels:
+        candidates = rows
+    else:
+        candidates = [
+            r
+            for r in rows
+            if r.get("x", 0) >= right - width * 0.4 and r.get("y", 0) <= bottom + height * 0.4
+        ]
+    cells = []
+    for o in outlines or []:
+        if len(o.get("vertices", [])) >= 3:
+            polygon = Polygon(o["vertices"])
+            if polygon.is_valid and polygon.area > 0:
+                cells.append(polygon)
+    for row in candidates:
+        text = row["text"].translate(_DIGITS).strip()
         for key, pattern in _LABELS.items():
-            m = re.match(rf"^\s*{pattern}\s*[:：=]?\s*(.+)$", text, re.I)
+            m = re.fullmatch(rf"{pattern}\s*[:：=]?\s+(.+)", text, re.I)
             if m:
                 _assign(sheet, key, _value(key, m[1]), row)
-        _assign(sheet, "number", _value("number", text), row)
-        for key, pattern in _LABELS.items():
-            if not re.fullmatch(pattern, text, re.I):
+        key = _label(text)
+        if not key:
+            continue
+        h = max(row.get("height", 3), 1)
+        cell = min(
+            (p for p in cells if p.covers(Point(row["x"], row["y"]))),
+            key=lambda p: p.area,
+            default=None,
+        )
+        nearby = []
+        for r in candidates:
+            if r is row or _label(r["text"]) or r.get("table_cell"):
                 continue
-            nearby = [
-                r
-                for r in corner_rows
-                if r is not row
-                and (
-                    # A value on the same baseline, or directly below the label.
-                    (
-                        abs(r["y"] - row["y"]) <= row.get("height", 3)
-                        and 0 < r["x"] - row["x"] < width * 0.2
-                    )
-                    or (
-                        abs(r["x"] - row["x"]) < width * 0.05
-                        and 0 < row["y"] - r["y"] < height * 0.05
-                    )
-                )
-                and not any(re.match(p, r["text"], re.I) for p in _LABELS.values())
-            ]
-            if nearby:
-                value_row = min(
-                    nearby, key=lambda r: (r["x"] - row["x"]) ** 2 + (r["y"] - row["y"]) ** 2
-                )
-                _assign(sheet, key, _value(key, value_row["text"]), value_row)
-
-    # An explicit scale anywhere remains evidence, even when a frame was not supplied.
-    scales = [(r, _value("scale", r["text"])) for r in rows]
-    unique = {s for _, s in scales if s}
+            if row.get("block") and r.get("block") != row.get("block"):
+                continue
+            dx, dy = r["x"] - row["x"], r["y"] - row["y"]
+            if not (
+                (0 < dx <= h * 35 and abs(dy) <= h * 0.8)
+                or (abs(dx) <= h * 12 and -h * 8 <= dy < -h * 0.8)
+            ):
+                continue
+            if cell is not None and not cell.covers(Point(r["x"], r["y"])):
+                continue
+            link = LineString([(row["x"], row["y"]), (r["x"], r["y"])])
+            if any(
+                link.crosses(LineString([line["start"], line["end"]])) for line in segments or []
+            ):
+                continue
+            value = _value(key, r["text"])
+            if value:
+                nearby.append((dx * dx + dy * dy, r, value))
+        if nearby:
+            _, r, value = min(nearby, key=lambda item: item[0])
+            _assign(sheet, key, value, r)
+    # A unique, explicit scale remains useful in a frame-less synthetic/PDF plan.
+    scales = [
+        (r, _value("scale", match[0]))
+        for r in rows
+        if not r.get("table_cell") and len(r["text"]) <= 80
+        for match in _SCALE.finditer(r["text"])
+    ]
+    scales += [
+        (r, _value("scale", r["text"]))
+        for r in rows
+        if r["text"].strip().upper() == "NTS" or r["text"].strip() == "لا يوجد مقياس"
+    ]
+    unique = {v for _, v in scales if v}
     if len(unique) == 1:
-        row, value = next((r, s) for r, s in scales if s)
-        _assign(sheet, "scale", value, row)
+        r, v = next((r, v) for r, v in scales if v)
+        _assign(sheet, "scale", v, r)
+    _discipline(sheet)
+
+
+def _discipline(sheet: Sheet):
     if sheet.number:
-        prefix = sheet.number.split("-")[0].upper()
-        discipline = _DISCIPLINES.get(prefix)
-        if discipline:
-            sheet.discipline_hint = discipline
+        hint = _DISCIPLINES.get(sheet.number.split("-")[0].upper())
+        if hint:
+            sheet.discipline_hint = hint
             sheet.source["discipline_hint"] = sheet.source["number"]
 
 
@@ -243,34 +374,71 @@ _METRES = {
 }
 
 
+# Conservative semantic room labels. Arbitrary alphabetic notes are not rooms.
+_ROOM = re.compile(
+    r"\b(?:room|office|bedroom|living|kitchen|bathroom|toilet|wc|wash|lobby|corridor|hall"
+    r"|store|storage|service|entrance|reception|balcony|terrace|stair|parking|garage|gym"
+    r"|classroom|pantry|dining|meeting|lounge|laundry|shaft)\b"
+    r"|(?:غرف[ةه]|مكتب|مكاتب|معارض|مطبخ|حمام|صالة|صاله|دورة مياه|دورات مياه"
+    r"|ممر|مدخل|مخزن|استقبال|بلكونة|سلم|خدمات)",
+    re.I,
+)
+_NOTE = re.compile(
+    r"\b(?:note|provide|install|typical|detail|schedule|plan|section|elevation|legend|floor|level|scale)\b|ملاحظ|تفصيل|مخطط|منسوب",
+    re.I,
+)
+
+
+def _room_name(row: dict) -> bool:
+    name = row["text"].strip()
+    return bool(
+        len(name) <= 60
+        and _ROOM.search(name)
+        and not _NOTE.search(name)
+        and not _label(name)
+        and not row.get("table_cell")
+        and not _EXCLUDE.search(row.get("block", "") + row.get("layer", ""))
+    )
+
+
 def _rooms(sheet: Sheet, outlines: list[dict], units: int):
-    polygons = []
+    polygons, seen = [], set()
     for row in outlines:
+        if _EXCLUDE.search(row.get("layer", "") + row.get("block", "")):
+            continue
         vertices = row.get("vertices", [])
         if len(vertices) < 3:
             continue
         polygon = Polygon(vertices)
         if polygon.is_valid and polygon.area > 0:
-            polygons.append((polygon, row))
+            identity = polygon.normalize().wkb
+            if identity not in seen:
+                seen.add(identity)
+                polygons.append((polygon, row))
+    names = [t for t in sheet.texts if _room_name(t)]
     tree = STRtree([p for p, _ in polygons])
-    for text in sheet.texts:
-        name = text["text"].strip()
-        if not any(c.isalpha() for c in name) or len(name) > 80 or ":" in name:
-            continue
-        if _SHEET_NO.fullmatch(name.translate(_DIGITS)) or any(
-            re.match(p, name, re.I) for p in _LABELS.values()
-        ):
-            continue
-        point = Point(text["x"], text["y"])
-        containing = [polygons[i] for i in tree.query(point, predicate="within")]
-        if not containing:
-            continue
-        polygon, outline = min(containing, key=lambda pair: pair[0].area)
+    occupants = [[] for _ in polygons]
+    for text in names:
+        for i in tree.query(Point(text["x"], text["y"]), predicate="within"):
+            occupants[i].append(text)
+    selected = {}
+    for i, texts in enumerate(occupants):
+        if len(texts) == 1:
+            text = texts[0]
+            previous = selected.get(id(text))
+            if previous is None or polygons[i][0].area < polygons[previous][0].area:
+                selected[id(text)] = i
+    for i in selected.values():
+        polygon, outline = polygons[i]
+        text = occupants[i][0]
         factor = _METRES.get(units)
         area = outline.get("area", polygon.area) * factor**2 if factor else None
+        # Reject tiny symbol enclosures and building/site boundaries in known units.
+        if area is not None and not 1 <= area <= 10000:
+            continue
         sheet.rooms.append(
             Room(
-                name,
+                text["text"].strip(),
                 area,
                 list(polygon.bounds),
                 {"name": _source(text), "outline": _source(outline), "units": units},
@@ -284,14 +452,56 @@ def sheets_from_drawing(drawing: Drawing) -> list[Sheet]:
         for key in ("texts", "inserts", "closed", "dimensions", "hatches")
         for r in getattr(drawing, key)
     } | {"Model"}
+    names |= {layout["name"] for layout in drawing.layouts}
     result = []
     for name in sorted(names, key=lambda n: (n != "Model", n)):
         sheet = Sheet(layout=name)
-        sheet.texts = [t for t in drawing.texts if t.get("layout", "Model") == name]
+        sheet.texts = [decode_text(t) for t in drawing.texts if t.get("layout", "Model") == name]
         inserts = [i for i in drawing.inserts if i.get("layout", "Model") == name]
-        sheet.counts = dict(Counter(i["block"] for i in inserts))
-        sheet.source["counts"] = [_source(i) for i in inserts]
         outlines = [o for o in drawing.closed if o.get("layout", "Model") == name]
+        legend_regions = []
+        for i in inserts:
+            if (
+                re.search(r"legend|table|schedule|جدول|مفتاح", i["block"], re.I)
+                and len(i.get("bounds", [])) == 4
+            ):
+                x0, y0, x1, y1 = i["bounds"]
+                if x1 > x0 and y1 > y0:
+                    legend_regions.append(Polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)]))
+        legend_labels = [
+            t
+            for t in sheet.texts
+            if re.search(r"\b(?:legend|schedule of symbols)\b|مفتاح الرموز", t["text"], re.I)
+        ]
+        for t in legend_labels:
+            regions = []
+            for o in outlines:
+                if len(o.get("vertices", [])) >= 3:
+                    p = Polygon(o["vertices"])
+                    if p.is_valid and p.covers(Point(t["x"], t["y"])):
+                        regions.append(p)
+            if regions:
+                legend_regions.append(min(regions, key=lambda p: p.area))
+        installed = []
+        for i in inserts:
+            effective = i.get("effective_name", i["block"])
+            if (
+                effective.startswith("*")
+                or _EXCLUDE.search(effective)
+                or _EXCLUDE.search(i.get("container", "") + i.get("context", ""))
+            ):
+                continue
+            if any(p.covers(Point(i["x"], i["y"])) for p in legend_regions):
+                continue
+            installed.append(i)
+        sheet.counts = dict(Counter(i.get("effective_name", i["block"]) for i in installed))
+        sheet.source["counts"] = [_source(i) for i in installed]
+        sheet.counts_complete = not (drawing.omitted.get("inserts") or drawing.traversal_limited)
+        sheet.rooms_complete = not (
+            drawing.omitted.get("texts")
+            or drawing.omitted.get("closed")
+            or drawing.traversal_limited
+        )
         points = [(t["x"], t["y"]) for t in sheet.texts + inserts] + [
             tuple(v[:2]) for o in outlines for v in o.get("vertices", [])
         ]
@@ -309,7 +519,15 @@ def sheets_from_drawing(drawing: Drawing) -> list[Sheet]:
         paper = layout.get("paper_size", [])
         if len(paper) == 2 and all(paper):
             bounds = (0, 0, *paper)
-        _title(sheet, sheet.texts, inserts, bounds)
+        _title(
+            sheet,
+            sheet.texts,
+            inserts,
+            bounds,
+            outlines,
+            _value("number", Path(drawing.name).stem),
+            [line for line in drawing.segments if line.get("layout", "Model") == name],
+        )
         if sheet.discipline_hint is None:
             evidence = [
                 (r, _DISCIPLINES.get(r.get("layer", "").upper().split("-")[0]))
@@ -319,14 +537,59 @@ def sheets_from_drawing(drawing: Drawing) -> list[Sheet]:
             if len(hints) == 1:
                 row, sheet.discipline_hint = next((r, h) for r, h in evidence if h)
                 sheet.source["discipline_hint"] = {**_source(row), "layer": row["layer"]}
-        _rooms(sheet, outlines, drawing.units)
+        room_outlines = outlines
+        if name == "Model" and len(drawing.extents) == 4:
+            x0, y0, x1, y1 = drawing.extents
+            if x1 > x0 and y1 > y0:
+                room_outlines = [
+                    o
+                    for o in outlines
+                    if o.get("vertices")
+                    and all(x0 <= v[0] <= x1 and y0 <= v[1] <= y1 for v in o["vertices"])
+                ]
+        if sheet.rooms_complete:
+            _rooms(sheet, room_outlines, drawing.units)
+        if _non_plan(sheet.title) or _non_plan(drawing.name):
+            sheet.rooms = []
+        if sheet.number is None and drawing.name:
+            number = _value("number", Path(drawing.name).stem)
+            if number:
+                sheet.number = number
+                sheet.source["number"] = {"source": "file name", "name": drawing.name}
+                _discipline(sheet)
         result.append(sheet)
+    paper_titles = [s.title for s in result if s.layout != "Model" and s.title]
+    model = next(s for s in result if s.layout == "Model")
+    if paper_titles and all(_non_plan(title) for title in paper_titles):
+        model.rooms = []
+    if paper_titles and all(
+        re.search(r"legend|schedule|جدول|مفتاح", title, re.I) for title in paper_titles
+    ):
+        model.counts = {}
+        model.source["counts"] = []
     return result
+
+
+def _non_plan(title: str | None) -> bool:
+    return bool(
+        title
+        and re.search(r"legend|diagram|schedule|notes|details|جدول|تفاصيل|ملاحظات", title, re.I)
+    )
 
 
 def read_sheets(name: str, data: bytes) -> list[Sheet]:
     drawing = read_drawing(name, data)
-    return [] if drawing.note and not drawing.repaired else sheets_from_drawing(drawing)
+    if drawing.note and not drawing.repaired:
+        return []
+    sheets = sheets_from_drawing(drawing)
+    number = _value("number", Path(name).stem)
+    if number:
+        for sheet in sheets:
+            if sheet.number is None:
+                sheet.number = number
+                sheet.source["number"] = {"source": "file name", "name": name}
+                _discipline(sheet)
+    return sheets
 
 
 def read_pdf_sheet(
@@ -398,3 +661,119 @@ def read_pdf_sheet(
                 room.area_m2 = Polygon(outline["vertices"]).area * metres_per_unit**2
                 room.source["calibration"] = metres_per_unit
     return sheet
+
+
+def _embedded_texts(drawing: Drawing):
+    """Read cached Excel cells from OLE storage without executing embedded code."""
+    import xlrd
+
+    for embedded in drawing.embedded:
+        if embedded.get("package_hex"):
+            _package_texts(drawing, embedded)
+            _deduplicate_cells(drawing)
+            continue
+        payload = embedded.get("compound_hex", "")
+        if not payload or len(payload) > 16 * 1024 * 1024:
+            continue
+        try:
+            book = xlrd.open_workbook(file_contents=bytes.fromhex(payload), on_demand=True)
+            try:
+                for table in book.sheets():
+                    for ri in range(min(table.nrows, 4096)):
+                        for ci in range(min(table.ncols, 256)):
+                            cell = table.cell(ri, ci)
+                            if cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+                                continue
+                            value = str(cell.value)
+                            drawing.texts.append(
+                                {
+                                    k: v
+                                    for k, v in embedded.items()
+                                    if k not in ("compound_hex", "package_hex")
+                                }
+                                | {
+                                    "text": value,
+                                    "raw_text": value,
+                                    "table_cell": [ri, ci],
+                                    "embedded_sheet": table.name,
+                                }
+                            )
+                            if len(drawing.texts) >= 100000:
+                                drawing.problems.append({"code": "embedded-cell-limit"})
+                                return
+            finally:
+                book.release_resources()
+                _deduplicate_cells(drawing)
+        except (ValueError, xlrd.XLRDError, IndexError, TypeError):
+            drawing.problems.append(
+                {"code": "embedded-workbook-unreadable", "handle": embedded.get("handle")}
+            )
+
+
+def _package_texts(drawing: Drawing, embedded: dict):
+    import io
+    import zipfile
+
+    import openpyxl
+
+    payload = embedded["package_hex"]
+    if len(payload) > 16 * 1024 * 1024:
+        return
+    try:
+        data = bytes.fromhex(payload)
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            if sum(i.file_size for i in archive.infolist()) > 64 * 1024 * 1024:
+                return
+        book = openpyxl.load_workbook(
+            io.BytesIO(data), read_only=True, data_only=True, keep_links=False
+        )
+        try:
+            source = {k: v for k, v in embedded.items() if k not in ("compound_hex", "package_hex")}
+            for table in book:
+                for ri, row in enumerate(
+                    table.iter_rows(
+                        max_row=min(table.max_row or 4096, 4096),
+                        max_col=min(table.max_column or 256, 256),
+                        values_only=True,
+                    )
+                ):
+                    for ci, value in enumerate(row):
+                        if value is None:
+                            continue
+                        drawing.texts.append(
+                            source
+                            | {
+                                "text": str(value),
+                                "raw_text": str(value),
+                                "table_cell": [ri, ci],
+                                "embedded_sheet": table.title,
+                            }
+                        )
+                        if len(drawing.texts) >= 100000:
+                            drawing.problems.append({"code": "embedded-cell-limit"})
+                            return
+        finally:
+            book.close()
+    except (ValueError, OSError, KeyError, zipfile.BadZipFile):
+        drawing.problems.append(
+            {"code": "embedded-workbook-unreadable", "handle": embedded.get("handle")}
+        )
+
+
+def _deduplicate_cells(drawing: Drawing):
+    # OLE placements often embed the entire same workbook many times. Retain
+    # the first sourced occurrence of each identical cell/value per layout.
+    seen, rows = set(), []
+    for row in drawing.texts:
+        if "embedded_sheet" in row:
+            key = (
+                row.get("layout", "Model"),
+                row["embedded_sheet"],
+                tuple(row["table_cell"]),
+                row["text"],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+        rows.append(row)
+    drawing.texts = rows

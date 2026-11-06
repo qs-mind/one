@@ -1,6 +1,61 @@
 #[cfg(test)]
 mod tests {
     #[test]
+    fn paper_grid_lines_are_positioned() {
+        let doc = acadrust::CadDocument::new();
+        let mut line = acadrust::entities::Line::new();
+        line.end = acadrust::types::Vector3::new(10.0, 20.0, 0.0);
+        let mut out = super::digest(&doc, "dxf");
+        super::emit(
+            &doc,
+            &acadrust::EntityType::Line(line),
+            "Layout1",
+            None,
+            "",
+            &mut out,
+            0,
+        );
+        assert_eq!(out["segments"][0]["end"], serde_json::json!([10.0, 20.0]));
+    }
+    #[test]
+    fn hatch_budget_does_not_starve_text() {
+        let mut out = serde_json::json!({"hatches":[],"texts":[],"totals":{},"byte_counts":{},"output_bytes":0});
+        for _ in 0..20 {
+            super::push(
+                &mut out,
+                "hatches",
+                serde_json::json!({"loops":"x".repeat(100000)}),
+            );
+        }
+        super::push(&mut out, "texts", serde_json::json!({"text":"SAMPLE"}));
+        assert_eq!(out["texts"][0]["text"], "SAMPLE");
+        assert_eq!(out["limited"], true);
+    }
+    #[test]
+    fn styles_and_table_cells_are_evidence() {
+        let mut doc = acadrust::CadDocument::new();
+        let mut style = acadrust::tables::TextStyle::new("SampleArabic");
+        style.font_file = "arabic.shx".into();
+        doc.text_styles.add(style).unwrap();
+        let mut t = acadrust::entities::Text::new();
+        t.value = "synthetic".into();
+        t.style = "SampleArabic".into();
+        doc.add_entity(acadrust::EntityType::Text(t)).unwrap();
+        let mut table =
+            acadrust::entities::Table::new(acadrust::types::Vector3::new(10.0, 20.0, 0.0), 1, 1);
+        table.set_cell_text(0, 0, "SAMPLE CELL");
+        doc.add_entity(acadrust::EntityType::Table(Box::new(table)))
+            .unwrap();
+        let out = super::digest(&doc, "dxf");
+        assert_eq!(out["texts"][0]["font_file"], "arabic.shx");
+        assert_eq!(out["texts"][0]["raw_text"], "synthetic");
+        assert!(out["texts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["text"] == "SAMPLE CELL" && r["table_cell"] == serde_json::json!([0, 0])));
+    }
+    #[test]
     fn curved_closed_outline_is_preserved() {
         use acadrust::entities::{LwPolyline, LwVertex};
         use acadrust::types::Vector2;
@@ -32,7 +87,7 @@ mod tests {
     }
     #[test]
     fn output_has_a_byte_budget() {
-        let mut out = serde_json::json!({"texts":[],"totals":{},"output_bytes":0});
+        let mut out = serde_json::json!({"texts":[],"totals":{},"byte_counts":{},"output_bytes":0});
         for _ in 0..10000 {
             super::push(
                 &mut out,
@@ -103,16 +158,27 @@ use acadrust::objects::ObjectType;
 use acadrust::{CadDocument, EntityType};
 use serde_json::{json, Value};
 use std::io::{Cursor, Read};
-const LIMIT: usize = 20_000;
+const LIMIT: usize = 100_000;
 const INPUT_LIMIT: u64 = 64 * 1024 * 1024;
 fn push(out: &mut Value, key: &str, value: Value) {
     let n = out["totals"][key].as_u64().unwrap_or(0) + 1;
     out["totals"][key] = json!(n);
     let bytes = serde_json::to_vec(&value).map(|v| v.len()).unwrap_or(0) as u64;
     let used = out["output_bytes"].as_u64().unwrap_or(0);
-    if out[key].as_array().unwrap().len() < LIMIT && used + bytes < 24 * 1024 * 1024 {
+    let budget = match key {
+        "hatches" => 1024 * 1024,
+        "closed" => 16 * 1024 * 1024,
+        "embedded" => 40 * 1024 * 1024,
+        _ => 8 * 1024 * 1024,
+    };
+    let key_used = out["byte_counts"][key].as_u64().unwrap_or(0);
+    if out[key].as_array().unwrap().len() < LIMIT
+        && key_used + bytes < budget
+        && used + bytes < 56 * 1024 * 1024
+    {
         out[key].as_array_mut().unwrap().push(value);
         out["output_bytes"] = json!(used + bytes);
+        out["byte_counts"][key] = json!(key_used + bytes);
     } else {
         out["limited"] = json!(true);
     }
@@ -156,11 +222,23 @@ fn outline(out: &mut Value, mut row: Value, points: Vec<(f64, f64, f64)>) {
     push(out, "closed", row);
 }
 fn digest(doc: &CadDocument, format: &str) -> Value {
-    let mut out = json!({"format":format,"version":format!("{:?}",doc.version),"units":doc.header.insertion_units,
+    let mut out = json!({"format":format,"version":format!("{:?}",doc.version),"units":doc.header.insertion_units,"extents":[doc.header.model_space_extents_min.x,doc.header.model_space_extents_min.y,doc.header.model_space_extents_max.x,doc.header.model_space_extents_max.y],
         "summary_info":{"title":doc.summary_info.title.chars().take(8192).collect::<String>(),"subject":doc.summary_info.subject.chars().take(8192).collect::<String>(),"author":doc.summary_info.author.chars().take(8192).collect::<String>(),"keywords":doc.summary_info.keywords.chars().take(8192).collect::<String>(),"comments":doc.summary_info.comments.chars().take(8192).collect::<String>(),"revision_number":doc.summary_info.revision_number,
             "last_saved_by":doc.summary_info.last_saved_by.chars().take(8192).collect::<String>(),
             "hyperlink_base":doc.summary_info.hyperlink_base.chars().take(8192).collect::<String>(),
-            "custom_properties":doc.summary_info.custom_properties.iter().take(128).map(|(k,v)|(k.chars().take(256).collect::<String>(),v.chars().take(8192).collect::<String>())).collect::<Vec<_>>()},"layers":[],"layouts":[],"texts":[],"inserts":[],"dimensions":[],"hatches":[],"closed":[],"xrefs":[],"problems":[],"totals":{},"output_bytes":0,"limited":false,"work":0});
+            "custom_properties":doc.summary_info.custom_properties.iter().take(128).map(|(k,v)|(k.chars().take(256).collect::<String>(),v.chars().take(8192).collect::<String>())).collect::<Vec<_>>()},"styles":[],"embedded":[],"segments":[],"omitted":{},"traversal_limited":false,"entity_kinds":{},"layers":[],"layouts":[],"texts":[],"inserts":[],"dimensions":[],"hatches":[],"closed":[],"xrefs":[],"problems":[],"totals":{},"byte_counts":{},"output_bytes":0,"limited":false,"work":0});
+    for style in doc.text_styles.iter().take(LIMIT) {
+        push(
+            &mut out,
+            "styles",
+            json!({"name":style.name,"font_file":style.font_file,"big_font_file":style.big_font_file,"true_type_font":style.true_type_font}),
+        );
+    }
+    for entity in doc.entities() {
+        let kind = entity.as_entity().entity_type();
+        let count = out["entity_kinds"][kind].as_u64().unwrap_or(0);
+        out["entity_kinds"][kind] = json!(count + 1);
+    }
     for l in doc.layers.iter().take(LIMIT) {
         push(
             &mut out,
@@ -216,20 +294,71 @@ fn digest(doc: &CadDocument, format: &str) -> Value {
             continue;
         }
         let layout = layout.unwrap_or("Model");
-        emit(doc, e, layout, None, &mut out, 0);
+        emit(doc, e, layout, None, "", &mut out, 0);
     }
     out
+}
+fn package_stream(storage: &acadrust::compound_file::CompoundStorage) -> Option<Vec<u8>> {
+    for entry in &storage.entries {
+        match entry {
+            acadrust::compound_file::CompoundEntry::Stream(s) if s.name == "Package" => {
+                return Some(s.content.encode())
+            }
+            acadrust::compound_file::CompoundEntry::Storage(s) => {
+                if let Some(data) = package_stream(s) {
+                    return Some(data);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+fn stream_names(storage: &acadrust::compound_file::CompoundStorage, names: &mut Vec<String>) {
+    for entry in &storage.entries {
+        match entry {
+            acadrust::compound_file::CompoundEntry::Stream(s) => names.push(s.name.clone()),
+            acadrust::compound_file::CompoundEntry::Storage(s) => stream_names(s, names),
+        }
+    }
+}
+fn text_style(doc: &CadDocument, name: &str, row: &mut Value) {
+    row["style"] = json!(name);
+    if let Some(style) = doc.text_styles.get(name) {
+        row["font_file"] = json!(style.font_file);
+        row["big_font_file"] = json!(style.big_font_file);
+    }
 }
 fn emit(
     doc: &CadDocument,
     e: &EntityType,
     layout: &str,
     block: Option<&str>,
+    context: &str,
     out: &mut Value,
     depth: usize,
 ) {
+    if !matches!(
+        e,
+        EntityType::Line(_)
+            | EntityType::Text(_)
+            | EntityType::MText(_)
+            | EntityType::Insert(_)
+            | EntityType::Table(_)
+            | EntityType::Ole2Frame(_)
+            | EntityType::LwPolyline(_)
+            | EntityType::Polyline2D(_)
+            | EntityType::Polyline(_)
+            | EntityType::Polyline3D(_)
+            | EntityType::Circle(_)
+            | EntityType::Dimension(_)
+            | EntityType::Hatch(_)
+    ) {
+        return;
+    }
     let work = out["work"].as_u64().unwrap_or(0);
-    if work >= 200_000 {
+    if work >= 2_000_000 {
+        out["traversal_limited"] = json!(true);
         out["limited"] = json!(true);
         return;
     }
@@ -240,7 +369,23 @@ fn emit(
     if let Some(b) = block {
         row["block"] = json!(b);
     }
+    row["context"] = json!(context);
+    if let Some(b) = block {
+        row["container"] = json!(b);
+    }
     match e {
+        EntityType::Line(line) => {
+            let ancestry = context.to_lowercase();
+            if layout != "Model"
+                || ["frame", "title", "layout"]
+                    .iter()
+                    .any(|s| ancestry.contains(s))
+            {
+                row["start"] = json!([line.start.x, line.start.y]);
+                row["end"] = json!([line.end.x, line.end.y]);
+                push(out, "segments", row);
+            }
+        }
         EntityType::Text(t) => {
             if t.value.chars().count() > 8192 {
                 out["limited"] = json!(true);
@@ -252,6 +397,8 @@ fn emit(
                     .take(8192)
                     .collect::<String>()
             );
+            row["raw_text"] = json!(t.value.chars().take(8192).collect::<String>());
+            text_style(doc, &t.style, &mut row);
             row["x"] = json!(t.insertion_point.x);
             row["y"] = json!(t.insertion_point.y);
             row["height"] = json!(t.height);
@@ -269,6 +416,8 @@ fn emit(
                     .take(8192)
                     .collect::<String>()
             );
+            row["raw_text"] = json!(t.value.chars().take(8192).collect::<String>());
+            text_style(doc, &t.style, &mut row);
             row["x"] = json!(t.insertion_point.x);
             row["y"] = json!(t.insertion_point.y);
             row["height"] = json!(t.height);
@@ -282,6 +431,7 @@ fn emit(
                 out["limited"] = json!(true);
             }
             if depth >= 8 {
+                out["traversal_limited"] = json!(true);
                 out["limited"] = json!(true);
             }
             let parent = doc
@@ -290,11 +440,66 @@ fn emit(
                 .map(|b| b.name.as_str())
                 .unwrap_or(&i.block_name);
             row["block"] = json!(parent);
+            row["effective_name"] = json!(parent);
+            row["instance"] = json!(format!("{}:{:X}", layout, c.handle.value()));
+            if block.is_some() {
+                row["container"] = json!(block);
+            }
             row["x"] = json!(i.insert_point.x);
             row["y"] = json!(i.insert_point.y);
             row["scale"] = json!([i.x_scale(), i.y_scale(), i.z_scale()]);
             row["rotation"] = json!(i.rotation);
-            row["attributes"]=json!(i.attributes.iter().take(256).map(|a|json!({"tag":a.tag,"value":a.value.chars().take(8192).collect::<String>(),"handle":format!("{:X}",a.common.handle.value()),"x":a.insertion_point.x,"y":a.insertion_point.y})).collect::<Vec<_>>());
+            row["attributes"]=json!(i.attributes.iter().take(256).map(|a|json!({"tag":a.tag,"value":acadrust::entities::mtext_format::parse_mtext(&a.value, true).to_plain_text().chars().take(8192).collect::<String>(),"handle":format!("{:X}",a.common.handle.value()),"x":a.insertion_point.x,"y":a.insertion_point.y})).collect::<Vec<_>>());
+            for a in i.attributes.iter().take(256) {
+                if !a.value.is_empty() {
+                    let mut attr = row.clone();
+                    attr.as_object_mut().unwrap().remove("attributes");
+                    attr["text"] = json!(acadrust::entities::mtext_format::parse_mtext(
+                        &a.value, true
+                    )
+                    .to_plain_text()
+                    .chars()
+                    .take(8192)
+                    .collect::<String>());
+                    attr["raw_text"] = json!(a.value.chars().take(8192).collect::<String>());
+                    attr["handle"] = json!(format!("{:X}", a.common.handle.value()));
+                    attr["x"] = json!(a.insertion_point.x);
+                    attr["y"] = json!(a.insertion_point.y);
+                    attr["height"] = json!(a.height);
+                    text_style(doc, &a.text_style, &mut attr);
+                    push(out, "texts", attr);
+                }
+            }
+            if depth == 0 {
+                let mut bounds = [
+                    f64::INFINITY,
+                    f64::INFINITY,
+                    f64::NEG_INFINITY,
+                    f64::NEG_INFINITY,
+                ];
+                for child in doc.entities_in_block(&i.block_name).take(LIMIT) {
+                    let mut placed = child.clone();
+                    if let Some(b) = doc.block_records.get(&i.block_name) {
+                        placed.as_entity_mut().apply_transform(
+                            &acadrust::types::Transform::from_translation(-b.base_point),
+                        );
+                    }
+                    placed.as_entity_mut().apply_transform(&i.get_transform());
+                    let b = placed.as_entity().bounding_box();
+                    if [b.min.x, b.min.y, b.max.x, b.max.y]
+                        .iter()
+                        .all(|v| v.is_finite())
+                    {
+                        bounds[0] = bounds[0].min(b.min.x);
+                        bounds[1] = bounds[1].min(b.min.y);
+                        bounds[2] = bounds[2].max(b.max.x);
+                        bounds[3] = bounds[3].max(b.max.y);
+                    }
+                }
+                if bounds.iter().all(|v| v.is_finite()) {
+                    row["bounds"] = json!(bounds);
+                }
+            }
             push(out, "inserts", row);
             if depth < 8 && out["totals"]["texts"].as_u64().unwrap_or(0) < 100_000 {
                 for child in doc.entities_in_block(&i.block_name).take(LIMIT) {
@@ -305,8 +510,81 @@ fn emit(
                         );
                     }
                     placed.as_entity_mut().apply_transform(&i.get_transform());
-                    emit(doc, &placed, layout, Some(parent), out, depth + 1);
+                    emit(
+                        doc,
+                        &placed,
+                        layout,
+                        Some(parent),
+                        &format!("{}/{}:{:X}", context, parent, c.handle.value()),
+                        out,
+                        depth + 1,
+                    );
                 }
+            }
+        }
+        EntityType::Ole2Frame(t) => {
+            row["x"] = json!(t.upper_left_corner.x);
+            row["y"] = json!(t.upper_left_corner.y);
+            row["application"] = json!(t.source_application);
+            if let Some(file) = &t.storage.compound_file {
+                let mut names = Vec::new();
+                stream_names(&file.root, &mut names);
+                row["streams"] = json!(names);
+                if let Some(data) = package_stream(&file.root) {
+                    if data.len() <= 8 * 1024 * 1024 {
+                        row["package_hex"] = json!(data
+                            .iter()
+                            .map(|b| format!("{:02x}", b))
+                            .collect::<String>());
+                    } else {
+                        out["limited"] = json!(true);
+                    }
+                }
+                if names
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case("Workbook") || s.eq_ignore_ascii_case("Book"))
+                {
+                    let data = file.encode();
+                    if data.len() <= 8 * 1024 * 1024 {
+                        row["compound_hex"] = json!(data
+                            .iter()
+                            .map(|b| format!("{:02x}", b))
+                            .collect::<String>());
+                    } else {
+                        out["limited"] = json!(true);
+                    }
+                }
+            }
+            push(out, "embedded", row);
+        }
+        EntityType::Table(t) => {
+            let mut y = t.insertion_point.y;
+            for (ri, r) in t.rows.iter().take(4096).enumerate() {
+                let mut x = t.insertion_point.x;
+                for (ci, cell) in r.cells.iter().take(1024).enumerate() {
+                    for content in &cell.contents {
+                        let text = content.value.display();
+                        if !text.is_empty() {
+                            let mut cell_row = row.clone();
+                            cell_row["text"] =
+                                json!(acadrust::entities::mtext_format::parse_mtext(text, true)
+                                    .to_plain_text()
+                                    .chars()
+                                    .take(8192)
+                                    .collect::<String>());
+                            cell_row["raw_text"] =
+                                json!(text.chars().take(8192).collect::<String>());
+                            cell_row["table_cell"] = json!([ri, ci]);
+                            cell_row["x"] = json!(x);
+                            cell_row["y"] = json!(y);
+                            cell_row["height"] = json!(content.text_height);
+                            text_style(doc, &content.text_style_name, &mut cell_row);
+                            push(out, "texts", cell_row);
+                        }
+                    }
+                    x += t.columns.get(ci).map(|c| c.width).unwrap_or(0.0);
+                }
+                y -= r.height;
             }
         }
         EntityType::LwPolyline(p) if p.is_closed => {
@@ -435,6 +713,17 @@ fn read(name: &str, data: Vec<u8>) -> Result<(Value, i32), String> {
     let result = result.map_err(|e| e.to_string())?;
     let mut out = digest(&result.document, if dwg { "dwg" } else { "dxf" });
     out["problems"] = json!(result.stats.diagnostics);
+    for key in [
+        "texts", "inserts", "closed", "hatches", "embedded", "segments",
+    ] {
+        let omitted = out["totals"][key]
+            .as_u64()
+            .unwrap_or(0)
+            .saturating_sub(out[key].as_array().unwrap().len() as u64);
+        if omitted > 0 {
+            out["omitted"][key] = json!(omitted);
+        }
+    }
     let capped = out["limited"] == true
         || out["totals"]
             .as_object()
@@ -450,6 +739,7 @@ fn read(name: &str, data: Vec<u8>) -> Result<(Value, i32), String> {
         0
     };
     out.as_object_mut().unwrap().remove("work");
+    out.as_object_mut().unwrap().remove("byte_counts");
     out.as_object_mut().unwrap().remove("output_bytes");
     Ok((out, code))
 }

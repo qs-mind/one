@@ -11,3 +11,5 @@ build/
 
 # The updater signing key: on this computer only, never committed
 .secrets/
+
+/drawings/target/
