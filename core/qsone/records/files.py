@@ -41,13 +41,16 @@ class FileInfo:
     valid_until: str | None
     flags: int = 0  # hidden-text flags (file_flags rows)
     folder: str | None = None  # the path inside a dropped folder, "a/b" (Plan 8)
+    flag_kinds: str | None = None  # the flags' kinds, "hidden_rows,hidden_sheet" (sorted)
     duplicate: bool = False
 
 
 _INFO = (
     "SELECT f.id, f.name, f.kind, f.size, f.sha256, f.status, f.note, f.pages,"
     " (SELECT count(*) FROM chunks c WHERE c.file_id = f.id), f.added_at, f.replaces,"
-    " f.valid_until, (SELECT count(*) FROM file_flags g WHERE g.file_id = f.id), f.folder"
+    " f.valid_until, (SELECT count(*) FROM file_flags g WHERE g.file_id = f.id), f.folder,"
+    " (SELECT group_concat(kind) FROM (SELECT DISTINCT g.kind FROM file_flags g"
+    " WHERE g.file_id = f.id ORDER BY g.kind))"
     " FROM files f"
 )
 
@@ -202,6 +205,7 @@ def add_file(
         None,
         len(all_flags),
         folder,
+        ",".join(sorted({f.kind for f in all_flags})) or None,
     )
 
 

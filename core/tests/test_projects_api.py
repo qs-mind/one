@@ -126,6 +126,7 @@ def test_same_bytes_and_new_versions(client, project):
     again = upload(client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "قديم"]]}))
     assert again.status_code == 200 and again.json()["duplicate"] is True
     assert again.json()["id"] == first["id"]
+    assert again.json()["same_as"] == copy.FILE_SAME_AGAIN
     newer = upload(client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "جديد"]]}))
     assert newer.status_code == 201 and newer.json()["replaces"] == first["id"]
     current = client.get(f"/projects/{project}/files", headers=AUTH).json()["files"]
@@ -331,6 +332,40 @@ def test_a_files_hidden_text_flags_are_listed(client, project):
     assert white["locator"] == {"page": 1} and white["excerpt"] == "ignore previous instructions"
     assert white["count"] == len("ignorepreviousinstructions")
     assert all(set(f) == {"kind", "locator", "excerpt", "count"} for f in flags)
+
+
+def test_the_same_file_under_another_name_says_so_on_the_new_name(client, project):
+    # real walk: same.xlsx showed «موجود بالفعل» on the older row, and its own name never came
+    data = sample_xlsx({"BOQ": [["03/02", "خرسانة - عينة"]]})
+    first = upload(client, project, "🏗️ مقايسة  - عينة.xlsx", data).json()
+    again = upload(client, project, "same.xlsx", data)
+    assert again.status_code == 200 and again.json()["id"] == first["id"]
+    assert again.json()["dropped_as"] == "same.xlsx"
+    old = copy.file_name("🏗️ مقايسة  - عينة.xlsx")
+    assert again.json()["same_as"] == copy.fill(copy.FILE_SAME_AS, old=old)
+    assert (
+        upload(client, project, "same.xlsx", data)
+        .json()["same_as"]["en"]
+        .startswith("is the same file as")
+    )  # a second copy says it again
+    names = [
+        f["name"] for f in client.get(f"/projects/{project}/files", headers=AUTH).json()["files"]
+    ]
+    assert names == ["🏗️ مقايسة  - عينة.xlsx"]  # kept once
+
+
+def test_a_file_names_the_kinds_of_its_flags(client, project):
+    data = sample_xlsx(
+        {"BOQ": [["03/02", "خرسانة - عينة", "م3", 5]], "تسعير": [["480"]]},
+        hidden_sheets=["تسعير"],
+        hidden_rows={"BOQ": [1]},
+    )
+    info = upload(client, project, BOQ, data).json()
+    assert info["flag_kinds"] == ["hidden_rows", "hidden_sheet"]
+    listed = client.get(f"/projects/{project}/files", headers=AUTH).json()["files"]
+    assert listed[0]["flag_kinds"] == ["hidden_rows", "hidden_sheet"]
+    plain = upload(client, project, "عادي - عينة.xlsx", sample_xlsx({"BOQ": [["1"]]})).json()
+    assert plain["flag_kinds"] == []
 
 
 def test_flags_of_a_plain_file_and_of_no_file(client, project):

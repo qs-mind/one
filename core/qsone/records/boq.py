@@ -39,7 +39,7 @@ import xlrd
 
 from qsone import copy
 from qsone.records import audit, ledger
-from qsone.records.arabic import display_text, normalise
+from qsone.records.arabic import clean, display_number, display_text, normalise
 from qsone.records.files import read_original
 from qsone.records.hidden import _xlsx_sheets
 from qsone.records.project import Records, RecordsError
@@ -51,6 +51,7 @@ NUMBERS = ("quantity", "rate", "amount")
 MAX_DECIMALS = 6
 PREVIEW_ROWS = 30
 EXAMPLE_ROWS = 40  # rows below the header read for each column's first values
+SECTION_CHARS = 80  # a heading longer than this is an item's lead-in, not a section's title
 KINDS = ("xlsx", "xls")
 ITEM, HEADING = "boq_item", "boq_heading"
 
@@ -112,7 +113,8 @@ def exact(value, fmt: str | None) -> tuple[str | None, str | None]:
 
 
 def _text(value, fmt: str | None = None) -> str:
-    """A text cell as shown: a number as exact text, a date as its day."""
+    """A text cell as shown: a number as exact text (as Excel rounds it when it has more than 6
+    decimals), a date as its day."""
     if value is None:
         return ""
     if isinstance(value, str):
@@ -120,7 +122,7 @@ def _text(value, fmt: str | None = None) -> str:
     if hasattr(value, "isoformat"):
         return value.isoformat()[:10]
     shown, _ = exact(value, fmt)
-    return shown if shown is not None else str(value)
+    return shown if shown is not None else display_number(value)
 
 
 # Reading a sheet --------------------------------------------------------------------------------
@@ -264,15 +266,33 @@ def workbook(rec: Records, file_id: str) -> Workbook:
     return Workbook(file_id, row[0], row[1], read_original(rec, file_id))
 
 
+def _sheet_key(name: str) -> str:
+    """A sheet name as compared when it is not given exactly: no spaces at its ends, spaces
+    (an Arabic or a no-break one) as one, no tatweel or invisible marks, any case."""
+    return clean(name).casefold()
+
+
+def match_sheet(names: list[str], asked: str) -> str | None:
+    """The sheet `asked` names: the one of exactly that name, else the one only that is the
+    same after trimming and normalising both («مقايسة » for "مقايسة"); None when there is no
+    such sheet or two are."""
+    if asked in names:
+        return asked
+    found = [n for n in names if _sheet_key(n) == _sheet_key(asked)]
+    return found[0] if len(found) == 1 else None
+
+
 def read(book: Workbook, sheet: str | None) -> tuple[list[str], Sheet]:
-    """The sheet names and one sheet: `sheet`, or the first one Excel shows. Raises
-    `RecordsError` BOQ_NO_SHEET (field sheet) with the sheet names."""
+    """The sheet names and one sheet: `sheet` (`match_sheet`), or the first one Excel shows.
+    Raises `RecordsError` BOQ_NO_SHEET (field sheet) with the sheet names."""
     reader = _xlsx if book.kind == "xlsx" else _xls
     listed, _ = reader(book.data, None)
     names = [n for n, _ in listed]
     if sheet is None:
         sheet = next((n for n, hidden in listed if not hidden), names[0] if names else None)
-    if sheet not in names:
+    else:
+        sheet = match_sheet(names, sheet)
+    if sheet is None:
         text = copy.fill(copy.BOQ_NO_SHEET, sheets=", ".join(names))
         raise RecordsError(text, status=422, field="sheet")
     return names, reader(book.data, sheet)[1]
@@ -298,26 +318,50 @@ _KEYWORDS = sorted(
 )
 
 
+# A heading that names the total of the quantities («اجمالي كميات المقايسة والزيادة», «الكمية
+# الإجمالية», "Total Qty"): the quantity, over a column of the original or the added quantity.
+_TOTAL_WORD = re.compile(r"[اإأ]جمال|مجموع|\btotal\b", re.IGNORECASE)
+_QUANTITY_WORD = re.compile(r"كمي|\bqty\b|\bqnty\b|quantit", re.IGNORECASE)
+
+
+def _total_quantity(text: str) -> bool:
+    t = clean(text)
+    return bool(_TOTAL_WORD.search(t) and _QUANTITY_WORD.search(t))
+
+
 def heading_field(text: str) -> str | None:
     """The BOQ field a column heading names, by its longest matching word ("سعر الوحدة" is the
-    rate, not the unit); a word of one or two letters ("م", "no") must be the whole heading."""
+    rate, not the unit); a word of one or two letters ("م", "no") must be the whole heading. A
+    total of the quantities is the quantity, not the amount; «سعر» run into the next word
+    («سعرمقايسة») is the rate."""
     t = normalise(text)
     if not t:
         return None
+    if _total_quantity(text):
+        return "quantity"
     for word, name in _KEYWORDS:
         if t == word or (len(word) >= 3 and f" {word} " in f" {t} "):
             return name
+    if t.startswith("سعر"):
+        return "rate"
     return None
 
 
 def _named(row: dict[int, Cell]) -> dict[str, str]:
     """field -> column letter, for the first column whose heading names each field; a second
-    description column (the other language of a bilingual BOQ) is `description_2`."""
+    description column (the other language of a bilingual BOQ) is `description_2`. A total
+    quantity column («اجمالي الكميات») is the quantity even after a column of the original
+    quantity or the added one."""
     found: dict[str, str] = {}
+    total_quantity = False
     for col in sorted(row):
-        name = heading_field(_text(row[col].value)) if isinstance(row[col].value, str) else None
+        value = row[col].value
+        name = heading_field(_text(value)) if isinstance(value, str) else None
         if name == "description" and name in found:
             name = "description_2"
+        if name == "quantity" and not total_quantity and _total_quantity(value):
+            found[name], total_quantity = letters(col), True
+            continue
         if name and name not in found:
             found[name] = letters(col)
     return found
@@ -393,7 +437,8 @@ def heading_text(sheet: Sheet, header_row: int, col: int) -> str:
 def preview(rec: Records, file_id: str, sheet: str | None, *, rows: int = PREVIEW_ROWS) -> dict:
     """{"name", "sheets", "sheet", "sheet_hidden", "rows": [{"row": n, "cells": {"A": "…"}}],
     "header_guess": n | None, "columns_guess": {field: letter}, "hidden_rows", "merged_rows",
-    "last_row"}: the first `rows` rows of the sheet with content, as text."""
+    "last_row", "overview"}: the first `rows` rows of the sheet with content, as text, and what
+    the whole sheet holds by the guessed columns (`overview`)."""
     book = workbook(rec, file_id)
     names, ws = read(book, sheet)
     shown = sorted(ws.cells)[:rows]
@@ -420,6 +465,68 @@ def preview(rec: Records, file_id: str, sheet: str | None, *, rows: int = PREVIE
         "hidden_rows": [r for r in shown if r in ws.hidden_rows],
         "merged_rows": [r for r in shown if r in set(merged)],
         "last_row": ws.last_row,
+        "overview": overview(rec, book, ws, header, columns),
+    }
+
+
+def overview(
+    rec: Records, book: Workbook, ws: Sheet, header: int | None, columns: dict[str, str]
+) -> dict | None:
+    """What the whole sheet holds, read to its last row by `columns`: {"items", "headings",
+    "sections": [{"row", "title"}], "sections_count", "total", "first_row", "last_row",
+    "hidden_rows"}. `sections` are the short headings with no item number (one with a number,
+    or a long one, leads into its sub-items); `sections_count` adds the items above the first
+    of them, if any.
+    `total` is the file's own total: the last total row's amount, {"value", "row", "column",
+    "label"}, or None. None when the header or a needed column is not known."""
+    if header is None or any(f not in columns for f in REQUIRED):
+        return None
+    try:
+        p = plan_sheet(
+            rec, book, ws, header_row=header, columns=columns, hidden="include", again=True
+        )
+    except RecordsError:
+        return None
+    sections = [
+        {"row": r.row, "title": r.description}
+        for r in p.rows
+        if r.kind == HEADING
+        and not r.code
+        and r.description
+        and len(r.description) <= SECTION_CHARS
+        and "\n" not in r.description
+    ]
+    first_item = next((r.row for r in p.rows if r.kind == ITEM), None)
+    lead = first_item is not None and (not sections or first_item < sections[0]["row"])
+    total = None
+    if "amount" in columns:
+        col = column(columns["amount"])
+        for skipped in p.skipped:
+            if skipped["why"] is not copy.BOQ_WHY_TOTAL:
+                continue
+            row = ws.cells.get(skipped["row"], {})
+            cell = row.get(col)
+            value = None if cell is None else exact(cell.value, cell.fmt)[0]
+            if value is None:
+                continue
+            words = " ".join(
+                _text(c.value) for _, c in sorted(row.items()) if isinstance(c.value, str)
+            )
+            total = {
+                "value": value,
+                "row": skipped["row"],
+                "column": columns["amount"],
+                "label": " ".join(words.split())[:120],
+            }
+    return {
+        "items": p.items,
+        "headings": p.headings,
+        "sections": sections,
+        "sections_count": len(sections) + (1 if lead else 0),
+        "total": total,
+        "first_row": p.first_row,
+        "last_row": p.last_row,
+        "hidden_rows": len(p.hidden_rows),
     }
 
 
@@ -566,13 +673,33 @@ def plan(
     `RecordsError`: FILE_NOT_IN_PROJECT, BOQ_NOT_EXCEL, BOQ_NO_SHEET, BOQ_NO_ROWS."""
     book = workbook(rec, file_id)
     _, ws = read(book, sheet)
+    return plan_sheet(
+        rec, book, ws, header_row=header_row, columns=columns, rows=rows, hidden=hidden
+    )
+
+
+def plan_sheet(
+    rec: Records,
+    book: Workbook,
+    ws: Sheet,
+    *,
+    header_row: int,
+    columns: dict[str, str],
+    rows: tuple[int, int] | None = None,
+    hidden: Hidden = "skip",
+    again: bool = False,
+) -> Plan:
+    """`plan` of a sheet already read. `again`: rows imported before are sorted too, not passed
+    over (what the sheet holds, whatever was imported)."""
+    file_id = book.file_id
     cols = {f: column(columns[f]) for f in FIELDS if f in columns}
     first = max(header_row + 1, rows[0] if rows else 1)
     last = min(ws.last_row, rows[1] if rows else ws.last_row)
     origins = _origins(ws, cols)
     header = ws.cells.get(header_row, {})
     headers = {f: _text(header[c].value) if c in header else "" for f, c in cols.items()}
-    flagged, before = _flagged(rec, file_id, sheet), _imported_rows(rec, file_id, sheet)
+    flagged = _flagged(rec, file_id, ws.name)
+    before = set() if again else _imported_rows(rec, file_id, ws.name)
 
     def raw(r: int, f: str):
         if f not in cols:

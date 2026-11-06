@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from qsone import activity, copy, settings
 from qsone.backup import keys as backup_keys
 from qsone.meaning.service import Meaning, ModelFailed
-from qsone.records import audit, files, search, unzip, vault
+from qsone.records import audit, files, report, search, unzip, vault
 from qsone.records.project import FILE_NAME, Records, RecordsError
 
 if TYPE_CHECKING:
@@ -263,6 +263,11 @@ class NameTaken(RecordsError):
         self.project = project
 
 
+class ReportIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    file_ids: list[Annotated[str, Field(max_length=80)]] = Field(max_length=5000)
+
+
 class ProjectIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -271,9 +276,26 @@ class ProjectIn(BaseModel):
 
 def _file(info: files.FileInfo) -> dict:
     """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair; `note_key`
-    keeps the name (the import report names a locked or an empty file by it)."""
+    keeps the name (the import report names a locked or an empty file by it); `flag_kinds` the
+    kinds of its hidden-text flags (the screen tells hidden rows from orders to an AI)."""
     note = getattr(copy, info.note) if info.note else None
-    return asdict(info) | {"note": note, "note_key": info.note}
+    kinds = info.flag_kinds.split(",") if info.flag_kinds else []
+    return asdict(info) | {"note": note, "note_key": info.note, "flag_kinds": kinds}
+
+
+def _answer(info: files.FileInfo, dropped: str) -> dict:
+    """`_file`, and for bytes already here, `same_as`: the line said after the name dropped
+    («same.xlsx» is the same file as «<the one kept>»; kept once)."""
+    found = _file(info)
+    if info.duplicate:
+        name = re.split(r"[/\\]", dropped)[-1][:255]
+        found["dropped_as"] = name
+        found["same_as"] = (
+            copy.FILE_SAME_AGAIN
+            if name == info.name
+            else copy.fill(copy.FILE_SAME_AS, old=copy.file_name(info.name))
+        )
+    return found
 
 
 def _zip_note(text: dict) -> str:
@@ -289,8 +311,8 @@ def add_upload(rec: Records, name: str, data: bytes, *, folder: str | None) -> t
     note. Each added file reaches the canvas live. Raises what `files.add_file` raises."""
     if not unzip.is_zip(name, data):
         info = files.add_file(rec, name, data, actor=ACTOR, folder=folder)
-        found = _file(info)
-        activity.publish(rec.id, {"type": "file", "file": found})  # the canvas, live
+        found = _answer(info, name)
+        activity.publish(rec.id, {"type": "file", "file": _file(info)})  # the canvas, live
         return found, 200 if info.duplicate else 201
     added: list[dict] = []
     skipped: list[dict] = []
@@ -308,8 +330,8 @@ def add_upload(rec: Records, name: str, data: bytes, *, folder: str | None) -> t
                     raise
                 skipped.append({"name": member, "folder": where, "error": e.text})
                 continue
-            added.append(_file(info))
-            activity.publish(rec.id, {"type": "file", "file": added[-1]})
+            added.append(_answer(info, member))
+            activity.publish(rec.id, {"type": "file", "file": _file(info)})
     except RecordsError as refused:  # kept as it came, not opened
         if refused.text not in (copy.ZIP_TOO_BIG, copy.ZIP_UNSAFE):
             raise  # e.g. an archived project
@@ -420,6 +442,16 @@ def router(
         )
         wake()  # embedding happens in the background; the upload never waits for it
         return JSONResponse(found, status_code=status)
+
+    @r.post("/projects/{project_id}/files/report")
+    async def report_files(project_id: str, body: ReportIn) -> Response:
+        """Once per drop, after its files landed: what ONE found in them, from its own reading,
+        kept for the project chat (201); 204 when none of them is in the project."""
+        rec = await run_in_threadpool(projects.get, project_id)
+        found = await run_in_threadpool(report.make, rec, body.file_ids)
+        if found is None:
+            return Response(status_code=204)
+        return JSONResponse(found, status_code=201)
 
     @r.get("/projects/{project_id}/search")
     def search_project(

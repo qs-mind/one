@@ -238,6 +238,32 @@ def test_an_older_project_with_text_starts_it_at_startup(app_with, hub, spec, mo
         wait_for(lambda: indexed(client, pid, total=len(BOQ_ROWS)))
 
 
+def test_the_model_loads_when_a_project_with_text_opens_not_at_the_first_search(
+    app_with, installed
+):
+    # real walk, Brissa: the first meaning search took 15 s, the model loading then
+    loads = []
+
+    def loader(spec, folder):
+        loads.append(spec.id)
+        return ConceptEmbedder()
+
+    with TestClient(app_with(loader=loader)) as client:
+        pid = new_project(client, BOQ_ROWS)
+        wait_for(lambda: indexed(client, pid, total=len(BOQ_ROWS)))
+    loads.clear()
+    with TestClient(app_with(loader=loader)) as client:  # the next day: all indexed already
+        assert client.post(f"/projects/{pid}/open", headers=AUTH).status_code == 200
+        wait_for(lambda: loads == [installed_id(client)])  # before any search
+        assert "embedder" in client.app.state.meaning._host.loaded()
+        assert find(client, pid, "waterproofing for the foundations")["mode"] == "hybrid"
+        assert len(loads) == 1  # the search found it loaded
+
+
+def installed_id(client) -> str:
+    return client.app.state.meaning._specs[0].id
+
+
 def test_projects_without_text_download_nothing_at_startup(app_with, hub):
     with TestClient(app_with(available=lambda: False)) as client:
         new_project(client)  # no file

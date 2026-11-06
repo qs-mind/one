@@ -77,6 +77,7 @@ class Meaning:
         self._state, self._reason = "off", None
         self._done, self._total = 0, spec.size
         self._jobs: dict[str, dict] = {}  # project id -> its indexing state
+        self._warmed: dict[str, int] = {}  # project id -> its chunks when the model was loaded
         self._quit, self._wake = threading.Event(), threading.Event()
         self._stop_download = threading.Event()
         self._download_thread: threading.Thread | None = None
@@ -250,7 +251,10 @@ class Meaning:
         while not self._quit.is_set():
             self._wake.clear()
             self._host.unload_idle()
-            for pid, rec in self._projects.opened():
+            opened = self._projects.opened()
+            for pid in set(self._warmed) - {pid for pid, _ in opened}:
+                del self._warmed[pid]  # closed: opening it again loads the model again
+            for pid, rec in opened:
                 if self._quit.is_set():
                     break
                 self._look(pid, rec)
@@ -289,6 +293,20 @@ class Meaning:
             self._want()
         if not self._held():
             self._index(pid, rec, done, total)
+            if total:
+                self._warm(pid, total)
+
+    def _warm(self, pid: str, total: int) -> None:
+        """The model loads as soon as an open project has text (opened, or a file read), so the
+        first search does not wait for it. Once per project and text: an idle model unloads."""
+        if self._warmed.get(pid) == total:
+            return
+        self._warmed[pid] = total
+        try:
+            with self._host.use("embedder", background=True):
+                pass
+        except ModelFailed:  # the state now says why
+            pass
 
     def _index(self, pid: str, rec, done: int, total: int) -> None:
         with self._lock:
@@ -327,3 +345,4 @@ class Meaning:
     def _drop(self, pid: str) -> None:
         with self._lock:
             self._jobs.pop(pid, None)
+        self._warmed.pop(pid, None)

@@ -131,6 +131,9 @@ export type OneData = {
   worklog: WorklogData;
   facts: FactsData;
   redo: RedoData;
+  /** data-files_read: what ONE found in a drop of files, each line from the core's own reading
+   * (core/qsone/records/report.py). */
+  files_read: { lines: Text[] };
 };
 
 /** A message the engineer sent while a Brief ran is marked as steering it; one sent with a canvas selection keeps
