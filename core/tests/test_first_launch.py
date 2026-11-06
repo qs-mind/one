@@ -565,3 +565,41 @@ async def test_background_defaults_filter_unlisted_and_refused_choices(data_dir,
     assert checked == {available}
     assert models[available].calls == 1
     assert models[refused].calls == models[absent].calls == 0
+
+
+async def test_connection_check_uses_connected_model_over_a_stale_saved_role(data_dir, monkeypatch):
+    from types import SimpleNamespace
+
+    settings.save_ai(
+        "standard",
+        [
+            {
+                "id": "g",
+                "name": "Google",
+                "base_url": GOOGLE_URL,
+                "provider": "google",
+                "model": "gemini-3.1-flash-lite",
+            }
+        ],
+    )
+    roles.choose("lead", ModelChoice("standard:g", "models/gemini-2.5-flash-lite"))
+    setup_state.give_consent(setup_state.CONSENT_VERSION)
+    link = google_link()
+    checked = []
+
+    async def check(via, **kwargs):
+        checked.append(via)
+        if via.endswith("gemini-2.5-flash-lite"):
+            return copy.MODEL_GONE
+        return None
+
+    monkeypatch.setattr(connectors, "check", check)
+    engine = SimpleNamespace(connectors=lambda: [link], cost_book=lambda: None)
+    endpoint = next(
+        r.endpoint for r in routes.router(engine).routes if r.path == "/settings/ai/check"
+    )
+    response = await endpoint(routes.CheckIn(via="standard", connector="standard:g"))
+    assert json.loads(response.body) == {"ok": True}
+    assert checked[0] == "standard:g/models/gemini-3.1-flash-lite"
+    if routes._BEHIND:
+        await asyncio.gather(*routes._BEHIND)

@@ -8,6 +8,8 @@ Scripted models make exactly the mistakes gemini-3.1-flash-lite made on the tend
 
 import asyncio
 
+import pytest
+
 from qsone.engine.runner import _stored_events
 from qsone.engine.types import Data, Progress, TextDelta
 from qsone.records import ledger
@@ -183,3 +185,62 @@ async def test_import_offer_is_routed_back_to_rows_card(make_engine, project):
     await asyncio.wait_for(finish(engine, await engine.start_brief(project, "Import the BOQ.")), 10)
     assert "boq_import" in str(lead.seen[1])
     assert "rows card" in str(lead.seen[1])
+
+
+async def test_repeated_reads_are_short_and_stop_searching(make_engine, project, registry):
+    from qsone.records.files import add_file
+    from tests.samples import sample_pdf
+
+    file = add_file(registry.get(project), "sample.pdf", sample_pdf([["Sample terms"]]), actor="t")
+    args = {"file_id": file.id, "pages": "1"}
+    final_tools = []
+
+    def answer(messages, info):
+        final_tools.extend(info.function_tools)
+        return "Not found in the files read: offer deadline and duration."
+
+    lead = scripted(*[call("files_read", args) for _ in range(4)], answer)
+    engine = await started(make_engine(links(lead=lead)))
+    events = await asyncio.wait_for(
+        finish(engine, await engine.start_brief(project, "Find the offer deadline and duration.")),
+        10,
+    )
+    assert lead.calls == 5
+    assert "already read in this Brief" in str(lead.seen[2])
+    assert "Stop searching" in str(lead.seen[4])
+    assert not final_tools
+    assert "Not found in the files read" in reply(events)
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_blank_template_is_a_verified_answer(make_engine, project, registry, legacy):
+    from qsone.records.files import add_file
+    from tests.samples import sample_pdf
+
+    file = add_file(
+        registry.get(project),
+        "sample-blank.pdf",
+        sample_pdf([["Offer deadline: day ........ date ..../..../14 AH"]]),
+        actor="t",
+    )
+    if legacy:
+        # Projects imported before this fix lost dotted fields during display cleanup.
+        with registry.get(project).write("t") as c:
+            c.execute("UPDATE chunks SET text=replace(text,'.','') WHERE file_id=?", (file.id,))
+    answer = "Offer deadline: left blank in the tender documents (sample-blank.pdf, page 1)."
+    lead = scripted(call("files_read", {"file_id": file.id, "pages": "1"}), said(answer))
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, "What is the offer deadline?")
+    events = await asyncio.wait_for(finish(engine, brief), 10)
+    from pydantic_ai.messages import ModelRequest, ToolReturnPart
+
+    returns = [
+        p.content
+        for m in lead.seen[1]
+        if isinstance(m, ModelRequest)
+        for p in m.parts
+        if isinstance(p, ToolReturnPart) and p.tool_name == "files_read"
+    ]
+    assert "left blank in the tender documents" in returns[0]
+    assert reply(events) == answer
+    assert lead.calls == 2

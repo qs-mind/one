@@ -1094,7 +1094,9 @@ def _mapping_output(seen, tool):
     elif "links" in properties:
         output = {"links": []}
     elif "groups" in properties:
-        output = {"groups": [{"file_id": f["file_id"], "path": "Sample tender"} for f in inputs]}
+        output = {
+            "groups": [{"file_id": f["file_id"], "path": "Sample tender"} for f in inputs["files"]]
+        }
     else:
         result = []
         for file in inputs:

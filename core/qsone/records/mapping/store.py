@@ -150,6 +150,20 @@ def list_map(rec, *, parent=None, cursor=None, limit=100):
             done=f"{status['done'] + status['failed']:,}",
             total=f"{status['total']:,}",
         )
+        ai_failed = c.execute(
+            "SELECT count(*) FROM map_files WHERE valid_until IS NULL AND ai_state='failed'"
+        ).fetchone()[0]
+        status["ai_failed"] = ai_failed
+        if ai_failed:
+            reason = c.execute(
+                "SELECT note FROM map_files WHERE valid_until IS NULL "
+                "AND ai_state='failed' ORDER BY file_id LIMIT 1"
+            ).fetchone()[0]
+            status["line"] = copy.fill(
+                copy.MAP_AI_FAILED,
+                count=str(ai_failed),
+                reason=json.loads(reason) if reason else copy.MAP_AI_FAILED_REASON,
+            )
         # Return immediate child groups, bounded and keyset-paged alongside the files.
         prefix = (parent.rstrip("/") + "/") if parent else ""
         groups = rows(
@@ -165,7 +179,7 @@ def list_map(rec, *, parent=None, cursor=None, limit=100):
             c,
             "SELECT f.id AS file_id,f.name,f.folder,f.kind,f.pages,"
             "coalesce(m.read_how,'stored') AS read_how,m.ai_title,m.ai_group,"
-            "coalesce(m.key_pages,'[]') AS key_pages,m.ai_state,"
+            "coalesce(m.key_pages,'[]') AS key_pages,m.ai_state,m.note,"
             "coalesce(m.local_state,'waiting') AS local_state "
             "FROM files f LEFT JOIN map_files m ON m.file_id=f.id "
             f"WHERE f.valid_until IS NULL AND f.id>? AND (? IS NULL OR {group}=?) "

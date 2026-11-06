@@ -181,7 +181,7 @@ async def test_replacement_maps_only_changed_file(rec, monkeypatch):
 
     await ai.run(rec, SimpleNamespace(), request=request)
     assert [f["file_id"] for f in calls[0][1]] == [new.id]
-    assert [f["file_id"] for f in calls[1][1]] == [new.id]
+    assert [f["file_id"] for f in calls[1][1]["files"]] == [new.id]
 
 
 @pytest.mark.anyio
@@ -448,3 +448,224 @@ async def test_joined_passes_share_drop_approval(rec, monkeypatch, approved):
     assert bool(store.entries(rec, "facts")["facts"]) == approved
 
     assert any(r["by"] == "ai" for r in store.entries(rec, "links")["links"]) == approved
+
+
+@pytest.mark.anyio
+async def test_failed_ai_keeps_local_reason_and_retries_only_once(rec, monkeypatch):
+    f = files.add_file(rec, "sample.txt", b"Sample conditions", actor="engineer")
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0.01"))
+    calls = []
+
+    async def fail(*args):
+        calls.append(1)
+        raise RuntimeError("private source text must never appear")
+
+    assert not await ai.run(rec, SimpleNamespace(), request=fail)
+    detail = store.detail(rec, f.id)
+    assert detail["ai_state"] == "failed" and detail["local_state"] == "done"
+    assert set(detail["note"]) == {"en", "ar"}
+    assert store.list_map(rec)["files"][0]["note"] == detail["note"]
+    assert "private source" not in str(detail["note"])
+    assert "could not map 1 files with the AI" in store.list_map(rec)["status"]["line"]["en"]
+    await ai.run(rec, SimpleNamespace(), request=fail)
+    await ai.run(rec, SimpleNamespace(), request=fail)
+    assert len(calls) == 2
+
+
+@pytest.mark.anyio
+async def test_groups_chunks_receive_previous_paths(rec, monkeypatch):
+    with rec.write("one") as c:
+        c.executemany(
+            "INSERT INTO files(id,name,kind,size,sha256,status,added_at,added_by) "
+            "VALUES (?,?,'txt',1,?,'stored',?,'engineer')",
+            ((f"{i:03}", f"Sample {i}", f"hash{i}", rec.clock()) for i in range(250)),
+        )
+        c.executemany(
+            "INSERT INTO map_files(file_id,kind,local_state) VALUES (?,'txt','done')",
+            ((f"{i:03}",) for i in range(250)),
+        )
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+    groups = []
+
+    async def request(prompt, schema, instructions):
+        data = json.loads(prompt)
+        if schema is ai.Groups:
+            groups.append(data)
+            return ai.Groups(
+                groups=[ai.Group(file_id=data["files"][0]["file_id"], path="Electrical/Power")]
+            )
+        return ai.Batch(
+            files=[
+                ai.FileMap(
+                    file_id=f["file_id"],
+                    kind="text",
+                    title={"en": "Sample", "ar": "عينة"},
+                    group="Tender",
+                )
+                for f in data
+            ]
+        )
+
+    await ai.run(rec, SimpleNamespace(), request=request)
+    assert [len(g["files"]) for g in groups] == [100, 100, 50]
+    assert "Electrical/Power" in groups[1]["existing_groups"]
+    assert "Electrical/Power" in groups[2]["existing_groups"]
+
+
+@pytest.mark.anyio
+async def test_group_failure_retries_without_reclassifying(rec, monkeypatch):
+    f = files.add_file(rec, "sample.txt", b"Sample conditions", actor="engineer")
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+    calls = []
+
+    async def request(prompt, schema, instructions):
+        calls.append(schema)
+        if schema is ai.Batch:
+            return ai.Batch(
+                files=[
+                    ai.FileMap(
+                        file_id=f.id,
+                        kind="text",
+                        title={"en": "Sample", "ar": "عينة"},
+                        group="Tender",
+                    )
+                ]
+            )
+        if calls.count(ai.Groups) == 1:
+            raise RuntimeError("provider unavailable")
+        return ai.Groups(groups=[])
+
+    await ai.run(rec, SimpleNamespace(), request=request)
+    assert store.detail(rec, f.id)["ai_state"] == "failed"
+    await ai.run(rec, SimpleNamespace(), request=request)
+    assert store.detail(rec, f.id)["ai_state"] == "done"
+    assert calls.count(ai.Batch) == 1 and calls.count(ai.Groups) == 2
+
+
+@pytest.mark.anyio
+async def test_existing_duplicate_is_never_sent_to_ai(rec, monkeypatch):
+    first = files.add_file(rec, "sample.txt", b"Sample conditions", actor="engineer")
+    drain(rec)
+    with rec.write("one") as c:
+        store.write(c, rec, "map_files", {"file_id": first.id, "ai_state": "done"})
+        c.execute(
+            "INSERT INTO files(id,name,kind,size,sha256,status,added_at,added_by) "
+            "SELECT 'copy','copy.txt',kind,size,sha256,status,added_at,added_by "
+            "FROM files WHERE id=?",
+            (first.id,),
+        )
+        store.enqueue(c, rec, "copy", "txt", None)
+        store.write(c, rec, "map_files", {"file_id": "copy", "local_state": "done"})
+
+    async def never(*args):
+        raise AssertionError("Duplicate sent to AI")
+
+    monkeypatch.setattr(
+        oneshot, "map_model", lambda _: (_ for _ in ()).throw(AssertionError("AI consulted"))
+    )
+    assert not await ai.run(rec, SimpleNamespace(), request=never)
+    assert store.detail(rec, "copy")["ai_state"] == "local"
+
+
+@pytest.mark.anyio
+async def test_links_retry_keeps_successful_groups_facts_and_link_batches(rec, monkeypatch):
+    from collections import Counter
+
+    from qsone.records.mapping import facts, links
+
+    for i in range(9):
+        files.add_file(
+            rec, f"sample{i}.txt", f"Retention 10% sample {i}".encode(), actor="engineer"
+        )
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+    calls = Counter()
+    link_inputs = []
+    reads = []
+
+    async def read(fid, loc):
+        reads.append(fid)
+        return "Retention 10%"
+
+    async def request(prompt, schema, instructions):
+        calls[schema] += 1
+        if schema is ai.Batch:
+            return ai.Batch(
+                files=[
+                    ai.FileMap(
+                        file_id=d["file_id"],
+                        kind="text",
+                        title={"en": "Sample", "ar": "عينة"},
+                        group="Tender",
+                    )
+                    for d in json.loads(prompt)
+                ]
+            )
+        if schema is ai.Groups:
+            return ai.Groups(groups=[])
+        if schema is facts.Result:
+            return facts.Result(facts=[])
+        batch = json.loads(prompt.split("\n", 1)[1])
+        link_inputs.append([d["file_id"] for d in batch])
+        if calls[links.Result] == 2:
+            raise RuntimeError("sample interruption")
+        return links.Result(links=[])
+
+    await ai.run(rec, SimpleNamespace(), request=request, passes={"read": read})
+    first_reads = list(reads)
+    await ai.run(rec, SimpleNamespace(), request=request, passes={"read": read})
+    assert calls == {ai.Batch: 3, ai.Groups: 1, facts.Result: 1, links.Result: 4}
+    assert reads == first_reads
+    assert link_inputs[3] == link_inputs[1]
+    assert all(row["ai_state"] == "done" for row in store.list_map(rec)["files"])
+
+
+@pytest.mark.anyio
+async def test_links_never_receive_failed_classification(rec, monkeypatch):
+    from qsone.records.mapping import facts, links
+
+    for i in range(5):
+        files.add_file(
+            rec, f"sample{i}.txt", f"Retention 10% sample {i}".encode(), actor="engineer"
+        )
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+    failed_ids = set()
+    link_ids = set()
+
+    async def read(fid, loc):
+        return "Retention 10%"
+
+    async def request(prompt, schema, instructions):
+        if schema is ai.Batch:
+            data = json.loads(prompt)
+            if not failed_ids:
+                failed_ids.update(d["file_id"] for d in data)
+                raise RuntimeError("sample interruption")
+            return ai.Batch(
+                files=[
+                    ai.FileMap(
+                        file_id=d["file_id"],
+                        kind="text",
+                        title={"en": "Sample", "ar": "عينة"},
+                        group="Tender",
+                    )
+                    for d in data
+                ]
+            )
+        if schema is ai.Groups:
+            return ai.Groups(groups=[])
+        if schema is facts.Result:
+            return facts.Result(facts=[])
+        link_ids.update(d["file_id"] for d in json.loads(prompt.split("\n", 1)[1]))
+        return links.Result(links=[])
+
+    await ai.run(rec, SimpleNamespace(), request=request, passes={"read": read})
+    assert link_ids and not link_ids & failed_ids

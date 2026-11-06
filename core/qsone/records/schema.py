@@ -483,4 +483,7 @@ MIGRATIONS: list[str] = [
     PACK_SQL,
     FILE_REGION_COMMENTS_SQL,
     MAP_SQL,
+    "ALTER TABLE map_files ADD COLUMN ai_attempts INTEGER NOT NULL DEFAULT 0;",
+    "ALTER TABLE map_files ADD COLUMN ai_stage TEXT NOT NULL DEFAULT 'classification';"
+    "UPDATE map_files SET ai_stage='groups' WHERE ai_title IS NOT NULL;",
 ]

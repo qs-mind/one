@@ -348,7 +348,7 @@ def _pdf(data: bytes) -> Extracted:
         for i in range(pages):
             page = pdf[i]
             textpage = page.get_textpage()
-            text = display_text(_page_text(textpage))
+            text = display_text(_page_text(textpage), keep_blanks=True)
             flags += hidden.pdf_page_flags(page, textpage, i + 1)
             textpage.close()
             page.close()

@@ -490,3 +490,65 @@ def test_no_ocr_languages_fails_with_bilingual_note(rec, monkeypatch):
     drain(rec)
     row = store.detail(rec, f.id)
     assert row["local_state"] == "failed" and row["note"] == copy.OCR_TESSERACT_FAILED
+
+
+def test_existing_exact_copy_reuses_local_map_without_reading(rec, monkeypatch):
+    first = files.add_file(rec, "sample.txt", b"Sample conditions", actor="engineer")
+    drain(rec)
+    with rec.write("one") as c:
+        c.execute(
+            "INSERT INTO files(id,name,kind,size,sha256,status,added_at,added_by) "
+            "SELECT 'copy','copy.txt',kind,size,sha256,status,added_at,added_by "
+            "FROM files WHERE id=?",
+            (first.id,),
+        )
+        store.enqueue(c, rec, "copy", "txt", None)
+    monkeypatch.setattr(
+        worker, "_structure", lambda *a: (_ for _ in ()).throw(AssertionError("copy read again"))
+    )
+    drain(rec)
+    detail = store.detail(rec, "copy")
+    assert detail["local_state"] == "done"
+    assert detail["ai_state"] == "local"
+    assert detail["structure"] == store.detail(rec, first.id)["structure"]
+
+
+def test_ai_failure_is_not_resubmitted_until_wake(rec, monkeypatch):
+    from concurrent.futures import Future
+    from types import SimpleNamespace
+
+    from qsone.records.mapping.service import Mapping
+
+    f = files.add_file(rec, "sample.txt", b"Sample conditions", actor="engineer")
+    other = files.add_file(rec, "other.txt", b"Sample other", actor="engineer")
+    drain(rec)
+    calls = []
+
+    def completed(pid, pending):
+        calls.append(pending)
+        with rec.write("one") as c:
+            store.write(c, rec, "map_files", {"file_id": other.id, "ai_state": "done"})
+            store.write(c, rec, "map_files", {"file_id": f.id, "ai_state": "failed"})
+        future = Future()
+        future.set_result(False)
+        return future
+
+    service = Mapping(SimpleNamespace(opened=lambda: [(rec.id, rec)]), completed=completed)
+    service._last_drop = 0
+    monkeypatch.setattr("qsone.records.mapping.service.time.monotonic", lambda: 100)
+    waits = []
+
+    def wait(_):
+        waits.append(1)
+        if len(waits) == 3:
+            service._quit.set()
+
+    monkeypatch.setattr(service._wake, "wait", wait)
+    service._work()
+    assert len(calls) == 1 and set(calls[0]) == {f.id, other.id}
+    service._quit.clear()
+    waits.clear()
+    service.wake()
+    service._last_drop = 0
+    service._work()
+    assert len(calls) == 2 and calls[1] == [f.id]

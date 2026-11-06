@@ -8,6 +8,7 @@ keys only in the key store, under "standard:<id>".
 
 import ipaddress
 import re
+from dataclasses import replace
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -48,6 +49,33 @@ class _ChatModel(OpenAIChatModel):
     @property
     def _streamed_response_cls(self) -> type[OpenAIStreamedResponse]:
         return _OnceStreamed
+
+
+def _google_schema(value):
+    """Wire-only compatibility; Pydantic keeps every local validation constraint."""
+    if isinstance(value, list):
+        return [_google_schema(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _google_schema(v) for k, v in value.items() if k not in {"maxItems", "minItems"}}
+    return value
+
+
+class _GoogleChatModel(_ChatModel):
+    def customize_request_parameters(self, parameters):
+        parameters = super().customize_request_parameters(parameters)
+
+        def tool(t):
+            return replace(t, parameters_json_schema=_google_schema(t.parameters_json_schema))
+
+        output = parameters.output_object
+        return replace(
+            parameters,
+            function_tools=[tool(t) for t in parameters.function_tools],
+            output_tools=[tool(t) for t in parameters.output_tools],
+            output_object=None
+            if output is None
+            else replace(output, json_schema=_google_schema(output.json_schema)),
+        )
 
 
 class KeyInTheClear(ValueError):
@@ -146,7 +174,14 @@ class StandardLink:
         provider = OpenAIProvider(
             base_url=self.base_url, api_key=self._key(), http_client=self._http
         )
-        return _ChatModel(model_id, provider=provider)
+        host = urlsplit(self.base_url).hostname or ""
+        google = (
+            self.provider in {"google", "google-vertex"}
+            or host in {"generativelanguage.googleapis.com", "aiplatform.googleapis.com"}
+            or host.endswith("-aiplatform.googleapis.com")
+        )
+        model_type = _GoogleChatModel if google else _ChatModel
+        return model_type(model_id, provider=provider)
 
 
 def _entries() -> list[dict]:

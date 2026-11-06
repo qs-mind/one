@@ -554,6 +554,7 @@ class _Brief:
         self.lead_ctx: ToolContext | None = None
         self.truth_retried = False  # the reply went back once to be fixed (engine.truth)
         self.changes = 0  # the writes this Brief made to the records since it started (`wrote`)
+        self.read_repeats = 0
         self.step_limited = False  # the Lead reached STEP_LIMIT and reported what it had
         self.budget_approved = False  # the engineer said yes to the Brief Budget of its plan
         self.said = 0  # the reply's length so far, in the screen's units (UTF-16)
@@ -1135,7 +1136,11 @@ class _Brief:
         Lead says, without another tool, what it got so far (the top 5 of SGH took 50 steps of
         one item each and ended "problem inside ONE", 6 Nov 2026)."""
         log.info("brief %s at the step limit", self.brief_id)
-        notice = copy.fill(copy.STEP_LIMIT_REACHED, n=str(STEP_LIMIT))
+        notice = (
+            copy.READ_REPEAT_LIMIT
+            if self.read_repeats >= 3
+            else copy.fill(copy.STEP_LIMIT_REACHED, n=str(STEP_LIMIT))
+        )
         self.emit(Data(self.brief_id, "notice", f"{self.brief_id}-step-limit", {"text": notice}))
         self.worklog.truth = (self.worklog.truth or {}) | {"step_limit": notice}
         self.step_limited = True
@@ -1143,7 +1148,11 @@ class _Brief:
             out = await self._attempts(
                 self.lead_run_id,
                 self.lead_ctx.agent,
-                lambda c: self._lead_pass(c, report=True, prompt=copy.STEP_LIMIT_NOW),
+                lambda c: self._lead_pass(
+                    c,
+                    report=True,
+                    prompt=copy.READ_REPEAT_NOW if self.read_repeats >= 3 else copy.STEP_LIMIT_NOW,
+                ),
             )
         except UsageLimitExceeded:
             out = None
@@ -1211,7 +1220,7 @@ class _Brief:
         agent = agents.build_agent(
             spec,
             model,
-            self._toolset(spec, self.lead_ctx),
+            tools.toolset((), self.lead_ctx) if report else self._toolset(spec, self.lead_ctx),
             output_type=[self.output_type or str, DeferredToolRequests],
         )
         if not report and self.output_type is None:
@@ -1235,6 +1244,9 @@ class _Brief:
                     if not Agent.is_call_tools_node(node):
                         self._tools_done(run_id)
                     if Agent.is_model_request_node(node):
+                        if self.read_repeats >= 3 and not report:
+                            self._save(run_id, run.all_messages()[len(earlier) :])
+                            raise UsageLimitExceeded("Repeated full reads")
                         self._agent(run_id, state="thinking")
                         self.answer_from = self.said  # where this response's words begin
                         if self.redo_cleared:  # the screen dropped every word said so far
@@ -1592,6 +1604,43 @@ class _Brief:
         except Exception:  # noqa: BLE001 - an older file: the check is left out, never the reply
             return 1
         return rows
+
+    def read_repeat(self, name: str, args: dict) -> bool:
+        """Deduplicate only successfully answered full reads within this Brief."""
+        expected = REGISTRY[name].args.model_validate(args).model_dump(mode="json")
+        runs = self.store.runs(self.brief_id)
+        previous_repeats = sum(
+            result == copy.READ_ALREADY["en"]
+            for run in runs
+            if run["history"]
+            for tool, result in agents.tool_returns(run["history"])
+            if tool in {"files_read", "read_chunk"}
+        )
+        for run in runs:
+            messages = _load(run["history"])
+            answered = {
+                p.tool_call_id
+                for m in messages
+                if isinstance(m, ModelRequest)
+                for p in m.parts
+                if isinstance(p, ToolReturnPart)
+                and p.outcome == "success"
+                and not str(p.content).startswith(NOT_DONE)
+            }
+            for m in messages:
+                if not isinstance(m, ModelResponse):
+                    continue
+                for call in _calls(m):
+                    if call.tool_name != name or call.tool_call_id not in answered:
+                        continue
+                    try:
+                        old = REGISTRY[name].args.model_validate(call.args_as_dict())
+                    except ValueError:
+                        continue
+                    if old.model_dump(mode="json") == expected:
+                        self.read_repeats = max(self.read_repeats, previous_repeats) + 1
+                        return True
+        return False
 
     def _read_returns(self) -> list[tuple[str, str]]:
         return [

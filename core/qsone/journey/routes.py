@@ -166,8 +166,10 @@ def router(engine: Any) -> APIRouter:
             lead = roles.chosen(listed).get("lead")
             model = lead if lead is not None and lead.connector == body.connector else None
             typed = next((c for c in standard.typed() if c.connector == body.connector), None)
-            if typed is not None and roles.typed_card(listed) is None:
-                model = typed  # a model the provider serves but does not list: still the one
+            if typed is not None:
+                # Check this connection's model, never an older saved role selection.
+                connected = roles.typed_card(listed)
+                model = connected.choice if connected is not None else typed
             if model is None and listed:
                 model = listed[0].choice
             if model is None:

@@ -571,6 +571,7 @@ TOOL_WORDS = {
     "deliverable_read": {"en": "Reading a Deliverable", "ar": "بيقرا مُخرج"},
     "explain_number": {"en": "Tracing where a number comes from", "ar": "بيتتبّع مصدر رقم"},
     "files_list": {"en": "Looking at the project files", "ar": "بيشوف ملفات المشروع"},
+    "project_map": {"en": "Reading the project map", "ar": "بيقرا خريطة المشروع"},
     "files_read": {"en": "Reading a project file", "ar": "بيقرا ملف من ملفات المشروع"},
     "find_items": {"en": "Looking up items", "ar": "بيدوّر على بنود"},
     "hand_to_project": {"en": "Passing the work to a project", "ar": "بيحوّل الشغل لمشروع"},
@@ -2922,3 +2923,34 @@ MAP_AI_COST = {
     "ar": "تخطيط {count} ملف هيتكلف حوالي {cost} دولار.",
 }
 MAP_AI_RUN = {"en": "Map them", "ar": "خطّطهم"}
+
+MAP_AI_FAILED_REASON = {
+    "en": "the AI request failed",
+    "ar": "طلب الذكاء الاصطناعي فشل",
+}
+MAP_AI_FAILED = {
+    "en": "ONE could not map {count} files with the AI: {reason}. Local reading is kept.",
+    "ar": "ONE مقدرش يعمل خريطة {count} ملف بالذكاء الاصطناعي: {reason}. القراية المحلية محفوظة.",
+}
+
+READ_ALREADY = {
+    "en": "already read in this Brief; use the text above or read another page/file.",
+    "ar": "ONE قرا ده في الطلب ده؛ استخدم النص اللي فوق أو اقرا صفحة أو ملف تاني.",
+}
+READ_REPEAT_NOW = (
+    "Stop searching: three identical reads were repeated. Answer using only what you have. "
+    "For each remaining question say plainly 'not found in the files read: …'. "
+    "A dotted or underscored template field is 'left blank in the tender documents' "
+    "with its file and page, not an unknown value to search for. No more tools."
+)
+READ_TEMPLATE_BLANK = {
+    "en": "A dotted/underscored template field above is left blank in the tender documents. "
+    "Report that with its file and page; do not invent its value.",
+    "ar": "الخانة اللي فيها نقط أو شرطات تحت السطر فوق متسابة فاضية في مستندات المناقصة. "
+    "قول ده مع اسم الملف والصفحة؛ ماتخمنش قيمتها.",
+}
+
+READ_REPEAT_LIMIT = {
+    "en": "ONE stopped searching after three repeated reads and will answer from the files read.",
+    "ar": "ONE وقف البحث بعد تكرار القراية تلات مرات وهيرد من الملفات اللي قراها.",
+}

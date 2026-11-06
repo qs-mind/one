@@ -428,3 +428,20 @@ def test_pack_office_missing_libreoffice_uses_plain_message(rec, monkeypatch):
             },
         )
     assert error.value.text == copy.FILE_LIBREOFFICE_MISSING
+
+
+def test_signoff_gate_before_map_migration_and_after_open(data_dir, monkeypatch):
+    from qsone.records import schema
+    from qsone.records.mapping.facts import gate
+    from qsone.records.project import Records
+
+    migrations = schema.MIGRATIONS
+    with monkeypatch.context() as patch:
+        patch.setattr(schema, "MIGRATIONS", migrations[: migrations.index(schema.MAP_SQL)])
+        rec = Records.create(data_dir / "pre-map", name="Sample", actor="engineer")
+        assert gate(rec, {"sources": {}, "steps": []}) == []
+    rec._migrate()
+    with rec.read() as conn:
+        assert conn.execute("SELECT count(*) FROM map_facts").fetchone()[0] == 0
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+    rec.close()

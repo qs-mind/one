@@ -271,6 +271,11 @@ def gate(rec, view):
     explicit = set(view.get("fact_ids", []))
     reasons = []
     with rec.read() as c:
+        # An older project may be used while its map migration has not run yet.
+        if not c.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='map_facts'"
+        ).fetchone():
+            return []
         rows = [
             store.decoded(r)
             for r in store.rows(
