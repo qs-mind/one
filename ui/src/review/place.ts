@@ -19,6 +19,7 @@ export function rowName(view: View, row: string | null | undefined, lang: Langua
     const found = view.rows.find((r) => r.id === row);
     return found ? (found.code ?? found.title ?? "") : "";
   }
+  if (view.kind === "pack") return view.title;
   const block = view.blocks.find((b) => b.id === row);
   const text = block ? blockText(block.node as SlateElement).trim() : "";
   return text ? fill(pick(texts.placeQuote, lang), { quote: short(text, 30) }) : pick(texts.placeParagraph, lang);

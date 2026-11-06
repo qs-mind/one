@@ -176,6 +176,8 @@ def record_review(
 
 
 def _has_numbers(v: dict) -> bool:
+    if v["kind"] == "pack":
+        return True  # A tender submission always needs the Checking QS.
     if v["kind"] == "document":
         return bool(v["refs"])
     return v["total"] is not None or any(

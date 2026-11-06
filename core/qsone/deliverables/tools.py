@@ -171,6 +171,13 @@ def _typed_numbers(conn, text: str) -> list[str]:
 
 
 def _page(v: dict, offset: int, limit: int) -> dict:
+    if v["kind"] == "pack":
+        return {
+            **v,
+            "steps": v["steps"][offset : offset + limit],
+            "offset": offset,
+            "next": offset + limit if offset + limit < len(v["steps"]) else None,
+        }
     parts = "rows" if v["kind"] == "sheet" else "blocks"
     shown = v[parts][offset : offset + limit]
     ids = {p["id"] for p in shown}
@@ -317,6 +324,41 @@ def client_file_plan(ctx: ToolContext, deliverable_id: Id, file_id: Id, plan: di
     }
 
 
+def pack_propose(
+    ctx: ToolContext,
+    steps: list[dict],
+    reason: Name,
+    id: Id | None = None,
+    title: Name = "Tender pack",
+    language: Literal["en", "ar"] = "ar",
+) -> dict:
+    """Propose a tender pack's complete ordered steps as one Suggested change. Without id,
+    creates an empty pack first. Only the engineer accepts the change. File pages must exist.
+    Steps: {kind:"file",file_id,ranges:[[first,last]],title?:{en,ar}};
+    {kind:"cover"|"divider",text:{en,ar},title?:{en,ar}};
+    {kind:"stamp",text:{en,ar},position:"top"|"center"|"bottom",pages:[output page]};
+    {kind:"page_numbers"}; {kind:"seal"} (last, optional local integrity seal).
+    Ranges are one-based inclusive; stamps target final output pages. Titles make bookmarks.
+    Example: {"steps":[{"kind":"cover","text":{"en":"Sample","ar":"عينة"}}],
+    "title":"Sample", "language":"en", "reason":"Sample pack"}
+    """
+    from qsone.deliverables.pack import validate_steps
+    from qsone.records.files import read_original
+
+    rec = _rec(ctx)
+    validate_steps(steps, lambda fid: read_original(rec, fid))
+    if id is None:
+        id = store.create(
+            rec, kind="pack", variant="tender", title=title, language=language, actor=actor(ctx)
+        )
+    made = changes.propose(
+        rec, id, [{"op": "set_pack", "steps": steps}], actor=actor(ctx), reason=reason
+    )
+    ctx.host.emit(Data(ctx.brief_id, "deliverable", id, {"id": id}))
+    return {"id": id, "change_ids": [c.id for c in made]}
+
+
+register_functions("outputs", [pack_propose], roles={"lead"}, risk="write")
 _TEAM = {"lead", "specialist"}
 register_functions("outputs", [deliverable_read, client_file_read], roles=_TEAM, risk="read")
 register_functions(
@@ -327,6 +369,7 @@ register_functions(
 )
 REGISTRY["client_file_read"] = replace(REGISTRY["client_file_read"], untrusted=True)
 OUTPUTS_TOOLS = (
+    "pack_propose",
     "deliverable_create",
     "deliverable_read",
     "deliverable_propose",
@@ -349,7 +392,10 @@ def check_draft(
         v = current_view(rec, deliverable_id)
     except RecordsError:
         return None
-    if v["kind"] == "sheet":
+    if v["kind"] == "pack":
+        rows = [{**step, "source_file": v["files"].get(step.get("file_id"))} for step in v["steps"]]
+        body = "\n".join(step["text"][v["language"]] for step in v["steps"] if "text" in step)
+    elif v["kind"] == "sheet":
         rows = []
         for r in v["rows"]:
             row = {"row": r["id"], "code": r.get("code") or r.get("title", "")}
@@ -367,7 +413,7 @@ def check_draft(
         body = "\n\n".join(compare.block_text(b["node"], v["refs"]) for b in v["blocks"])
     draft = DeliverableDraft(
         id=v["id"],
-        kind="table" if v["kind"] == "sheet" else "document",
+        kind="table" if v["kind"] == "sheet" else v["kind"],
         title=v["title"],
         body=body,
         rows=tuple(rows),
@@ -382,7 +428,7 @@ def stored_cards(brief_id: str, returns: list[tuple[str, str]]) -> list[Data]:
     result text)`: one for each Deliverable it made, as `deliverable_create` showed it."""
     found = []
     for name, text in returns:
-        if name != "deliverable_create":
+        if name not in ("deliverable_create", "pack_propose"):
             continue
         try:
             out = json.loads(text)
@@ -400,7 +446,7 @@ def unchecked(rec: Records, returns: list[tuple[str, str]]) -> list[DeliverableD
     ids: list[str] = []
     change_ids: list[str] = []
     for name, text in returns:
-        if name not in ("deliverable_create", "deliverable_propose"):
+        if name not in ("deliverable_create", "deliverable_propose", "pack_propose"):
             continue
         try:
             out = json.loads(text)
@@ -408,7 +454,7 @@ def unchecked(rec: Records, returns: list[tuple[str, str]]) -> list[DeliverableD
             continue
         if not isinstance(out, dict):
             continue
-        if name == "deliverable_create" and isinstance(out.get("id"), str):
+        if name in ("deliverable_create", "pack_propose") and isinstance(out.get("id"), str):
             ids.append(out["id"])
         elif name == "deliverable_propose" and isinstance(out.get("change_ids"), list):
             change_ids += [c for c in out["change_ids"] if isinstance(c, str)]

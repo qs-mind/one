@@ -25,7 +25,7 @@ export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, 
   const [done, setDone] = useState<string | null>(null);
   const draft = view.status !== "signed_off";
   const formats: ["xlsx" | "docx" | "pdf", string][] =
-    view.kind === "sheet"
+    view.kind === "pack" ? [["pdf", t("exportPdf")]] : view.kind === "sheet"
       ? [
           ["xlsx", t("exportExcel")],
           ["pdf", t("exportPdf")],
@@ -55,7 +55,7 @@ export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, 
         <button
           key={format}
           type="button"
-          disabled={busy}
+          disabled={busy || (view.kind === "pack" && draft)}
           aria-describedby={draft ? markId : undefined}
           className="rounded-lg border border-ink/20 px-3 py-1 hover:bg-stone disabled:opacity-40"
           onClick={() => void make(format)}
@@ -80,7 +80,7 @@ export function ExportMenu({ projectId, view, fillPlanId, fillFileName, onFill, 
       {draft && (
         <span id={markId} className="text-copper">
           {/* the mark is printed in the Deliverable's own language, as the files carry it */}
-          <bdi dir="auto">{pick(texts.exportDraftMark, view.language)}</bdi>
+          <bdi dir="auto">{pick(view.kind === "pack" ? texts.packNeedsSignoff : texts.exportDraftMark, view.language)}</bdi>
         </span>
       )}
       {done && (

@@ -545,10 +545,14 @@ def validate(rec: Records, deliverable: dict, op: dict, *, actor: str) -> dict:
     (CHANGE_STALE) and an agent's number without a source (NUMBER_NEEDS_SOURCE). The ledger's own
     checks on values, units and dates run when the change is tried (`apply` in a dry run)."""
     kind = op.get("op") if isinstance(op, dict) else None
-    if kind not in SHEET_OPS | DOC_OPS:
+    if kind not in SHEET_OPS | DOC_OPS | {"set_pack"}:
         raise _refuse(copy.OP_UNKNOWN, "op")
     if kind not in deliverable["template"].get("ops", []):
         raise _refuse(copy.OP_NOT_IN_TEMPLATE, "op")
+    if kind == "set_pack":
+        from qsone.deliverables.pack import validate_op
+
+        return validate_op(rec, deliverable, op)
     with rec.read() as conn:
         return _RULES[kind][0](conn, deliverable, dict(op), actor)
 
@@ -560,6 +564,10 @@ def apply(
     `reason` or «تعديل يدوي في …»), item fields, parts or the template. Returns the Sheet rows
     whose calculated cells follow it, or None for all of them (a template change keeps
     `deliverable["template"]` current)."""
+    if op["op"] == "set_pack":
+        from qsone.deliverables.pack import apply_op
+
+        return apply_op(conn, rec, deliverable, op, actor, reason)
     return _RULES[op["op"]][1](conn, rec, deliverable, op, actor, reason)
 
 
@@ -597,7 +605,7 @@ def is_stale(conn, deliverable: dict, op: dict) -> bool:
         now = {"version": latest_version(conn, deliverable["id"])}
         now["mark"] = records_mark(conn, deliverable)
         return op.get("expect") != now
-    if kind == "set_columns":
+    if kind in ("set_columns", "set_pack"):
         return deliverable["template"]["version"] != op["expect"]
     key = "block" if kind in DOC_OPS else "row"
     kinds = {"block"} if kind in DOC_OPS else _ROWS

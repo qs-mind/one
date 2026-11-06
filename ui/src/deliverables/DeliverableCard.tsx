@@ -9,7 +9,7 @@ import type { DeliverableInfo } from "./types";
 import type { Subscribe } from "./useDeliverable";
 
 export function kindName(kind: DeliverableInfo["kind"]): string {
-  return kind === "sheet" ? t("deliverableSheet") : kind === "document" ? t("deliverableDocument") : t("deliverableOther");
+  return kind === "pack" ? t("deliverablePack") : kind === "sheet" ? t("deliverableSheet") : kind === "document" ? t("deliverableDocument") : t("deliverableOther");
 }
 
 /** The small facts under a Deliverable's title: Revision, pending changes, open comments, sample data. */

@@ -195,8 +195,9 @@ def _put_back(conn, rec: Records, head: dict, plan: dict, actor: str) -> None:
         if until is None:
             _end_number(conn, rec, number_id, actor)
     if plan["template"]:
-        columns = plan["template"][0]["columns"]
-        op = {"op": "set_columns", "columns": columns, "expect": head["template"]["version"]}
+        key = "steps" if head["kind"] == "pack" else "columns"
+        operation = "set_pack" if head["kind"] == "pack" else "set_columns"
+        op = {"op": operation, key: plan["template"][0][key], "expect": head["template"]["version"]}
         ops.apply(conn, rec, head, op, actor=actor, reason=None)
 
 

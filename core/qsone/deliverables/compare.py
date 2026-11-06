@@ -132,4 +132,19 @@ def compare(a: dict, b: dict) -> dict:
     under "title")."""
     if a["id"] != b["id"] or a["kind"] != b["kind"]:
         raise ValueError("compare takes two views of one Deliverable")
+    if a["kind"] == "pack":
+        from qsone.deliverables.pack import describe
+
+        return {
+            "blocks": [
+                {
+                    "id": "pack",
+                    "change": "same" if a["steps"] == b["steps"] else "changed",
+                    "segments": segments(
+                        describe(a),
+                        describe(b),
+                    ),
+                }
+            ]
+        }
     return _sheets(a, b) if a["kind"] == "sheet" else _documents(a, b)

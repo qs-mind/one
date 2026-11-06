@@ -375,6 +375,22 @@ ALTER TABLE ai_costs ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE ai_costs ADD COLUMN cache_write_tokens INTEGER NOT NULL DEFAULT 0
 """
 
+PACK_SQL = """
+CREATE TABLE deliverables_pack (
+  id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('sheet','document','pack')),
+  variant TEXT NOT NULL, title TEXT NOT NULL,
+  language TEXT NOT NULL CHECK (language IN ('ar','en')),
+  template TEXT NOT NULL CHECK (json_valid(template)),
+  total_item_id TEXT REFERENCES items(id),
+  desk TEXT CHECK (desk IS NULL OR json_valid(desk)), off_desk INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, created_by TEXT NOT NULL, updated_at TEXT NOT NULL);
+INSERT INTO deliverables_pack SELECT * FROM deliverables;
+DROP TABLE deliverables;
+ALTER TABLE deliverables_pack RENAME TO deliverables;
+CREATE TRIGGER deliverables_no_delete BEFORE DELETE ON deliverables
+  BEGIN SELECT RAISE(ABORT, 'Deliverables are never deleted'); END;
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -388,4 +404,5 @@ MIGRATIONS: list[str] = [
     UNDO_SQL,
     WORKSPACE_SQL,
     CACHE_SQL,
+    PACK_SQL,
 ]

@@ -70,6 +70,8 @@ def refs(draft: DeliverableDraft) -> tuple[list[str], list[str]]:
 
 def has_numbers(draft: DeliverableDraft) -> bool:
     """Whether the Checking QS must check it before the Brief is done."""
+    if draft.kind == "pack":
+        return True
     number_ids, calc_ids = refs(draft)
     return bool(number_ids or calc_ids or numbers_in(f"{draft.title}\n{draft.body}"))
 

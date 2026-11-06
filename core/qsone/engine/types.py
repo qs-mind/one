@@ -102,7 +102,7 @@ class AgentSpec:
 @dataclass(frozen=True)
 class DeliverableDraft:
     id: str
-    kind: Literal["table", "document", "answer"]
+    kind: Literal["table", "document", "answer", "pack"]
     title: str
     body: str  # Markdown
     rows: tuple[dict, ...] = ()  # each numeric cell is {"number_id": …} or {"calc_id": …}

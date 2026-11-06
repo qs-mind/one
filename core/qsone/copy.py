@@ -603,6 +603,7 @@ TOOL_WORDS = {
     "web_read": {"en": "Reading a web page", "ar": "بيقرا صفحة ويب"},
     "open_tools": {"en": "Getting tools ready", "ar": "بيجهّز أدواته"},
     "compare_files": {"en": "Comparing file revisions", "ar": "بيقارن نسخ الملفات"},
+    "pack_propose": {"en": "Arranging the tender pack", "ar": "بيرتّب ملف المناقصة"},
     "web_search": {"en": "Searching the web", "ar": "بيدوّر على الويب"},
 }
 
@@ -2683,6 +2684,39 @@ def error(text: dict[str, str]) -> dict:
     fix = fix_of(text)
     return {"error": text} if fix is None else {"error": text, "fix": fix}
 
+
+# Tender packs (wave 1 A).
+PACK_INVALID = {
+    "en": "This pack step is invalid. Choose pages that exist and paired text.",
+    "ar": "الخطوة دي مش صالحة. اختار صفحات موجودة ونص بالعربي والإنجليزي.",
+}
+PACK_PAGE = {"en": "Page {n} of {total}", "ar": "صفحة {n} من {total}"}
+PACK_SEAL = {
+    "en": (
+        "The free seal proves the file was not changed after sealing. "
+        "It is not a licensed e-signature."
+    ),
+    "ar": "الختم المجاني بيثبت إن الملف ماتغيرش بعد الختم. ده مش توقيع إلكتروني معتمد.",
+}
+PACK_KEY_UNAVAILABLE = {
+    "en": "ONE could not access the key store to seal this pack.",
+    "ar": "ONE مش قادر يوصل لمخزن المفاتيح عشان يختم الحزمة.",
+}
+PACK_LABELS = {
+    "file": {"en": "File pages", "ar": "صفحات الملف"},
+    "cover": {"en": "Cover", "ar": "الغلاف"},
+    "divider": {"en": "Divider", "ar": "فاصل"},
+    "stamp": {"en": "Stamp", "ar": "ختم نصّي"},
+    "page_numbers": {"en": "Page numbers", "ar": "ترقيم الصفحات"},
+    "seal": {"en": "Free integrity seal", "ar": "ختم سلامة مجاني"},
+    "top": {"en": "Top", "ar": "فوق"},
+    "center": {"en": "Center", "ar": "في النص"},
+    "bottom": {"en": "Bottom", "ar": "تحت"},
+}
+PACK_LOCKED = {
+    "en": "This PDF needs a password. Add an unlocked copy to the project to include its pages.",
+    "ar": "الـ PDF ده محتاج كلمة سر. ضيف نسخة مفتوحة للمشروع عشان تستخدم صفحاته.",
+}
 
 # Revision comparison: observed words/pixels only, never inferred engineering changes.
 COMPARE_TEXT = {"en": "Page words changed.", "ar": "كلمات الصفحة اتغيّرت."}

@@ -50,6 +50,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
     ),
     "boq": ("boq_preview", "boq_import", "prices_lookup"),
     "documents": (
+        "pack_propose",
         "compare_files",
         "deliverable_create",
         "deliverable_read",

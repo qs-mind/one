@@ -154,14 +154,20 @@ class Records:
             if version == len(migrations):
                 return
             body = "\n".join(f"{sql};" for sql in migrations[version:])
+            conn.execute("PRAGMA foreign_keys = OFF")
             try:
                 conn.executescript(
-                    f"BEGIN IMMEDIATE;\n{body}\nPRAGMA user_version = {len(migrations)};\nCOMMIT;"
+                    f"BEGIN IMMEDIATE;\n{body}\nPRAGMA user_version = {len(migrations)};"
                 )
+                if conn.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                    raise RecordsError(copy.PROJECT_DAMAGED)
+                conn.execute("COMMIT")
             except BaseException:
                 if conn.in_transaction:
                     conn.execute("ROLLBACK")
                 raise
+            finally:
+                conn.execute("PRAGMA foreign_keys = ON")
 
     def meta(self) -> dict[str, str]:
         with self.read() as conn:

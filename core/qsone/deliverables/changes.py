@@ -234,6 +234,8 @@ def _shown_of(v: dict, head: dict, op: dict, new: set[str]) -> dict | None:
     """What the op's own target looks like in view `v`: a cell, a row, a block or the columns.
     `new` holds the part ids that only the dry run made."""
     kind = op["op"]
+    if kind == "set_pack":
+        return {"steps": v["steps"], "files": v["files"]}
     if kind == "set_columns":
         return {"columns": v["columns"]}
     if kind in ops.DOC_OPS:
@@ -267,7 +269,7 @@ def _note(conn, op: dict) -> dict | None:
 def _shown(conn, rec, head: dict, now: dict, op: dict, *, actor, reason) -> dict:
     then, follows = _try(rec, head, op, actor=actor, reason=reason)
     parts = "blocks" if head["kind"] == "document" else "rows"
-    new = {p["id"] for p in then[parts]} - {p["id"] for p in now[parts]}
+    new = {p["id"] for p in then.get(parts, [])} - {p["id"] for p in now.get(parts, [])}
     return _settle(
         conn,
         {

@@ -232,6 +232,10 @@ def _with_head(rec: Records, v: dict) -> dict:
 
 def _export(rec: Records, d: str, format_: str, revision: int | None) -> Response:
     v = _with_head(rec, current_view(rec, d, revision=revision))
+    if v["kind"] == "pack" and format_ == "pdf":
+        from qsone.deliverables.pack import build_view
+
+        return _file(build_view(rec, v, exporting=True), export.file_name(v, "pdf"))
     make = _EXPORTS.get((v["kind"], format_))
     if make is None:
         raise RecordsError(copy.EXPORT_FORMAT_NOT_ALLOWED, status=422, field="format")
@@ -318,6 +322,12 @@ def router(projects: Projects, trash: Trash | None = None) -> APIRouter:
     @r.get(base + "/{d}")
     async def get_view(p: str, d: str, version: int | None = None, revision: int | None = None):
         return await answer(p, screen_view, d, version, revision, ids=deliverable(d))
+
+    @r.post(base + "/{d}/pack/build")
+    async def build_pack(p: str, d: str, version: int, page: int = 1):
+        from qsone.deliverables.pack import preview
+
+        return await answer(p, preview, d, version, page, ids=deliverable(d))
 
     @r.get(base + "/{d}/changes")
     async def list_changes(p: str, d: str, status: str | None = None) -> Response:

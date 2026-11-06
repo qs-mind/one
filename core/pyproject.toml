@@ -29,6 +29,10 @@ dependencies = [
   "sqlite-vec",
   "pypdfium2",  # Apache-2.0 / BSD-3-Clause; PDF reading and revision page renders
   "pdfplumber",  # MIT; PDF BOQ tables; brings pdfminer.six (MIT)
+  "pypdf>=6.2",  # BSD-3-Clause; tender pack assembly
+  "pyhanko",  # MIT; local PDF integrity seal
+  "pyhanko-certvalidator",  # MIT; the seal certificate store
+  "asn1crypto",  # MIT; in-memory seal key and certificate encoding
   "openpyxl",
   "xlrd",
   "platformdirs",
