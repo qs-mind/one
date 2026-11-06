@@ -4,14 +4,17 @@ files and DWG drawings are kept with a plain note. Everything is read from memor
 temporary file."""
 
 import csv
+import ctypes
 import datetime as dt
 import io
+import re
 import zipfile
 from dataclasses import dataclass, field
 from typing import Literal
 
 import openpyxl
 import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 import xlrd
 
 from qsone.records import hidden
@@ -181,6 +184,55 @@ def chunk(pieces: list[Piece], max_chars: int = 800) -> list[Piece]:
     return out
 
 
+# A clause number in Arabic-Indic digits with dashes («١٢-١-٢-») in a right-to-left line: a
+# dash does not join Arabic-Indic digits, so each number shows on its own and pdfium gives them
+# left to right as they are seen («-٢-١-١٢»). Such a run is put back in reading order. A run
+# joined by a dot, a comma or a slash shows as one number and is left as it is.
+_AN = "[\u0660-\u0669\u06f0-\u06f9]+"
+_RTL_RUN = re.compile(
+    rf"(?<![\u0660-\u0669\u06f0-\u06f9.,/\u066b\u066c])"
+    rf"(?:(?<![\u0660-\u0669\u06f0-\u06f9]):)?[-\u2013]*{_AN}(?:[-\u2013]+{_AN})*[-\u2013]*"
+    rf"(?::(?![\u0660-\u0669\u06f0-\u06f9]))?"
+    rf"(?![\u0660-\u0669\u06f0-\u06f9.,/\u066b\u066c])"
+)
+_RTL_TOKEN = re.compile(rf"{_AN}|[-\u2013:]")
+_ARABIC_LETTER = re.compile("[\u0621-\u064a]")
+
+
+def _page_text(textpage) -> str:
+    """The page's text, with Arabic-Indic clause numbers in reading order (`_RTL_RUN`): only in
+    a line with Arabic letters, and only where the page has the run left to right."""
+    text = textpage.get_text_range()
+    tp = textpage.raw
+    if len(text) != pdfium_c.FPDFText_CountChars(tp) or not _ARABIC_LETTER.search(text):
+        return text  # a character index is not a place in the text: nothing is moved
+    out, done = [], 0
+    for m in _RTL_RUN.finditer(text):
+        tokens = _RTL_TOKEN.findall(m[0])
+        if len(tokens) < 2:
+            continue
+        start = text.rfind("\n", 0, m.start()) + 1
+        end = text.find("\n", m.end())
+        if not _ARABIC_LETTER.search(text[start : len(text) if end < 0 else end]):
+            continue
+        if not _left_to_right(tp, m.start(), m.end() - 1):
+            continue  # already in reading order
+        out += [text[done : m.start()], "".join(reversed(tokens))]
+        done = m.end()
+    return "".join(out) + text[done:] if out else text
+
+
+def _left_to_right(tp, first: int, last: int) -> bool:
+    """Character `first` is left of character `last` on the page."""
+    boxes = []
+    for i in (first, last):
+        box = [ctypes.c_double() for _ in range(4)]  # left, right, bottom, top
+        if not pdfium_c.FPDFText_GetCharBox(tp, i, *box):
+            return False
+        boxes.append(box[0].value)
+    return boxes[0] < boxes[1]
+
+
 def _pdf(data: bytes) -> Extracted:
     pieces, flags, pdf = [], [], None
     try:
@@ -189,7 +241,7 @@ def _pdf(data: bytes) -> Extracted:
         for i in range(pages):
             page = pdf[i]
             textpage = page.get_textpage()
-            text = display_text(textpage.get_text_range())
+            text = display_text(_page_text(textpage))
             flags += hidden.pdf_page_flags(page, textpage, i + 1)
             textpage.close()
             page.close()

@@ -28,6 +28,21 @@ def test_pdf_arabic_comes_out_in_reading_order_with_digits_kept():
     assert x.pieces[1].locator == {"page": 2}
 
 
+def test_pdf_arabic_clause_numbers_keep_their_order():
+    # real walk, momah p358: «-٢-١-١٢تعاريف» for clause ١٢-١-٢; a dash does not join
+    # Arabic-Indic digits, so pdfium gives each number as it is seen, left to right
+    lines = ["فيراعت-٢-١-١٢", "مسقلا :٢", "Clause 12-1-2 rev 3"]
+    x = extract("مواصفات - عينة.pdf", sample_pdf([lines]))
+    assert x.pieces[0].text.split("\n") == ["١٢-١-٢-تعاريف", "٢: القسم", "Clause 12-1-2 rev 3"]
+
+
+def test_pdf_numbers_joined_by_a_dot_or_slash_are_left_as_they_are():
+    # «٣٫٥», «١٠:٣٠» and «٢٠٢٦/١١/٠٦» show as one number each: pdfium keeps their order
+    lines = ["ةعاسلا ١٠:٣٠", "خيراتب ٢٠٢٦/١١/٠٦", "مس ٣.٥-٤.٥ كمس"]
+    text = extract("مواصفات - عينة.pdf", sample_pdf([lines])).pieces[0].text
+    assert "١٠:٣٠" in text and "٢٠٢٦/١١/٠٦" in text and "٣.٥-٤.٥" in text
+
+
 def test_scanned_page_is_named():
     x = extract("عينة.pdf", sample_pdf([["Page one text"], []]))
     assert x.status == "partly_read" and x.note == "FILE_SCANNED_PAGES"

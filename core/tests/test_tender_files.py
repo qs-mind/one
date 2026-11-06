@@ -64,6 +64,19 @@ def test_lahun_overview_reads_the_whole_sheet(rec):
     }
 
 
+def test_momah_clause_numbers_read_in_order():
+    import pypdfium2 as pdfium
+
+    from qsone.records.extract import _page_text
+
+    pdf = pdfium.PdfDocument(real(MOMAH))
+    try:
+        lines = _page_text(pdf[357].get_textpage()).splitlines()  # page 358
+    finally:
+        pdf.close()
+    assert "١٢-١-٢-تعاريف" in lines and "١٢-١-١- الوصف" in lines
+
+
 def test_lahun_columns_are_the_total_quantity_and_the_amount(rec):
     f = add_file(rec, "boq-priced.xlsx", real(LAHUN), actor="engineer").id
     p = boq.preview(rec, f, None)
