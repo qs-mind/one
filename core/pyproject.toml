@@ -30,6 +30,8 @@ dependencies = [
   "pypdfium2",  # Apache-2.0 / BSD-3-Clause; PDF reading and revision page renders
   "pdfplumber",  # MIT; PDF BOQ tables; brings pdfminer.six (MIT)
   "pypdf>=6.2",  # BSD-3-Clause; tender pack assembly
+  "pdf-inspector",  # MIT; PDF page types, headings and tables for the Project Map
+  "shapely",  # BSD-3-Clause; room areas from drawing outlines
   "pyhanko",  # MIT; local PDF integrity seal
   "pyhanko-certvalidator",  # MIT; the seal certificate store
   "asn1crypto",  # MIT; in-memory seal key and certificate encoding
