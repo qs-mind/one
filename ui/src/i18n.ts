@@ -372,6 +372,7 @@ export const texts = {
   fileNotAdded: { en: "The file was not added. Try again.", ar: "الملف ماتضافش. جرّب تاني." },
   fileDuplicate: { en: "Already in Project Records.", ar: "موجود بالفعل في سجلات المشروع." },
   fileRead: { en: "Read", ar: "مقروء" },
+  fileAdded: { en: "Added", ar: "اتضاف" },
   filePartlyRead: { en: "Partly read", ar: "مقروء جزئيًا" },
   fileStored: { en: "Kept, not read", ar: "محفوظ دون قراءة" },
   fileUnreadable: { en: "Could not be read", ar: "مقدرناش نقراه" },
@@ -1100,8 +1101,10 @@ export function setLanguage(lang: Language) {
   for (const listener of listeners) listener();
 }
 
-export function pick(text: Text, lang: Language = current): string {
-  return text[lang];
+/** The text in `lang`. A text that is missing (a row the core sent without one) or has one language only gives what
+ * there is, or nothing: a screen never breaks on a missing line. */
+export function pick(text: Text | null | undefined, lang: Language = current): string {
+  return text?.[lang] ?? text?.en ?? text?.ar ?? "";
 }
 
 export function t(key: keyof typeof texts, lang: Language = current): string {

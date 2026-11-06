@@ -110,7 +110,9 @@ export function httpSources(projectId: string): ProjectSources {
     async upload(chosen) {
       const added = await uploadFile(projectId, chosen);
       if (!added.ok) throw new SourceError(added.line);
-      return added.info;
+      const [info] = added.files;
+      if (!info) throw new SourceError(added.skipped[0]?.line ?? texts.fileNotAdded);
+      return info;
     },
   };
 }

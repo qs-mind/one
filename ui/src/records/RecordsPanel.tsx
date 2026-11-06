@@ -142,17 +142,24 @@ function HiddenText({ projectId, fileId }: { projectId: string; fileId: string }
   );
 }
 
-/** Sends one file to Project Records as its raw bytes; answers what the core made of it, or its refusal. */
+/** A file a zip held that the core did not add (too big, empty), with why. */
+export type Skipped = { name: string; line: Text };
+
+/** Sends one file to Project Records as its raw bytes; answers what the core made of it, or its refusal. A zip answers
+ * the files it held (core: projects.add_upload, {zip, files, skipped}), so each is listed at once. */
 export async function uploadFile(
   projectId: string,
   file: File,
-): Promise<{ ok: true; info: FileInfo } | { ok: false; line: Text }> {
+): Promise<{ ok: true; files: FileInfo[]; skipped: Skipped[] } | { ok: false; line: Text }> {
   const response = await api(`/projects/${projectId}/files?name=${encodeURIComponent(file.name)}`, {
     method: "POST",
     body: file,
   }).catch(() => undefined);
-  if (response?.ok) return { ok: true, info: (await response.json()) as FileInfo };
-  return { ok: false, line: await coreLine(response, texts.fileNotAdded) };
+  if (!response?.ok) return { ok: false, line: await coreLine(response, texts.fileNotAdded) };
+  const body = (await response.json()) as FileInfo | { zip: true; files?: FileInfo[]; skipped?: { name: string; error?: Text }[] };
+  if (!("zip" in body)) return { ok: true, files: [body], skipped: [] };
+  const skipped = (body.skipped ?? []).map((one) => ({ name: one.name, line: one.error ?? texts.fileNotAdded }));
+  return { ok: true, files: body.files ?? [], skipped };
 }
 
 // Files dropped on the open document (any document of the workspace): they go to Project Records here, where Project
@@ -267,9 +274,10 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     for (const file of chosen) {
       const added = await uploadFile(id, file);
       if (added.ok) {
-        const { info } = added;
-        // the newest first; a new version takes the place of the one it replaces
-        setFiles((list = []) => [info, ...list.filter((f) => f.id !== info.id && f.id !== info.replaces)]);
+        // the newest first; a new version takes the place of the one it replaces; a zip's files all come at once
+        const come = added.files;
+        setFiles((list = []) => [...come, ...list.filter((f) => !come.some((info) => f.id === info.id || f.id === info.replaces))]);
+        if (added.skipped.length) setProblems((list) => [...list, ...added.skipped]);
       } else {
         const { line } = added;
         setProblems((list) => [...list, { name: file.name, line }]);
@@ -432,7 +440,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
                       <Line className={`flex items-center justify-between gap-4${asDocument ? " w-full" : ""}`}>
                         <FileName name={file.name} fit />
                         <span className={`shrink-0 ${file.status === "read" ? "text-slate" : "text-copper"}`}>
-                          {pick(statusText[file.status])}
+                          {pick(statusText[file.status] ?? texts.fileAdded)}
                         </span>
                       </Line>
                       {file.note && <Note className="text-slate">{pick(file.note)}</Note>}
