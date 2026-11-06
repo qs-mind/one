@@ -1,0 +1,73 @@
+name: old_office
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/egypt/madinaty-british-school/boq-priced.xls'
+  - '{test_files}/saudi/mof-standard/tender-booklet-general-construction.docx'
+real:
+- project: old-office {run}
+- files:
+  - '{test_files}/egypt/madinaty-british-school/boq-priced.xls'
+  - '{test_files}/saudi/mof-standard/tender-booklet-general-construction.docx'
+- ask: Import the workbook and give the overall architectural and MEP total, citing
+    the summary sheet.
+  answer:
+    rows: keep
+- check:
+    reply_numbers:
+    - '100912880.78'
+    cited:
+      value: '100912880.78'
+      sheet: ALL
+      row: 23
+- ask: إيه العملة المطلوبة في كراسة الشروط؟ اذكر مصدرها بالفقرة.
+- check:
+    no_promise: true
+    cited:
+      file: 1
+      paragraph: 293
+      value: الريال السعودي
+- needs: libreoffice
+  then:
+  - command:
+    - file
+    - pdf
+    - '{project}'
+    - '{file1}'
+    - --out
+    - '{scratch}/booklet.pdf'
+  - check:
+      export_ok:
+        pages: 1
+scripted:
+- project: Sample old office {run}
+- files:
+  - '{samples}/sample-boq.xls'
+  - '{samples}/sample-booklet.docx'
+- ask: bench:oldoffice Import the sample native XLS and tell me how offers must be
+    submitted in the booklet.
+  answer:
+    rows: keep
+- boq: show
+- deliverable:
+    kind: sheet
+    variant: boq
+- check:
+    boq_items: 4
+    boq_total: '1810000'
+    cited:
+      file: 1
+      paragraph: 1
+      value: electronically
+- needs: libreoffice
+  then:
+  - command:
+    - file
+    - pdf
+    - '{project}'
+    - '{file1}'
+    - --out
+    - '{scratch}/sample-booklet.pdf'
+  - check:
+      export_ok:
+        pages: 1

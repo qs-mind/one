@@ -1,57 +1,157 @@
 name: lahun
+max_usd: 0.1
 needs:
-- '{test_files}/egypt/lahun-medical-center/boq-priced.xlsx'
-max_usd: 3
+  real:
+  - '{test_files}/egypt/lahun-medical-center/boq-priced.xlsx'
 real:
 - project: lahun {run}
 - files:
   - '{test_files}/egypt/lahun-medical-center/boq-priced.xlsx'
-- ask: Import this BOQ and tell me its total.
+- ask: استورد المقايسة وقولي إجماليها.
   answer:
     rows: keep
-    question:
-      choice: sent
-      answers:
-        currency: EGP
 - boq: show
 - check:
-    reply_contains: 640,983.35
     boq_items: 54
     boq_sections: 4
-    card_meanings:
-      F: quantity
-      G: rate
-      H: amount
+    reply_numbers:
+    - '640983.35'
     quantity_rows:
       first: 54
       last: 64
       column: D
-    no_raw: true
-    max_usd: 3
+    no_promise: true
+- ask: سعّر المقايسة كلها من شيت التسعير
+- deliverable:
+    kind: sheet
+    variant: boq
+- check:
+    deliverable:
+      kind: sheet
+      variant: boq
+    boq_total: '640983.35'
+    rates_cited:
+      sheet: 'تسعير '
+- ask: زوّد الخرسانة ٥٪
+- command:
+  - changes
+  - list
+  - '{project}'
+  - '{deliverable}'
+- check:
+    changes_count:
+      min: 1
+    changes_target:
+      description_contains: خرسانة
+- command:
+  - changes
+  - accept
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - undo
+  - '{undo}'
+- ask: اكتب خطاب العطاء
+- deliverable:
+    kind: document
+    variant: letter
+- check:
+    deliverable:
+      kind: document
+      variant: letter
+    deliverable_numbers:
+    - '640983.35'
+- command:
+  - deliverable
+  - check
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - deliverable
+  - signoff
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - deliverable
+  - export
+  - '{project}'
+  - '{deliverable}'
+  - --format
+  - pdf
+  - --out
+  - '{scratch}/letter.pdf'
+- check:
+    export_ok:
+      pages: 1
 scripted:
-- project: CLI sample {run}
+- project: Sample pricing {run}
 - files:
   - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
-- ask: bench:question What do you need?
-  answer:
-    question:
-      choice: sent
-      answers:
-        q1: Ready-mix
-        q2: Sample note
-- check:
-    reply_contains: bench reply
-    no_raw: true
-    max_usd: 1
-- ask: bench:boq Import the BOQ
+- ask: bench:pricing Price the BOQ from its sample workbook rates.
   answer:
     rows: keep
 - boq: show
+- deliverable:
+    kind: sheet
+    variant: boq
 - check:
     boq_items: 4
-    boq_sections: 2
-    no_raw: true
-- ask: bench:chat Hello
-- boq: show
+    boq_total: '1810000'
+    rates_cited:
+      sheet: المقايسة
+- ask: bench:revise Increase the sample concrete rates by 5%. target:{deliverable}
+- command:
+  - changes
+  - list
+  - '{project}'
+  - '{deliverable}'
 - check:
-    items_unchanged: true
+    changes_count: 2
+    changes_target:
+      description_contains: خرسانة
+- command:
+  - changes
+  - accept
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - undo
+  - '{undo}'
+- deliverable:
+    kind: sheet
+    variant: boq
+- check:
+    boq_total: '1810000'
+- ask: bench:letter Write the sample tender letter. target:{deliverable}
+- deliverable:
+    kind: document
+    variant: letter
+- check:
+    deliverable:
+      kind: document
+      variant: letter
+      title_contains: sample
+    deliverable_numbers:
+    - '1810000'
+- command:
+  - deliverable
+  - check
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - deliverable
+  - signoff
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - deliverable
+  - export
+  - '{project}'
+  - '{deliverable}'
+  - --format
+  - pdf
+  - --out
+  - '{scratch}/sample-letter.pdf'
+- check:
+    export_ok:
+      pages: 1

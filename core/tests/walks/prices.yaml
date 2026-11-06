@@ -1,0 +1,64 @@
+# GASTAT source is physical start line 1902 (CSV record 952 contains quoted newlines).
+name: prices
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/saudi/gastat-prices/construction-materials-prices-2007-2026.csv'
+  - '{test_files}/uae/scad-building-materials-prices/scad_building_materials_avg_prices_2014_08.xls'
+  - '{test_files}/egypt/rate-analysis/item-cost-analysis.xlsx'
+real:
+- project: prices {run}
+- files:
+  - '{test_files}/saudi/gastat-prices/construction-materials-prices-2007-2026.csv'
+  - '{test_files}/uae/scad-building-materials-prices/scad_building_materials_avg_prices_2014_08.xls'
+  - '{test_files}/egypt/rate-analysis/item-cost-analysis.xlsx'
+- ask: What was the Saudi price of rebar in September 2026? Cite its row.
+- check:
+    reply_numbers:
+    - '3259.438571429'
+    cited:
+      file: 0
+      sheet: ''
+      row: 1902
+      column: H
+      value: '3259.438571429'
+- ask: What was the price of UAE 10–25 mm rebar in August 2014? Cite its row.
+- check:
+    reply_numbers:
+    - 2575
+    cited:
+      file: 1
+      sheet: Month Prices
+      row: 42
+      value: 2575
+- ask: Use the item cost analysis workbook to price a sample item from its build-up,
+    calculating each amount from its sources.
+- check:
+    no_promise: true
+scripted:
+- project: Sample market prices {run}
+- files:
+  - '{samples}/sample-market.csv'
+- ask: bench:market What is the sample rebar price in September 2026?
+- check:
+    reply_numbers:
+    - 3200
+    cited:
+      file: 0
+      row: 2
+      value: 3200
+- files:
+  - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
+- ask: bench:pricing Price the BOQ from its sample workbook rates.
+  answer:
+    rows: keep
+- deliverable:
+    kind: sheet
+    variant: boq
+- check:
+    boq_total: '1810000'
+    rates_cited:
+      sheet: المقايسة
+limitations:
+- The real item-cost-analysis build-up result is not established; no expected computed
+  value is invented.

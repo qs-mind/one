@@ -306,3 +306,58 @@ def test_a_change_names_the_source_of_its_new_number(client):
     sourced, typed = listed["changes"]
     assert sourced["after"]["source"] == source and sourced["sources"][source]["kind"] == "sample"
     assert typed["after"]["source"] is None  # the engineer's own: its source comes with the accept
+
+
+@pytest.mark.parametrize("changed_after_accept", [False, True])
+def test_undo_restores_accepted_rate_with_a_calculation_source(rec, changed_after_accept):
+    from qsone.calc.engine import calculate
+    from qsone.calc.spec import CalcRequest
+
+    d = sample_sheet(rec)
+    before = view(rec, d)
+    row = row_by_code_in(before, "03/02")
+    result = calculate(
+        rec,
+        CalcRequest(
+            formula="rate * (1 + 5%)",
+            item=row["item_id"],
+            result={"unit": "EGP/m3"},
+            save={"name": "proposed_rate"},
+        ),
+        actor="lead_qs",
+    ).results[0]
+    with rec.read() as conn:
+        (source,) = conn.execute(
+            "SELECT source_id FROM numbers WHERE id = ?", (result.number,)
+        ).fetchone()
+    [change] = propose(
+        rec,
+        d,
+        [{**set_number(row, "rate", result.value), "source_id": source}],
+        actor="lead_qs",
+    )
+    accepted = accept(rec, d, [change.id], actor="engineer")
+    increased = row_by_code_in(view(rec, d), "03/02")["cells"]["rate"]
+    assert increased["value"] == "41843.03"
+    assert increased["source"] == source
+    if changed_after_accept:
+        ledger.correct_number(
+            rec,
+            increased["number_id"],
+            value="42000",
+            reason="Updated sample supplier quote",
+            source_id=sample_source(rec),
+            dated="2026-11-04",
+            actor="estimator",
+        )
+        with pytest.raises(RecordsError) as error:
+            revert.undo_accept(rec, d, accepted["version"], actor="engineer")
+        assert error.value.text == copy.UNDO_TOO_LATE
+    else:
+        undone = revert.undo_accept(rec, d, accepted["version"], actor="engineer")
+        assert undone["pending"] == [change.id]
+        restored = view(rec, d)
+        assert shown(restored) == shown(before)
+        restored_rate = row_by_code_in(restored, "03/02")["cells"]["rate"]
+        assert restored_rate["source"] == row["cells"]["rate"]["source"]
+        assert restored_rate["number_id"] != row["cells"]["rate"]["number_id"]

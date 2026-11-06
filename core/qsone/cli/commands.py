@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from qsone.cli import session
 from qsone.cli.follow import follow
-from qsone.cli.texts import CliError
+from qsone.cli.texts import TEXT, CliError
 
 
 class Commands:
@@ -140,6 +140,49 @@ class Commands:
             ],
         }
 
+    def download(self, route, out, *, method="GET", **params):
+        response = self.client.http.request(method, route, params=params)
+        self.client.check(response)
+        result = {"out": str(out), "bytes": len(response.content)}
+        if response.content.startswith(b"%PDF"):
+            from io import BytesIO
+
+            from pypdf import PdfReader
+
+            pdf = PdfReader(BytesIO(response.content))
+            result.update(pages=len(pdf.pages), bookmarks=[])
+
+            def bookmarks(nodes):
+                for node in nodes:
+                    if isinstance(node, list):
+                        bookmarks(node)
+                    else:
+                        result["bookmarks"].append(
+                            {"title": node.title, "page": pdf.get_destination_page_number(node) + 1}
+                        )
+
+            bookmarks(pdf.outline)
+            result["signature_fields"] = [
+                {
+                    "name": name,
+                    "type": str(field.get("/FT", "")),
+                    "has_contents": bool((field.get("/V") or {}).get("/Contents")),
+                }
+                for name, field in (pdf.get_fields() or {}).items()
+            ]
+            from contextlib import closing
+
+            import pypdfium2 as pdfium
+
+            with pdfium.PdfDocument(response.content) as rendered:
+                result["page_texts"] = []
+                for page_index in range(len(rendered)):
+                    with closing(rendered[page_index]) as page:
+                        with closing(page.get_textpage()) as text:
+                            result["page_texts"].append(text.get_text_range())
+        Path(out).write_bytes(response.content)
+        return result
+
     def run(self, args):
         c = self.client
         cmd, action = args.command, getattr(args, "action", None)
@@ -165,6 +208,8 @@ class Commands:
             return c.get(base + "/files")
         if cmd == "file":
             route = base + f"/files/{args.file}"
+            if action == "pdf":
+                return self.download(route + "/pdf", args.out, method="POST")
             if args.sheet is not None:
                 return c.get(route + "/sheet", name=args.sheet or None)
             return c.get(route + ("/text" if args.page else "/pages"), page=args.page)
@@ -194,13 +239,25 @@ class Commands:
                 return c.get(route)
             route += f"/{args.deliverable}"
             if action == "show":
-                return c.get(route)
-            response = c.http.get(route + "/export", params={"format": args.format})
-            c.check(response)
-            Path(args.out).write_bytes(response.content)
-            return {"out": str(args.out), "bytes": len(response.content)}
+                return c.get(route) | {"versions": c.get(route + "/versions")}
+            if action == "signoff":
+                return c.post(route + "/signoff")
+            if action == "check":
+                c.get(route)  # Validate the target before starting paid work.
+                result = self.ask(
+                    p, TEXT["check_request"][self.lang].format(deliverable=args.deliverable)
+                )
+                closeout = c.get(route + "/closeout")
+                version = c.get(route)["version"]
+                checked = (closeout.get("check") or {}).get("version_n") == version
+                if result.get("state") == "done" and not checked:
+                    result.update(state="failed", error=TEXT["not_checked"])
+                return result | {"closeout": closeout, "checked": checked}
+            return self.download(route + "/export", args.out, format=args.format)
         if cmd == "changes":
             route = base + f"/deliverables/{args.deliverable}/changes"
+            if action == "list":
+                return c.get(route, status="pending")
             ids = (
                 args.ids.split(",")
                 if args.ids
@@ -217,6 +274,46 @@ class Commands:
             )
         if cmd == "number":
             return c.get(base + f"/numbers/{args.number}/explain")
+        if cmd == "pack":
+            route = base + f"/deliverables/{args.deliverable}"
+            view = c.get(route)
+            if action == "show":
+                return view
+            c.request("POST", route + "/pack/build", params={"version": view["version"]})
+            return self.download(route + "/export", args.out, format="pdf")
+        if cmd == "compare":
+            return c.post(
+                base + "/files/compare",
+                {"old_file_id": args.old_file, "new_file_id": args.new_file},
+            )
+        if cmd == "region":
+            route = base + f"/files/{args.file}/comments"
+            if action == "list":
+                return c.get(route)
+            box = [float(v) for v in args.box.split(",")]
+            if len(box) != 4:
+                raise CliError()
+            return c.post(
+                route,
+                {
+                    "anchor": {
+                        "kind": "file_region",
+                        "file_id": args.file,
+                        "page": args.page,
+                        "box": box,
+                    },
+                    "body": args.comment,
+                },
+            )
         if cmd == "costs":
-            return c.get("/costs", brief_id=args.brief)
+            result = c.get("/costs", brief_id=args.brief)
+            if args.today:
+                return {
+                    key: value.get("today")
+                    if isinstance(value, dict) and "today" in value
+                    else value
+                    for key, value in result.items()
+                    if key not in ("brief", "month")
+                }
+            return result
         raise CliError()

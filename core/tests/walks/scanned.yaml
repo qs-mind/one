@@ -1,0 +1,63 @@
+name: scanned
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/egypt/dakahlia-social-housing-ac/boq-scanned-priced.pdf'
+real:
+- project: scanned {run}
+- files:
+  - '{test_files}/egypt/dakahlia-social-housing-ac/boq-scanned-priced.pdf'
+- check:
+    scan_report: true
+- needs: ocr:ara
+  then:
+  - ask: اقرأ المقايسة المصورة باستخدام OCR العربي واستورد بنودها.
+    answer:
+      rows: keep
+  - boq: show
+  - check:
+      boq_items:
+        min: 1
+  - command:
+    - file
+    - show
+    - '{project}'
+    - '{file0}'
+    - --page
+    - '1'
+  - check:
+      ocr_boxes: true
+      no_promise: true
+  otherwise:
+  - ask: إيه الناقص عندي عشان أقرأ المقايسة المصورة باستخدام OCR عربي محلي؟ متبدأش
+      تنزيل أي حاجة.
+  - check:
+      reply_contains_any:
+      - ناقص
+      - مش موجود
+      - غير متوفر
+      - غير مثبت
+      - missing
+      - unavailable
+      - not installed
+      no_promise: true
+scripted:
+- project: Sample scanned BOQ {run}
+- files:
+  - '{samples}/sample-scan.pdf'
+- check:
+    scan_report: true
+- ask: bench:scanned What is missing before importing the sample scanned BOQ?
+- check:
+    reply_contains:
+    - OCR
+    - no items
+    no_promise: true
+- boq: show
+- check:
+    boq_items: 0
+limitations:
+- OCR capability requires the executable and verified models in this session data
+  folder; an attached core cannot establish its model directory. The scripted scan
+  exercises the missing-OCR outcome; OCR word-box extraction remains covered by core
+  OCR tests.

@@ -1,58 +1,77 @@
 name: brissa
+max_usd: 0.1
 needs:
-- '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
-max_usd: 3
+  real:
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol2_technical_specs.pdf'
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol3_boq.pdf'
 real:
 - project: brissa {run}
 - files:
   - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
-- ask: What are the retention conditions in this tender? Cite the clause and page.
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol2_technical_specs.pdf'
+  - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol3_boq.pdf'
+- ask: What are the payment terms, retention and delay damages? Cite the contract.
 - check:
-    reply_contains: ['14.3', '(iii)']
-    cited:
-      value: '14.3'
-      page: 58
-    no_raw: true
-    max_usd: 1
-- ask: What are the delay damages per day? Cite the clause and source page.
-- check:
-    reply_contains: 0.2%
-    no_raw: true
-    max_usd: 1
-- ask: What is the bid security amount and currency? Cite the page.
-- check:
+    reply_numbers:
+    - 15
+    - 25
+    - 0.2
+    - 10
     reply_contains:
-    - 350,000
+    - '14.3'
+    - (iii)
+- check:
+    cited:
+      value: '0.2'
+      page: 58
+    no_promise: true
+- ask: What are the bid validity and security requirements?
+- check:
+    reply_numbers:
+    - 180
+    - 350000
+    reply_contains:
     - USD
     cited:
       value: 350,000
       page: 26
-    no_raw: true
-    max_usd: 1
-scripted:
-- project: CLI sample {run}
-- files:
-  - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
-- ask: bench:question What do you need?
-  answer:
-    question:
-      choice: sent
-      answers:
-        q1: Ready-mix
-        q2: Sample note
-- check:
-    reply_contains: bench reply
-    no_raw: true
-    max_usd: 1
-- ask: bench:boq Import the BOQ
+- ask: Import the bill of quantities as the client BOQ.
   answer:
     rows: keep
 - boq: show
 - check:
-    boq_items: 4
-    boq_sections: 2
-    no_raw: true
-- ask: bench:chat Hello
-- boq: show
+    boq_items:
+      min: 1
+    boq_sources:
+      page_box: true
+      minimum_number: 1000
+scripted:
+- project: Sample contract and PDF BOQ {run}
+- files:
+  - '{samples}/sample-conditions.pdf'
+- ask: bench:conditions What are the sample payment terms and bid requirements?
 - check:
-    items_unchanged: true
+    reply_numbers:
+    - '0.2'
+    - '10'
+    - '180'
+    - '350000'
+    cited:
+      file: 0
+      page: 2
+      value: 350000
+- files:
+  - '{samples}/sample-boq.pdf'
+- ask: bench:pdfboq Import the sample PDF BOQ.
+  answer:
+    rows: keep
+- boq: show
+- deliverable:
+    kind: sheet
+    variant: boq
+- check:
+    boq_items: 2
+    boq_total: '310'
+    boq_sources:
+      page_box: true

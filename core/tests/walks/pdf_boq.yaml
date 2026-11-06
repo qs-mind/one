@@ -1,0 +1,64 @@
+# Printed total checks deliberately omitted: the supplied Mansoura summary is blank;
+# Giza printed total is not established. No total is inferred or invented.
+name: pdf_boq
+max_usd: 0.1
+needs:
+  real:
+  - '{test_files}/egypt/mansoura-law-faculty/boq-priced.pdf'
+  - '{test_files}/egypt/giza-haram-annual-works/boq-2011-12-priced.pdf'
+real:
+- project: pdf-boq-0 {run}
+- files:
+  - '{test_files}/egypt/mansoura-law-faculty/boq-priced.pdf'
+- ask: استورد المقايسة وقولي الإجمالي المكتوب فيها، ولو الأسعار مش مكتوبة قولّي.
+  answer:
+    rows: keep
+- boq: show
+- check:
+    boq_items:
+      min: 1
+    boq_sources:
+      page_box: true
+    no_promise: true
+- project: pdf-boq-1 {run}
+- files:
+  - '{test_files}/egypt/giza-haram-annual-works/boq-2011-12-priced.pdf'
+- ask: استورد المقايسة وقولي الإجمالي المكتوب فيها، ولو الأسعار مش مكتوبة قولّي.
+  answer:
+    rows: keep
+- boq: show
+- check:
+    boq_items:
+      min: 1
+    boq_sources:
+      page_box: true
+    no_promise: true
+scripted:
+- project: Sample PDF BOQ {run}
+- files:
+  - '{samples}/sample-boq.pdf'
+- ask: bench:pdfboq Import this sample PDF BOQ.
+  answer:
+    rows: keep
+- boq: show
+- deliverable:
+    kind: sheet
+    variant: boq
+- check:
+    boq_items: 2
+    boq_total: '310'
+    boq_units:
+    - m3
+    boq_sources:
+      page_box: true
+- command:
+  - deliverable
+  - export
+  - '{project}'
+  - '{deliverable}'
+  - --format
+  - xlsx
+  - --out
+  - '{scratch}/sample-boq.xlsx'
+- check:
+    export_ok: true
