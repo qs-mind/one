@@ -232,6 +232,9 @@ def _with_head(rec: Records, v: dict) -> dict:
 
 def _export(rec: Records, d: str, format_: str, revision: int | None) -> Response:
     v = _with_head(rec, current_view(rec, d, revision=revision))
+    from qsone.records.mapping.facts import require_confirmed
+
+    require_confirmed(rec, v)
     if v["kind"] == "pack" and format_ == "pdf":
         from qsone.deliverables.pack import build_view
 

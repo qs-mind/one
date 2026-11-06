@@ -200,7 +200,9 @@ def _gate(conn, rec: Records, head: dict) -> dict:
     checks = _checks(conn, head["id"])
     check = checks[-1] if checks else None  # the newest, as `store.status` reads it
     current = check is not None and check["version_n"] == v["version"]
-    reasons = []
+    from qsone.records.mapping.facts import gate as fact_gate
+
+    reasons = fact_gate(rec, v)
     if v["status"] == "signed_off":
         reasons.append(copy.ALREADY_SIGNED_OFF)
     if pending:

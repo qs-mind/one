@@ -174,9 +174,9 @@ def write_cli_samples(folder: Path) -> None:
         sample_pdf(
             [
                 [
-                    "Sample contract data"
+                    "14.3 Sample contract data. Retention 10%. Advance payment: ____"
                     if p == 58
-                    else "Sample bid data"
+                    else "Sample bid data. Bid validity 180 days. See Clause 14.3"
                     if p == 26
                     else f"Sample page {p}"
                 ]

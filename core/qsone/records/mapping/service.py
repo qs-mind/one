@@ -11,10 +11,16 @@ log = logging.getLogger(__name__)
 
 class Mapping:
     def __init__(
-        self, projects, *, foreground=lambda project_id: False, completed=lambda pid, ids: None
+        self,
+        projects,
+        *,
+        foreground=lambda project_id: False,
+        completed=lambda pid, ids: None,
+        passes=lambda rec: {},
     ):
         self.projects = projects
         self.foreground = foreground
+        self.passes = passes
         self.completed = completed
         self._submitted = {}
         self._last_drop = time.monotonic()
@@ -63,6 +69,7 @@ class Mapping:
                         worker.step(
                             rec,
                             original=self._original,
+                            **{k: v for k, v in self.passes(rec).items() if k != "approved"},
                             cancelled=lambda pid=pid: self._quit.is_set() or self.foreground(pid),
                         )
                         or worked
@@ -88,7 +95,12 @@ class Mapping:
                             if not accepted:
                                 self._submitted.pop(key, None)
                         if pending and key not in self._submitted:
-                            self._submitted[key] = self.completed(pid, pending)
+                            approved = self.passes(rec).get("approved")
+                            self._submitted[key] = (
+                                self.completed(pid, pending, passes=approved)
+                                if approved is not None
+                                else self.completed(pid, pending)
+                            )
                     if worked:
                         break
                 except Exception as error:

@@ -372,8 +372,12 @@ def view(
             ).fetchone()
             if found is None:
                 raise _not_found("revision")
-            return json.loads(zlib.decompress(found[0]))
-        return _view(conn, _head(conn, deliverable_id), version)
+            result = json.loads(zlib.decompress(found[0]))
+        else:
+            result = _view(conn, _head(conn, deliverable_id), version)
+        from qsone.records.mapping.facts import annotate
+
+        return annotate(rec, result)
 
 
 def _view(conn, head: dict, version: int | None) -> dict:

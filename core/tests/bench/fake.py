@@ -1061,14 +1061,39 @@ def _map_read(seen):
 
 
 LEAD_SCENARIOS["map"] = (_map_overview, _map_read)
+_STEP_OF.update({_map_overview: "map", _map_read: "mapread"})
 
 
 def _mapping_output(seen, tool):
     properties = tool.parameters_json_schema.get("properties", {})
-    if not ({"files", "groups"} & properties.keys()):
+    if not ({"files", "groups", "facts", "links"} & properties.keys()):
         return None
-    inputs = json.loads(seen.brief)
-    if "groups" in properties:
+    inputs = json.loads(
+        seen.brief.split("\n", 1)[1]
+        if "facts" in properties or "links" in properties
+        else seen.brief
+    )
+    if "facts" in properties:
+        output = {"facts": []}
+        for page in inputs:
+            for name, ar, value, state, evidence in [
+                ("Retention", "المحتجز", "10%", "found", "Retention 10%"),
+                ("Advance payment", "الدفعة المقدمة", "", "blank", "Advance payment: ____"),
+            ]:
+                if evidence in page["text"]:
+                    output["facts"].append(
+                        dict(
+                            name={"en": name, "ar": ar},
+                            value=value,
+                            state=state,
+                            evidence=evidence,
+                            file_id=page["file_id"],
+                            locator=page["locator"],
+                        )
+                    )
+    elif "links" in properties:
+        output = {"links": []}
+    elif "groups" in properties:
         output = {"groups": [{"file_id": f["file_id"], "path": "Sample tender"} for f in inputs]}
     else:
         result = []

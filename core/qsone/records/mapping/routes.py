@@ -1,10 +1,17 @@
 """Project Map read API; mounted under the app's existing bearer authentication."""
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictStr
 
 from qsone import copy
 from qsone.records.mapping import store
 from qsone.records.project import RecordsError
+
+
+class FactEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: StrictBool | None = None
+    value: StrictStr | None = None
 
 
 def router(projects):
@@ -44,6 +51,12 @@ def router(projects):
         Current facts only; empty until the fact-mapping job fills them.
         """
         return store.entries(projects.get(project_id), "facts", cursor=cursor, limit=limit)
+
+    @r.post("/projects/{project_id}/map/facts/{fact_id}")
+    def edit_fact(project_id: str, fact_id: str, edit: FactEdit):
+        from qsone.records.mapping.facts import update
+
+        return update(projects.get(project_id), fact_id, confirm=edit.confirm, value=edit.value)
 
     @r.get("/projects/{project_id}/map/links")
     def links(project_id: str, cursor: str | None = None, limit: int = Query(100, ge=1, le=200)):
