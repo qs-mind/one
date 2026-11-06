@@ -458,3 +458,11 @@ async def test_what_files_read_prints_is_what_add_source_takes(rec, scanned_pdf,
     row = json.loads(re.search(r'\{"sheet": "BOQ", "row": 3\}', out)[0])
     source = {"kind": "file", "file_id": big_xlsx, "locator": row, "dated": "2026-11-01"}
     await call("add_source", source, ctx)
+
+
+async def test_csv_can_read_a_physical_source_row_with_embedded_newlines(rec):
+    file = add(rec, "sample.csv", b'Date,Price\n"2026\n09",100\n2026/10,200\n')
+    ctx = ctx_for(rec)
+    out = await call("files_read", {"file_id": file, "rows": "4"}, ctx)
+    assert "200" in out and "100" not in out
+    assert '"line": 4' in out

@@ -1461,7 +1461,7 @@ class _Brief:
                     continue
                 if tool.writes and (name not in team.TEAM_TOOLS or name == "make_deliverable"):
                     did.writes += 1
-                if name in ("deliverable_create", "make_deliverable"):
+                if name in ("deliverable_create", "make_deliverable", "boq_price_from_sheet"):
                     did.deliverables += 1
                 did.shown = did.shown or name == view.TOOL
                 did.understood = did.understood or name == understand.TOOL
@@ -1521,7 +1521,9 @@ class _Brief:
                     continue
                 if not isinstance(out, dict):
                     continue
-                if name == "deliverable_create" and isinstance(out.get("id"), str):
+                if name in {"deliverable_create", "boq_price_from_sheet"} and isinstance(
+                    out.get("id"), str
+                ):
                     made.append(out["id"])
                 elif name == "deliverable_propose" and isinstance(out.get("change_ids"), list):
                     changes += [c for c in out["change_ids"] if isinstance(c, str)]
@@ -1552,6 +1554,15 @@ class _Brief:
             return 1
         return rows
 
+    def _read_returns(self) -> list[tuple[str, str]]:
+        return [
+            (name, result)
+            for run in self.store.runs(self.brief_id)
+            if run["history"]
+            for name, result in agents.tool_returns(run["history"])
+            if name in {"files_read", "read_chunk"}
+        ]
+
     def _reply_problems(self, output: str) -> list[truth.Problem]:
         rec = self.place.rec
         found = truth.reply_problems(
@@ -1564,6 +1575,7 @@ class _Brief:
         if rec is not None:  # each number at the row or page the reply cites for it
             with rec.read() as c:
                 found += truth.miscited(c, output)
+                found += truth.unread_citations(output, self._read_returns())
                 ids = []
                 for run in self.store.runs(self.brief_id):
                     for name, result in (
@@ -1648,6 +1660,8 @@ class _Brief:
     async def _finish(self, output: Any) -> None:
         if isinstance(output, str):
             clean = truth.clean_reply(output, shown=self._did().shown)
+            if truth.unread_citations(clean, self._read_returns()):
+                clean = copy.TRUTH_UNREAD_REPLY["ar" if truth.arabic(self.text) else "en"]
             if clean != output:  # JSON or ids that stayed after the retry: never on the screen
                 self.emit(Data(self.brief_id, "redo", self.brief_id, {"from": 0, "to": self.said}))
                 self.emit(TextDelta(self.brief_id, clean))
@@ -2232,11 +2246,6 @@ def _marked(rec: Records | None, reply: str, results: list[str]) -> list[str]:
     marked = numbers_guard.unsourced(reply, numbers_guard.known_values(results))
     if marked and rec is not None:
         marked = numbers_guard.described(reply, marked, _descriptions(rec))
-    if marked and rec is not None:
-        with rec.read() as c:
-            cited = truth.cited_values(c, reply)
-        if cited:
-            marked = [m for m in marked if numbers_guard.known_values([m]) - cited]
     return marked
 
 

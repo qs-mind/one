@@ -109,7 +109,7 @@ source/time. JSON preserves the API's bilingual text, dates and source records.
 ## Walk format
 
 A YAML document has `name`, optional `needs`, optional `max_usd` (default 3), and
-`scripted` / `real` step lists. The session mode selects the list. Every missing
+`scripted` / `real` step lists. The session mode selects the list; an absent mode is skipped. Every missing
 `needs` path causes `SKIPPED` and exit 0 before any step runs. Real tender files
 are private, read-only inputs; no fixture copies are included.
 
@@ -282,3 +282,8 @@ build-up expectations remain unestablished; scripted estimates/pricing exercise
 those routes with labelled sample inputs instead. Real walks have not been run
 with a paid provider, so passing scripted walks is not a certification of real-AI
 accuracy on every tender. New dependencies: none.
+
+A walk may explicitly use `review: close_fixed` after asking the Lead to address review
+comments, accepting the linked Suggested changes, and requesting a fresh check. It closes
+only Code C threads with an accepted change carrying their `comment_id` and a current
+Code A/B check. It refuses unresolved comments; it never grants Sign-off.

@@ -28,6 +28,7 @@ LEAD_TOOLS = (
     "compare_files",
     "boq_preview",
     "boq_import",
+    "boq_price_from_sheet",
     "ask_engineer",
     "prices_lookup",
     "note_lesson",

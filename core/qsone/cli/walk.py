@@ -300,6 +300,33 @@ class Walk:
         if name == "no_raw":
             raw = self.last.get("reply", "")
             return not re.search(r"\b[0-9a-f]{32}\b", raw, re.I) and not has_json(raw)
+        if name == "boq_sections" and self.report.get("files"):
+            count = 0
+            reports = {f["id"]: f for f in self.report["files"]}
+            for view in self.boq["sheets"]:
+                titles = {r.get("title") for r in view["rows"] if r["kind"] == "section"}
+                locations = [
+                    view.get("sources", {}).get(c.get("source"), {}).get("locator", {})
+                    for r in view["rows"]
+                    if r["kind"] == "item"
+                    for c in r.get("cells", {}).values()
+                ]
+                for sheet in reports.get(view["file_id"], {}).get("sheets", []):
+                    rows = [
+                        loc["row"]
+                        for loc in locations
+                        if loc.get("sheet") == sheet["sheet"] and "row" in loc
+                    ]
+                    if not rows:
+                        continue
+                    sections = sheet.get("sections", [])
+                    count += sum(section["title"] in titles for section in sections)
+                    count += not sections or min(rows) < min(s["row"] for s in sections)
+            return (
+                count >= int(expected["min"])
+                if isinstance(expected, dict)
+                else count == int(expected)
+            )
         if name in ("boq_items", "boq_sections"):
             kind = "item" if name == "boq_items" else "section"
             count = sum(row["kind"] == kind for row in self.rows())
@@ -356,7 +383,7 @@ class Walk:
                     if key == "paragraph"
                     else r"row|الصف|صف|السطر|سطر"
                 )
-                pattern = rf"(?<!\w)(?:{label})\s*[:：]?\s*{expected[key]}(?!\d)"
+                pattern = rf"(?<!\w)(?:{label})\s*(?:رقم\s*)?[:：]?\s*{expected[key]}(?!\d)"
                 cited = any(
                     re.search(pattern, segment, re.I) and contains_value(segment, value)
                     for segment in re.split(r"\n|(?<=[!?؟])\s+|(?<=\.)(?!\d)\s+", reply)
@@ -417,6 +444,27 @@ class Walk:
                 "checks": [check for output in outputs for check in output.get("checks", [])],
                 "results": outputs,
             }
+        if "review" in step:
+            if step["review"] != "close_fixed":
+                raise CliError("walk")
+            base = f"/projects/{self.project}/deliverables/{self.variables['deliverable']}"
+            view = self.c.get(base)
+            closeout = self.c.get(base + "/closeout")
+            blocking = closeout.get("blocking", [])
+            if not blocking:
+                return {"closed": []}
+            check = closeout.get("check") or {}
+            changes = self.c.get(base + "/changes", status="accepted").get("changes", [])
+            fixed = {c.get("comment_id") for c in changes if c.get("status") == "accepted"}
+            if (
+                check.get("version_n") != view.get("version")
+                or check.get("code") not in {"A", "B"}
+                or any(thread["id"] not in fixed for thread in blocking)
+            ):
+                raise CliError("review_unresolved")
+            for thread in blocking:
+                self.c.post(f"/projects/{self.project}/comments/{thread['id']}/close")
+            return {"closed": [thread["id"] for thread in blocking]}
         if "make" in step:
             spec = step["make"]
             output = make_revision(
@@ -436,7 +484,7 @@ class Walk:
                     matching = view
                     break
             if matching is None:
-                raise CliError("walk")
+                raise CliError("deliverable_missing")
             self.deliverable = matching
             self.variables["deliverable"] = matching["id"]
             return self.deliverable
@@ -589,8 +637,18 @@ def execute_steps(walk, steps, guard):
                             entry["status"] = "FAIL"
                     if output.get("state") == "failed":
                         entry["status"] = "FAIL"
+                        entry["error"] = output.get("error") or next(
+                            (
+                                e["data"]
+                                for e in reversed(output.get("events", []))
+                                if e.get("type") == "data-error"
+                            ),
+                            TEXT["brief_failed"],
+                        )
             except CliError as error:
                 entry.update(status="FAIL", error=error.text)
+            except httpx.TimeoutException:
+                entry.update(status="FAIL", error=TEXT["request_timeout"])
             except (OSError, ValueError, KeyError, TypeError, IndexError, httpx.HTTPError):
                 entry.update(status="FAIL", error=TEXT["walk"])
             try:
@@ -644,6 +702,10 @@ def run(commands, file, *, max_usd=None, report=None, scripted_only=False):
         "steps": [],
         "limitations": document.get("limitations", []),
     }
+    if commands.saved["mode"] not in document:
+        result.update(status="SKIPPED", reason=TEXT["mode_not_defined"])
+        write_report(result, report, commands.lang if hasattr(commands, "lang") else "en")
+        return result
     needs = document.get("needs", [])
     if isinstance(needs, dict):
         needs = needs.get(commands.saved["mode"], [])
@@ -753,7 +815,7 @@ def make_revision(source, scratch, *, page):
     )
     resources = DictionaryObject(target.get("/Resources", {}))
     fonts = DictionaryObject(resources.get("/Font", {}))
-    fonts[NameObject("/ONESample")] = font
+    fonts[NameObject("/ONESample")] = writer._add_object(font)
     resources[NameObject("/Font")] = fonts
     target[NameObject("/Resources")] = resources
     original = target.get_contents()
@@ -761,9 +823,13 @@ def make_revision(source, scratch, *, page):
     stream.set_data(
         b"q\n"
         + (original.get_data() if original else b"")
-        + b"\nQ\nBT /ONESample 16 Tf 20 20 Td (SAMPLE REVISION) Tj ET"
+        + (
+            f"\nQ\nq\n0 g\nBT /ONESample 16 Tf 1 0 0 1 "
+            f"{float(target.cropbox.left) + 20} {float(target.cropbox.bottom) + 20} Tm "
+            "(SAMPLE REVISION) Tj ET\nQ"
+        ).encode()
     )
-    target[NameObject("/Contents")] = stream
+    target[NameObject("/Contents")] = writer._add_object(stream)
     destination = Path(scratch) / ("revision-" + uuid4().hex[:8] + ".pdf")
     destination.parent.mkdir(parents=True, exist_ok=True)
     writer.write(destination)

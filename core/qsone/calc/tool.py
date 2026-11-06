@@ -264,6 +264,19 @@ def _refusal(tool: Tool, e: RecordsError, payload) -> dict:
     }
     for k, v in values.items():
         reply.setdefault(k, v if isinstance(v, str | int | bool | None) else str(v))
+    if (
+        tool.name == "calculate"
+        and isinstance(e, CalcError)
+        and e.key == "CALC_UNKNOWN_FUNCTION"
+        and e.values.get("name") == "each"
+    ):
+        reply["example"] = _json(
+            {
+                "formula": "sum(amounts)",
+                "inputs": {"amounts": {"each": {"kind": "boq_item"}, "name": "amount"}},
+                "result": {"unit": "EGP"},
+            }
+        )
     return reply
 
 

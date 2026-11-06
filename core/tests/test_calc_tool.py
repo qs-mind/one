@@ -455,3 +455,13 @@ def test_closed_project_answers_in_plain_words(client, project, method, path):
 
 def json_for(method, body):
     return {"json": body} if method == "post" else {}
+
+
+def test_each_function_refusal_teaches_the_actual_list_input(boq):
+    out = call(boq, "calculate", {"formula": "sum(each(amount))"}, actor="t")
+    assert out["key"] == "CALC_UNKNOWN_FUNCTION"
+    assert json.loads(out["example"]) == {
+        "formula": "sum(amounts)",
+        "inputs": {"amounts": {"each": {"kind": "boq_item"}, "name": "amount"}},
+        "result": {"unit": "EGP"},
+    }

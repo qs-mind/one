@@ -542,6 +542,10 @@ TOOL_WORDS = {
     "add_source": {"en": "Adding a source to the Source Ledger", "ar": "بيضيف مصدر لسجل المصادر"},
     "ask_engineer": {"en": "Asking you a question", "ar": "بيسألك سؤال"},
     "boq_import": {"en": "Importing the BOQ", "ar": "بيستورد جدول الكميات"},
+    "boq_price_from_sheet": {
+        "en": "Pricing the BOQ from the build-up sheet",
+        "ar": "بيسعّر المقايسة من شيت التسعير",
+    },
     "boq_preview": {"en": "Looking at the BOQ's columns", "ar": "بيشوف أعمدة جدول الكميات"},
     "build_specialist": {"en": "Setting up a specialist", "ar": "بيجهّز متخصص"},
     "calculate": {"en": "Calculating a number", "ar": "بيحسب رقم"},
@@ -2840,6 +2844,22 @@ OCR_ARABIC_MISSING = {
     ),
 }
 
+TRUTH_UNREAD_PLACE = {
+    "en": "ONE has not read {place} in this Brief. Read the source before relying on this claim.",
+    "ar": "ONE مقراش {place} في الطلب ده. اقرا المصدر قبل ما تعتمد على المعلومة دي.",
+}
+TRUTH_UNREAD_REPLY = {
+    "en": (
+        "ONE could not verify the cited source in this Brief. "
+        "Read the source before relying on this answer."
+    ),
+    "ar": "ONE مقدرش يتحقق من المصدر المذكور في الطلب ده. اقرا المصدر قبل ما تعتمد على الإجابة دي.",
+}
+
+TOOL_PRICE_FROM_SHEET = {
+    "en": "Price existing BOQ items from build-up cells",
+    "ar": "يسعّر بنود المقايسة الموجودة من خلايا تحليل السعر",
+}
 MAP_PROGRESS = {
     "en": "Reading {done} of {total} files",
     "ar": "بنقرا {done} من {total} ملف",
@@ -2870,8 +2890,8 @@ FILE_DRAWINGS_REPAIRED = {
     "ar": "اتقرا بإصلاحات أو حدود. ممكن يكون فيه محتوى ناقص من الرسم.",
 }
 FILE_DRAWING_PREVIEW = {
-    "en": "A drawing preview is not available yet. The text ONE read is shown below.",
-    "ar": "معاينة الرسم لسه مش متاحة. النص اللي ONE قراه ظاهر تحت.",
+    "en": "A drawing preview is not available yet; ONE shows the text it read from the drawing.",
+    "ar": "معاينة الرسم لسه مش متاحة؛ ONE بيعرض النص اللي قراه من الرسم.",
 }
 REPORT_DRAWING = {
     "en": "Drawing, {sheets} sheets: {index}",

@@ -371,3 +371,42 @@ def test_a_number_not_at_its_place_is_code_c():
     capped = checker.capped(_packet((), citations=(wrong,)), _review("A"))
     assert capped.code == "C" and "2500 is not at عرض.pdf, page 1" in capped.comments[0]["text"]
     assert "checked" in checker.ReviewOut.model_json_schema()["required"]
+
+
+def test_citing_a_page_range_requires_every_page_returned():
+    returns = [
+        (
+            "files_read",
+            'file_id: sample | file: sample.pdf\n{"page": 1}\nSample 350000 USD\nsources:',
+        )
+    ]
+    assert truth.unread_citations("Security 350000 USD, pages 1, 2.", returns)
+    assert not truth.unread_citations("Security 350000 USD, page 1.", returns)
+
+
+def test_wrong_file_cannot_satisfy_a_page_read():
+    returns = [
+        (
+            "files_read",
+            'file_id: sample | file: other.pdf\n{"page": 26}\nSample 350000 USD\nsources:',
+        )
+    ]
+    assert truth.unread_citations("Security 350000 USD, contract.pdf, page 26.", returns)
+
+
+def test_citation_cannot_use_numbers_outside_the_returned_page_part():
+    returns = [
+        ("files_read", 'file_id: sample | file: sample.pdf\n{"page": 26}\nOnly 180 days\nsources:')
+    ]
+    assert truth.unread_citations("Security 350000 USD, page 26.", returns)
+
+
+def test_csv_row_citations_require_the_returned_physical_line():
+    returns = [
+        (
+            "files_read",
+            'file_id: sample | file: sample.csv\n{"line": 1902} 3259.438571429\nsources:',
+        )
+    ]
+    assert not truth.unread_citations("Price 3259.438571429, row 1902.", returns)
+    assert truth.unread_citations("Price 3259.438571429, row 952.", returns)

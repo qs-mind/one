@@ -28,6 +28,18 @@ real:
   - check
   - '{project}'
   - '{deliverable}'
+- ask: Read every open Checking QS comment on deliverable {deliverable}. Propose the corrections now, linking each fix with its comment_id. Do not claim a comment is closed. If a source page is wrong, read the actual form-of-tender page and fix both copies.
+- command:
+  - changes
+  - accept
+  - '{project}'
+  - '{deliverable}'
+- command:
+  - deliverable
+  - check
+  - '{project}'
+  - '{deliverable}'
+- review: close_fixed
 - command:
   - deliverable
   - signoff
