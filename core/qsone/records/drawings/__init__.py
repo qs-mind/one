@@ -259,7 +259,11 @@ def _title(
         if i["block"] in frame_names or any(_label(a["tag"]) for a in i.get("attributes", []))
     ]
     for insert in attributed:
-        for attr in insert.get("attributes", []):
+        # Explicit title fields outrank generic top/bottom view labels.
+        for attr in sorted(
+            insert.get("attributes", []),
+            key=lambda a: bool(re.fullmatch(r"(?:top|bottom)[- _]title", a["tag"], re.I)),
+        ):
             key = _label(attr["tag"])
             value = attr.get("value", "")
             if key:

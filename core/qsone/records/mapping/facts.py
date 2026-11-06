@@ -163,11 +163,13 @@ def shown(row):
 
 
 def accept(rec, proposals, *, picture_fallback=True, rejected=None):
-    ids, prepared = [], []
+    ids, prepared, rejected_proposals = [], [], []
     rejected = rejected if rejected is not None else {}
 
     def reject(reason):
         rejected[reason] = rejected.get(reason, 0) + 1
+        if reason != "duplicate":
+            rejected_proposals.append((p, reason))
 
     with rec.read() as c:
         for p in proposals:
@@ -293,6 +295,7 @@ def accept(rec, proposals, *, picture_fallback=True, rejected=None):
             store.write(c, rec, "map_facts", row)
             ids.append(row["id"])
         _conflicts(c, rec)
+    store.retain_rejected(rec, rejected_proposals)
     return ids
 
 
@@ -338,10 +341,12 @@ def update(rec, fact_id, *, confirm=None, value=None, actor="engineer"):
     return shown(result)
 
 
-def candidates(rec, *, limit=15, file_ids=None):
+def candidates(rec, *, limit=30, file_ids=None):
+    limit = max(0, min(limit, 30))
     result, seen, pools = [], set(), []
     project_scores = {}
     reserved = []
+    short_files = set()
     with rec.read() as c:
         rows = [
             store.decoded(r)
@@ -376,11 +381,14 @@ def candidates(rec, *, limit=15, file_ids=None):
             for position, text in page_text.items():
                 words = arabic.clean(text)
                 if len(re.findall(r"\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}", words)) >= 2 or re.search(
-                    r"فتح العروض|الترسية|بدء الأعمال|ضمان ابتدائي|سريان", words
+                    r"فتح العروض|الترسية|بدء الأعمال|ضمان ابتدائي|سريان|مدة التنفيذ|مدة المشروع|"
+                    r"غرامة التأخير|duration|delay penalty",
+                    words,
                 ):
                     priority.add(position)
             locators = [dict(loc) for loc in sorted(priority)]
             if row["pages"] is not None and row["pages"] <= 10 and page_text:
+                short_files.add(row["file_id"])
                 locators.append(dict(max(page_text, key=lambda loc: guide_score(page_text[loc]))))
             mandatory = {tuple(sorted(loc.items())) for loc in locators}
             locators += [
@@ -414,8 +422,9 @@ def candidates(rec, *, limit=15, file_ids=None):
                     pool.append(candidate)
                     if tuple(sorted(loc.items())) in mandatory:
                         reserved.append(candidate)
-                    scores[tuple(sorted(loc.items()))] = guide_score(text)
-                    project_scores[key] = guide_score(text)
+                    score = guide_score(text) + 50 * (tuple(sorted(loc.items())) in priority)
+                    scores[tuple(sorted(loc.items()))] = score
+                    project_scores[key] = score
                     seen.add(key)
             if pool:
                 pool.sort(key=lambda p: -scores[tuple(sorted(p["locator"].items()))])
@@ -429,26 +438,27 @@ def candidates(rec, *, limit=15, file_ids=None):
             key = (p["file_id"], tuple(sorted(p["locator"].items())))
             scored.append((project_scores[key], p))
     ordered = [p for _, p in sorted(scored, key=lambda pair: -pair[0])]
-    # Mandatory source coverage may exceed the soft project budget.
-    result.extend(reserved)
-    counts, deferred = {}, []
-    for p in reserved:
-        counts[p["file_id"]] = counts.get(p["file_id"], 0) + 1
+    # Reservations get priority, but never expand the project budget. Short files
+    # contribute their single best page; longer files retain priority date/term pages.
+    reserved_keys = {(p["file_id"], tuple(sorted(p["locator"].items()))) for p in reserved}
+    ordered.sort(
+        key=lambda p: (
+            (p["file_id"], tuple(sorted(p["locator"].items()))) not in reserved_keys,
+            -project_scores[(p["file_id"], tuple(sorted(p["locator"].items())))],
+        )
+    )
+    counts = {}
+    best_short = {
+        p["file_id"]: pool[0] for pool in pools for p in pool[:1] if p["file_id"] in short_files
+    }
     for p in ordered:
-        if p in reserved:
-            continue
         if len(result) >= limit:
             break
         fid = p["file_id"]
-        if counts.get(fid, 0) >= 3:
-            deferred.append(p)
+        if fid in short_files and (counts.get(fid) or p != best_short[fid]):
             continue
         result.append(p)
         counts[fid] = counts.get(fid, 0) + 1
-        if len(result) == limit:
-            return result
-    result.extend(deferred[: max(0, limit - len(result))])
-
     return result
 
 
@@ -463,22 +473,18 @@ def run(rec, *, read, propose):
         return []
     proposals = propose(pages)
     allowed = {(p["file_id"], repr(sorted(p["locator"].items()))) for p in pages}
-    return accept(
-        rec,
-        [
-            p
-            for p in (proposals if isinstance(proposals, list) else [])
-            if isinstance(p, dict)
+    valid, refused = [], []
+    for p in proposals if isinstance(proposals, list) else []:
+        if (
+            isinstance(p, dict)
             and isinstance(p.get("locator"), dict)
             and (p.get("file_id"), repr(sorted(p["locator"].items()))) in allowed
-            and any(
-                q["file_id"] == p["file_id"]
-                and q["locator"] == p["locator"]
-                and grounded(q["text"], p)
-                for q in pages
-            )
-        ],
-    )
+        ):
+            valid.append(p)
+        else:
+            refused.append((p, "other"))
+    store.retain_rejected(rec, refused)
+    return accept(rec, valid)
 
 
 def step(rec, *, read=None, propose=None):
@@ -665,7 +671,7 @@ async def run_approved(rec, *, read, request, file_ids, vision_request=None):
     result = await request(prompt(pages), Result, "Extract sourced tender facts only.")
     allowed = {(p["file_id"], repr(sorted(p["locator"].items()))): p["text"] for p in pages}
     counts["proposed"] = len(result.facts)
-    valid = []
+    valid, rejected_proposals = [], []
     for fact in result.facts:
         p = fact.model_dump()
         text = allowed.get((p["file_id"], repr(sorted(p["locator"].items()))))
@@ -684,6 +690,8 @@ async def run_approved(rec, *, read, request, file_ids, vision_request=None):
                 else "number_missing"
             )
             rejected[reason] += 1
+            rejected_proposals.append((p, reason))
+    store.retain_rejected(rec, rejected_proposals)
     report()
     if not valid:
         raise NoTenderFacts("NoTenderFacts: no grounded tender facts returned")

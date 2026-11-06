@@ -64,7 +64,10 @@ def parser():
     mapping.add_argument("--cursor")
     mapping.add_argument("--wait", nargs="?", const=60, type=float)
     for name in ("facts", "links"):
-        command(name).add_argument("project")
+        item = command(name)
+        item.add_argument("project")
+        if name == "facts":
+            item.add_argument("--rejected", action="store_true")
     confirm, correct = group("fact", ["confirm", "correct"])
     for item in (confirm, correct):
         item.add_argument("project")
@@ -160,7 +163,7 @@ def plain(value, lang, indent=""):
         if "en" in value and "ar" in value:
             return indent + str(value[lang])
         value = dict(value)
-        for key in ("state", "local_state", "ai_state", "read_how"):
+        for key in ("state", "local_state", "ai_state", "read_how", "reason"):
             if isinstance(value.get(key), str) and value[key] in VALUES:
                 value[key] = VALUES[value[key]][lang]
         if value.get("confirmed_at") and "conflict_with" in value:
@@ -212,7 +215,11 @@ def human_result(result):
         return {
             **({"failures": failures} if failures else {}),
             "count": len(uploads),
-            "added": sum(s in ("read", "partly_read", "stored") for s in states),
+            "added": sum(
+                u.get("status") in ("read", "partly_read", "stored")
+                or u.get("note_key", u.get("note")) == "FILE_SCANNED_PAGES"
+                for u in uploads
+            ),
             "read": states.count("read"),
             "partly_read": states.count("partly_read"),
             "failed": sum(

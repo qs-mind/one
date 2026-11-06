@@ -1721,9 +1721,9 @@ class _Brief:
             )
             found += truth.tender_search_problem(output, self.text, searched)
         if rec is not None:  # each number at the row or page the reply cites for it
+            found += truth.unread_citations(output, self._read_returns(), rec=rec)
             with rec.read() as c:
                 found += truth.miscited(c, output)
-                found += truth.unread_citations(output, self._read_returns())
                 ids = []
                 for run in self.store.runs(self.brief_id):
                     for name, result in (
@@ -1818,7 +1818,7 @@ class _Brief:
             unread_segments = [
                 segment
                 for segment, _, _ in truth.citations(output)
-                if truth.unread_citations(segment, self._read_returns())
+                if truth.unread_citations(segment, self._read_returns(), rec=self.place.rec)
             ]
             marked = list(dict.fromkeys([*marked, *unread_segments]))
             if marked:

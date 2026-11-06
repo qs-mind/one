@@ -291,6 +291,22 @@ def test_first_lead_schemas_and_digest_leave_room_for_context(rec):
                 ],
             },
         )
+    with rec.write("one") as c:
+        for n in range(30):
+            store.write(
+                c,
+                rec,
+                "map_facts",
+                dict(
+                    id=f"sample-{n}",
+                    file_id=f.id,
+                    name={"en": f"Tender date {n}", "ar": f"تاريخ المناقصة {n}"},
+                    value="16/04/1448",
+                    locator={"page": 7},
+                    state="found",
+                    evidence="Sample date 16/04/1448",
+                ),
+            )
     spec = agents.lead_spec()
     definitions = [
         ToolDefinition(

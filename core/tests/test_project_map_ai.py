@@ -862,8 +862,10 @@ async def test_model_slice_yields_only_to_matching_active_model(monkeypatch):
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("enrichment,expected", [(False, "0.80"), (True, "2.40")])
-async def test_drop_estimate_reserves_validation_retry(rec, monkeypatch, enrichment, expected):
+@pytest.mark.parametrize("enrichment,expected", [(False, "0.50"), (True, "1.00")])
+async def test_drop_estimate_uses_ordinary_passes_with_margin(
+    rec, monkeypatch, enrichment, expected
+):
     files.add_file(rec, "sample.txt", b"Sample contract data", actor="engineer")
     drain(rec)
     asked = []
@@ -876,8 +878,8 @@ async def test_drop_estimate_reserves_validation_retry(rec, monkeypatch, enrichm
         pytest.fail("approval declined")
 
     monkeypatch.setattr(oneshot, "map_model", lambda _: object())
-    # Two passes at $0.20 each: one request each is below $0.50, reserving
-    # one validation retry each must trigger approval at $0.80.
+    # Display ordinary passes plus a 25% margin; retries remain bounded separately.
+    monkeypatch.setattr(ai.settings, "map_auto_usd", lambda: Decimal("0.49"))
     monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0.20"))
     assert not await ai.run(
         rec,
@@ -968,7 +970,12 @@ async def test_vision_is_in_drop_estimate_before_any_image_leaves(rec, monkeypat
 
     f = files.add_file(rec, "sample.pdf", sample_pdf([["Validity 01 days"]]), actor="engineer")
     drain(rec)
-    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(
+        oneshot,
+        "map_model",
+        lambda _: SimpleNamespace(choice=SimpleNamespace(model="gemini-3.1-flash-lite")),
+    )
+    monkeypatch.setattr(picture, "crop", lambda *a: b"sample")
     priced = []
 
     def price(card, *, input_tokens, output_tokens):
@@ -992,23 +999,28 @@ async def test_vision_is_in_drop_estimate_before_any_image_leaves(rec, monkeypat
         vision_request=forbidden,
         passes={"read": forbidden},
     )
-    assert (picture.MAX_FACTS * picture.IMAGE_TOKENS + 2000, picture.MAX_FACTS * 100) in priced
+    assert any(tokens >= 1120 and output == 60 for tokens, output in priced)
+    assert not any(output == picture.MAX_FACTS * 100 for _, output in priced)
     assert len(asked) == 1
     assert store.detail(rec, f.id)["ai_state"] == "declined"
 
 
-async def test_estimate_covers_mandatory_pages_beyond_soft_limit(rec, monkeypatch):
+async def test_estimate_measures_selected_page_text(rec, monkeypatch):
     from qsone.engine import request_size
     from qsone.records.mapping import facts
 
     f = files.add_file(rec, "sample.pdf", sample_pdf([["Sample"]] * 18), actor="engineer")
     drain(rec)
     monkeypatch.setattr(oneshot, "map_model", lambda _: object())
-    monkeypatch.setattr(facts, "candidates", lambda _: [{}] * 18)
+    monkeypatch.setattr(
+        facts,
+        "candidates",
+        lambda _: [{"file_id": f.id, "locator": {"page": n}} for n in range(1, 19)],
+    )
     tokens = []
 
     def cost(card, *, input_tokens, output_tokens):
-        if output_tokens == 10000:
+        if output_tokens == 250 * 18:
             tokens.append(input_tokens)
         return Decimal("0.001")
 
@@ -1020,7 +1032,7 @@ async def test_estimate_covers_mandatory_pages_beyond_soft_limit(rec, monkeypatc
         return ai.Batch(files=[])
 
     await ai.run(rec, SimpleNamespace(), request=request, passes={"read": None}, file_ids=[f.id])
-    assert tokens[0] >= 18 * request_size.estimate("م" * facts.PAGE_CHARS)
+    assert tokens[0] < 18 * request_size.estimate("م" * facts.PAGE_CHARS)
 
 
 def test_pass_summary_keeps_running_link_batch_visible(rec):

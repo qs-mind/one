@@ -127,7 +127,7 @@ LABELS = {
     "before": {"en": "Before", "ar": "قبل التعديل"},
     "op": {"en": "Proposed operation", "ar": "التعديل المقترح"},
     "changed": {"en": "Changed pages", "ar": "الصفحات المتغيّرة"},
-    "added": {"en": "Added words", "ar": "الكلمات المضافة"},
+    "added": {"en": "Files added", "ar": "الملفات المضافة"},
     "removed": {"en": "Removed words", "ar": "الكلمات المحذوفة"},
     "pairing_note": {"en": "Pairing reason", "ar": "سبب المطابقة"},
     "comments": {"en": "Comments", "ar": "التعليقات"},
@@ -170,6 +170,10 @@ LABELS.update(
         "key_pages": {"en": "Key pages", "ar": "الصفحات المهمة"},
         "sheets": {"en": "Sheets", "ar": "اللوحات"},
         "facts": {"en": "Tender summary", "ar": "ملخص المناقصة"},
+        "rejected": {"en": "Found but not verified", "ar": "اتلاقت، بس لسه مش متحقق منها"},
+        "proposal": {"en": "Unverified proposal", "ar": "مقترح مش متحقق منه"},
+        "reason": {"en": "Reason", "ar": "السبب"},
+        "recorded_at": {"en": "Recorded at", "ar": "وقت التسجيل"},
         "links": {"en": "Links", "ar": "الروابط"},
         "folder": {"en": "Folder", "ar": "الفولدر"},
         "file_id": {"en": "File ID", "ar": "معرّف الملف"},
@@ -187,6 +191,12 @@ LABELS.update(
 )
 
 VALUES = {
+    "not_grounded": {"en": "Evidence does not match the source", "ar": "الدليل مش مطابق للمصدر"},
+    "number_missing": {
+        "en": "The source does not support the number",
+        "ar": "المصدر مش بيثبت الرقم",
+    },
+    "other": {"en": "Proposal did not pass verification", "ar": "المقترح ماعداش التحقق"},
     "found": {"en": "read by ONE, not checked", "ar": "قراه ONE، لسه متراجعش"},
     "confirmed": {"en": "Confirmed", "ar": "متأكد"},
     "blank": {"en": "Blank", "ar": "فاضي"},

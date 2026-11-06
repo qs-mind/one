@@ -164,7 +164,10 @@ def _list(rec: Records, include_old: bool) -> str:
     with rec.read() as c:
         sheet_counts = dict(
             c.execute(
-                "SELECT file_id,count(*) FROM map_sheets WHERE valid_until IS NULL GROUP BY file_id"
+                "SELECT file_id,count(*) FROM map_sheets s WHERE valid_until IS NULL "
+                "AND (s.sheet<>'Model' OR NOT EXISTS (SELECT 1 FROM map_sheets p "
+                "WHERE p.file_id=s.file_id AND p.sheet<>'Model' AND p.valid_until IS NULL)) "
+                "GROUP BY file_id"
             ).fetchall()
         )
     for f in found:

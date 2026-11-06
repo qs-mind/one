@@ -105,7 +105,7 @@ async def test_arabic_real_shaped_facts_keep_three_dates_and_sources(rec):
     f = files.add_file(
         rec,
         "sample-conditions.pdf",
-        sample_pdf([["Sample page"] for _ in range(7)]),
+        sample_pdf([["Sample page"] for _ in range(11)]),
         actor="engineer",
     )
     drain(rec)

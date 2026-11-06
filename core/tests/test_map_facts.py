@@ -323,7 +323,10 @@ async def test_synthetic_arabic_tender_pages_security_validity_and_blank(rec):
     tender = files.add_file(
         rec,
         "sample-conditions.pdf",
-        sample_pdf([["Sample cover"], ["Sample article 8"], ["Sample validity"]]),
+        sample_pdf(
+            [["Sample cover"], ["Sample article 8"], ["Sample validity"]]
+            + [["Sample appendix"]] * 8
+        ),
         actor="engineer",
     )
     rules = files.add_file(
@@ -559,7 +562,7 @@ async def test_reviewer_five_rows_keep_conflict(rec):
     cond = files.add_file(
         rec,
         "sample-conditions.pdf",
-        sample_pdf([["Sample condition"] for _ in range(3)]),
+        sample_pdf([["Sample condition"] for _ in range(11)]),
         actor="engineer",
     )
     rows = [

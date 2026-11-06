@@ -3007,13 +3007,14 @@ MAP_PASS_FAILED = {
 TENDER_SEARCH_NUDGE = {
     "en": (
         "Before saying a tender requirement was not found, use search_records "
-        "received_only=true with 2–3 short Arabic/English phrasings (فتح العروض, مدة "
+        "received_only=true in the documents’ language with 2–3 short Arabic/English "
+        "phrasings (فتح العروض, مدة "
         "التنفيذ, مدة المشروع, duration), then files_read the best hit's page. If still "
         "missing, name the searches tried. Retry silently."
     ),
     "ar": (
         "قبل ما تقول إن شرط مناقصة مش موجود، استخدم search_records مع received_only=true "
-        "بصيغتين أو تلاتة قصيرين بالعربي والإنجليزي (فتح العروض، مدة التنفيذ، مدة "
+        "بلغة المستندات، بصيغتين أو تلاتة قصيرين بالعربي والإنجليزي (فتح العروض، مدة التنفيذ، مدة "
         "المشروع، duration)، واقرأ صفحة أحسن نتيجة بـ files_read. لو لسه مش موجود، اذكر "
         "كلمات البحث اللي جرّبتها. أعد المحاولة من غير ما تقول للمهندس."
     ),
@@ -3023,4 +3024,10 @@ TENDER_SEARCH_NUDGE = {
 MAP_PICTURE_NUMBER = {
     "en": "The PDF's text says {text}; the page shows {picture} — check the page.",
     "ar": "نص الـPDF بيقول {text}؛ الصفحة بتعرض {picture} — راجع الصفحة.",
+}
+
+
+MAP_FACT_REJECTED = {
+    "en": "Found but not verified",
+    "ar": "اتلاقت، بس لسه مش متحقق منها",
 }

@@ -877,7 +877,7 @@ def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]
         for m in _BARE_ROW.finditer(blank):
             places.append(Place("", rows=_numbers_of(m["rows"])))
             blank = blank.replace(m[0], " " * len(m[0]))
-        filename = re.search(r"[\w-]+\.(?:pdf|xlsx?|docx?|csv)\b", segment, re.I)
+        filename = re.search(r"[\w-]+\.(?:pdf|xlsx?|docx?|csv|txt|dwg|dxf)\b", segment, re.I)
         if filename:
             places = [Place(p.sheet, p.rows, p.pages, filename[0]) for p in places]
         parsed.append([segment, places, list(numbers_guard._counted(blank))])
@@ -1331,11 +1331,19 @@ def read_passages(returns: list[tuple[str, str]]) -> list[tuple[str, dict, str]]
     return found
 
 
-def unread_citations(text: str, returns: list[tuple[str, str]]) -> list[Problem]:
+def unread_citations(text: str, returns: list[tuple[str, str]], *, rec=None) -> list[Problem]:
     """A cited place must occur in this Brief's returned text, including specialists' reads."""
     passages = read_passages(returns)
+    if rec is not None:
+        from qsone.engine.map_digest import tender_facts
+
+        passages += [
+            (f["file_id"], f["locator"] | {"_file_name": f["file"]}, f["value"])
+            for f in tender_facts(rec)
+            if f["state"] != "blank" and f["value"]
+        ]
     problems = []
-    for _, places, numbers in citations(text):
+    for segment, places, numbers in citations(text):
         for place in places:
 
             def matches(loc, coordinate, place=place):
@@ -1356,8 +1364,16 @@ def unread_citations(text: str, returns: list[tuple[str, str]]) -> list[Problem]
                 words for _, loc, words in passages if any(matches(loc, n) for n in coordinates)
             ]
             have = numbers_guard.known_values(read_text)
-            if not all(any(matches(loc, n) for _, loc, _ in passages) for n in coordinates) or any(
-                value not in have for _, value in numbers
+            # Dates are intentionally excluded by the general quantity guard; here
+            # they are tender values and must match the cited evidence too.
+            dates = re.findall(r"(?<!\d)\d{1,4}/\d{1,2}/\d{1,4}(?!\d)", segment)
+            dates_match = all(
+                d.translate(_DIGITS) in " ".join(read_text).translate(_DIGITS) for d in dates
+            )
+            if (
+                not all(any(matches(loc, n) for _, loc, _ in passages) for n in coordinates)
+                or any(value not in have for _, value in numbers)
+                or not dates_match
             ):
                 where = place.words()
                 if any(p.fix.startswith(where["en"] + " was") for p in problems):

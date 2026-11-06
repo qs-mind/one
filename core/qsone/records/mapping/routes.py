@@ -45,11 +45,18 @@ def router(projects):
         return result
 
     @r.get("/projects/{project_id}/map/facts")
-    def facts(project_id: str, cursor: str | None = None, limit: int = Query(100, ge=1, le=200)):
+    def facts(
+        project_id: str,
+        cursor: str | None = None,
+        limit: int = Query(100, ge=1, le=200),
+        rejected: bool = False,
+    ):
         """{facts:[{id,name:{en,ar},value,unit,currency,file_id,locator,box,state,
         conflict_with,confirmed_by,confirmed_at,corrected_value}],next_cursor}.
         Current facts only; empty until the fact-mapping job fills them.
         """
+        if rejected:
+            return store.rejected_entries(projects.get(project_id), cursor=cursor, limit=limit)
         return store.entries(projects.get(project_id), "facts", cursor=cursor, limit=limit)
 
     @r.post("/projects/{project_id}/map/facts/{fact_id}")
