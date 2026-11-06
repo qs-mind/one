@@ -99,7 +99,9 @@ def record_check(
             try:
                 threads.check_kind("review", CHECKER, comment.get("code"))
                 body = threads.check_body(comment.get("body"))
-                anchor = threads.check_anchor(conn, head, comment.get("anchor"), current=False)
+                anchor = threads.check_anchor(
+                    conn, head, comment.get("anchor"), current=False, rec=rec
+                )
             except RecordsError as e:
                 e.field = f"comments[{i}]" + (f".{e.field}" if e.field else "")
                 raise

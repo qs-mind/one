@@ -198,7 +198,7 @@ describe("the workspace", () => {
     const sources = fakeSources({ files: [spec], pages: { spec: 4 } });
     render(<Workspace projectId="p1" sources={sources} documents={{ deliverables: [], clientBoqs: [], files: [spec], desks: [] }} />);
     act(() => openSourceFile("spec", { page: 3 }, ["3,450"]));
-    expect(workspaceApi.current()).toEqual({ key: "file:spec", anchor: { page: 3 } });
+    expect(workspaceApi.current()).toEqual({ key: "file:spec", anchor: { page: 3, value: "3,450" } });
     await waitFor(() => expect(document.querySelector('img[data-source-at="file:spec#page=3"]')).not.toBeNull());
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(screen.queryByText(texts.sourceNotMarked.ar)).toBeNull();

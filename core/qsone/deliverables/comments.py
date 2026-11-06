@@ -22,7 +22,7 @@ from uuid import uuid4
 
 from qsone import copy
 from qsone.deliverables import compare, events, ops, store
-from qsone.records import audit
+from qsone.records import audit, regions
 from qsone.records.project import Records, RecordsError
 
 ENGINEER = ops.ENGINEER
@@ -116,9 +116,15 @@ def _found(text: str, quote: str, near: int) -> int | None:
     return min(places, key=lambda p: (abs(p - near), p)) if places else None
 
 
-def check_anchor(conn, head: dict, anchor, *, current: bool = True) -> dict:
+def check_anchor(
+    conn, head: dict, anchor, *, current: bool = True, rec: Records | None = None
+) -> dict:
     """The anchor checked against the Deliverable (ANCHOR_NOT_FOUND, field `anchor.<key>`) and
     rebuilt with its own keys only. A text anchor's offsets are set to where its quote is."""
+    if isinstance(anchor, dict) and anchor.get("kind") == "file_region":
+        if rec is None:
+            raise _refuse(copy.ANCHOR_NOT_FOUND, "anchor")
+        return regions.check_region(rec, anchor)
     kind = anchor.get("type") if isinstance(anchor, dict) else None
     if kind not in head["template"].get("anchors", []):
         raise _refuse(copy.ANCHOR_NOT_FOUND, "anchor.type")
@@ -167,7 +173,7 @@ def _now(anchor: dict, parts: dict, columns: set[str]) -> dict:
     def alive(part_id) -> bool:
         return part_id in parts and not parts[part_id]["removed"]
 
-    kind = anchor["type"]
+    kind = anchor.get("type", anchor.get("kind"))
     if kind == "row":
         return anchor if alive(anchor["row"]) else _MOVED
     if kind == "cell":
@@ -194,7 +200,7 @@ def _now(anchor: dict, parts: dict, columns: set[str]) -> dict:
         if start is None:
             return {"type": "row", "block": anchor["block"], "moved": True}
         return {**anchor, "start": start, "end": start + _units(anchor["quote"])}
-    return anchor  # the whole Deliverable; "pdf_region" and "drawing_point" are reserved
+    return anchor  # a file region stays on its immutable file; the whole Deliverable stays too
 
 
 # Reading.
@@ -212,7 +218,7 @@ def read_threads(conn, head: dict, *, status: str | None = None) -> list[dict]:
     rows = [
         _row(found)
         for found in conn.execute(
-            f"SELECT {', '.join(_COLUMNS)} FROM comments WHERE deliverable_id = ?"
+            f"SELECT {', '.join(_COLUMNS)} FROM comments WHERE deliverable_id IS ?"
             " ORDER BY created_at, rowid",
             (head["id"],),
         )
@@ -237,10 +243,32 @@ def read_threads(conn, head: dict, *, status: str | None = None) -> list[dict]:
     return [t for t in threads.values() if status is None or t["status"] == status]
 
 
-def list_comments(rec: Records, deliverable_id: str, *, status: str | None = None) -> list[dict]:
+def list_comments(
+    rec: Records, deliverable_id: str | None, *, status: str | None = None
+) -> list[dict]:
     """The Deliverable's threads, oldest first; each with its replies and `anchor_now`."""
     with rec.read() as conn:
-        return read_threads(conn, ops.deliverable(conn, deliverable_id), status=status)
+        return read_threads(conn, _head(conn, deliverable_id), status=status)
+
+
+def _head(conn, deliverable_id):
+    return ops.deliverable(conn, deliverable_id) if deliverable_id else {"id": None, "template": {}}
+
+
+def file_comments(rec: Records, file_id: str) -> list[dict]:
+    """File-region threads, including ones attached to a Deliverable, with replies."""
+    with rec.read() as conn:
+        owners = conn.execute(
+            "SELECT DISTINCT deliverable_id FROM comments"
+            " WHERE json_extract(anchor, '$.file_id') = ?",
+            (file_id,),
+        ).fetchall()
+        return [
+            t
+            for (owner,) in owners
+            for t in read_threads(conn, _head(conn, owner))
+            if t["anchor"].get("file_id") == file_id
+        ]
 
 
 def _root(conn, comment_id) -> dict:
@@ -330,7 +358,7 @@ def _update(conn, rec, comment: dict, actor: str, **change) -> None:
 
 def add(
     rec: Records,
-    deliverable_id: str,
+    deliverable_id: str | None,
     *,
     kind: str,
     anchor: dict,
@@ -344,8 +372,11 @@ def add(
     COMMENT_NEEDS_TEXT, ANCHOR_NOT_FOUND (`anchor.<key>`), DELIVERABLE_NOT_FOUND."""
     check_kind(kind, actor, code)
     body = check_body(body)
+    is_region = isinstance(anchor, dict) and anchor.get("kind") == "file_region"
+    if not is_region and deliverable_id is None:
+        raise _refuse(copy.ANCHOR_NOT_FOUND, "anchor")
     with rec.write(actor) as conn:
-        head = ops.deliverable(conn, deliverable_id)
+        head = _head(conn, deliverable_id)
         if (
             check_id is not None
             and not conn.execute(
@@ -358,14 +389,15 @@ def add(
             rec,
             head,
             kind=kind,
-            anchor=check_anchor(conn, head, anchor),
+            anchor=check_anchor(conn, head, anchor, rec=rec),
             body=body,
             actor=actor,
             code=code,
             check_id=check_id,
-            version_n=ops.latest_version(conn, head["id"]),
+            version_n=ops.latest_version(conn, head["id"]) if head["id"] else 0,
         )
-    events.publish_deliverable(rec, rec.id, deliverable_id)
+    if deliverable_id:
+        events.publish_deliverable(rec, rec.id, deliverable_id)
     return comment_id
 
 
@@ -374,7 +406,7 @@ def reply(rec: Records, comment_id: str, *, body: str, actor: str) -> str:
     body = check_body(body)
     with rec.write(actor) as conn:
         root = _root(conn, comment_id)
-        head = ops.deliverable(conn, root["deliverable_id"])
+        head = _head(conn, root["deliverable_id"])
         reply_id = insert(
             conn,
             rec,
@@ -385,10 +417,11 @@ def reply(rec: Records, comment_id: str, *, body: str, actor: str) -> str:
             actor=actor,
             code=None,
             check_id=None,
-            version_n=ops.latest_version(conn, head["id"]),
+            version_n=ops.latest_version(conn, head["id"]) if head["id"] else 0,
             parent_id=root["id"],
         )
-    events.publish_deliverable(rec, rec.id, root["deliverable_id"])
+    if root["deliverable_id"]:
+        events.publish_deliverable(rec, rec.id, root["deliverable_id"])
     return reply_id
 
 
@@ -401,7 +434,8 @@ def _set_status(rec: Records, comment_id: str, status: str, actor: str) -> None:
             return
         closed = (rec.clock(), actor) if status == "closed" else (None, None)
         _update(conn, rec, root, actor, status=status, closed_at=closed[0], closed_by=closed[1])
-    events.publish_deliverable(rec, rec.id, root["deliverable_id"])
+    if root["deliverable_id"]:
+        events.publish_deliverable(rec, rec.id, root["deliverable_id"])
 
 
 def close(rec: Records, comment_id: str, *, actor: str) -> None:
@@ -433,7 +467,14 @@ def _label(v: dict, part_id: str) -> str:
 
 def _place(v: dict, anchor: dict) -> dict:
     labels = {c["key"]: c["label"] for c in v.get("columns", [])}
-    kind = anchor["type"]
+    kind = anchor.get("type", anchor.get("kind"))
+    if kind == "file_region":
+        return copy.fill(
+            copy.FILE_REGION_PLACE,
+            file=anchor["file_id"],
+            page=anchor["page"],
+            box=json.dumps(anchor["box"]),
+        )
     if kind == "cell":
         return copy.fill(
             copy.FIX_PLACE_CELL,
@@ -467,7 +508,17 @@ def fix_text(rec: Records, comment_id: str, *, lang: str) -> str:
         raise ValueError(f"lang must be one of {store.LANGUAGES}")
     with rec.write(ENGINEER) as conn:
         root = _root(conn, comment_id)
-        head = ops.deliverable(conn, root["deliverable_id"])
+        head = _head(conn, root["deliverable_id"])
+        if head["id"] is None:
+            text = copy.fill(
+                copy.FILE_REGION_FIX,
+                file=root["anchor"]["file_id"],
+                page=root["anchor"]["page"],
+                box=json.dumps(root["anchor"]["box"]),
+                body=root["body"],
+            )[lang]
+            _update(conn, rec, root, ENGINEER, fix_asked_at=rec.clock())
+            return text
         v = store.view(rec, head["id"])
         [thread] = [t for t in read_threads(conn, head) if t["id"] == root["id"]]
         at = (

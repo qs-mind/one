@@ -160,7 +160,7 @@ function Level({
   function openSource() {
     if (!fileId) return;
     // the file opens as the document, at its page, and the quoted place is marked there; the card has done its job
-    openSourceFile(fileId, source?.locator, value ? figuresOf(value) : []);
+    openSourceFile(fileId, source?.locator, value ? figuresOf(value) : [], { box: source?.box, value });
     onClose();
   }
 

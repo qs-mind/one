@@ -2,6 +2,7 @@ import type { SourceLocator } from "../project/types";
 // A number's source opened from its card: the file opens as the document at its page, and once it shows, the quoted
 // place in it is marked with the source mark (sources/mark.ts): a sheet row or line of the file's text. The card
 // closes as the file opens, so the workspace marks it (Workspace.tsx) and says once when it cannot.
+import type { PdfBox } from "../deliverables/types";
 import type { Anchor, Opened } from "../project/types";
 import { sourceKeys } from "../sources/targets";
 import { workspaceApi } from "./api";
@@ -11,9 +12,16 @@ type Wanted = { key: string; opened: Opened | null; keys: string[]; figures: str
 let wanted: Wanted | null = null;
 
 /** Opens the file of a source as the document, at its page; its place is marked once it shows. */
-export function openSourceFile(fileId: string, locator: SourceLocator | null | undefined, figures: string[]) {
+export function openSourceFile(fileId: string, locator: SourceLocator | null | undefined, figures: string[], region?: { box?: PdfBox; value?: string }) {
   wanted = { key: `file:${fileId}`, opened: null, keys: sourceKeys({ fileId, locator }), figures };
-  workspaceApi.open(`file:${fileId}`, anchorOf(locator));
+  const anchor = anchorOf(locator);
+  if (anchor.page) {
+    const box = region?.box ?? locator?.box;
+    if (Array.isArray(box) && box.length === 4 && box.every(Number.isFinite)) anchor.box = box as PdfBox;
+    if (region?.value) anchor.value = region.value;
+    else if (figures[0]) anchor.value = figures[0];
+  }
+  workspaceApi.open(`file:${fileId}`, anchor);
 }
 
 /** Where in the file to open: a PDF's page, or a spreadsheet's cell (its sheet, row `r<row>` and column letters). */

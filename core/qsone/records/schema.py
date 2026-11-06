@@ -391,6 +391,24 @@ CREATE TRIGGER deliverables_no_delete BEFORE DELETE ON deliverables
   BEGIN SELECT RAISE(ABORT, 'Deliverables are never deleted'); END;
 """
 
+# File-only threads share comments and its audit trail, without a fictitious Deliverable.
+FILE_REGION_COMMENTS_SQL = """
+ALTER TABLE comments RENAME TO comments_before_regions;
+CREATE TABLE comments (
+  id TEXT PRIMARY KEY, deliverable_id TEXT REFERENCES deliverables(id),
+  parent_id TEXT REFERENCES comments(id), kind TEXT NOT NULL CHECK (kind IN ('note','review')),
+  anchor TEXT NOT NULL CHECK (json_valid(anchor)), body TEXT NOT NULL, author TEXT NOT NULL,
+  code TEXT CHECK (code IS NULL OR code IN ('B','C')), check_id TEXT REFERENCES checks(id),
+  status TEXT NOT NULL CHECK (status IN ('open','closed')), version_n INTEGER NOT NULL,
+  created_at TEXT NOT NULL, closed_at TEXT, closed_by TEXT, fix_asked_at TEXT);
+INSERT INTO comments SELECT * FROM comments_before_regions;
+DROP TABLE comments_before_regions;
+CREATE INDEX comments_deliverable ON comments(deliverable_id, status);
+CREATE INDEX comments_file_region ON comments(json_extract(anchor, '$.file_id'));
+CREATE TRIGGER comments_no_delete BEFORE DELETE ON comments
+  BEGIN SELECT RAISE(ABORT, 'Comments are never deleted'); END;
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -405,4 +423,5 @@ MIGRATIONS: list[str] = [
     WORKSPACE_SQL,
     CACHE_SQL,
     PACK_SQL,
+    FILE_REGION_COMMENTS_SQL,
 ]

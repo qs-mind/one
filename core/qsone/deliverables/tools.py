@@ -267,14 +267,30 @@ def deliverable_propose(
     return out
 
 
-def deliverable_comment(ctx: ToolContext, id: Id, anchor: dict, body: str) -> dict:
+def deliverable_comment(
+    ctx: ToolContext,
+    id: Id | None = None,
+    anchor: dict | None = None,
+    body: str | None = None,
+    file_id: Id | None = None,
+) -> dict:
     """Leave ONE's note on a Deliverable for the engineer (it never blocks Sign-off). anchor is
     {"type": "cell", "row": "<row id>", "column": "rate"}, {"type": "range", "from": {"row",
     "column"}, "to": {"row", "column"}}, {"type": "row", "row": "<row or block id>"}, {"type":
     "text", "block": "<block id>", "start": 0, "end": 7, "quote": "the exact words"} or
-    {"type": "deliverable"}. Returns {"comment_id"}.
+    {"type": "deliverable"}, or {"kind": "file_region", "file_id": "<file id>", "page": 1,
+    "box": [10, 20, 100, 50]} (PDF points, top-left origin). Omit id for a file-only note.
+    Omit body to READ threads: file_id reads that file's region comments, id a Deliverable's.
+    Returns {"comment_id"} when writing, {"comments"} when reading.
     Example: {"id": "<deliverable id>", "anchor": {"type": "cell", "row": "<row id>", "column":
     "rate"}, "body": "السعر من عرض المورد بتاريخ 2 نوفمبر"}"""
+    if body is None:
+        rec = _rec(ctx)
+        return {
+            "comments": comments.file_comments(rec, file_id)
+            if file_id
+            else comments.list_comments(rec, id)
+        }
     made = comments.add(_rec(ctx), id, kind="note", anchor=anchor, body=body, actor=actor(ctx))
     return {"comment_id": made}
 

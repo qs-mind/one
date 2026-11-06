@@ -8,6 +8,9 @@ import { REVEAL_WAIT_MS } from "../../sources/mark";
 import { fileKey, TARGET } from "../../sources/targets";
 import { Segmented } from "../../ui/Segmented";
 import { type SheetHandle, SheetViewer } from "../../viewers/sheet/SheetViewer";
+import type { FileRegion, PdfBox } from "../../deliverables/types";
+import { PdfRegions } from "./PdfRegions";
+import { FileRegionComments } from "./FileRegionComments";
 import { workspaceApi } from "../api";
 import { CompareDoc } from "./CompareDoc";
 
@@ -49,12 +52,15 @@ export function useFilePage(sources: ProjectSources, fileId: string, opened?: Op
   openedRef.current = opened;
   useEffect(() => {
     const asked = opened?.anchor?.page;
-    if (asked) setPage(asked);
+    if (asked) {
+      setPage(asked);
+      if (opened?.anchor?.box || opened?.anchor?.value) setMode("image");
+    }
   }, [opened]);
   useEffect(() => {
     const now = openedRef.current;
     if (!now || workspaceApi.current() !== now || now.anchor?.page === page) return;
-    workspaceApi.at({ ...now.anchor, page });
+    workspaceApi.at({ ...now.anchor, page, box: undefined, value: undefined });
   }, [page]);
 
   useEffect(() => {
@@ -81,11 +87,15 @@ export function FilePages({
   state,
   width,
   notice,
+  opened,
+  projectId,
   controls = true,
 }: {
   sources: ProjectSources;
   fileId: string;
   state: FilePage;
+  opened?: Opened;
+  projectId?: string;
   width: number;
   controls?: boolean;
   /** Said under the page controls, a row of its own: it never covers them. */
@@ -95,6 +105,29 @@ export function FilePages({
   const { pages, page, setPage, mode, setMode, pageOf } = state;
   const [image, setImage] = useState<Image>(null);
   const [pieces, setPieces] = useState<FilePiece[] | null>(null);
+
+  const [geometry, setGeometry] = useState<{width: number; height: number; boxes: PdfBox[]} | null>(null);
+  const [regionFailed, setRegionFailed] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selection, setSelection] = useState<FileRegion | null>(null);
+  const asked = opened?.anchor?.page === page ? opened.anchor : null;
+  const sourceBox = asked?.box;
+  const value = sourceBox ? undefined : asked?.value;
+  useEffect(() => {
+    let live = true;
+    setGeometry(null);
+    setRegionFailed(false);
+    setSelection(null);
+    setSelecting(false);
+    if (pages && sources.pageBoxes) {
+      void sources.pageBoxes(fileId, page, value).then(
+        (got) => { if (live) setGeometry(got); },
+        () => { if (live) setRegionFailed(true); },
+      );
+    }
+    return () => { live = false; };
+  }, [sources, fileId, pages, page, value, opened]);
+  const boxes = selection ? [selection.box] : sourceBox ? [sourceBox] : geometry?.boxes ?? [];
 
   const showImage = pages !== null && pages > 0 && mode === "image";
   useEffect(() => {
@@ -150,6 +183,17 @@ export function FilePages({
           />
         </div>
       )}
+      {showImage && projectId && geometry && (
+        <div className="flex items-center gap-3 px-5 py-2">
+          <button type="button" className={button} aria-pressed={selecting} onClick={() => setSelecting(!selecting)}>
+            {t("regionSelect")}
+          </button>
+          {selecting && <span>{t("regionDrag")}</span>}
+        </div>
+      )}
+      {showImage && (regionFailed || (value && geometry && !geometry.boxes.length)) && (
+        <p role="status" className="px-5 py-2 text-slate">{t(regionFailed ? "regionUnavailable" : "regionValueMissing")}</p>
+      )}
       {notice && (
         <p role="status" className={`px-5 pb-2 text-sm text-slate ${pages ? "bg-stone/60" : "pt-2"}`}>
           {notice}
@@ -162,15 +206,24 @@ export function FilePages({
           </p>
         ) : (
           image && (
-            <img
-              src={image.url}
-              alt={pageOf ?? ""}
-              className="block w-full"
-              draggable={false}
-              {...{ [TARGET]: fileKey(fileId, { page }) }} // a number from this page draws its source line here
-            />
+            <PdfRegions
+              width={geometry?.width ?? 1} height={geometry?.height ?? 1} boxes={geometry ? boxes : []}
+              onSelect={selecting && geometry ? (box) => {
+                setSelection({ kind: "file_region", file_id: fileId, page, box });
+                setSelecting(false);
+              } : undefined}
+            >
+              <img
+                src={image.url} alt={pageOf ?? ""} className="block w-full" draggable={false}
+                {...{ [TARGET]: fileKey(fileId, { page }) }}
+              />
+            </PdfRegions>
           )
         ))}
+      {projectId && pages !== null && pages > 0 && (
+        <FileRegionComments key={fileId} sources={sources} projectId={projectId} fileId={fileId}
+          selection={selection} onAdded={() => setSelection(null)} />
+      )}
       {showText &&
         pieces &&
         (pieces.length === 0 ? (
@@ -323,7 +376,7 @@ export function FileDoc({ projectId, sources, fileId, opened, notice }: {
   return (
     <div ref={root} dir={dir()} className="h-full overflow-auto bg-paper text-ink">
       {projectId && (state.pages ?? 0) > 0 && <button type="button" className="px-5 py-2 text-copper" onClick={() => setComparing(true)}>{t("compareOpen")}</button>}
-      {sheet === null && <FilePages sources={sources} fileId={fileId} state={state} width={width} notice={notice} />}
+      {sheet === null && <FilePages sources={sources} fileId={fileId} state={state} width={width} notice={notice} opened={opened} projectId={projectId} />}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { deliverablesApi } from "../deliverables/api";
 import type { Text } from "../i18n";
 import { texts } from "../i18n";
 import { uploadFile } from "../records/RecordsPanel";
-import type { SheetView } from "../deliverables/types";
+import type { SheetView, Thread } from "../deliverables/types";
 import type { Anchor, ClientBoqInfo, DeliverableInfo, DocKey, FileInfo, FilePiece, FileSheet, ProjectSources, Team, ViewerProps } from "./types";
 
 /** A refused call, with the core's line in both languages. */
@@ -92,6 +92,11 @@ export function httpSources(projectId: string): ProjectSources {
       }
       return made;
     },
+    pageBoxes: (fileId, page, value = "") => json(`${file(fileId)}/pages/${page}/boxes?value=${encodeURIComponent(value)}`),
+    fileComments: async (fileId) => (await json<{comments: Thread[]}>(`${file(fileId)}/comments`)).comments,
+    addFileComment: (fileId, anchor, body) => json<Thread>(`${file(fileId)}/comments`, undefined, {
+      method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({anchor, body}),
+    }),
     async pages(fileId) {
       const response = await api(`${file(fileId)}/pages`).catch(() => undefined);
       if (response?.status === 404 || response?.status === 409) return 0; // no route yet, or not a PDF

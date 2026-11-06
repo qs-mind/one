@@ -48,7 +48,9 @@ export function rangePlace(view: View, from: string, to: string, column?: string
 }
 
 /** Where a comment sits now, in plain words. */
-export function anchorPlace(view: View, anchor: CommentAnchor, lang: Language = language()): string {
+export function anchorPlace(view: View | null, anchor: CommentAnchor, lang: Language = language()): string {
+  if ("kind" in anchor && anchor.kind === "file_region") return fill(pick(texts.page, lang), {page: anchor.page});
+  if (!view) return pick(texts.placeWhole, lang);
   let place: string;
   switch (anchor.type) {
     case "cell":

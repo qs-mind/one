@@ -25,7 +25,11 @@ export type DeliverableInfo = {
   sample?: boolean;
 };
 
+export type PdfBox = [number, number, number, number];
+export type FileRegion = { kind: "file_region"; file_id: string; page: number; box: PdfBox; type?: never; moved?: never };
+
 export type Source = {
+  box?: PdfBox;
   kind: string; // "sample", "engineer", "calculation", "file", …
   title: string;
   file_name?: string | null;
@@ -190,6 +194,7 @@ export const asCell = (shown: Shown | null | undefined): ViewCell | null =>
 
 /** Where a comment sits, keyed on part ids and column keys (never A1 addresses). */
 export type CommentAnchor =
+  | FileRegion
   | { type: "cell"; row: string; column: string; moved?: boolean }
   | { type: "range"; from: { row: string; column: string }; to: { row: string; column: string }; moved?: boolean }
   | { type: "row"; row?: string; block?: string; moved?: boolean }
@@ -198,7 +203,7 @@ export type CommentAnchor =
 
 export type Comment = {
   id: string;
-  deliverable_id: string;
+  deliverable_id: string | null;
   parent_id: string | null;
   kind: "note" | "review";
   anchor: CommentAnchor;
