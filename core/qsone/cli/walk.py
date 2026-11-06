@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import httpx
 
+from qsone import copy
 from qsone.cli.session import ROOT
 from qsone.cli.texts import TEXT, CliError
 from qsone.engine.truth import citations, has_json, promise
@@ -289,6 +290,36 @@ class Walk:
                 and self.observed.get("bytes", 0) > 0
                 and self.observed.get("pages", 0) >= minimum
             )
+        if name == "max_tool_steps":
+            from qsone.cli.checks import max_tool_steps
+
+            return max_tool_steps(self.last.get("events", []), expected)
+        if name == "map_key_pages":
+            entries = [
+                p
+                for f in self.observed.get("map", {}).get("files", [])
+                for p in f.get("key_pages", [])
+            ]
+            return bool(expected) and all(
+                any(
+                    p.get("page") == wanted["page"]
+                    and normal(wanted["label"]) in normal(" ".join(p.get("label", {}).values()))
+                    for p in entries
+                )
+                for wanted in expected
+            )
+        if name == "map_total":
+            return self.observed.get("map", {}).get("status", {}).get("total") == int(expected)
+        if name == "map_page_fast":
+            return "map_seconds" in self.observed and self.observed["map_seconds"] < float(expected)
+        if name == "map_cost_card":
+            return (
+                any(
+                    c.get("kind") == "cost" and c.get("title") == copy.MAP_AI_LABEL
+                    for c in self.observed.get("map_cards", [])
+                )
+                == expected
+            )
         if name == "max_steps":
             logs = [
                 e["data"] for e in self.last.get("events", []) if e.get("type") == "data-worklog"
@@ -444,6 +475,46 @@ class Walk:
                 "checks": [check for output in outputs for check in output.get("checks", [])],
                 "results": outputs,
             }
+        if "synthetic_map_files" in step:
+            if self.commands.saved["mode"] != "scripted":
+                raise CliError("walk")
+            count = int(step["synthetic_map_files"])
+            if not 1 <= count <= 2000:
+                raise CliError("walk")
+            folder = Path(self.variables["scratch"]) / "sample-map"
+            folder.mkdir(exist_ok=True)
+            paths = []
+            for i in range(count):
+                path = folder / f"sample-{i:04}.txt"
+                path.write_text(
+                    f"Sample data file {i}. Construction tender sample.", encoding="utf-8"
+                )
+                paths.append(str(path))
+            return self.commands.files_add(self.project, paths)
+        if "map" in step:
+            wanted = step["map"] or {}
+            deadline = time.monotonic() + min(600, max(1, int(wanted.get("wait_seconds", 60))))
+            while True:
+                started = time.monotonic()
+                found = self.c.get(f"/projects/{self.project}/map", limit=20)
+                elapsed = time.monotonic() - started
+                messages = self.c.get(f"/chat/{self.project}/messages")["messages"]
+                cards = [
+                    p.get("data", {})
+                    for m in messages
+                    for p in m.get("parts", [])
+                    if p.get("type") == "data-card"
+                ]
+                mapped = found.get("files") and all(f.get("ai_title") for f in found["files"])
+                has_card = any(
+                    c.get("kind") == "cost" and c.get("title") == copy.MAP_AI_LABEL for c in cards
+                )
+                if (
+                    has_card if wanted.get("cost_card") else mapped
+                ) or time.monotonic() >= deadline:
+                    self.observed = {"map": found, "map_seconds": elapsed, "map_cards": cards}
+                    return self.observed
+                time.sleep(0.1)
         if "review" in step:
             if step["review"] != "close_fixed":
                 raise CliError("walk")

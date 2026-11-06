@@ -180,7 +180,14 @@ def _structure(rec, info, data):
                     for c in cells.values()
                 )
             ]
-            structure["sheets"].append({"name": name, "header_row": header, "totals_rows": totals})
+            structure["sheets"].append(
+                {
+                    "name": name,
+                    "header_row": header,
+                    "totals_rows": totals,
+                    "last_row": sheet.last_row,
+                }
+            )
             tables.append(
                 _table(
                     sheet,
@@ -348,6 +355,10 @@ def step(rec, *, cancelled=lambda: False, original=None):
                 if loc.get("read_by") == "tesseract" and "box" in loc:
                     words.setdefault(loc["page"], []).append({"text": text, "box": loc["box"]})
             tables = _pdf_tables(original(rec, file_id), ocr_words=words)
+        from qsone.records.mapping import drawing_map, remap
+
+        drawing_map.populate(rec, file_id, original(rec, file_id))
+        remap.revalidate(rec, file_id)
         _update(
             rec,
             file_id,

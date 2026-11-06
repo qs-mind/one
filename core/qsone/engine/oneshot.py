@@ -379,3 +379,40 @@ def for_run(services: Any, models: Models) -> Any:
         transcriber=services.transcriber or page_reader(models),
         native_search=services.native_search or native_searcher(models),
     )
+
+
+async def map_text(models: Models, prompt: str, output_type, instructions: str):
+    """A text-only mapping request, using the quick role first and normal cost checks."""
+    found = None
+    for role in ("quick", "specialist", "lead"):
+        card = models.card(models.roles.get(role))
+        if card is not None and _model_link(models, card):
+            found = card, role
+            break
+    found = found or _subscription(models, ("quick", "specialist", "lead"))
+    if found is None:
+        raise OneShotFailed(copy.NO_AI)
+    card, role = found
+    if card.choice.connector == claude_code.ID:
+        schema = json.dumps(output_type.model_json_schema(), ensure_ascii=False)
+        text = await _on_subscription(
+            models,
+            card,
+            role,
+            [{"type": "text", "text": prompt}],
+            instructions=instructions + "\nReturn JSON matching: " + schema,
+            tools=(),
+            failed=copy.MAP_FAILED,
+        )
+        return output_type.model_validate_json(text)
+    agent = Agent(_costed(models, card, role), instructions=instructions, output_type=output_type)
+    return (await _once(models, card, role, agent, prompt)).output
+
+
+def map_model(models: Models):
+    for role in ("quick", "specialist", "lead"):
+        card = models.card(models.roles.get(role))
+        if card is not None and _model_link(models, card):
+            return card
+    found = _subscription(models, ("quick", "specialist", "lead"))
+    return None if found is None else found[0]

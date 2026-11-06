@@ -51,6 +51,7 @@ SCENARIOS = (
     "pack",
     "estimate",
     "conditions",
+    "map",
     "oldoffice",
     "pdfboq",
     "scanned",
@@ -1040,8 +1041,71 @@ def general(seen: Seen) -> Step:
     return _say(_report(seen))
 
 
+def _map_overview(seen):
+    return _call("map", "project_map", {})
+
+
+def _map_read(seen):
+    raw = seen.done.get("map", ("", False))[0]
+    start, end = raw.find("{"), raw.rfind("}")
+    if start < 0:
+        return None
+    data = json.loads(raw[start : end + 1])
+    file = next((f for f in data.get("files", []) if f.get("key_pages")), None)
+    if file is None:
+        return None
+    pages = [p["page"] for p in file["key_pages"] if p.get("page")]
+    return _call(
+        "mapread", "files_read", {"file_id": file["file_id"], "pages": ",".join(map(str, pages))}
+    )
+
+
+LEAD_SCENARIOS["map"] = (_map_overview, _map_read)
+
+
+def _mapping_output(seen, tool):
+    properties = tool.parameters_json_schema.get("properties", {})
+    if not ({"files", "groups"} & properties.keys()):
+        return None
+    inputs = json.loads(seen.brief)
+    if "groups" in properties:
+        output = {"groups": [{"file_id": f["file_id"], "path": "Sample tender"} for f in inputs]}
+    else:
+        result = []
+        for file in inputs:
+            pages = file.get("pages") or 0
+            keys = []
+            for page, en, ar in [
+                (58 if pages >= 58 else 1, "Contract data", "بيانات العقد"),
+                (26 if pages >= 26 else 2, "Bid data", "بيانات العطاء"),
+            ]:
+                if page <= pages:
+                    keys.append(
+                        {
+                            "label": {"en": en, "ar": ar},
+                            "page": page,
+                            "why": {"en": "Sample navigation", "ar": "تصفح بيانات العينة"},
+                        }
+                    )
+            result.append(
+                {
+                    "file_id": file["file_id"],
+                    "kind": "contract",
+                    "title": {"en": "Sample tender", "ar": "عينة عطاء"},
+                    "group": "Sample tender",
+                    "key_pages": keys,
+                }
+            )
+        output = {"files": result}
+    return Step(
+        (ToolCallPart(tool.name, output, tool_call_id=f"bench-map-{uuid4().hex[:8]}"),), USAGE
+    )
+
+
 def brain(messages: list, info: AgentInfo) -> Step:
     seen = read(messages, info)
+    if info.output_tools and (mapping := _mapping_output(seen, info.output_tools[0])):
+        return mapping
     if info.output_tools:  # the Checking QS: its verdict is the output tool
         tool = info.output_tools[0]
         checked = ["(bench check) each number's source and date", "(bench check) the totals"]

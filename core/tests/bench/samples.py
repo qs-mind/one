@@ -170,6 +170,20 @@ def write_cli_samples(folder: Path) -> None:
             ]
         )
     )
+    (folder / "sample-map-contract.pdf").write_bytes(
+        sample_pdf(
+            [
+                [
+                    "Sample contract data"
+                    if p == 58
+                    else "Sample bid data"
+                    if p == 26
+                    else f"Sample page {p}"
+                ]
+                for p in range(1, 59)
+            ]
+        )
+    )
     (folder / "sample-scan.pdf").write_bytes(sample_pdf([[]]))
     (folder / "sample-market.csv").write_text(
         "Month,Material,Price,Unit\n2026-09,Sample rebar,3200,EGP/t\n"

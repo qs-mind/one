@@ -61,6 +61,12 @@ class CapsIn(BaseModel):
     subscription_stops: StrictBool | None = None
 
 
+class MapSettingsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    map_auto_usd: str = Field(pattern=r"^\d{1,12}(?:\.\d{1,6})?$", max_length=20)
+
+
 class ClaudeCodeIn(BaseModel):
     """`keep_copy` is optional: whether Claude Code keeps its own copy of each conversation
     (founder question 3); left out, it stays as it was (on by default)."""
@@ -215,6 +221,15 @@ def settings_router(
 
     def caps_answer(value: costs.Caps) -> dict:
         return {"caps": costs.caps_json(value), "recommended": costs.caps_json(costs.RECOMMENDED)}
+
+    @router.get("/settings/project-map")
+    def map_settings():
+        return {"map_auto_usd": format(settings.map_auto_usd(), "f")}
+
+    @router.put("/settings/project-map")
+    def change_map_settings(body: MapSettingsIn):
+        settings.save_map_auto_usd(body.map_auto_usd)
+        return map_settings()
 
     @router.get("/settings/ai/caps")
     def spending_caps() -> dict:

@@ -2,6 +2,7 @@
 
 import logging
 import threading
+import time
 
 from qsone.records.mapping import worker
 
@@ -9,9 +10,14 @@ log = logging.getLogger(__name__)
 
 
 class Mapping:
-    def __init__(self, projects, *, foreground=lambda project_id: False):
+    def __init__(
+        self, projects, *, foreground=lambda project_id: False, completed=lambda pid, ids: None
+    ):
         self.projects = projects
         self.foreground = foreground
+        self.completed = completed
+        self._submitted = {}
+        self._last_drop = time.monotonic()
         self._quit = threading.Event()
         self._wake = threading.Event()
         self._thread = None
@@ -22,6 +28,8 @@ class Mapping:
         self._thread.start()
 
     def wake(self):
+        self._last_drop = time.monotonic()
+        self._submitted.clear()
         self._wake.set()
 
     def stop(self):
@@ -59,6 +67,28 @@ class Mapping:
                         )
                         or worked
                     )
+                    if not worked and time.monotonic() - self._last_drop >= 5:
+                        with rec.read() as c:
+                            pending = [
+                                r[0]
+                                for r in c.execute(
+                                    "SELECT file_id FROM map_files WHERE valid_until IS NULL "
+                                    "AND local_state='done' AND coalesce(ai_state,'') NOT IN "
+                                    "('done','local','declined') "
+                                    "ORDER BY file_id"
+                                )
+                            ]
+                        key = (pid, tuple(pending))
+                        previous = self._submitted.get(key)
+                        if previous is not None and previous.done():
+                            try:
+                                accepted = previous.result()
+                            except Exception:
+                                accepted = False
+                            if not accepted:
+                                self._submitted.pop(key, None)
+                        if pending and key not in self._submitted:
+                            self._submitted[key] = self.completed(pid, pending)
                     if worked:
                         break
                 except Exception as error:

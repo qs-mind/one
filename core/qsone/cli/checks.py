@@ -121,3 +121,11 @@ def calculated_numbers(deliverable, expected):
         )
         for value in expected
     )
+
+
+def max_tool_steps(events, maximum):
+    """Count actual tool steps in the latest complete work log; absent evidence fails."""
+    logs = [event.get("data", {}) for event in events if event.get("type") == "data-worklog"]
+    return bool(logs) and sum(bool(step.get("tool")) for step in logs[-1].get("steps", [])) <= int(
+        maximum
+    )
