@@ -185,13 +185,22 @@ def vector_counts(rec: Records, embedder: Embedder) -> tuple[int, int]:
 
 def _words(conn, match: str, include_old: bool, limit: int) -> list[tuple[int, float]]:
     rows = conn.execute(
-        "SELECT c.id, bm25(chunks_fts) FROM chunks_fts"
+        "SELECT c.id, bm25(chunks_fts), c.file_id, c.locator FROM chunks_fts"
         " JOIN chunks c ON c.id = chunks_fts.rowid JOIN files f ON f.id = c.file_id"
         " WHERE chunks_fts MATCH ? AND (? OR f.valid_until IS NULL)"
-        " ORDER BY bm25(chunks_fts), c.id LIMIT ?",
-        (match, include_old, limit),
+        " ORDER BY bm25(chunks_fts), c.id",
+        (match, include_old),
     )
-    return [(chunk_id, -score) for chunk_id, score in rows]
+    found, seen = [], set()
+    for chunk_id, score, file_id, locator in rows:
+        key = _place_key(chunk_id, file_id, json.loads(locator))
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append((chunk_id, -score))
+        if len(found) >= limit:
+            break
+    return found
 
 
 def _meaning(
@@ -200,15 +209,59 @@ def _meaning(
     """Top KNN first, then only chunks of current files (unless `include_old`) and, with
     `language`, only chunks written in it. MATERIALIZED keeps the KNN apart, as vec0 refuses any
     other ORDER BY term in its own query."""
-    rows = conn.execute(
-        "WITH knn AS MATERIALIZED (SELECT chunk_id, distance FROM chunk_vectors"
-        " WHERE embedding MATCH ? AND k = ?)"
-        " SELECT knn.chunk_id, c.text FROM knn JOIN chunks c ON c.id = knn.chunk_id"
-        " JOIN files f ON f.id = c.file_id WHERE ? OR f.valid_until IS NULL"
-        " ORDER BY knn.distance, knn.chunk_id",
-        (_pack(vector, dims), LIST_SIZE, include_old),
-    )
-    return [i for i, text in rows if language is None or qs_terms.language(text) == language]
+    (total,) = conn.execute("SELECT count(*) FROM chunk_vectors").fetchone()
+    candidates = min(LIST_SIZE, total)
+    while candidates:
+        if candidates > 4096:  # vec0's KNN ceiling; keep looking beyond dense/old pages
+            candidates = total
+            rows = conn.execute(
+                "SELECT v.chunk_id, c.text, c.file_id, c.locator FROM chunk_vectors v"
+                " JOIN chunks c ON c.id = v.chunk_id JOIN files f ON f.id = c.file_id"
+                " WHERE ? OR f.valid_until IS NULL"
+                " ORDER BY vec_distance_cosine(v.embedding, ?), v.chunk_id",
+                (include_old, _pack(vector, dims)),
+            )
+        else:
+            rows = conn.execute(
+                "WITH knn AS MATERIALIZED (SELECT chunk_id, distance FROM chunk_vectors"
+                " WHERE embedding MATCH ? AND k = ?)"
+                " SELECT knn.chunk_id, c.text, c.file_id, c.locator FROM knn"
+                " JOIN chunks c ON c.id = knn.chunk_id"
+                " JOIN files f ON f.id = c.file_id WHERE ? OR f.valid_until IS NULL"
+                " ORDER BY knn.distance, knn.chunk_id",
+                (_pack(vector, dims), candidates, include_old),
+            )
+        found, seen = [], set()
+        for i, text, file_id, locator in rows:
+            if language is not None and qs_terms.language(text) != language:
+                continue
+            key = _place_key(i, file_id, json.loads(locator))
+            if key not in seen:
+                seen.add(key)
+                found.append(i)
+            if len(found) == LIST_SIZE:
+                return found
+        if candidates == total:
+            return found
+        candidates = min(candidates * 2, total)
+    return []
+
+
+def _place_key(chunk_id: int, file_id: str, locator: dict) -> tuple:
+    """PDF chunks share a page; spreadsheet rows and other passages stay separate."""
+    if "page" in locator:
+        return (file_id, locator["page"])
+    return (chunk_id,)
+
+
+def _distinct_hits(hits: list[Hit], k: int) -> list[Hit]:
+    found, seen = [], set()
+    for hit in hits:
+        key = _place_key(hit.chunk_id, hit.file_id, hit.locator)
+        if key not in seen:
+            seen.add(key)
+            found.append(hit)
+    return found[:k]
 
 
 def _hits(conn, scored: list[tuple[int, float]], found_by: dict[int, tuple[str, ...]]) -> list[Hit]:
@@ -305,7 +358,7 @@ def search(
             for i in ids:
                 if kind not in found_by.get(i, ()):
                     found_by[i] = (*found_by.get(i, ()), kind)
-        fused = rrf([ids for _, ids, _ in lists], weights=[w for *_, w in lists])[:k]
-        hits = _hits(conn, fused, found_by)
+        fused = rrf([ids for _, ids, _ in lists], weights=[w for *_, w in lists])
+        hits = _distinct_hits(_hits(conn, fused, found_by), k)
 
     return Result(hybrid, hits[:k])

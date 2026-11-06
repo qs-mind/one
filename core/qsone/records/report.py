@@ -8,16 +8,35 @@ import json
 import re
 import uuid
 from decimal import Decimal
+from xml.etree.ElementTree import ParseError
+from zipfile import BadZipFile
+
+from openpyxl.utils.exceptions import InvalidFileException
+from pdfminer.pdfparser import PDFException
+from pdfplumber.utils.exceptions import PdfminerException
+from xlrd import XLRDError
 
 from qsone import copy
-from qsone.records import audit, boq
+from qsone.records import audit, boq, boq_pdf
 from qsone.records.arabic import clean
-from qsone.records.files import read_original
+from qsone.records.files import read_original, read_pages
 from qsone.records.project import Records, RecordsError, utc_now
 
 ACTION = "files_report"
 TABLE = "chats"
 ACTOR = "ONE"
+READER_ERRORS = (
+    RecordsError,
+    ValueError,
+    KeyError,
+    OSError,
+    XLRDError,
+    PDFException,
+    PdfminerException,
+    BadZipFile,
+    InvalidFileException,
+    ParseError,
+)
 FIRST_CHUNKS = 8  # the text a document is sorted by: its name and its first pieces
 TENDER = ("boq", "specs", "conditions", "drawings")  # what a tender folder holds
 
@@ -40,10 +59,10 @@ def _sorted_by_words(text: str) -> str | None:
 
 
 def _boq_sheets(rec: Records, file_id: str, name: str, kind: str) -> tuple[list[dict], bool]:
-    """Each sheet Excel shows that reads as a BOQ, with what it holds; and whether a sheet has
+    """Each visible Excel sheet or PDF table that reads as a BOQ; whether a sheet has
     rates but no quantities (a price list)."""
     book = boq.Workbook(file_id, name, kind, read_original(rec, file_id))
-    reader = boq._xlsx if kind == "xlsx" else boq._xls
+    reader = {"xlsx": boq._xlsx, "xls": boq._xls, "pdf": boq_pdf.read}[kind]
     found, priced = [], False
     listed, _ = reader(book.data, None)
     for sheet, hidden in listed:
@@ -64,7 +83,7 @@ def _what(rec: Records, f: dict) -> dict:
     """One file: its label and, for a BOQ, its sheets."""
     entry = {"id": f["id"], "name": f["name"], "kind": f["kind"], "status": f["status"]}
     entry["note"] = f["note"]
-    if f["status"] == "unreadable" or f["note"] in (
+    if (f["status"] == "unreadable" and f["note"] != "FILE_SCANNED_PAGES") or f["note"] in (
         "FILE_LOCKED",
         "FILE_SHEETS_EMPTY",
         "FILE_LIBREOFFICE_MISSING",
@@ -72,11 +91,38 @@ def _what(rec: Records, f: dict) -> dict:
     ):
         entry["label"] = None
         return entry
+    if f["kind"] == "pdf":
+        entry["pdf"] = {
+            "pages": f["pages"],
+            "needs_reading": f["needs_reading"],
+            "boq_rows": None,
+        }
+        book = boq.Workbook(f["id"], f["name"], "pdf", read_original(rec, f["id"]))
+        try:
+            sheets, _ = boq_pdf.sheets(book.data)
+        except READER_ERRORS:
+            sheets = []  # Page coverage remains known even when table reading fails.
+            entry["note"] = "REPORT_TABLES_NOT_READ"
+        counts = []
+        for ws in sheets:
+            header, columns = boq.guess(ws, ws.last_row)
+            seen = boq.overview(rec, book, ws, header, columns)
+            if seen is not None:
+                counts.append(seen["items"])
+        if counts:
+            entry["pdf"]["boq_rows"] = sum(counts)
+        entry["label"] = (
+            "boq"
+            if any(counts)
+            else _sorted_by_words(f["name"]) or _sorted_by_words(f["text"]) or "document"
+        )
+        return entry
     if f["kind"] in boq.KINDS:
         try:
             sheets, priced = _boq_sheets(rec, f["id"], f["name"], f["kind"])
-        except (RecordsError, ValueError, KeyError, OSError):
-            sheets, priced = [], False
+        except READER_ERRORS:
+            entry["label"], entry["note"] = None, "FILE_UNREADABLE"
+            return entry
         if sheets:
             entry["label"], entry["sheets"] = "boq", sheets
             return entry
@@ -95,12 +141,12 @@ def _what(rec: Records, f: dict) -> dict:
 def _files(conn, ids: list[str]) -> list[dict]:
     marks = ",".join("?" * len(ids))
     rows = conn.execute(
-        f"SELECT id, name, kind, status, note FROM files WHERE id IN ({marks})"  # noqa: S608
+        f"SELECT id, name, kind, status, note, pages FROM files WHERE id IN ({marks})"  # noqa: S608
         " AND valid_until IS NULL ORDER BY added_at, rowid",
         ids,
     ).fetchall()
     found = []
-    for file_id, name, kind, status, note in rows:
+    for file_id, name, kind, status, note, pages in rows:
         text = " ".join(
             t
             for (t,) in conn.execute(
@@ -116,6 +162,10 @@ def _files(conn, ids: list[str]) -> list[dict]:
                 "status": status,
                 "note": note,
                 "text": text,
+                "pages": pages,
+                "needs_reading": sorted(set(range(1, (pages or 0) + 1)) - read_pages(conn, file_id))
+                if kind == "pdf"
+                else [],
             }
         )
     return found
@@ -158,10 +208,21 @@ def _lines(entries: list[dict], missing: list[str]) -> list[dict]:
             continue
         label = copy.REPORT_LABELS[e["label"]]
         lines.append(copy.fill(copy.REPORT_FILE, name=name, label=label))
+        if pdf := e.get("pdf"):
+            lines.append(copy.fill(copy.REPORT_PDF_PAGES, pages=str(pdf["pages"])))
+            if pdf["needs_reading"]:
+                lines.append(
+                    copy.fill(
+                        copy.REPORT_PDF_UNREAD, pages=", ".join(map(str, pdf["needs_reading"]))
+                    )
+                )
+            if pdf["boq_rows"] is not None:
+                lines.append(copy.fill(copy.REPORT_PDF_BOQ, rows=str(pdf["boq_rows"])))
         for s in e.get("sheets", [])[:10]:
             lines.append(_sheet_line(s))
         if (
-            e["note"] in ("FILE_SCANNED_PAGES", "FILE_LIBREOFFICE_MISSING")
+            (e["note"] == "FILE_SCANNED_PAGES" and "pdf" not in e)
+            or e["note"] in ("FILE_LIBREOFFICE_MISSING", "REPORT_TABLES_NOT_READ")
             or e["status"] == "stored"
         ):
             lines.append(getattr(copy, e["note"] or "FILE_NOT_READ_YET"))
@@ -219,7 +280,11 @@ def make(rec: Records, file_ids: list[str]) -> dict | None:
     lines = _lines(entries, missing)
     report_id, at = uuid.uuid4().hex, utc_now()
     kept = [
-        {"id": e["id"], "label": e["label"], **({"sheets": e["sheets"]} if "sheets" in e else {})}
+        {
+            "id": e["id"],
+            "label": e["label"],
+            **{key: e[key] for key in ("sheets", "pdf") if key in e},
+        }
         for e in entries
     ]
     with rec.write(ACTOR) as conn:
