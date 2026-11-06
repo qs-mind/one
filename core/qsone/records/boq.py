@@ -310,6 +310,7 @@ class Workbook:
     name: str
     kind: str
     data: bytes
+    records: Records | None = field(default=None, repr=False, compare=False)
 
 
 def workbook(rec: Records, file_id: str) -> Workbook:
@@ -321,7 +322,7 @@ def workbook(rec: Records, file_id: str) -> Workbook:
         raise RecordsError(copy.FILE_NOT_IN_PROJECT, status=422, field="file_id")
     if row[1] not in KINDS:
         raise RecordsError(copy.BOQ_NOT_EXCEL, status=422, field="file_id")
-    return Workbook(file_id, row[0], row[1], read_original(rec, file_id))
+    return Workbook(file_id, row[0], row[1], read_original(rec, file_id), rec)
 
 
 def _sheet_key(name: str) -> str:
@@ -359,6 +360,11 @@ def read(book: Workbook, sheet: str | None) -> tuple[list[str], Sheet]:
     from qsone.records import boq_pdf
 
     reader = {"xlsx": _xlsx, "xls": _xls, "pdf": boq_pdf.read}[book.kind]
+    if book.kind == "pdf" and book.records is not None:
+
+        def reader(data, name):
+            return boq_pdf.read_stored(book.records, book.file_id, name)
+
     listed, _ = reader(book.data, None)
     names = [n for n, _ in listed]
     if sheet is None:
@@ -540,6 +546,7 @@ def preview(rec: Records, file_id: str, sheet: str | None, *, rows: int = PREVIE
         "last_row": ws.last_row,
         "overview": overview(rec, book, ws, header, columns),
         **({"needs_reading": ws.needs_reading} if book.kind == "pdf" else {}),
+        **({"reading_help": copy.BOQ_SCAN_NEEDS_READING} if ws.needs_reading else {}),
     }
 
 

@@ -99,7 +99,9 @@ def test_scan_reports_needs_reading(rec):
 
     with pytest.raises(RecordsError) as error:
         boq.preview(rec, f, None)
-    assert error.value.text == copy.FILE_SCANNED_PAGES
+    assert error.value.text == copy.BOQ_SCAN_NEEDS_READING
+    assert "files_read" in error.value.text["en"]
+    assert "ocr=true" in error.value.text["ar"]
 
 
 def test_source_ref_keeps_pdf_box():
@@ -328,3 +330,26 @@ def test_scanned_table_reads_stored_ocr_words(rec, ruled):
     )
     assert plan.items == 2
     assert sheet.needs_reading == []
+    preview = boq.preview(rec, file_id, None)
+    assert preview["overview"]["items"] == 2
+    names, loaded = boq.read(boq.workbook(rec, file_id), None)
+    assert loaded.cells == sheet.cells
+    plan = boq.plan(
+        rec,
+        file_id,
+        sheet=preview["sheet"],
+        header_row=preview["header_guess"],
+        columns=preview["columns_guess"],
+    )
+    args = boq_tools.ImportArgs(
+        file_id=file_id, sheet=plan.sheet, header_row=plan.header_row, columns=plan.columns
+    )
+    boq_tools._write(tool_ctx(rec), rec, args, plan)
+    view = imported.sheet(rec, file_id)
+    for row, value, y in zip(view["rows"], ("12.50", "20.00"), (55, 85), strict=True):
+        cell = row["cells"]["quantity"]
+        assert cell["value"] == value
+        source = view["sources"][cell["source"]]
+        assert source["file_id"] == file_id
+        assert source["locator"]["page"] == 1
+        assert source["locator"]["box"] == [285, y, 325, y + 10]

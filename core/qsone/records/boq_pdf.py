@@ -174,7 +174,7 @@ def read(data, name, *, ocr_words=None):
     found, missing = sheets(data, ocr_words=ocr_words)
     if not found:
         raise RecordsError(
-            copy.FILE_SCANNED_PAGES if missing else copy.BOQ_PDF_NO_TABLES,
+            copy.BOQ_SCAN_NEEDS_READING if missing else copy.BOQ_PDF_NO_TABLES,
             status=422,
             field="file_id",
         )
