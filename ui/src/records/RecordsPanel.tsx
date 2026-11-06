@@ -25,6 +25,9 @@ type Found = { state: "found"; note: Text | null; results: Hit[] } | { state: "f
 // Search shows the core's top 10: words and meaning fused (no reranker since 5 Nov 2026). The box sends the
 // query as typed; the core has no translation of its own, so the other language is found by meaning only.
 const SHOWN = 10;
+/** The types the core reads (core/qsone/records/extract.py, unzip.py), offered first in the file chooser; the dialog
+ * keeps "All files", and a file of another type is kept and says so. */
+const ACCEPT = ".pdf,.xlsx,.xlsm,.xls,.csv,.txt,.docx,.doc,.dxf,.dwg,.ifc,.png,.jpg,.jpeg,.webp,.zip";
 
 const statusText: Record<FileInfo["status"], Text> = {
   read: texts.fileRead,
@@ -328,6 +331,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     <input
       ref={chooser}
       type="file"
+      accept={ACCEPT}
       multiple
       hidden
       tabIndex={-1}

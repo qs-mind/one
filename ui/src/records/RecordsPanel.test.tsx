@@ -126,6 +126,10 @@ describe("RecordsPanel", () => {
     const { container } = panel();
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
     expect(input).toHaveAttribute("multiple");
+    // the chooser offers the types ONE reads first (the core's readers), a zip too; "All files" stays in the dialog
+    const accept = input.getAttribute("accept")?.split(",") ?? [];
+    for (const type of [".pdf", ".xlsx", ".xls", ".csv", ".docx", ".txt", ".dxf", ".ifc", ".zip", ".png", ".jpg"])
+      expect(accept).toContain(type);
     const chooser = vi.spyOn(input, "click");
     await user.click(screen.getByRole("button", { name: texts.addFiles.ar }));
     expect(chooser).toHaveBeenCalled();
