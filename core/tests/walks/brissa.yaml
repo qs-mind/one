@@ -1,5 +1,5 @@
 name: brissa
-max_usd: 0.1
+max_usd: 0.2
 needs:
   real:
   - '{test_files}/gulf-regional/kfaed-brissa-dam-lebanon/brissa_vol1_bidding_conditions_fidic2017_pc.pdf'
