@@ -841,10 +841,10 @@ STEP_LIMIT_NOW = (  # the model reads it: the last request after ONE's step limi
     "tool, reply with what you found so far, with its sources, and what is left."
 )
 STEP_LIMIT_REACHED = {
-    "en": "ONE stopped this request at its limit of {n} steps. What the Lead QS found so far is "
-    "above; ask for less at a time (one section, or the top items) to go on.",
-    "ar": "ONE وقّف الطلب ده عند حدّه: {n} خطوة. اللي كبير مهندسي الكميات لقاه لحد دلوقتي "
-    "فوق؛ اطلب حاجة أصغر في المرة (قسم واحد، أو أعلى البنود) عشان نكمّل.",
+    "en": "ONE stopped this request at its limit of {n} steps, with what the Lead QS found so "
+    "far. Ask for less at a time (one section, or the top items) to go on.",
+    "ar": "ONE وقّف الطلب ده عند حدّه: {n} خطوة، ومعاه اللي كبير مهندسي الكميات لقاه لحد "
+    "دلوقتي. اطلب حاجة أصغر في المرة (قسم واحد، أو أعلى البنود) عشان نكمّل.",
 }
 # ONE's own refusals, repeated until the model gave up: never the provider's fault (6 Nov 2026).
 TOOL_GAVE_UP = {
