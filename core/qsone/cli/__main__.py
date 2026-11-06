@@ -208,7 +208,21 @@ def human_result(result):
             "count": len(uploads),
             "read": states.count("read"),
             "partly_read": states.count("partly_read"),
-            "failed": sum(s not in ("read", "partly_read") for s in states),
+            "failed": sum(
+                u.get("status") not in ("read", "partly_read", "stored")
+                and u.get("note_key", u.get("note")) != "FILE_SCANNED_PAGES"
+                for u in uploads
+            ),
+            **(
+                {
+                    "scanned": sum(
+                        u.get("note_key", u.get("note")) == "FILE_SCANNED_PAGES" for u in uploads
+                    )
+                }
+                if any(u.get("note_key", u.get("note")) == "FILE_SCANNED_PAGES" for u in uploads)
+                else {}
+            ),
+            **({"kept": states.count("stored")} if "stored" in states else {}),
         }
     return result
 

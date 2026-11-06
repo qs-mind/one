@@ -154,7 +154,10 @@ class Commands:
                 return result | {"cards": pending, "state": "waiting_engineer"}
             status = result.get("status", {})
             settled = not (status.get("waiting", 0) or status.get("reading", 0)) and all(
-                f.get("ai_state") in ("done", "local", "declined", "no_ai", "failed")
+                (
+                    f.get("local_state") not in ("waiting", "reading")
+                    and f.get("ai_state") in ("done", "local", "declined", "no_ai", "failed")
+                )
                 or f.get("local_state") == "failed"
                 for f in states
             )

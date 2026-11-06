@@ -139,6 +139,11 @@ LABELS = {
 
 LABELS.update(
     {
+        "scanned": {"en": "Scanned, read in the background", "ar": "سكان، بيتقري في الخلفية"},
+        "kept": {
+            "en": "Kept, ONE can't read this type yet",
+            "ar": "محفوظ، ONE لسه مش بيقرا النوع ده",
+        },
         "count": {"en": "Files attempted", "ar": "عدد الملفات"},
         "read": {"en": "Read", "ar": "اتقرا"},
         "partly_read": {"en": "Partly read", "ar": "اتقرا جزء منه"},

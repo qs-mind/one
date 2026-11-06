@@ -202,6 +202,22 @@ async def test_a_qa_brief_stays_under_the_targets(registry, data_dir, fake_clock
     `pytest -s` prints each request's parts."""
     project = registry.create("Brissa - measure", "engineer")["id"]
     kind = _add_tender(registry.get(project))
+    from qsone.records.mapping import store
+
+    rec = registry.get(project)
+    with rec.write("one") as c:
+        file_id = c.execute("SELECT id FROM files ORDER BY id LIMIT 1").fetchone()[0]
+        store.write(
+            c,
+            rec,
+            "map_files",
+            {
+                "file_id": file_id,
+                "key_pages": [
+                    {"label": {"en": "Key Tender Data", "ar": "بيانات المناقصة"}, "page": 7}
+                ],
+            },
+        )
     questions = [
         ("What is the bid security amount and its validity?", "bid security"),
         ("ما هي نسبة المحتجز من المستخلصات؟", "retention"),
@@ -219,6 +235,7 @@ async def test_a_qa_brief_stays_under_the_targets(registry, data_dir, fake_clock
                 Path(os.environ["DUMP_BODY"]).write_text(
                     json.dumps(provider.bodies[-1], ensure_ascii=False, indent=1)
                 )
+            assert "Key Tender Data" in json.dumps(provider.bodies[start], ensure_ascii=False)
             assert len(sent) == 4  # list, search, read, answer: the script ran to its end
             assert max(p["total"] for p in sent) < STEP_TARGET
             assert sum(p["total"] for p in sent) < BRIEF_TARGET
@@ -247,3 +264,47 @@ def test_a_tool_schema_is_sent_without_what_only_the_check_needs():
     assert "title" in show["properties"]  # a field's name stays: only the keyword goes
     full = len(json.dumps(REGISTRY["show"].args.model_json_schema()))
     assert len(json.dumps(show)) < full * 0.8
+
+
+def test_first_lead_schemas_and_digest_leave_room_for_context(rec):
+    """Static request estimate leaves 1,000 tokens for runtime instructions and history."""
+    from types import SimpleNamespace
+
+    from pydantic_ai.messages import ModelRequest, UserPromptPart
+    from pydantic_ai.tools import ToolDefinition
+
+    from qsone.engine import agents, request_size, tool_groups, tools
+    from qsone.engine.data_text import as_data, new_fence
+    from qsone.engine.map_digest import digest
+    from qsone.records.mapping import store
+
+    f = files.add_file(rec, "sample.txt", b"Sample tender data", actor="engineer")
+    with rec.write("one") as c:
+        store.write(
+            c,
+            rec,
+            "map_files",
+            {
+                "file_id": f.id,
+                "key_pages": [
+                    {"label": {"en": "Key Tender Data", "ar": "بيانات المناقصة"}, "page": 7}
+                ],
+            },
+        )
+    spec = agents.lead_spec()
+    definitions = [
+        ToolDefinition(
+            name=name,
+            description=tools.REGISTRY[name].description,
+            parameters_json_schema=tools.sent_schema(tools.REGISTRY[name]),
+        )
+        for name in spec.tools
+    ]
+    prompt = "Find the tender dates.\n" + as_data(
+        digest(rec), source="project_map", fence=new_fence()
+    )
+    messages = [ModelRequest(parts=[UserPromptPart(prompt)], instructions=spec.instructions)]
+    params = SimpleNamespace(function_tools=tool_groups.sent(definitions, []), output_tools=[])
+    sizes = request_size.parts(messages, params)
+    assert "Key Tender Data" in prompt
+    assert sizes["total"] < STEP_TARGET - 1_000
