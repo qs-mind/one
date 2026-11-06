@@ -110,7 +110,7 @@ export class RealApp {
     const { width = 1920, height = 1080 } = this.opts;
     this.display = this.opts.display ?? freeDisplay();
     this.port = this.opts.port ?? (await freePort(DEFAULT_PORT));
-    this.dir = path.join(tmpdir(), `qs-mind-one-realapp-${this.port}`);
+    this.dir = this.opts.dir ?? path.join(tmpdir(), `qs-mind-one-realapp-${this.port}`);
     if (!this.opts.keep) rmSync(this.dir, { recursive: true, force: true });
     mkdirSync(this.dir, { recursive: true });
     mkdirSync(this.shotsDir, { recursive: true });
@@ -158,6 +158,7 @@ export class RealApp {
         QSONE_BENCH_DIR: this.dir,
         QSONE_BENCH_PORT: String(this.port),
         PYTHONPATH: [path.join(root, "core"), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+        ...(this.opts.core === "real" ? { QSONE_REALAPP_CORE: "real" } : {}), // realcore.py, real AI providers
         VITE_QSONE_TEST_BRIDGE: "1",
         VITE_QSONE_TEST_BRIDGE_URL: this.bridge.url,
       },
@@ -166,13 +167,13 @@ export class RealApp {
     });
     this.children.push(vite);
     this.vite = vite;
-    await until("the bench core", async () => {
+    await until(this.opts.core === "real" ? "the core" : "the bench core", async () => {
       if (vite.exitCode !== null) throw new Error(`Vite stopped; see ${path.join(this.dir, "vite.log")}`);
       return (await fetch(`http://127.0.0.1:${this.port}/api/health`)).ok;
     }, 90_000, 500).catch((error) => {
       throw vite.exitCode !== null ? new Error(`Vite stopped; see ${path.join(this.dir, "vite.log")}`) : error;
     });
-    if (this.opts.firstLaunch) this.forgetFirstLaunch();
+    if (this.opts.firstLaunch && this.opts.core !== "real") this.forgetFirstLaunch(); // a real core's fresh folder has none
 
     // the window: its own profile (identifier), its own D-Bus session (no single-instance hand-over, no portal)
     if (!this.opts.keepProfile) this.freshProfile();
@@ -539,7 +540,9 @@ export class RealApp {
 
 /** Starts the screen, the bench's core and Vite, and the ONE window; `stop()` ends them all.
  * Options: width, height (1920×1080), firstLaunch (forget the first launch's answers), shots (folder), verbose,
- * display, port, keep (keep the data folder), keepProfile (keep the window's web storage), compositing. */
+ * display, port, keep (keep the data folder), keepProfile (keep the window's web storage), compositing, dir (the run
+ * folder: data, logs), core ("bench", the default: the scripted AI; "real": the real core with real AI providers,
+ * realcore.py, in the same throw-away data folder with keyring's fail backend, no Claude Code and no browser). */
 export async function launch(opts = {}) {
   const app = new RealApp(opts);
   try {

@@ -25,6 +25,11 @@ docs repo; a worktree finds it in the main checkout) or `$QSONE_REALAPP_BOQ`.
   window state, never rebuilds your `tauri dev` binary. It runs in its own D-Bus session with no services (no portal
   could open a dialog on your screen, no key ring), with no Wayland display, and its own `XDG_DATA_HOME` (web storage,
   GTK's recent files) with your fonts linked in.
+- **Real AI** (`launch({ core: "real", dir })`): the real core with real providers instead (`realcore.py`), in the
+  same throw-away data folder, with keyring's fail backend (its keys in that folder's `keystore.json`, never the
+  system key store), the engineer's Claude Code never found and no browser. Type the key in through the screen.
+- **Step by step** (`drive.mjs`): `start '<launch options>'` keeps one window open; `send <run folder> '<step>'` runs
+  one async step there with `app`, `snap`, `chat`, `api` and `stop` in scope, for walks that follow what the AI said.
 - `stop()` ends only what it started; logs (`app.log`, `vite.log`, `core.log`, `xvfb.log`) stay in the run folder.
 
 ## Writing a walk
