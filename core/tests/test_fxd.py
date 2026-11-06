@@ -174,7 +174,7 @@ def test_digest_keeps_navigation_and_fact_states_within_budget(rec):
 
 
 @pytest.mark.anyio
-async def test_waiting_state_follows_visible_card():
+async def test_paused_state_precedes_card_but_waiting_step_follows_it():
     import asyncio
     from types import SimpleNamespace
 
@@ -201,15 +201,16 @@ async def test_waiting_state_follows_visible_card():
         _waiting_count=lambda: None,
     )
 
-    def state(value, step):
+    def state(value, step=None):
         host.state = value
-        events.append(value)
+        events.append((value, step))
 
     host.set_state = state
     task = asyncio.create_task(_Brief.ask(host, card))
     await asyncio.sleep(0)
-    assert isinstance(events[0], Asked)
-    assert events[1] == "waiting_engineer"
+    assert events[0] == ("waiting_engineer", None)
+    assert isinstance(events[1], Asked)
+    assert events[2] == ("waiting_engineer", copy.fill(copy.STEP_WAITING, title=card.title))
     host.waiting[card.id][1].set_result("sent")
     assert await task == "sent"
     from qsone.engine.tools import REGISTRY
@@ -233,3 +234,61 @@ async def test_short_echo_of_one_requested_fact_is_refused(rec):
         )
     with pytest.raises(ModelRetry, match="answer from the files"):
         await call("ask_engineer", {"questions": [{"id": "q1", "text": "Project duration?"}]}, ctx)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "brief,question",
+    [
+        ("What is the concrete rate?", "What is your concrete rate?"),
+        ("سعر الخرسانة كام؟", "سعر الخرسانة عندك كام؟"),
+        ("What is the concrete grade?", "What is the concrete rate?"),
+    ],
+)
+async def test_shared_words_do_not_refuse_engineer_supplied_fact(rec, brief, question):
+    ctx = tool_ctx(
+        rec, answers={"question": json.dumps({"choice": "sent", "answers": {"q1": "sample"}})}
+    )
+    with rec.write("engineer") as c:
+        c.execute("UPDATE briefs SET text=? WHERE id=?", (brief, ctx.brief_id))
+    result = await call("ask_engineer", {"questions": [{"id": "q1", "text": question}]}, ctx)
+    assert "sample" in result
+    assert len(ctx.host.cards) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Could you tell me the submission deadline please?",
+        "Can you give me the project duration?",
+    ],
+)
+async def test_polite_rewording_is_still_a_brief_echo(rec, question):
+    ctx = tool_ctx(
+        rec, answers={"question": json.dumps({"choice": "sent", "answers": {"q1": "sample"}})}
+    )
+    with rec.write("engineer") as c:
+        c.execute(
+            "UPDATE briefs SET text=? WHERE id=?",
+            ("What is the submission deadline and project duration?", ctx.brief_id),
+        )
+    with pytest.raises(ModelRetry, match="answer from the files"):
+        await call("ask_engineer", {"questions": [{"id": "q1", "text": question}]}, ctx)
+    assert not ctx.host.cards
+
+
+@pytest.mark.anyio
+async def test_requested_pricing_can_ask_for_engineers_own_rate(rec):
+    ctx = tool_ctx(
+        rec, answers={"question": json.dumps({"choice": "sent", "answers": {"q1": "sample"}})}
+    )
+    with rec.write("engineer") as c:
+        c.execute(
+            "UPDATE briefs SET text=? WHERE id=?",
+            ("Price concrete using your concrete rate", ctx.brief_id),
+        )
+    result = await call(
+        "ask_engineer", {"questions": [{"id": "q1", "text": "Your concrete rate?"}]}, ctx
+    )
+    assert "sample" in result

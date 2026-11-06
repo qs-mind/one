@@ -244,11 +244,14 @@ async def test_kill_and_continue_while_a_question_waits(make_engine, project, da
     assert states(events)[-1] == "done"
     assert "waiting_engineer" in states(events)
     assert any(isinstance(e, Asked) and e.card.id == new.id for e in events)
-    assert not any(isinstance(e, Progress) and e.text == copy.DOING_ASK for e in events)
     card_at = next(i for i, e in enumerate(events) if isinstance(e, Asked) and e.card.id == new.id)
-    waiting_at = next(
-        i for i, e in enumerate(events) if getattr(e, "state", None) == "waiting_engineer"
+    # Continue replays the earlier checkpoint's waiting status before asking again.
+    # The new waiting *step* must follow the replacement card, not that old status.
+    wait_at = next(
+        i
+        for i, e in enumerate(events)
+        if i > card_at and isinstance(e, Progress) and e.text == copy.DOING_ASK
     )
-    assert card_at < waiting_at
+    assert card_at < wait_at
     [answer] = _returns(lead2.seen[-1])
     assert '"q1": "موقع"' in answer and f"card:{new.id}" in answer

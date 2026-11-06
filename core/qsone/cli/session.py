@@ -247,7 +247,10 @@ def stop(path):
                     return {"state": "stopped"}
                 raise CliError("identity")
             os.kill(pid, signal.SIGTERM)
-            deadline = time.monotonic() + 10
+            # Graceful shutdown drains active work and bounded background reader /
+            # model-download calls before closing Records. Their cleanup can exceed
+            # ten seconds. Keep ownership checks and retain the session on timeout.
+            deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
                 try:
                     stat = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()

@@ -699,7 +699,12 @@ class _Brief:
         self.waiting[card.id] = (card, future)
         before = self.step
         state: BriefState = "paused_cap" if card.kind == "cap" else "waiting_engineer"
+        # Consumers answering a card must already observe its paused state. Keep
+        # the previous step until the card is visible; only then announce waiting.
+        self.set_state(state)
         self.emit(Asked(self.brief_id, card))
+        if card.kind == "question" and self.lead_run_id is not None:
+            self.emit(Progress(self.brief_id, self.lead_run_id, copy.ROLE_LEAD, copy.DOING_ASK))
         self.set_state(state, copy.fill(copy.STEP_WAITING, title=card.title))
         if self.lead_run_id is not None:
             self._agent(self.lead_run_id, state="waiting")
