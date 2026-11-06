@@ -457,7 +457,20 @@ def sheets_from_drawing(drawing: Drawing) -> list[Sheet]:
     for name in sorted(names, key=lambda n: (n != "Model", n)):
         sheet = Sheet(layout=name)
         sheet.texts = [decode_text(t) for t in drawing.texts if t.get("layout", "Model") == name]
-        inserts = [i for i in drawing.inserts if i.get("layout", "Model") == name]
+        unique_inserts = {}
+        for index, insert in enumerate(drawing.inserts):
+            if insert.get("layout", "Model") != name:
+                continue
+            identity = (
+                insert.get("context", ""),
+                insert.get("instance") or insert.get("handle") or index,
+            )
+            previous = unique_inserts.get(identity)
+            if previous is None or (
+                insert.get("effective_name") and not previous.get("effective_name")
+            ):
+                unique_inserts[identity] = insert
+        inserts = list(unique_inserts.values())
         outlines = [o for o in drawing.closed if o.get("layout", "Model") == name]
         legend_regions = []
         for i in inserts:
@@ -487,6 +500,7 @@ def sheets_from_drawing(drawing: Drawing) -> list[Sheet]:
             effective = i.get("effective_name", i["block"])
             if (
                 effective.startswith("*")
+                or (re.match(r"A\$C[0-9A-F]+$", effective, re.I) and i.get("container"))
                 or _EXCLUDE.search(effective)
                 or _EXCLUDE.search(i.get("container", "") + i.get("context", ""))
             ):

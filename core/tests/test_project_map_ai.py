@@ -669,3 +669,163 @@ async def test_links_never_receive_failed_classification(rec, monkeypatch):
 
     await ai.run(rec, SimpleNamespace(), request=request, passes={"read": read})
     assert link_ids and not link_ids & failed_ids
+
+
+@pytest.mark.anyio
+async def test_invalid_batch_isolated_and_missing_title_falls_back(rec, monkeypatch):
+    from pydantic import ValidationError
+
+    for n in range(2):
+        files.add_file(rec, f"sample{n}.txt", f"Sample heading {n}".encode(), actor="engineer")
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+    calls = []
+
+    async def request(prompt, schema, instructions):
+        if schema is ai.Groups:
+            return ai.Groups(groups=[])
+        data = json.loads(prompt)
+        calls.append(len(data))
+        if len(data) > 1:
+            raise ValidationError.from_exception_data("Batch", [])
+        return ai.Batch.model_validate(
+            {
+                "files": [
+                    dict(
+                        file_id=data[0]["file_id"],
+                        kind="text",
+                        group="Tender",
+                        title={"en": "", "ar": ""},
+                    )
+                ]
+            }
+        )
+
+    await ai.run(rec, SimpleNamespace(), request=request)
+    assert calls == [2, 1, 1]
+    assert all(
+        f["ai_state"] == "done" and f["ai_title"]["en"] for f in store.list_map(rec)["files"]
+    )
+
+
+@pytest.mark.anyio
+async def test_timeout_has_plain_bilingual_cause(rec, monkeypatch):
+    f = files.add_file(rec, "sample.txt", b"Sample", actor="engineer")
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+
+    async def request(*args):
+        raise TimeoutError("private text")
+
+    await ai.run(rec, SimpleNamespace(), request=request)
+    assert "timed out" in store.detail(rec, f.id)["note"]["en"]
+
+
+@pytest.mark.anyio
+async def test_groups_bilingual_reuse_and_keep_engineer_folder(rec, monkeypatch):
+    with rec.write("engineer") as c:
+        rec.set_meta(c, "name", "Sample project")
+    a = files.add_file(
+        rec, "a.txt", b"Sample a", folder="001 Sample project/01 المستلم", actor="engineer"
+    )
+    b = files.add_file(
+        rec, "b.txt", b"Sample b", folder="001 Sample project/01 المستلم", actor="engineer"
+    )
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+
+    async def request(prompt, schema, instructions):
+        if schema is ai.Groups:
+            return ai.Groups(
+                groups=[
+                    ai.Group(
+                        file_id=a.id, path={"en": "Project Documentation", "ar": "مستندات المشروع"}
+                    ),
+                    ai.Group(
+                        file_id=b.id, path={"en": "project_documentation", "ar": "مستندات المشروع"}
+                    ),
+                ]
+            )
+        return ai.Batch(
+            files=[
+                ai.FileMap(
+                    file_id=d["file_id"],
+                    kind="text",
+                    title={"en": "Sample", "ar": "عينة"},
+                    group="Tender",
+                )
+                for d in json.loads(prompt)
+            ]
+        )
+
+    await ai.run(rec, SimpleNamespace(), request=request)
+    group = store.list_map(rec, parent="01 المستلم")["groups"]
+    assert len(group) == 1
+    assert group[0]["label"] == {"en": "Project Documentation", "ar": "مستندات المشروع"}
+    assert group[0]["count"] == 2
+
+
+def test_engineer_folder_is_not_mistaken_for_dropped_root(rec):
+    f = files.add_file(rec, "sample.txt", b"Sample", folder="01 المستلم/عقود", actor="engineer")
+    assert (
+        ai._group_patch(rec, f.id, ai.Text(en="Conditions", ar="الشروط"))["ai_group"]
+        == "01 المستلم/عقود/Conditions"
+    )
+
+
+@pytest.mark.anyio
+async def test_wrapped_timeout_keeps_specific_cause(rec, monkeypatch):
+    from qsone import copy
+
+    f = files.add_file(rec, "sample.txt", b"Sample", actor="engineer")
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0"))
+
+    async def request(*args):
+        try:
+            raise TimeoutError("private text")
+        except TimeoutError:
+            raise oneshot.OneShotFailed(copy.MAP_AI_FAILED_REASON) from None
+
+    await ai.run(rec, SimpleNamespace(), request=request)
+    assert "timed out" in store.detail(rec, f.id)["note"]["en"]
+
+
+def test_request_too_large_has_plain_reason(rec):
+    import httpx
+
+    f = files.add_file(rec, "sample.txt", b"Sample", actor="engineer")
+    drain(rec)
+    response = httpx.Response(413, request=httpx.Request("POST", "https://sample.invalid"))
+    ai._failed(
+        rec,
+        [f.id],
+        httpx.HTTPStatusError("private text", request=response.request, response=response),
+    )
+    assert "too large" in store.detail(rec, f.id)["note"]["en"]
+
+
+@pytest.mark.anyio
+async def test_model_slice_yields_only_to_matching_active_model(monkeypatch):
+    agent = SimpleNamespace(model="foreground-model", state="thinking")
+    brief = SimpleNamespace(
+        finished=False, mapping_files=None, state="running", agents={"run": agent}
+    )
+    models = SimpleNamespace(host=SimpleNamespace(engine=SimpleNamespace(_briefs={"brief": brief})))
+    slept = []
+
+    async def sleep(seconds):
+        slept.append(seconds)
+        brief.state = "waiting_engineer"
+
+    monkeypatch.setattr(ai.asyncio, "sleep", sleep)
+    await ai._wait_for_model(models, SimpleNamespace(choice=SimpleNamespace(model="other-model")))
+    assert not slept
+    await ai._wait_for_model(
+        models, SimpleNamespace(choice=SimpleNamespace(model="foreground-model"))
+    )
+    assert slept == [0.05]

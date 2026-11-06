@@ -223,3 +223,198 @@ async def test_no_ai_produces_no_facts():
 
     models = SimpleNamespace(roles={}, card=lambda _: None, connectors={})
     assert await facts.propose([], models=models) == []
+
+
+def test_arabic_guide_search_in_addition_to_key_pages(rec):
+    from qsone.records.mapping import worker
+
+    f = files.add_file(
+        rec,
+        "sample-ar.txt",
+        "فتح العروض 16/04/1448\nسريان العرض 90 يوم\nالضمان الابتدائي 1%–2%".encode(),
+        actor="engineer",
+    )
+    while worker.step(rec):
+        pass
+    with rec.write("one") as c:
+        store.write(c, rec, "map_files", dict(file_id=f.id, key_pages=[{"page": 99}]))
+    assert facts.candidates(rec)
+
+
+def test_opening_label_cannot_be_submission(rec):
+    f = files.add_file(rec, "sample-ar.txt", "فتح العروض 16/04/1448".encode(), actor="engineer")
+    wrong = dict(
+        name={"en": "Submission Date", "ar": "ميعاد التقديم"},
+        value="16/04/1448",
+        file_id=f.id,
+        locator={},
+        source_label="فتح العروض",
+    )
+    assert facts.accept(rec, [wrong]) == []
+
+
+def test_candidate_budget_includes_other_files(rec):
+    from tests.test_project_map import drain
+
+    first = files.add_file(
+        rec,
+        "sample-many.pdf",
+        sample_pdf([[f"Retention sample {n}"] for n in range(20)]),
+        actor="engineer",
+    )
+    second = files.add_file(
+        rec, "sample-security.txt", "سريان العرض 90 يوم".encode(), actor="engineer"
+    )
+    drain(rec)
+    # Stable ordering deliberately puts the long file first.
+    selected = facts.candidates(rec, limit=2)
+    assert {p["file_id"] for p in selected} == {first.id, second.id}
+
+
+def test_source_label_is_kept_and_local_content_penalty_not_delay(rec):
+    f = files.add_file(
+        rec,
+        "sample-label.txt",
+        "فتح العروض 16/04/1448\nغرامة مخالفة المحتوى المحلي 10%".encode(),
+        actor="engineer",
+    )
+    base = dict(file_id=f.id, locator={})
+    accepted = facts.accept(
+        rec,
+        [
+            dict(
+                base,
+                name={"en": "Opening of offers", "ar": "فتح العروض"},
+                source_label="فتح العروض",
+                value="16/04/1448",
+            )
+        ],
+    )
+    assert store.entries(rec, "facts")["facts"][0]["source_label"] == "فتح العروض"
+    assert accepted
+    assert not facts.accept(
+        rec,
+        [
+            dict(
+                base,
+                name={"en": "Delay damages", "ar": "غرامة تأخير"},
+                source_label="غرامة مخالفة المحتوى المحلي",
+                value="10%",
+            )
+        ],
+    )
+
+
+@pytest.mark.anyio
+async def test_synthetic_arabic_tender_pages_security_validity_and_blank(rec):
+    import json
+
+    from tests.test_project_map import drain
+
+    # Synthetic OCR text, injected just as the local OCR adapter would persist it.
+    tender = files.add_file(
+        rec,
+        "sample-conditions.pdf",
+        sample_pdf([["Sample cover"], ["Sample article 8"], ["Sample validity"]]),
+        actor="engineer",
+    )
+    rules = files.add_file(
+        rec,
+        "sample-local-content.txt",
+        "غرامة مخالفة المحتوى المحلي 10%".encode(),
+        actor="engineer",
+    )
+    drain(rec)
+    text = {
+        1: "فتح العروض 16/04/1448",
+        2: "المادة 8 (ج) الضمان الابتدائي 1%–2% من قيمة العرض صالح 90 يوم من فتح العروض",
+        3: "مدة سريان العرض 90 يوم\nالدفعة المقدمة ____",
+    }
+    with rec.write("one") as c:
+        for page, words in text.items():
+            c.execute(
+                "UPDATE chunks SET text=? WHERE file_id=? AND json_extract(locator,'$.page')=?",
+                (words, tender.id, page),
+            )
+        store.write(c, rec, "map_files", dict(file_id=tender.id, key_pages=[{"page": 1}]))
+
+    async def read(fid, locator):
+        if fid == tender.id:
+            return text[locator["page"]]
+        return "غرامة مخالفة المحتوى المحلي 10%"
+
+    async def request(prompt, schema, instructions):
+        pages = json.loads(prompt.split("\n", 1)[1])
+        assert {(p["file_id"], p["locator"].get("page")) for p in pages} >= {
+            (tender.id, 1),
+            (tender.id, 2),
+            (tender.id, 3),
+        }
+
+        def fact(label, en, value, page, **extra):
+            return facts.Fact(
+                name={"en": en, "ar": label},
+                source_label=label,
+                value=value,
+                file_id=tender.id,
+                locator={"page": page},
+                state=extra.get("state", "found"),
+                evidence=extra.get("evidence", text[page]),
+            )
+
+        return facts.Result(
+            facts=[
+                fact("فتح العروض", "Submission Date", "16/04/1448", 1).model_copy(
+                    update={"name": facts.Label(en="Submission Date", ar="ميعاد التقديم")}
+                ),
+                fact("فتح العروض", "Opening of offers", "16/04/1448", 1),
+                fact("الضمان الابتدائي", "Bid security", "1%–2%", 2),
+                fact("الضمان الابتدائي", "Bid security validity", "90 يوم", 2),
+                fact("مدة سريان العرض", "Offer validity", "90 يوم", 3),
+                fact(
+                    "الدفعة المقدمة",
+                    "Advance payment",
+                    "",
+                    3,
+                    state="blank",
+                    evidence="الدفعة المقدمة ____",
+                ),
+                facts.Fact(
+                    name={"en": "Delay damages", "ar": "غرامة تأخير"},
+                    source_label="غرامة مخالفة المحتوى المحلي",
+                    value="10%",
+                    file_id=rules.id,
+                    locator={"line": 1},
+                    state="found",
+                    evidence="غرامة مخالفة المحتوى المحلي 10%",
+                ),
+            ]
+        )
+
+    ids = await facts.run_approved(rec, read=read, request=request, file_ids={tender.id, rules.id})
+    assert len(ids) == 5
+    saved = store.entries(rec, "facts")["facts"]
+    blank = next(f for f in saved if f["state"] == "blank")
+    assert blank["locator"] == {"page": 3}
+    assert all(f["source_label"] for f in saved)
+    assert not any(f["name"]["en"] in ("Submission Date", "Delay damages") for f in saved)
+
+
+@pytest.mark.anyio
+async def test_approved_facts_searches_existing_files_too(rec):
+    from tests.test_project_map import drain
+
+    existing = files.add_file(rec, "sample-existing.txt", b"Bid validity 90 days", actor="engineer")
+    added = files.add_file(rec, "sample-added.txt", b"Opening date 2026-11-06", actor="engineer")
+    drain(rec)
+    seen = set()
+
+    async def read(fid, loc):
+        seen.add(fid)
+        return "Bid validity 90 days" if fid == existing.id else "Opening date 2026-11-06"
+
+    async def request(*args):
+        return facts.Result(facts=[])
+
+    await facts.run_approved(rec, read=read, request=request, file_ids={added.id})
+    assert seen == {existing.id, added.id}

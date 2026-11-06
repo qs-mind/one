@@ -496,3 +496,26 @@ def test_diagram_file_does_not_claim_room_count():
         closed=[{"vertices": [[0, 0], [10, 0], [10, 10], [0, 10]]}],
     )
     assert drawings.sheets_from_drawing(d)[0].rooms == []
+
+
+def test_dynamic_wrapper_and_repeated_instances_count_once():
+    inserts = [
+        dict(block="MCCB", effective_name="MCCB", handle="1", x=0, y=0),
+        dict(block="A$C09D76011", container="MCCB", context="/MCCB:1", handle="2", x=0, y=0),
+        dict(block="MCCB", effective_name="MCCB", handle="3", x=0, y=0),
+    ]
+    sheet = drawings.sheets_from_drawing(drawings.Drawing(inserts=inserts))[0]
+    assert sheet.counts == {"MCCB": 2}
+
+
+def test_duplicate_insert_rows_keep_effective_name_and_context_instances():
+    rows = [
+        dict(block="A$C123", handle="1", instance="Model:1", effective_name="MCCB", x=0, y=0),
+        dict(block="A$C123", handle="1", instance="Model:1", x=0, y=0),
+        dict(block="DOOR", handle="2", context="/ROOM:A", x=0, y=0),
+        dict(block="DOOR", handle="2", context="/ROOM:B", x=0, y=0),
+    ]
+    assert drawings.sheets_from_drawing(drawings.Drawing(inserts=rows))[0].counts == {
+        "MCCB": 1,
+        "DOOR": 2,
+    }

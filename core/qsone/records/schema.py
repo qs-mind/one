@@ -486,4 +486,7 @@ MIGRATIONS: list[str] = [
     "ALTER TABLE map_files ADD COLUMN ai_attempts INTEGER NOT NULL DEFAULT 0;",
     "ALTER TABLE map_files ADD COLUMN ai_stage TEXT NOT NULL DEFAULT 'classification';"
     "UPDATE map_files SET ai_stage='groups' WHERE ai_title IS NOT NULL;",
+    "ALTER TABLE map_facts ADD COLUMN source_label TEXT;"
+    "ALTER TABLE map_files ADD COLUMN group_labels TEXT "
+    "CHECK(group_labels IS NULL OR json_valid(group_labels));",
 ]

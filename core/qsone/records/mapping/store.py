@@ -9,6 +9,7 @@ from qsone.records import audit
 
 ACTOR = "one"
 JSON_FIELDS = {
+    "group_labels",
     "scanned_pages",
     "ocr_done_pages",
     "structure",
@@ -191,7 +192,7 @@ def list_map(rec, *, parent=None, cursor=None, limit=100):
         "groups": [
             {
                 "path": prefix + g["path"],
-                "label": {"en": g["path"], "ar": g["path"]},
+                "label": _group_label(rec, prefix + g["path"], g["path"]),
                 "count": g["count"],
             }
             for g in groups[:limit]
@@ -249,3 +250,13 @@ def entries(rec, name, *, cursor=None, limit=100, file_id=None):
         name: [decoded(r) for r in found[:limit]],
         "next_cursor": found[limit - 1]["id"] if len(found) > limit else None,
     }
+
+
+def _group_label(rec, path, fallback):
+    with rec.read() as c:
+        row = c.execute(
+            "SELECT json_extract(group_labels, ?) FROM map_files "
+            "WHERE valid_until IS NULL AND json_extract(group_labels, ?) IS NOT NULL LIMIT 1",
+            ("$." + json.dumps(path), "$." + json.dumps(path)),
+        ).fetchone()
+    return json.loads(row[0]) if row else {"en": fallback, "ar": fallback}
