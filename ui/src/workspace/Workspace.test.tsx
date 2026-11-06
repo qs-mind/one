@@ -325,14 +325,64 @@ describe("dropping on the open document", () => {
     expect(workspaceApi.current()?.key).toBe("deliverable:dA"); // the import says how it went in the chat
   });
 
-  it("files dropped on the chat beside it never make the window open them", async () => {
+  it("files dropped on the chat or the top bar go into the open project, with one window-wide highlight while dragged", async () => {
     setCurrentProject(P1);
-    core();
+    const fetch = core({
+      routes: {
+        [`POST /api/projects/p1/files?name=${encodeURIComponent("أ - عينة.csv")}`]: () => Response.json(info("أ - عينة.csv"), { status: 201 }),
+        [`POST /api/projects/p1/files?name=${encodeURIComponent("ب - عينة.csv")}`]: () => Response.json(info("ب - عينة.csv"), { status: 201 }),
+      },
+    });
     render(<App sourcesFor={() => fakeSources({ deliverables: [A], workspace: { key: "deliverable:dA", anchor: null } })} />);
     const chat = await screen.findByRole("complementary", { name: texts.projectChat.ar });
     const transfer = { types: ["Files"], files: [new File(["a"], "أ - عينة.csv")], items: [] };
-    expect(fireEvent.dragOver(chat, { dataTransfer: transfer })).toBe(false);
+    fireEvent.dragEnter(chat, { dataTransfer: transfer });
+    expect(document.querySelectorAll("[data-window-drop]")).toHaveLength(1);
+    expect(screen.getByText(texts.windowDropProject.ar)).toBeInTheDocument();
+    expect(fireEvent.dragOver(chat, { dataTransfer: transfer })).toBe(false); // the window never opens the file
     expect(fireEvent.drop(chat, { dataTransfer: transfer })).toBe(false);
+    expect(document.querySelector("[data-window-drop]")).toBeNull();
+    expect(workspaceApi.current()?.key).toBe("files:all");
+    expect(await screen.findByText(/أ - عينة/)).toBeInTheDocument();
+    const top = document.querySelector<HTMLElement>('[data-region="topbar"]')!;
+    fireEvent.drop(top, { dataTransfer: { types: ["Files"], files: [new File(["b"], "ب - عينة.csv")], items: [] } });
+    expect(await screen.findByText(/ب - عينة/)).toBeInTheDocument();
+    const posted = fetch.mock.calls.filter(([url, init]) => String(url).startsWith("/api/projects/p1/files?") && init?.method === "POST");
+    expect(posted).toHaveLength(2);
+  });
+
+  it("an empty project takes files dropped outside its dashed box too", async () => {
+    setCurrentProject(P1);
+    const fetch = core({
+      routes: {
+        [`POST /api/projects/p1/files?name=${encodeURIComponent("أ - عينة.pdf")}`]: () => Response.json(info("أ - عينة.pdf"), { status: 201 }),
+      },
+    });
+    render(<App sourcesFor={() => fakeSources({ workspace: { key: "files:all", anchor: null } })} />);
+    await screen.findByText(texts.emptyFilesTitle.ar);
+    fireEvent.drop(document.querySelector<HTMLElement>("main")!, { dataTransfer: { types: ["Files"], files: [new File(["a"], "أ - عينة.pdf")], items: [] } });
+    expect(await screen.findByText(/أ - عينة/)).toBeInTheDocument();
+    expect(fetch.mock.calls.filter(([url, init]) => String(url).startsWith("/api/projects/p1/files?") && init?.method === "POST")).toHaveLength(1);
+  });
+
+  it("files dropped in the General chat ask which project they are for, and go into the one picked", async () => {
+    setCurrentProject(undefined);
+    const fetch = core({
+      routes: {
+        [`POST /api/projects/p1/files?name=${encodeURIComponent("أ - عينة.csv")}`]: () => Response.json(info("أ - عينة.csv"), { status: 201 }),
+      },
+    });
+    const user = userEvent.setup();
+    render(<App sourcesFor={() => fakeSources({ deliverables: [A], workspace: { key: "deliverable:dA", anchor: null } })} />);
+    const box = await screen.findByRole("textbox", { name: texts.message.ar });
+    fireEvent.drop(box, { dataTransfer: { types: ["Files"], files: [new File(["a"], "أ - عينة.csv")], items: [] } });
+    const projects = await screen.findByRole("region", { name: texts.projects.ar });
+    expect(within(projects).getByRole("status")).toHaveTextContent("الملف ده لأنهي مشروع؟");
+    await user.click(await within(projects).findByRole("button", { name: new RegExp(P1.name) }));
+    await waitFor(() => expect(workspaceApi.current()?.key).toBe("files:all"));
+    await waitFor(() =>
+      expect(fetch.mock.calls.filter(([url, init]) => String(url).startsWith("/api/projects/p1/files?") && init?.method === "POST")).toHaveLength(1),
+    );
   });
 });
 

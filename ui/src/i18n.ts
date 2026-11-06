@@ -828,7 +828,8 @@ export const texts = {
   readyRolePrice: { en: "${in}/${out} per million tokens", ar: "${in}/${out} لكل مليون توكن" },
   readyRolesChange: { en: "Change the models", ar: "غيّر النماذج" },
   // Task 11: tender folder import and the "I understood this" card.
-  importDrop: { en: "Drop a folder here", ar: "سيب الفولدر هنا" },
+  windowDropProject: { en: "Drop to add to this project", ar: "سيبهم هنا يتضافوا للمشروع ده" },
+  windowDropGeneral: { en: "Drop a tender folder, or files to pick their project", ar: "سيب فولدر المناقصة، أو ملفات وتختار مشروعها" },
   importChoose: { en: "Choose folder", ar: "اختار فولدر" },
   importNewProject: { en: "New project «{name}»", ar: "مشروع جديد «{name}»" },
   importUploading: { en: "Adding files: {done} of {total}", ar: "بنضيف الملفات: {done} من {total}" },
@@ -1141,6 +1142,15 @@ export const counted = {
       two: "ملاحظتين مفتوحتين",
       few: "{n} ملاحظات مفتوحة",
       other: "{n} ملاحظة مفتوحة",
+    },
+  },
+  filesForWhichProject: {
+    en: { one: "Which project is this file for? Pick one, or make a new one.", other: "Which project are these {n} files for? Pick one, or make a new one." },
+    ar: {
+      one: "الملف ده لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
+      two: "الملفين دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
+      few: "الـ{n} ملفات دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
+      other: "الـ{n} ملف دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
     },
   },
   boqItems: {
