@@ -37,7 +37,7 @@ from qsone.calc.units import UnitTable
 from qsone.engine import truth
 from qsone.engine.tools import ModelRetry, Tool, ToolContext, register, say_refused
 from qsone.engine.types import Card, Text
-from qsone.records import keep, ledger, search
+from qsone.records import arabic, boq, keep, ledger, search
 from qsone.records.project import Records, RecordsError
 
 _HIT_CHARS = 400  # characters of each search hit
@@ -507,6 +507,11 @@ def _inside(conn, file_id: str, pages: int | None, place: dict) -> None:
             text = copy.fill(copy.FILE_PAGES_OUT_OF_RANGE, pages=str(pages))
             raise RecordsError(text, status=422, field="locator")
         return
+    if "sheet" in place:
+        matched = boq.source_sheet(conn, file_id, place["sheet"])
+        if matched is None:
+            raise _no_evidence("locator")
+        place["sheet"] = matched
     keys = {k: v for k, v in place.items() if k not in _UNCHECKED}
     if not keys:
         raise _no_evidence("locator")
@@ -815,14 +820,14 @@ _NUMBER_EXAMPLE = {
     "source_id": "<source id>",
 }
 
-_NUMBER_DOC = f"""Record one number read from a source on a Source Ledger item; a number \
-you work out goes through calculate.
+_NUMBER_DOC = f"""Record a sourced number on an item. Computed numbers use calculate.
 - item: the item's id or code. name: quantity, rate, amount, price, or another word.
 - value: exact text as the source has it, one decimal point, no thousands separators.
 - unit: needed for a quantity and a rate (m3 for EGP per m3). currency: three letters, needed \
 for a rate and an amount.
 - source_id: from add_source. dated: YYYY-MM-DD, by default the source's.
 - where: engineer for an Engineer Records item and source.
+BOQ rates require an engineer-named item code/row; otherwise use prices_propose or a resource.
 Returns number_id; the same call again records nothing.
 Example:
 {_json(_NUMBER_EXAMPLE)}"""
@@ -930,8 +935,221 @@ def _same_measure(a: str, b: str) -> bool:
     return kind(da) == kind(db)
 
 
+def _pricing_scope(conn, item: dict, message: str) -> bool:
+    """The engineer's requested scope, independently of the source's claimed item."""
+    text = re.sub(r"[\u064b-\u065f]", "", arabic.clean(message).casefold())
+    action = (
+        r"\b(?:price|pricing|rate)\s+(?:(?:the|all|this|these)\s+)*"
+        r"(?:boq|bill of quantities|section|division|items)\b"
+        r"|(?:سعر|تسعير)\s+(?:(?:كل|جميع|هذه)\s+)*"
+        r"(?:المقايسة|المقايسه|البنود|بنود|القسم|قسم|الباب|باب)"
+    )
+    if not re.search(action, text):
+        return False
+    code = arabic.clean(item.get("code") or "").casefold()
+    section = re.search(r"(?:section|division|القسم|قسم|الباب|باب)\s+([\w./-]+)", text)
+    if section:
+        asked = section[1]
+        if code.startswith(tuple(asked + sep for sep in (".", "-", "/"))):
+            return True
+        fields = item["fields"]
+        if str(fields.get("section", "")).casefold() == asked:
+            return True
+        if fields.get("file_id") and isinstance(fields.get("row"), int):
+            headings = conn.execute(
+                "SELECT code, fields FROM items WHERE kind = 'boq_heading'"
+                " AND json_extract(fields, '$.file_id') = ?"
+                " AND json_extract(fields, '$.sheet') = ?"
+                " AND json_extract(fields, '$.row') < ?"
+                " ORDER BY json_extract(fields, '$.row') DESC",
+                (fields["file_id"], fields.get("sheet"), fields["row"]),
+            ).fetchall()
+            for heading_code, raw in headings:
+                heading = json.loads(raw)
+                if heading.get("line_kind"):
+                    continue
+                title = arabic.clean(heading.get("description", "")).casefold()
+                return (
+                    heading_code == asked
+                    or title == asked
+                    or bool(
+                        re.search(
+                            r"(?:section|division|القسم|قسم|الباب|باب)\s+"
+                            + re.escape(asked)
+                            + r"(?![\w./-])",
+                            title,
+                        )
+                    )
+                )
+        return False
+    # A list must not accidentally expand to every item in the BOQ.
+    listed = re.search(r"(?:items|البنود|بنود)\s*[:：]?\s*([0-9][\w./,، &و-]*)", text)
+    if listed:
+        return code in re.findall(r"[0-9]+(?:[./-][0-9]+)*", listed[1])
+    return bool(
+        re.search(r"\bboq\b|bill of quantities|المقايسة|المقايسه|البنود|بنود|\bitems\b", text)
+    )
+
+
+def _matching_price_source(
+    target: Records, item: dict, source_id: str | None, message: str
+) -> tuple[bool, bool]:
+    """Read the actual row, never a model's description of what the source contains.
+
+    Second result: the engineer explicitly identified this file as their priced copy.
+    """
+    if not source_id:
+        return False, False
+    with target.read() as conn:
+        source = conn.execute(
+            "SELECT file_id, locator FROM sources WHERE id = ?", (source_id,)
+        ).fetchone()
+    if not source or not source[0]:
+        return False, False
+    file_id, raw = source
+    loc = json.loads(raw)
+    if not isinstance(loc.get("row"), int) or not isinstance(loc.get("sheet"), str):
+        return False, False
+    try:
+        book = boq.workbook(target, file_id)
+        _, sheet = boq.read(book, loc["sheet"])
+    except RecordsError:
+        return False, False
+    cells = sheet.cells.get(loc["row"], {})
+    _, columns = boq.guess(sheet, boq.PREVIEW_ROWS)
+    code_cell = cells.get(boq.column(columns.get("code", "A")))
+    code = arabic.clean(item.get("code") or "").casefold()
+    same_code = bool(
+        code and code_cell and arabic.clean(boq._text(code_cell.value)).casefold() == code
+    )
+    description = arabic.normalise(item["fields"].get("description", ""))
+    words = set(description.split())
+
+    def close(value) -> bool:
+        if not isinstance(value, str) or len(words) < 2:
+            return False
+        other = set(arabic.normalise(value).split())
+
+        # Strength/class/dimensions must not disappear in a fuzzy description match.
+        def digits(tokens):
+            return {w for w in tokens if any(c.isdigit() for c in w)}
+
+        return (
+            digits(words) == digits(other)
+            and len(words & other) / max(len(words), len(other)) >= 0.85
+        )
+
+    same_description = any(close(c.value) for c in cells.values())
+    own = item["fields"]
+    own_rate = (
+        file_id == own.get("file_id")
+        and loc["row"] == own.get("row")
+        and boq.match_sheet([sheet.name], own.get("sheet", "")) is not None
+        and columns.get("rate") is not None
+        and loc.get("column") == columns["rate"]
+    )
+    said = re.sub(r"[\u064b-\u065f]", "", arabic.clean(message).casefold())
+    priced_copy = (
+        same_code
+        and "rate" in columns
+        and "quantity" in columns
+        and book.name.casefold() in said
+        and bool(re.search(r"my priced (?:copy|boq)|نسختي المسعر[ةه]|نسختي اللي سعرتها", said))
+    )
+    return same_code or same_description or own_rate, priced_copy
+
+
+def _price_item_named(
+    ctx: ToolContext, target: Records, ref: str, name: str, source_id: str | None = None
+) -> None:
+    """A source row names evidence, not the BOQ item to which its price belongs."""
+    if name.lower() not in _RATES:
+        return
+    with target.read() as conn:
+        item = resolve.find_item(conn, ref, field="item")
+    if item["kind"] != boq.ITEM:
+        return
+    code = arabic.clean(item.get("code") or "").casefold()
+    row = item["fields"].get("row")
+    item_word = r"(?:boq\s+)?(?:item|code)|(?:البند|بند|كود البند|كود)"
+
+    def names_item(text: str, *, answer: bool = False) -> bool:
+        text = arabic.clean(text).casefold()
+        if code:
+            escaped = re.escape(code)
+            if answer and text.strip(' «»"') == code:
+                return True
+            if re.search(
+                rf"(?:{item_word})\s*(?:no\.?|number|رقم)?\s*[:#«\"]?\s*{escaped}(?![\w/-]|\.\d)",
+                text,
+            ):
+                return True
+            # A compound code (16.1-1, 03/02) is unambiguous without the word item.
+            if (
+                any(c.isdigit() for c in code)
+                and any(c in "/-" for c in code)
+                and re.search(rf"(?<![\w./-]){escaped}(?![\w/-]|\.\d)", text)
+            ):
+                return True
+        if isinstance(row, int):
+            # An unqualified source's 'row 8' must never authorise BOQ row 8.
+            pattern = (
+                r"(?:boq\s+row|item\s+(?:at\s+)?row|صف\s+المقايسة|صف\s+البند)"
+                rf"\s*[:#]?\s*{row}(?!\d)"
+            )
+            if re.search(pattern, text):
+                return True
+        return False
+
+    message = ctx.store.brief(ctx.brief_id)["text"]
+    if names_item(message):
+        return
+    matches, priced_copy = _matching_price_source(target, item, source_id, message)
+    with target.read() as conn:
+        in_scope = _pricing_scope(conn, item, message)
+    if priced_copy or (in_scope and matches):
+        return
+    with ctx.store.rec.read() as conn:
+        answers = conn.execute(
+            "SELECT card, choice FROM approvals WHERE brief_id = ? AND status = 'settled'",
+            (ctx.brief_id,),
+        ).fetchall()
+    for card_json, choice in answers:
+        try:
+            answer = json.loads(choice)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(answer, dict):
+            continue
+        card = json.loads(card_json)
+        questions = {
+            q["id"]: q.get("text", "") for q in card.get("payload", {}).get("questions", [])
+        }
+        for key, value in answer.get("answers", {}).items():
+            if not isinstance(value, str):
+                continue
+            question = arabic.clean(str(questions.get(key, ""))).casefold()
+            if names_item(value, answer=bool(re.search(item_word, question))):
+                return
+            if (
+                isinstance(row, int)
+                and arabic.clean(value).strip() == str(row)
+                and re.search(r"boq\s+row|صف\s+المقايسة|صف\s+البند", question)
+            ):
+                return
+    raise RecordsError(
+        copy.fill(
+            copy.BOQ_PRICE_SOURCE_MISMATCH if in_scope else copy.BOQ_PRICE_ITEM_REQUIRED,
+            item=item.get("code") or str(row or ref),
+        ),
+        status=422,
+        field="item",
+    )
+
+
 async def _record_number(ctx: ToolContext, args: NumberArgs) -> str:
     target = _target(ctx, args.where)
+    await asyncio.to_thread(_price_item_named, ctx, target, args.item, args.name, args.source_id)
     if args.where == "engineer":
         action = copy.fill(copy.TOOL_RECORD_NUMBER, name=_field(args.name), item=args.item)
         if not await _engineer_ok(ctx, action):
@@ -992,7 +1210,14 @@ def _correct(rec: Records, args: CorrectionArgs, actor: str) -> str:
 
 
 async def _correct_number(ctx: ToolContext, args: CorrectionArgs) -> str:
-    return await asyncio.to_thread(_correct, _project(ctx), args, _actor(ctx))
+    target = _project(ctx)
+    with target.read() as conn:
+        old = conn.execute(
+            "SELECT item_id, name FROM numbers WHERE id = ?", (args.number_id,)
+        ).fetchone()
+    if old:
+        await asyncio.to_thread(_price_item_named, ctx, target, old[0], old[1], args.source_id)
+    return await asyncio.to_thread(_correct, target, args, _actor(ctx))
 
 
 # The Plan 3 calc tools -------------------------------------------------------------------------

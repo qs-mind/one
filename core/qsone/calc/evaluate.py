@@ -333,6 +333,9 @@ class _Run:
                 return self.choose(node, *args, live)
             case Call(fn="sum" | "count" | "avg" | "min" | "max") if len(args) == 1:
                 return self.over_list(node, args[0], live), None
+            case Call(fn="sum" | "avg"):
+                members = tuple(Quantity(a.value, a.unit) for a in args)
+                return self.over_list(node, _V(None, Unit(), items=members), live), None
             case Call(fn="min" | "max"):
                 return self.extreme(node, args, live), None
             case Call(fn="round"):

@@ -61,9 +61,9 @@ class Call(Node):
 
 # Function names and `pi` are the same as spec.RESERVED_NAMES (a test keeps them equal).
 FUNCTIONS = {
-    "sum": "sum(list)",
+    "sum": "sum(a, b, …) or sum(list)",
     "count": "count(list)",
-    "avg": "avg(list)",
+    "avg": "avg(a, b, …) or avg(list)",
     "min": "min(a, b, …) or min(list)",
     "max": "max(a, b, …) or max(list)",
     "round": 'round(x, places[, "half_up"|"half_even"|"up"|"down"])',
@@ -78,9 +78,9 @@ MAX_TEXT = 64
 
 # The same usage lines for the Arabic text, so it holds no English words.
 USAGE_AR = {
-    "sum": "sum(قايمة)",
+    "sum": "sum(أ، ب، …) أو sum(قايمة)",
     "count": "count(قايمة)",
-    "avg": "avg(قايمة)",
+    "avg": "avg(أ، ب، …) أو avg(قايمة)",
     "min": "min(أ، ب، …) أو min(قايمة)",
     "max": "max(أ، ب، …) أو max(قايمة)",
     "round": 'round(س، عدد الخانات[، "half_up"|"half_even"|"up"|"down"])',
@@ -91,9 +91,9 @@ USAGE_AR = {
 }
 # Argument counts (fewest, most; None is no limit) and the one place a quoted text stands.
 _ARITY = {
-    "sum": (1, 1),
+    "sum": (1, None),
     "count": (1, 1),
-    "avg": (1, 1),
+    "avg": (1, None),
     "min": (1, None),
     "max": (1, None),
     "round": (2, 3),

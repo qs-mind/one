@@ -1990,12 +1990,55 @@ BOQ_WHY_TEXT = {
     "en": "the {field} in column {column} is text, not a number",
     "ar": "{field} في العمود {column} نص، مش رقم",
 }
+BOQ_WHY_NUMBER_FORMAT = {
+    "en": (
+        "the {field} in column {column} has an ambiguous decimal/thousands separator; "
+        "the file does not establish one convention"
+    ),
+    "ar": (
+        "الفاصل في {field} بالعمود {column} مش واضح: عشري ولا آلاف، وباقي الملف مش موضّح طريقة واحدة"
+    ),
+}
 BOQ_WHY_DECIMALS = {
     "en": "the {field} in column {column} has more than 6 decimals; check the cell in Excel",
     "ar": "{field} في العمود {column} فيه أكتر من 6 أرقام عشرية؛ راجع الخانة في Excel",
 }
 BOQ_WHY_NO_UNIT = {"en": "a quantity with no unit", "ar": "كمية من غير وحدة"}
 BOQ_WHY_NO_DESCRIPTION = {"en": "numbers with no description", "ar": "أرقام من غير وصف"}
+BOQ_QUANTITY_FALLBACK = {
+    "en": "Quantity taken from column {column} for rows {rows}.",
+    "ar": "الكمية اتاخدت من العمود {column} للصفوف {rows}.",
+}
+BOQ_QUANTITY_MISSING = {
+    "en": (
+        "No quantity in the file for rows {rows} "
+        "(the mapped and quantity-heading columns are empty)."
+    ),
+    "ar": "مفيش كمية في الملف للصفوف {rows} (العمود المختار وأعمدة الكمية فاضيين).",
+}
+BOQ_PRICE_SOURCE_MISMATCH = {
+    "en": (
+        "The source row does not identify BOQ item {item}. Use a row carrying its code "
+        "or matching description, or keep the price on its own."
+    ),
+    "ar": (
+        "صف المصدر مش بيشاور على بند المقايسة {item}. اختار صف فيه كوده أو وصفه، "
+        "أو سجّل السعر لوحده."
+    ),
+}
+BOQ_PRICE_ITEM_REQUIRED = {
+    "en": (
+        "The engineer did not name item {item}, or this price is outside the requested scope "
+        "or its source does not identify that item. Use a source row carrying item {item}'s "
+        "code or matching description, name the intended BOQ item, or keep a standalone price."
+    ),
+    "ar": (
+        "البند {item} مش متحدد من المهندس، أو خارج المطلوب تسعيره، أو مصدر السعر مش بيشاور عليه. "
+        "اختار صف مصدر فيه كود البند {item} أو وصفه، أو حدّد بند المقايسة المقصود، "
+        "أو سجّل السعر لوحده."
+    ),
+}
+
 BOQ_WHY_TOTAL = {"en": "a total row", "ar": "صف إجمالي"}
 BOQ_WHY_NUMBER_ONLY = {
     "en": "a rate or amount with no quantity and no unit",

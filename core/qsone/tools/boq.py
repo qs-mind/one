@@ -249,6 +249,26 @@ NONE = "none"  # a column the import leaves out
 MEANINGS = (*boq.FIELDS, NONE)
 
 
+def _row_ranges(rows: list[int]) -> str:
+    spans = []
+    for row in sorted(set(rows)):
+        if spans and spans[-1][1] + 1 == row:
+            spans[-1][1] = row
+        else:
+            spans.append([row, row])
+    return ", ".join(str(a) if a == b else f"{a}–{b}" for a, b in spans)
+
+
+def _quantity_notes(fallbacks: dict[str, list[int]], missing: list[int]) -> list[dict]:
+    notes = [
+        copy.fill(copy.BOQ_QUANTITY_FALLBACK, column=c, rows=_row_ranges(rows))
+        for c, rows in fallbacks.items()
+    ]
+    if missing:
+        notes.append(copy.fill(copy.BOQ_QUANTITY_MISSING, rows=_row_ranges(missing)))
+    return notes
+
+
 def _card(ctx: ToolContext, p: boq.Plan) -> Card:
     """The rows card: one row per column of the sheet with its heading and first values, and
     what it holds as mapped; the engineer sets each column's meaning (a question per column)."""
@@ -276,6 +296,7 @@ def _card(ctx: ToolContext, p: boq.Plan) -> Card:
         "headings": copy.counted(p.headings, copy.HEADINGS),
     }
     parts = [copy.fill(copy.BOQ_CONFIRM_DETAIL, **counts)]
+    parts += _quantity_notes(p.quantity_fallbacks, p.no_quantity)
     if p.skipped:
         parts.append(
             copy.fill(copy.BOQ_CONFIRM_SKIPPED, count=copy.counted(len(p.skipped), copy.ROWS))
@@ -426,7 +447,13 @@ def _result(ctx: ToolContext, rec: Records, args: ImportArgs, out: dict) -> str:
     }
     if len(skipped) > MAX_SKIPPED:
         data["skipped_count"] = len(skipped)
-    for k in ("hidden_rows", "flagged_rows", "no_quantity", "already_imported_rows"):
+    for k in (
+        "hidden_rows",
+        "flagged_rows",
+        "no_quantity",
+        "quantity_fallbacks",
+        "already_imported_rows",
+    ):
         if out.get(k):
             data[k] = out[k]
     notes = [
@@ -435,6 +462,10 @@ def _result(ctx: ToolContext, rec: Records, args: ImportArgs, out: dict) -> str:
         'find_items {"kind": "boq_item"} lists the items; ledger_numbers {"item": "<code>"} '
         "gives each number with its sheet, row and column.",
         "Rates and amounts are copied as written; check them with calculate.",
+    ]
+    notes += [
+        n[_language(ctx)]
+        for n in _quantity_notes(out.get("quantity_fallbacks", {}), out.get("no_quantity", []))
     ]
     if out.get("already_imported"):
         data["already_imported"] = True

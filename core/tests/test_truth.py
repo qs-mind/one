@@ -229,6 +229,7 @@ async def _quote(ctx) -> dict:
 
 
 async def _item(ctx, code: str, description: str, unit: str) -> None:
+    ctx.brief_id = ctx.store.new_brief(ctx.rec.id, f"Record the sample rate for item {code}")
     fields = {"description": description, "unit": unit}
     await call("add_item", {"kind": "boq_item", "code": code, "fields": fields}, ctx)
 

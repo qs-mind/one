@@ -181,7 +181,7 @@ def test_cells_become_exact_text(value, fmt, exact):
         (1e-07, "decimals"),
         ("0.12345678", "decimals"),
         ("مقطوعية", "text"),
-        ("1,250", "text"),  # a thousands separator or a decimal comma: not guessed
+        ("1,250", "ambiguous"),  # a thousands separator or a decimal comma: not guessed
         (True, "text"),
         (datetime(2026, 11, 5), "text"),
         (float("nan"), "text"),
@@ -543,13 +543,12 @@ async def test_merged_headings_and_totals_are_not_items(ctx):
     ]
     f = add_boq(ctx.rec, book(rows, merges=("A4:F4",)))
     d = data_of(await run_import(ctx, f, columns=PRICED, currency="EGP"))
-    assert (d["items"], d["headings"]) == (1, 1)
-    (heading,) = items(ctx.rec, "boq_heading")
+    assert (d["items"], d["headings"]) == (1, 3)
+    heading, *totals = items(ctx.rec, "boq_heading")
+    assert [t["fields"]["line_kind"] for t in totals] == ["total", "total"]
     assert heading["code"] is None
     assert heading["fields"]["description"] == "الباب الأول: أعمال الخرسانة - عينة"
     assert d["skipped"] == [
-        {"row": 6, "why": "a total row"},
-        {"row": 7, "why": "a total row"},
         {"row": 8, "why": "the column headings again"},
         {"row": 9, "why": "a rate or amount with no quantity and no unit"},
     ]
@@ -684,3 +683,58 @@ def test_tools_are_short_recipes_with_an_example():
         assert (tool.risk, tool.untrusted) == (risk, untrusted)
         assert len(tool.description.split()) <= 120 and "\nExample:\n" in tool.description
     assert REGISTRY["boq_import"].writes
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("1,250.00", "1250.00"),
+        ("١٬٢٥٠٫٥٠", "1250.50"),
+        ("1 250,50", "1250.50"),
+        ("1\u202f250,50", "1250.50"),
+        ("1\u00a0250.50", "1250.50"),
+        ("1.250,50", "1250.50"),
+        ("1.250.000", "1250000"),
+    ],
+)
+def test_grouped_text_numbers(text, expected):
+    assert boq.exact(text, None) == (expected, None)
+
+
+@pytest.mark.parametrize("anchor, expected", [("2,500.50", "1250"), ("2.500,50", "1.250")])
+def test_ambiguous_grouping_follows_other_file_cells(rec, anchor, expected):
+    f = add_boq(
+        rec,
+        book(
+            [
+                ["A", "Sample", "m3", "1", anchor, anchor],
+                ["B", "Sample", "m3", "1", "1,250", "1,250"],
+            ]
+        ),
+    )
+    p = boq.plan(rec, f, sheet="BOQ", header_row=3, columns=PRICED)
+    assert p.items == 2
+    assert p.rows[1].numbers["rate"][0] == expected
+
+
+@pytest.mark.parametrize("text", ["1,25,000.00", "12 50,50", "1.25.000", "1,250"])
+def test_unresolved_grouped_text_is_not_guessed(text):
+    assert boq.exact(text, None)[0] is None
+
+
+def test_conflicting_file_conventions_leave_ambiguity_with_reason(rec):
+    f = add_boq(
+        rec,
+        book(
+            [
+                ["A", "Sample", "m3", 1, "1,250.50", "1,250.50"],
+                ["B", "Sample", "m3", 1, "1.250,50", "1.250,50"],
+                ["C", "Sample", "m3", 1, "1,250", "1,250"],
+            ]
+        ),
+    )
+    p = boq.plan(rec, f, sheet="BOQ", header_row=3, columns=PRICED)
+    assert p.items == 2
+    assert p.skipped[0]["row"] == 6
+    assert "ambiguous" in p.skipped[0]["why"]["en"]
+    assert p.skipped[0]["why"]["ar"]

@@ -71,11 +71,11 @@ def test_pdf_import_and_cell_sources(rec, ar):
         file_id=f, sheet=sheet.name, header_row=header, columns=columns, currency="EGP"
     )
     plan = boq.plan_sheet(rec, book, sheet, header_row=header, columns=columns)
-    assert plan.items == 2 and plan.headings == 1
+    assert plan.items == 2 and plan.headings == 2
     boq_tools._write(ctx, rec, args, plan)
     view = imported.sheet(rec, f)
-    assert len(view["rows"]) == 3
-    first, second = view["rows"][1:]
+    assert len(view["rows"]) == 4
+    first, second = [r for r in view["rows"] if r["kind"] == "item"]
     assert first["cells"]["description"]["text"] == ("خرسانة مسلحة" if ar else "Concrete sample")
     for row, values, page in [
         (first, ["12.50", "20.00", "250.00"], 1),
@@ -201,6 +201,54 @@ def test_continuation_without_header_and_small_page_offset(rec):
     preview = boq.preview(rec, f, None)
     assert len(preview["sheets"]) == 1
     assert preview["overview"]["items"] == 2
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("1,250.00", "1250.00"),
+        ("١٬٢٥٠٫٥٠", "1250.50"),
+        ("1 250,50", "1250.50"),
+        ("1.250,50", "1250.50"),
+    ],
+)
+def test_grouped_pdf_rate_and_amount_import(rec, text, expected):
+    typst = pytest.importorskip("typst")
+    source = "#set page(width: 650pt, height: 500pt, margin: 30pt)\n"
+    source += '#set text(font: "DejaVu Sans", size: 10pt)\n'
+    cells = [
+        "Item",
+        "Description",
+        "Unit",
+        "Quantity",
+        "Rate",
+        "Amount",
+        "1",
+        "Concrete sample",
+        "m3",
+        "1",
+        text,
+        text,
+    ]
+    source += "#table(columns: (45pt,170pt,45pt,70pt,70pt,80pt), inset: 6pt, "
+    source += ", ".join("[" + c + "]" for c in cells) + ")"
+    f = add_file(rec, "Grouped sample.pdf", typst.compile(source.encode()), actor="engineer").id
+    preview = boq.preview(rec, f, None)
+    p = boq.plan(
+        rec,
+        f,
+        sheet=preview["sheet"],
+        header_row=preview["header_guess"],
+        columns=preview["columns_guess"],
+    )
+    ctx = tool_ctx(rec)
+    args = boq_tools.ImportArgs(
+        file_id=f, sheet=p.sheet, header_row=p.header_row, columns=p.columns, currency="EGP"
+    )
+    boq_tools._write(ctx, rec, args, p)
+    row = imported.sheet(rec, f)["rows"][0]
+    assert row["cells"]["rate"]["value"] == expected
+    assert row["cells"]["amount"]["value"] == expected
 
 
 @pytest.mark.parametrize("unit", ["م3", "م.ط", "كجم/سم2"])
