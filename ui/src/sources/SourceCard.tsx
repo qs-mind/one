@@ -66,7 +66,7 @@ export const SUNK = "translateY(-8px) scale(0.96)";
 function where(locator: Record<string, string | number> | undefined): string | undefined {
   const { page, sheet, row, line } = locator ?? {};
   if (page !== undefined) return fill(t("page"), { page });
-  if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet, row });
+  if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet: String(sheet).trim(), row }); // «مقايسة » had a space
   if (row !== undefined) return fill(t("row"), { row });
   if (line !== undefined) return fill(t("line"), { line });
   return undefined;

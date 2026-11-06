@@ -321,7 +321,7 @@ describe("SheetViewer", () => {
     const dialog = await screen.findByRole("dialog", { name: texts.sheetSource.ar });
     expect(dialog).toHaveTextContent("مقايسة العميل - عينة.xlsx");
     await user.click(within(dialog).getByRole("button", { name: texts.sourceOpenFile.ar }));
-    expect(openFile).toHaveBeenCalledWith("file:f1", {});
+    expect(openFile).toHaveBeenCalledWith("file:f1", { sheet: "BOQ", row: "r5", column: "E" }); // lands on its cell
     openFile.mockRestore();
   });
 

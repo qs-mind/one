@@ -120,7 +120,8 @@ export function useDocuments(sources: ProjectSources | undefined): Documents | n
 
     const changed = () => {
       const opened = workspaceApi.current();
-      if (lists && opened) saver.save(opened);
+      // a view opened from the chat lives with the page only: the project keeps the document it came from
+      if (lists && opened && !opened.key.startsWith("view:")) saver.save(opened);
     };
     const offOpened = subscribeOpened(changed);
     const offMoved = subscribeMoved(changed); // a row selected, a page turned: saved as an opening is

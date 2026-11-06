@@ -148,6 +148,50 @@ describe("DocumentView", () => {
     expect(ref.current!.locate({ page: 4 })).toBeNull(); // a file has no viewer handle of its own
   });
 
+  it("a spreadsheet opens as its sheets, read only, a tab for each (a hidden one says so); a source lands on its sheet", async () => {
+    // real-app walk: an .xlsx showed pipe-joined text rows («… | م | بيان | …»), not the sheet
+    const user = userEvent.setup();
+    const head = sheet({ id: "file-sheet-f3", sample: false, total: null });
+    const page = (name: string, text: string) => ({
+      ...head,
+      variant: "file_sheet",
+      sheet: name,
+      sheets: [{ name: "مقايسة ", hidden: false }, { name: "تحليل", hidden: true }],
+      columns: [
+        { key: "code", from: "code", label: { en: "#", ar: "#" }, kind: "text" as const, edit: false, frozen: true, wrap: false, width: 48 },
+        { key: "B", label: { en: "B", ar: "B" }, kind: "text" as const, edit: false, frozen: false, wrap: false, width: 120 },
+      ],
+      rows: [{ id: "r4", kind: "item" as const, item_id: "r4", version: 1, code: "4", cells: { B: { text } } }],
+    });
+    const options = { sheets: { f3: { "مقايسة ": page("مقايسة ", "بلاط ارضيات"), تحليل: page("تحليل", "تحليل سعر") } } };
+    show({ key: "file:f3", anchor: null }, options);
+    const cell = await screen.findByText("بلاط ارضيات");
+    expect(cell).toHaveAttribute("data-source-at", "file:f3#sheet=%D9%85%D9%82%D8%A7%D9%8A%D8%B3%D8%A9%20&row=4");
+    expect(screen.getByText(texts.fileReadOnly.ar)).toBeInTheDocument();
+    expect(screen.queryByText(/\|/)).toBeNull(); // never the text rows
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["مقايسة", `تحليل${texts.sheetHidden.ar}`]);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    await user.click(tabs[1]!);
+    expect(await screen.findByText("تحليل سعر")).toBeInTheDocument();
+  });
+
+  it("a source in a spreadsheet's other sheet opens that sheet", async () => {
+    const head = sheet({ id: "file-sheet-f3", sample: false, total: null });
+    const page = (name: string, text: string) => ({
+      ...head, variant: "file_sheet", sheet: name, sheets: [{ name: "A", hidden: false }, { name: "B", hidden: false }],
+      rows: [{ id: "r2", kind: "item" as const, item_id: "r2", version: 1, code: "2", cells: { description: { text } } }],
+    });
+    show({ key: "file:f3", anchor: { sheet: "B", row: "r2" } }, { sheets: { f3: { A: page("A", "first"), B: page("B", "second") } } });
+    expect(await screen.findByText("second")).toBeInTheDocument();
+  });
+
+  it("a file the sheet reader cannot open shows the text ONE read", async () => {
+    show({ key: "file:f4", anchor: null }, { text: { f4: [{ locator: { sheet: "BOQ ", row: 3 }, text: "م | بيان" }] } });
+    expect(await screen.findByText("م | بيان")).toBeInTheDocument();
+    expect(screen.getByText(fill(texts.sheetRow.ar, { sheet: "BOQ", row: 3 }))).toBeInTheDocument(); // trimmed
+  });
+
   it("a client BOQ is read only: no cell opens an editor", async () => {
     const user = userEvent.setup();
     const fetch = core({});

@@ -51,7 +51,8 @@ export type NumberCell = {
   calculated?: boolean;
 };
 /** A cell that shows text: a field, a unit, or the note that stands in for a missing number («فئة فقط»). */
-export type TextCell = { text: string };
+/** `at`: the file place the cell shows, a source key (sources/targets.ts), in a spreadsheet opened as its sheets. */
+export type TextCell = { text: string; at?: string };
 export type ViewCell = NumberCell | TextCell;
 
 export const isNumber = (cell: ViewCell | null | undefined): cell is NumberCell =>

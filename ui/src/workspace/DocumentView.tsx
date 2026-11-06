@@ -35,7 +35,7 @@ export function DocumentView(props: {
     case "clientboq":
       return <ClientBoqDoc key={opened.key} projectId={projectId} sources={sources} fileId={id} />;
     case "file":
-      return <FileDoc key={opened.key} sources={sources} fileId={id} opened={opened} notice={props.notice} />;
+      return <FileDoc key={opened.key} projectId={projectId} sources={sources} fileId={id} opened={opened} notice={props.notice} />;
     case "files":
       return <FilesDoc />;
     case "view": {

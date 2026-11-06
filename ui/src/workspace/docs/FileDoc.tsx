@@ -1,10 +1,13 @@
 // One file of Project Records. A PDF shows its page as an image the core renders in memory, with page buttons and a
 // switch to the page's text; other files show the text pieces ONE read, with their sheet and row.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { isNumber } from "../../deliverables/types";
 import { dir, fill, t, useLanguage } from "../../i18n";
-import type { FilePiece, Opened, ProjectSources } from "../../project/types";
+import type { FilePiece, FileSheet, Opened, ProjectSources } from "../../project/types";
+import { REVEAL_WAIT_MS } from "../../sources/mark";
 import { fileKey, TARGET } from "../../sources/targets";
 import { Segmented } from "../../ui/Segmented";
+import { type SheetHandle, SheetViewer } from "../../viewers/sheet/SheetViewer";
 import { workspaceApi } from "../api";
 
 /** Page images come in two widths: enough for the file on screen, never more (decision 13). */
@@ -16,7 +19,7 @@ const RESIZE_SETTLE_MS = 150;
 function where(locator: FilePiece["locator"]): string | undefined {
   const { page, sheet, row, line } = locator;
   if (page !== undefined) return fill(t("page"), { page });
-  if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet, row });
+  if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet: String(sheet).trim(), row }); // «مقايسة » had a space
   if (row !== undefined) return fill(t("row"), { row });
   if (line !== undefined) return fill(t("line"), { line });
   return undefined;
@@ -186,10 +189,110 @@ export function FilePages({
   );
 }
 
-/** The file as the open document, at its anchor's page when one is asked for. */
-export function FileDoc({ sources, fileId, opened, notice }: { sources: ProjectSources; fileId: string; opened?: Opened; notice?: string | null }) {
+/** A spreadsheet's sheet in the Sheet viewer, read only, with a tab for each sheet (a hidden one says so). Each opening
+ * at a cell (a source) shows its sheet and scrolls to the cell; the source mark then finds its row. */
+function SheetFile({ projectId, sources, fileId, first, opened, notice }: {
+  projectId: string;
+  sources: ProjectSources;
+  fileId: string;
+  first: FileSheet;
+  notice?: string | null;
+  opened?: Opened;
+}) {
+  useLanguage();
+  const [view, setView] = useState(first);
+  const handle = useRef<SheetHandle>(null);
+  const asked = opened?.anchor?.sheet;
+  async function show(name: string) {
+    if (name === view.sheet) return;
+    const got = await sources.fileSheet(fileId, name).catch(() => null);
+    if (got) setView(got);
+  }
+  useEffect(() => {
+    if (asked !== undefined) void show(asked);
+  }, [opened]); // eslint-disable-line react-hooks/exhaustive-deps -- each opening once
+  useEffect(() => {
+    const anchor = opened?.anchor;
+    if (!anchor?.row || (anchor.sheet !== undefined && anchor.sheet !== view.sheet)) return;
+    let live = true;
+    void (async () => {
+      const started = Date.now();
+      while (live && !handle.current?.locate({ row: anchor.row, column: anchor.column }) && Date.now() - started < REVEAL_WAIT_MS)
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+    })();
+    return () => {
+      live = false;
+    };
+  }, [opened, view]);
+  // each row's first cell carries the place a source names, so the source mark finds the row
+  const shown = useMemo<FileSheet>(() => {
+    const place = (row: string): Record<string, string> => (view.sheet ? { sheet: view.sheet, row } : { line: row });
+    return {
+      ...view,
+      rows: view.rows.map((row) => {
+        const [key, cell] = Object.entries(row.cells)[0] ?? [];
+        if (!key || !cell || isNumber(cell)) return row;
+        return { ...row, cells: { ...row.cells, [key]: { ...cell, at: fileKey(fileId, place(row.code ?? "")) } } };
+      }),
+    };
+  }, [view, fileId]);
+  const tab = "whitespace-nowrap rounded-t-md border border-b-0 px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ink";
+  return (
+    <div className="flex h-full flex-col bg-paper">
+      {notice && (
+        <p role="status" className="px-5 py-2 text-sm text-slate">
+          {notice}
+        </p>
+      )}
+      <div className="min-h-0 flex-1">
+        <SheetViewer key={view.id} ref={handle} projectId={projectId} view={shown} mode="workspace" readOnly virtualize />
+      </div>
+      {view.sheets.length > 1 && (
+        <div role="tablist" aria-label={t("fileSheets")} className="flex shrink-0 gap-1 overflow-x-auto border-t border-stone px-3 pt-1">
+          {view.sheets.map((s) => (
+            <button
+              key={s.name}
+              type="button"
+              role="tab"
+              aria-selected={s.name === view.sheet}
+              onClick={() => void show(s.name)}
+              className={`${tab} ${s.name === view.sheet ? "border-ink bg-paper" : "border-stone text-slate hover:text-ink"}`}
+            >
+              <bdi>{s.name.trim()}</bdi>
+              {s.hidden && <span className="ms-1.5 text-xs text-slate">{t("sheetHidden")}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The file as the open document, at its anchor's page when one is asked for. A spreadsheet opens as its sheets; a
+ * file the sheet reader cannot open shows the text ONE read. */
+export function FileDoc({ projectId, sources, fileId, opened, notice }: {
+  projectId?: string;
+  sources: ProjectSources;
+  fileId: string;
+  opened?: Opened;
+  notice?: string | null;
+}) {
   useLanguage();
   const state = useFilePage(sources, fileId, opened);
+  // undefined while asked; null for no sheet (a PDF, a text file, or one the sheet reader cannot open)
+  const [sheet, setSheet] = useState<FileSheet | null | undefined>(undefined);
+  useEffect(() => {
+    if (state.pages === null) return;
+    if (state.pages > 0 || !projectId) return setSheet(null);
+    let live = true;
+    sources.fileSheet(fileId).then(
+      (got) => live && setSheet(got),
+      () => live && setSheet(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [sources, fileId, projectId, state.pages]);
   const root = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(SMALL);
   // measured again when the room changes (the chat folds, the window resizes), settled for 150 ms before a reload
@@ -210,9 +313,11 @@ export function FileDoc({ sources, fileId, opened, notice }: { sources: ProjectS
       sizes.disconnect();
     };
   }, []);
+  if (sheet && projectId)
+    return <SheetFile projectId={projectId} sources={sources} fileId={fileId} first={sheet} opened={opened} notice={notice} />;
   return (
     <div ref={root} dir={dir()} className="h-full overflow-auto bg-paper text-ink">
-      <FilePages sources={sources} fileId={fileId} state={state} width={width} notice={notice} />
+      {sheet === null && <FilePages sources={sources} fileId={fileId} state={state} width={width} notice={notice} />}
     </div>
   );
 }

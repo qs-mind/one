@@ -36,7 +36,7 @@ const statusText: Record<FileInfo["status"], Text> = {
 /** Where a result sits in its file: «صفحة 3», "Sheet BOQ, row 23". */
 function where({ page, sheet, row, line }: Hit["locator"]): string | undefined {
   if (page !== undefined) return fill(t("page"), { page });
-  if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet, row });
+  if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet: String(sheet).trim(), row }); // «مقايسة » had a space
   if (row !== undefined) return fill(t("row"), { row });
   if (line !== undefined) return fill(t("line"), { line });
   return undefined;

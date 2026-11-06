@@ -382,6 +382,8 @@ export const texts = {
   noResults: { en: "Nothing found.", ar: "ملقيتش حاجة." },
   page: { en: "Page {page}", ar: "صفحة {page}" },
   sheetRow: { en: "Sheet {sheet}, row {row}", ar: "ورقة {sheet}، صف {row}" },
+  fileSheets: { en: "Sheets", ar: "الأوراق" },
+  sheetHidden: { en: "hidden", ar: "مخفية" },
   row: { en: "Row {row}", ar: "صف {row}" },
   line: { en: "Line {line}", ar: "سطر {line}" },
   // Search by meaning gets ready by itself (5 Nov 2026): one quiet line, no button.
@@ -591,6 +593,7 @@ export const texts = {
   // The client BOQ as imported: a read-only document.
   clientBoqTitle: { en: "Client BOQ — {name}", ar: "مقايسة العميل — {name}" },
   clientBoqReadOnly: { en: "The client's document: read only", ar: "مستند العميل: للقراءة بس" },
+  fileReadOnly: { en: "As the file has it: read only", ar: "زي ما في الملف: للقراءة بس" },
   clientBoqLoading: { en: "Loading the client's BOQ…", ar: "بنحمّل مقايسة العميل…" },
   // The workspace's open document (workspace Task 5)
   noViewer: { en: "No viewer for this kind yet", ar: "لسه مافيش عرض للنوع ده" },

@@ -75,7 +75,7 @@ describe("a price card's rates", () => {
     expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: dayText(DAY) }));
     const open = vi.spyOn(workspaceApi, "open").mockImplementation(() => {});
     await user.click(within(card).getByRole("button", { name: texts.sourceOpenFile.ar }));
-    expect(open).toHaveBeenCalledWith("file:f1", {});
+    expect(open).toHaveBeenCalledWith("file:f1", { sheet: "Quote", row: "r2" }); // lands on its row
   });
 
   it("a rate said in the chat says so, and a card with no sources has no buttons", async () => {

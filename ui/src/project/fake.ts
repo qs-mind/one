@@ -9,6 +9,7 @@ import type {
   DocKey,
   FileInfo,
   FilePiece,
+  FileSheet,
   Opened,
   ProjectSources,
   ProjectStatus,
@@ -28,6 +29,8 @@ export type FakeOptions = {
   /** The imported client BOQs, and each one's read-only Sheet view by file id. */
   clientBoqs?: ClientBoqInfo[];
   clientBoqViews?: Record<string, SheetView>;
+  /** Spreadsheet files as their sheets, by file id then sheet name. */
+  sheets?: Record<string, Record<string, FileSheet>>;
 };
 
 export type FakeSources = ProjectSources & {
@@ -76,6 +79,10 @@ export function fakeSources(options: FakeOptions): FakeSources {
       const found = options.clientBoqViews?.[fileId];
       if (!found) throw new Error(`no client BOQ ${fileId}`);
       return found;
+    },
+    fileSheet: async (fileId, name) => {
+      const book = options.sheets?.[fileId];
+      return book ? (book[name ?? Object.keys(book)[0]!] ?? null) : null;
     },
     async upload(file) {
       uploads.push(file);

@@ -20,7 +20,7 @@ from qsone import copy
 from qsone.clientfile import imported
 from qsone.deliverables import store as deliverables
 from qsone.projects import Projects
-from qsone.records import files, render
+from qsone.records import files, render, sheetview
 from qsone.records.project import Records, RecordsError
 
 MAX_PIECES = 1000  # text pieces in one answer
@@ -279,6 +279,10 @@ def router(projects: Projects, waiting=lambda project_id: 0) -> APIRouter:
         project_id: str, file_id: str, page: Annotated[int | None, Query(ge=1)] = None
     ):
         return await run(lambda: file_text(project(project_id), file_id, page))
+
+    @r.get("/projects/{project_id}/files/{file_id}/sheet")
+    async def get_sheet(project_id: str, file_id: str, name: str | None = None):
+        return await run(lambda: sheetview.file_sheet(project(project_id), file_id, name))
 
     return r
 

@@ -86,7 +86,7 @@ describe("a number opens in place into its source card", () => {
     expect(card).toHaveTextContent(fill(texts.sheetDated.ar, { date: dayText(DAY) }));
     const open = vi.spyOn(workspaceApi, "open").mockImplementation(() => {});
     await user.click(within(card).getByRole("button", { name: texts.sourceOpenFile.ar }));
-    expect(open).toHaveBeenCalledWith("file:f1", {});
+    expect(open).toHaveBeenCalledWith("file:f1", { sheet: "Quote", row: "r12" }); // lands on its row
     expect(screen.queryByRole("dialog")).toBeNull(); // the card closes
   });
 

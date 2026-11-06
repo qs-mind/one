@@ -1,6 +1,7 @@
 """The workspace in the core (Workspace plan, Task 2): the project's open document, its status,
 and a PDF's pages as images and text. Synthetic «عينة» data only."""
 
+import io
 import json
 from datetime import date, timedelta
 from pathlib import Path
@@ -233,6 +234,43 @@ def test_text_of_a_sheet_keeps_sheet_and_row(client, project):
     assert client.get(f"{base}/pages", headers=AUTH).json() == {"pages": 0}
     pieces = client.get(f"{base}/text", headers=AUTH).json()["pieces"]
     assert any(p["locator"].get("sheet") == "BOQ" and "خرسانة" in p["text"] for p in pieces)
+
+
+def test_a_spreadsheet_opens_as_its_sheets(client, project):
+    """Real-app walk: a QS opening an .xlsx saw pipe-joined text rows, not the sheet."""
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "مقايسة "  # the trailing space the client's file had
+    ws.append(["م", "بيان", "الكمية", "الفئة"])
+    ws.append([1, "بلاط ارضيات - عينة", 1900, 10])
+    ws["C2"].number_format = "#,##0.00"
+    wb.create_sheet("تحليل").sheet_state = "hidden"
+    out = io.BytesIO()
+    wb.save(out)
+    fid = upload(client, project, "مقايسة - عينة.xlsx", out.getvalue())
+    base = f"/projects/{project}/files/{fid}"
+
+    view = client.get(f"{base}/sheet", headers=AUTH).json()
+    assert view["kind"] == "sheet" and view["sheet"] == "مقايسة "
+    assert view["sheets"] == [
+        {"name": "مقايسة ", "hidden": False},
+        {"name": "تحليل", "hidden": True},
+    ]
+    assert [c["key"] for c in view["columns"]] == ["code", "A", "B", "C", "D"]
+    row = next(r for r in view["rows"] if r["id"] == "r2")
+    assert row["code"] == "2"
+    assert row["cells"]["C"] == {"text": "1,900.00"}  # as Excel shows it
+    assert row["cells"]["D"] == {"text": "10"} and row["cells"]["B"]["text"] == "بلاط ارضيات - عينة"
+    assert view["language"] == "ar" and all(not c["edit"] for c in view["columns"])
+
+    hidden = client.get(f"{base}/sheet", params={"name": "تحليل"}, headers=AUTH).json()
+    assert hidden["sheet"] == "تحليل" and hidden["rows"] == []
+
+    pdf = upload(client, project, "مواصفات - عينة.pdf", sample_pdf([["Page one"]]))
+    refused = client.get(f"/projects/{project}/files/{pdf}/sheet", headers=AUTH)
+    assert refused.status_code == 409  # the screen shows its pages or text instead
 
 
 def test_unknown_file(client, project):
