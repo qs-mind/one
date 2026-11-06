@@ -46,6 +46,26 @@ describe("a failed Brief's line", () => {
   });
 });
 
+describe("a stopped Brief's line", () => {
+  it("says it stopped and what changed, never ending silently", async () => {
+    const said = { en: "Stopped. Nothing was changed.", ar: "وقفت. ماتغيرش حاجة." };
+    const stoppedRun = [
+      { type: "start", messageId: "m0" },
+      { type: "start-step" },
+      { type: "data-status", id: "b1", data: { state: "stopped", step: said } },
+      { type: "finish-step" },
+      { type: "finish" },
+    ];
+    core({ routes: { "POST /api/chat": (init) => streamed(stoppedRun, init) } });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await box(), "سعّر{enter}");
+    expect(await screen.findByText(said.ar)).toBeInTheDocument();
+    setLanguage("en");
+    expect(await screen.findByText(said.en)).toBeInTheDocument();
+  });
+});
+
 // What web_search sends when ONE has no search at all (core: tools/web._no_search; audit B8).
 const noSearch = {
   en: "No web search is set up. Add a search key, connect an AI that can search (Claude), or subscribe to QS Mind.",

@@ -185,10 +185,11 @@ export function useChats(chatId: string) {
     if (body?.messages?.length) setMessages(body.messages);
   }, [chatId, setMessages]);
 
-  async function halt() {
+  /** Stop: true once the core has ended the Brief. */
+  async function halt(): Promise<boolean> {
     const id = brief;
     void stop(); // the stream ends here at once; the Brief itself ends only by the stop call
-    if (!id) return;
+    if (!id) return false;
     setStopped((now) => new Set(now).add(id));
     // its waiting cards fold at once, withdrawn: no button is left that the core would refuse
     setMessages((now) => withdrawCards(now, id));
@@ -197,9 +198,10 @@ export function useChats(chatId: string) {
       setStopped((now) => new Set([...now].filter((other) => other !== id)));
       setFailed(await coreLine(response, texts.stopFailed));
       void resync(); // it still runs: its cards as they are
-    } else {
-      void reread(); // the stream that would have said it was cut above: the Brief's end, from the core
+      return false;
     }
+    await reread(); // the stream that would have said it was cut above: the Brief's end («Stopped…»), from the core
+    return true;
   }
 
   const continued = useCallback(

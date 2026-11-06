@@ -447,6 +447,7 @@ class _Brief:
         self.lead_run_id: str | None = None
         self.lead_ctx: ToolContext | None = None
         self.truth_retried = False  # the reply went back once to be fixed (engine.truth)
+        self.changes = 0  # the writes this Brief made to the records since it started (`wrote`)
         self.said = 0  # the reply's length so far, in the screen's units (UTF-16)
         self.answer_from = 0  # where the Lead's latest response began in it
         self.redo_cleared = False  # a reply sent back left the screen with no words
@@ -1311,6 +1312,23 @@ class _Brief:
                 did.understood_refused = refused or did.understood_refused
         return did
 
+    def wrote(self, tool: str) -> None:
+        """A tool call wrote to the records (engine.tools.call); team chatter is no change."""
+        if tool not in team.TEAM_TOOLS or tool == "make_deliverable":
+            self.changes += 1
+
+    def _stopped_line(self) -> Text:
+        """The engineer's Stop: what this Brief's records show it changed before it stopped (its
+        saved runs, and the writes since their last save)."""
+        try:
+            writes = max(self._did().writes, self.changes)
+        except Exception:  # its records cannot be read: the plain line, never a guess
+            log.exception("brief %s: what it changed", self.brief_id)
+            return copy.STOPPED
+        if not writes:
+            return copy.STOPPED_NOTHING
+        return copy.fill(copy.STOPPED_CHANGED, changes=copy.counted(writes, copy.CHANGES))
+
     def _reply_problems(self, output: str) -> list[truth.Problem]:
         rec = self.place.rec
         return truth.reply_problems(
@@ -1440,7 +1458,7 @@ class _Brief:
                 raise
             self._withdraw()
             if self.cancel_mode == "stop":
-                self.set_state("stopped", copy.STOPPED)
+                self.set_state("stopped", self._stopped_line())
             else:
                 self.emit(Status(self.brief_id, self.state, self.step))
         except CapReached:

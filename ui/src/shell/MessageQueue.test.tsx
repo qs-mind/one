@@ -107,9 +107,37 @@ describe("the message queue", () => {
     await waitFor(() => expect(queueRegion()).toBeNull());
   });
 
-  it("Stop pauses the queue rather than clearing it; «كمّل الطابور» sends the next", async () => {
+  it("after a Stop the core took, the queued message goes by itself", async () => {
     const run = briefs();
-    const fetch = core({ routes: { "POST /api/chat": run.route, "POST /api/briefs/b1/stop": () => Response.json({ state: "stopped" }) } });
+    let stopped = false;
+    const fetch = core({
+      routes: {
+        "POST /api/chat": (init) => {
+          expect(stopped).toBe(true); // the next message waits for the core to end the Brief
+          return run.route(init);
+        },
+        "POST /api/briefs/b1/stop": () => {
+          stopped = true;
+          return Response.json({ state: "stopped" });
+        },
+      },
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    stopped = true;
+    await user.type(await box(), "أول - عينة{enter}");
+    await screen.findByText(/مرحبا/);
+    stopped = false;
+    await user.type(await box(), "تاني - عينة{enter}");
+    await user.click(screen.getByRole("button", { name: texts.stop.ar }));
+    await waitFor(() => expect(sentTexts(fetch)).toEqual(["أول - عينة", "تاني - عينة"]));
+    await waitFor(() => expect(queueRegion()).toBeNull());
+    expect(calls(fetch, "POST", "/api/briefs/b1/stop")).toHaveLength(1);
+  });
+
+  it("a Stop the core refused leaves the queue waiting, never cleared", async () => {
+    const run = briefs();
+    const fetch = core({ routes: { "POST /api/chat": run.route, "POST /api/briefs/b1/stop": () => new Response(null, { status: 500 }) } });
     const user = userEvent.setup();
     render(<App />);
     await user.type(await box(), "أول - عينة{enter}");
@@ -117,11 +145,9 @@ describe("the message queue", () => {
     await user.type(await box(), "تاني - عينة{enter}");
     await user.click(screen.getByRole("button", { name: texts.stop.ar }));
     await waitFor(() => expect(calls(fetch, "POST", "/api/briefs/b1/stop")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     expect(within(queueRegion()!).getAllByRole("listitem")).toHaveLength(1);
     expect(sentTexts(fetch)).toHaveLength(1);
-    await user.click(await screen.findByRole("button", { name: texts.queueResume.ar }));
-    await waitFor(() => expect(sentTexts(fetch)).toEqual(["أول - عينة", "تاني - عينة"]));
-    await waitFor(() => expect(queueRegion()).toBeNull());
   });
 
   it("each queued message can be removed or edited in place", async () => {

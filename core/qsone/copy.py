@@ -644,6 +644,12 @@ STOPPED = {
     "en": "Stopped. The work so far is saved.",
     "ar": "وقفنا. الشغل اللي اتعمل لحد دلوقتي محفوظ.",
 }
+# The engineer pressed Stop: what the Brief's records show it changed before it stopped.
+STOPPED_NOTHING = {"en": "Stopped. Nothing was changed.", "ar": "وقفت. ماتغيرش حاجة."}
+STOPPED_CHANGED = {
+    "en": "Stopped. What changed before the stop is kept: {changes}.",
+    "ar": "وقفت. اللي اتغيّر قبل ما أقف محفوظ: {changes}.",
+}  # {changes}: counted(n, CHANGES)
 
 DESK_SAVE = {
     "en": "Keep “{desk}” as a Draft Desk for next time?",
@@ -956,6 +962,10 @@ HEADINGS = Noun(
 ROWS = Noun(
     en={"one": "1 row", "other": "{n} rows"},
     ar={"one": "صف واحد", "two": "صفين", "few": "{n} صفوف", "other": "{n} صف"},
+)
+CHANGES = Noun(
+    en={"one": "1 change", "other": "{n} changes"},
+    ar={"one": "تغيير واحد", "two": "تغييرين", "few": "{n} تغييرات", "other": "{n} تغيير"},
 )
 
 

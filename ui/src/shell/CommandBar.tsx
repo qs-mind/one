@@ -106,21 +106,31 @@ export function CommandBar({
     const item = queue.take();
     if (!item) return;
     const model = picked && settings?.sheet.some((x) => keyOf(x) === keyOf(picked)) ? picked : undefined;
-    if (await chat.send(item.text, item.selection, { model, effort })) onSent?.();
+    // the chat as it is now: after a Stop, the one rendered since the Brief ended (never the stopped Brief's, which
+    // would steer it)
+    if (await latest.current.send(item.text, item.selection, { model, effort })) onSent?.();
     else queue.putBack(item);
   }
+  const latest = useRef(chat);
+  latest.current = chat;
 
-  // When the Brief ends (and the queue is not paused by Stop), the next queued message goes by itself.
+  // When the Brief ends (and the queue is not paused), the next queued message goes by itself.
   const wasRunning = useRef(chat.running);
+  const stopping = useRef(false); // a Stop under way: the next message waits for the core to end the Brief
   useEffect(() => {
     const was = wasRunning.current;
     wasRunning.current = chat.running;
-    if (was && !chat.running) void sendNext();
+    if (was && !chat.running && !stopping.current) void sendNext();
   }, [chat.running]); // sendNext reads the queue as it is then
 
-  function stop() {
-    queue.pause(); // the queue waits; «كمّل الطابور» carries on
-    void chat.halt();
+  /** Stop ends the Brief; once the core has, the next queued message goes by itself (the engineer removes it to keep
+   * it from going). A Stop the core did not take leaves the queue waiting: «كمّل الطابور» carries on. */
+  async function stop() {
+    stopping.current = true;
+    const ended = await chat.halt();
+    stopping.current = false;
+    if (ended) void sendNext();
+    else queue.pause();
   }
 
   async function submit(words: string, typed: boolean) {
@@ -268,12 +278,12 @@ export function CommandBar({
       </div>
       <div className={`absolute flex items-center gap-1.5 ${inPanel ? "bottom-[0.3125rem] end-[0.3125rem] [&>button]:size-7" : "bottom-1.5 end-1.5"}`}>
         {chat.running && hasWords && (
-          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
+          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={() => void stop()} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
             <Square />
           </button>
         )}
         {stopOnly ? (
-          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-ink text-paper`}>
+          <button type="button" aria-label={t("stop")} title={t("stop")} onClick={() => void stop()} className={`${round} bg-ink text-paper`}>
             <Square />
           </button>
         ) : (

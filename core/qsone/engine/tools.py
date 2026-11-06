@@ -274,6 +274,9 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
     result = page + note
     if key is not None:
         ctx.store.remember_write(ctx.brief_id, key, result)
+        wrote = getattr(ctx.host, "wrote", None)  # the Brief counts its changes, for its Stop line
+        if wrote is not None:
+            wrote(tool.name)
     return result
 
 

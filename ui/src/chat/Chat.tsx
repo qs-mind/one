@@ -183,6 +183,12 @@ function BriefReply({
           <FixAction fix={fixOf(status.fix)} lang={said} />
         </div>
       )}
+      {status?.state === "stopped" && status.step && (
+        // Stop never ends a Brief silently: the core says what its records show changed before it stopped
+        <p role="status" dir="auto" className="text-slate">
+          {pick(status.step, said)}
+        </p>
+      )}
     </div>
   );
 }
