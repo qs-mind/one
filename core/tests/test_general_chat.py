@@ -13,7 +13,7 @@ from pydantic_ai.messages import ModelRequest, RetryPromptPart, ToolReturnPart
 from qsone import copy
 from qsone.app import create_app
 from qsone.deliverables.tools import OUTPUTS_TOOLS
-from qsone.engine import costs, general
+from qsone.engine import costs, general, tool_groups
 from qsone.engine.team import TEAM_TOOLS
 from qsone.engine.tools_records import RECORDS_TOOLS
 from tests.conftest import AUTH, SECRET, ui_message
@@ -163,14 +163,18 @@ def test_offer_a_new_project():
 
 def test_general_chat_has_no_project_tools():
     seen = Seen()
-    with TestClient(app_for(seen.tools_then(said("أهلاً - عينة")))) as client:
+    every_group = call(tool_groups.OPEN, {"open": list(tool_groups.GROUPS)})
+    with TestClient(
+        app_for(seen.tools_then(every_group), seen.tools_then(said("أهلاً - عينة")))
+    ) as client:
         ask(client, "أهلاً - عينة")
-    [tools] = seen.tools
+    first, tools = seen.tools  # before and after the Lead opened every group of its tools
+    assert first - {tool_groups.OPEN} < tools  # nothing left to open: open_tools goes
     assert set(general.GENERAL_TOOLS) == {"projects", "hand_to_project", "offer_new_project"}
-    assert set(general.GENERAL_TOOLS) <= tools
+    assert set(general.GENERAL_TOOLS) <= first
     assert not tools & {*RECORDS_TOOLS, *OUTPUTS_TOOLS, "note_lesson"}
     assert set(TEAM_TOOLS) <= tools  # Plans 4 and 5: specialists work for the General chat too
-    assert {"web_search", "web_read"} <= tools  # market news and prices: the Lead searches itself
+    assert {"web_search", "web_read"} <= first  # market news and prices: the Lead searches itself
 
 
 def test_a_project_chat_has_no_general_tools():

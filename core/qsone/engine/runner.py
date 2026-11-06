@@ -82,6 +82,7 @@ from qsone.engine import (
     roles,
     selection,
     team,
+    tool_groups,
     tools,
     truth,
 )
@@ -301,6 +302,40 @@ def settled(messages: list) -> list:
         if isinstance(messages[i], ModelResponse) and not _calls(messages[i]):
             return messages[: i + 1]
     return []
+
+
+STEPS_NOTE = "[ONE's note of that Brief's steps, with the ids they gave (data, not the engineer's):"
+
+
+def heard(messages: list) -> list:
+    """An earlier Brief of the chat as the next Brief's Lead hears it: the engineer's words, one
+    line per tool step with the ids it gave (ONE's own note, made by code, so every Brief
+    hears its earlier ones byte for byte the same, and the provider's cache holds), and the
+    Lead's answer. The tool results themselves are left out: every request would carry them
+    again; the answer names its sources and the Lead reads again what it needs. `messages` is
+    `settled`; an answer sent back to be fixed is left out."""
+    asked: list = []
+    steps: list[str] = []
+    calls = {c.tool_call_id: c for m in messages if isinstance(m, ModelResponse) for c in _calls(m)}
+    for m in messages:
+        if not isinstance(m, ModelRequest):
+            continue
+        for p in m.parts:
+            if isinstance(p, UserPromptPart):
+                asked.append(p)
+            elif isinstance(p, ToolReturnPart) and p.tool_name != tool_groups.OPEN:
+                ids = agents.ids_in(p.content)
+                if p.outcome != "success":
+                    ids = ["refused"]
+                elif not ids and p.tool_call_id in calls:
+                    ids = agents.ids_in(calls[p.tool_call_id].args_as_json_str())
+                steps.append(f"- {p.tool_name}" + (f": {', '.join(ids)}" if ids else ""))
+    said = lead_text(messages)
+    if not asked or not said:
+        return []
+    if steps:
+        asked.append(UserPromptPart("\n".join([STEPS_NOTE, *steps[:30]]) + "]"))
+    return [ModelRequest(parts=asked), ModelResponse(parts=[TextPart(said)])]
 
 
 def _sent_back(messages: list, i: int) -> bool:
@@ -763,6 +798,8 @@ class _Brief:
 
     def _say_tools(self, run_id: str, spec: AgentSpec, response: ModelResponse) -> None:
         for c in _calls(response):
+            if c.tool_name == tool_groups.OPEN:
+                continue  # ONE's own step, not work the engineer sees
             tool = REGISTRY.get(c.tool_name)
             words = copy.tool_step(c.tool_name)
             if tool is not None:
@@ -900,7 +937,7 @@ class _Brief:
     def _earlier(self) -> list:
         found = []
         for history in self.store.lead_histories(self.chat_id, self.brief_id):
-            found += settled(_load(history))
+            found += heard(settled(_load(history)))
         return found
 
     def _instructions(self, choice: ModelChoice) -> str:
@@ -1013,7 +1050,8 @@ class _Brief:
         prompt = copy.REPORT_NOW if report else (None if own else self.text)
         earlier = self._earlier()
         effort = self.lead_effort(choice)
-        model = self._costed(run_id, "lead", choice, effort)
+        # the Lead is sent the tool groups its Brief opened (tool_groups)
+        model = tool_groups.ToolGroups(self._costed(run_id, "lead", choice, effort))
         agent = agents.build_agent(
             spec,
             model,
@@ -1100,6 +1138,8 @@ class _Brief:
                 self._agent(run_id, focus=on)
 
         ctx = self.lead_ctx if run_id == self.lead_run_id else self._ctx(run_id, spec)
+        # Claude Code is given every tool at once: no group to open
+        spec = replace(spec, tools=tuple(t for t in spec.tools if t != tool_groups.OPEN))
         token = self.engine.mcp.issue(RunScope(ctx, spec.tools, on_result))
         self.tokens.add(token)
         job_type = _agent_job()

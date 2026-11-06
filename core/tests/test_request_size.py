@@ -22,6 +22,7 @@ from qsone.engine.runner import Engine
 from qsone.projects import Projects
 from qsone.records import files
 from tests.fake_openai import FakeProvider, wire_parts
+from tests.samples import sample_boq_xlsx, sample_pdf
 
 pytestmark = pytest.mark.anyio
 
@@ -36,8 +37,10 @@ LAHUN = "egypt/lahun-medical-center/boq-priced.xlsx"
 def _real_files() -> Path | None:
     """`QSONE_TEST_FILES`, else the private docs repo's `docs/test-files` in the checkout (or
     above a worktree of it); None when neither is on this computer."""
-    found = [Path(os.environ["QSONE_TEST_FILES"])] if "QSONE_TEST_FILES" in os.environ else []
-    found += [p / "docs" / "test-files" for p in Path(__file__).resolve().parents]
+    if "QSONE_TEST_FILES" in os.environ:  # set to a missing folder: the synthetic files
+        found = [Path(os.environ["QSONE_TEST_FILES"])]
+    else:
+        found = [p / "docs" / "test-files" for p in Path(__file__).resolve().parents]
     for root in found:
         if (root / BRISSA).is_dir() and (root / LAHUN).is_file():
             return root
@@ -118,13 +121,29 @@ async def _engine(registry, data_dir, provider, fake_clock, fake_sleep):
     return engine
 
 
-def _add_tender(rec) -> None:
+def _add_tender(rec) -> str:
+    """The real tender when it is on this computer, else a synthetic one of the same kind: 40
+    pages of conditions in two PDFs and a priced BOQ of 120 rows (all sample data)."""
     root = _real_files()
-    if root is None:
-        pytest.skip("the real test files are not on this computer")
-    for path in sorted((root / BRISSA).glob("*.pdf")):
-        files.add_file(rec, path.name, path.read_bytes(), actor="engineer")
-    files.add_file(rec, "boq-priced.xlsx", (root / LAHUN).read_bytes(), actor="engineer")
+    if root is not None:
+        for path in sorted((root / BRISSA).glob("*.pdf")):
+            files.add_file(rec, path.name, path.read_bytes(), actor="engineer")
+        files.add_file(rec, "boq-priced.xlsx", (root / LAHUN).read_bytes(), actor="engineer")
+        return "real"
+    clause = "The Contractor shall comply with the conditions of this clause - sample text. "
+    pages = [[f"Clause {n}.{k} " + clause * 2 for k in range(1, 30)] for n in range(1, 21)]
+    pages[6][3] = (
+        "Bid security of 2 percent of the bid price, valid 28 days beyond the bid validity."
+    )
+    pages[14][5] = "Retention of 5 percent is deducted from each interim payment certificate."
+    files.add_file(rec, "conditions - sample.pdf", sample_pdf(pages), actor="engineer")
+    files.add_file(rec, "specification - sample.pdf", sample_pdf(pages[::-1]), actor="engineer")
+    rows = [
+        [f"3.{n}", f"Concrete work item {n} - sample", "m3", "10", "39850.50", "398505"]
+        for n in range(1, 121)
+    ]
+    files.add_file(rec, "boq - sample.xlsx", sample_boq_xlsx(rows), actor="engineer")
+    return "synthetic"
 
 
 async def _run(engine, chat_id, text):
@@ -176,9 +195,13 @@ async def test_cached_tokens_are_recorded_and_priced_as_cached(
 # A whole Brief ---------------------------------------------------------------------------------
 
 
-async def test_measure_a_brissa_qa_brief(registry, data_dir, fake_clock, fake_sleep):
+async def test_a_qa_brief_stays_under_the_targets(registry, data_dir, fake_clock, fake_sleep):
+    """A Q&A Brief on the Brissa tender, then a second one in Arabic in the same chat: each
+    request under STEP_TARGET, each Brief under BRIEF_TARGET. Before the cuts of 6 Nov these were
+    28,800 to 32,900 a request and 122,000 and 140,000 a Brief (tool schemas 26,800 a request).
+    `pytest -s` prints each request's parts."""
     project = registry.create("Brissa - measure", "engineer")["id"]
-    _add_tender(registry.get(project))
+    kind = _add_tender(registry.get(project))
     questions = [
         ("What is the bid security amount and its validity?", "bid security"),
         ("ما هي نسبة المحتجز من المستخلصات؟", "retention"),
@@ -190,16 +213,37 @@ async def test_measure_a_brissa_qa_brief(registry, data_dir, fake_clock, fake_sl
             provider.script = qa_script(words)
             start = len(provider.bodies)
             await _run(engine, project, text)
-            print(f"\n== Brief: {text}")
-            total = 0
-            for body in provider.bodies[start:]:
-                found = wire_parts(body, brief=text)
-                total += found["total"]
-                print(found)
-            print("Brief total", total)
+            sent = [wire_parts(body, brief=text) for body in provider.bodies[start:]]
+            print(f"\n== {kind} files, Brief: {text}", *sent, sep="\n")
             if os.environ.get("DUMP_BODY"):
                 Path(os.environ["DUMP_BODY"]).write_text(
                     json.dumps(provider.bodies[-1], ensure_ascii=False, indent=1)
                 )
+            assert len(sent) == 4  # list, search, read, answer: the script ran to its end
+            assert max(p["total"] for p in sent) < STEP_TARGET
+            assert sum(p["total"] for p in sent) < BRIEF_TARGET
     finally:
         await engine.shutdown()
+
+
+# The tool schemas a model is sent ---------------------------------------------------------------
+
+
+def test_a_tool_schema_is_sent_without_what_only_the_check_needs():
+    """Titles, length and count limits and patterns are checked by ONE when the tool is called
+    (a refusal names the field and shows the example); the model is sent the shape only."""
+    import qsone.tools  # noqa: F401 - registers the tools
+    from qsone.engine.tools import REGISTRY, sent_schema
+
+    schema = sent_schema(REGISTRY["files_read"])
+    found = json.dumps(schema)
+    for word in ('"title"', '"maxLength"', '"minLength"', '"pattern"', '{"type": "null"}'):
+        assert word not in found
+    assert schema["required"] == ["file_id"]
+    assert schema["properties"]["sheet"] == {"type": "string"}  # optional, not "or null"
+    assert schema["properties"]["part"] == {"default": 1, "minimum": 1, "type": "integer"}
+    assert "additionalProperties" not in schema
+    show = sent_schema(REGISTRY["show"])
+    assert "title" in show["properties"]  # a field's name stays: only the keyword goes
+    full = len(json.dumps(REGISTRY["show"].args.model_json_schema()))
+    assert len(json.dumps(show)) < full * 0.8

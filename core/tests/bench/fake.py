@@ -33,6 +33,7 @@ from pydantic_ai.models.function import AgentInfo
 from pydantic_ai.profiles import ModelProfile
 
 from qsone import copy
+from qsone.engine import tool_groups
 from qsone.engine.types import ModelCard, ModelChoice
 from tests.bench import samples
 from tests.engine_fakes import Scripted, Step, _stream_usage
@@ -64,13 +65,14 @@ class Seen:
     """One request, read: the Brief (the last user prompt), its language and scenario, and
     each bench step done since, with its result text and whether the tool took it."""
 
-    tools: set[str]
+    tools: set[str]  # sent, or in a group the Lead can open
     brief: str
     lang: str  # "ar" | "en"
     scenario: str
     done: dict[str, tuple[str, bool]]  # step -> (result text, ok)
     used: dict[str, str] = field(default_factory=dict)  # step -> the tool it called
     model: str = ""  # the model it runs as, from One's own instructions
+    offered: set[str] = field(default_factory=set)  # the tools sent with this request
     effort: str | None = None  # the `thinking` setting One sent, if any
 
 
@@ -115,13 +117,29 @@ def read(messages: list, info: AgentInfo) -> Seen:
         scenario = "understand"
     elif brief in copy.LESSONS_BRIEF.values():  # the one closing a project starts
         scenario = "lessons"
-    tools = {t.name for t in info.function_tools}
+    offered = {t.name for t in info.function_tools}
+    tools = offered | openable(info)
     model = _MODEL.search(info.instructions or "")
     effort = info.model_request_parameters.thinking  # PydanticAI moves `thinking` here
     seen = Seen(tools, brief, language(brief), scenario, done, used)
     seen.model = model.group(1) if model else ""
+    seen.offered = offered
     seen.effort = effort if isinstance(effort, str) else None
     return seen
+
+
+def openable(info: AgentInfo) -> set[str]:
+    """The tools of the groups the Lead can still open, as `open_tools` names them."""
+    for tool in info.function_tools:
+        if tool.name == tool_groups.OPEN:
+            lines = (tool.description or "").splitlines()
+            return {
+                name.strip()
+                for line in lines
+                if line.startswith("- ") and ":" in line
+                for name in line.split(":", 1)[1].split(",")
+            }
+    return set()
 
 
 def _call(step: str, tool: str, args: dict) -> Step:
@@ -608,7 +626,7 @@ def _report(seen: Seen) -> str:
         return [
             copy.tool_step(seen.used.get(s, ""))[seen.lang]
             for s, (_, k) in seen.done.items()
-            if k is ok
+            if k is ok and seen.used.get(s) != tool_groups.OPEN
         ]
 
     refused, done = said(False), said(True)
@@ -629,8 +647,13 @@ def lead(seen: Seen) -> Step:
         if _STEP_OF[step] in seen.done:
             continue
         found = step(seen)
-        if found is not None and found.parts[0].tool_name in seen.tools:
-            return found
+        if found is None or found.parts[0].tool_name not in seen.tools:
+            continue
+        name = found.parts[0].tool_name
+        opening = "open" + name.replace("_", "")
+        if name not in seen.offered and opening not in seen.done:  # as a real Lead: open it first
+            return _call(opening, tool_groups.OPEN, {"open": [name]})
+        return found
     if seen.scenario == "weak":
         return _say(WEAK_CLAIM)
     if seen.scenario == "chat":
