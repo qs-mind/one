@@ -5,13 +5,31 @@ Build: cargo build --manifest-path drawings/Cargo.toml --release -j 4.
 Tests: cargo test --manifest-path drawings/Cargo.toml -j 4.
 
 Exit 0: read; 1: unreadable; 2: recovered or capped. Limits: 64 MiB input,
-128 MiB DWG decompression, 24 MiB entity JSON, 20,000 rows per category,
-4,096 vertices per outline, eight nested inserts, 200,000 entity visits.
-The Python wrapper times out after 30 seconds. Counts on capped drawings are partial.
+128 MiB DWG decompression, 56 MiB entity JSON, 100,000 rows per category,
+4,096 vertices per outline, eight nested inserts, 2,000,000 entity visits.
+Category byte budgets reserve room for text and inserts: hatches 1 MiB, outlines
+16 MiB, embedded workbooks 40 MiB, other categories 8 MiB each.
+`omitted` records dropped rows; `traversal_limited` records incomplete traversal.
+The Python wrapper times out after 30 seconds. Counts carry `counts_complete`; room candidates are withheld when text or outlines are incomplete.
 Curves use sampled polygons for containment and segment-integral areas; circle areas are exact.
 Tilted or nonplanar outlines are omitted with a limit diagnostic.
 Room matching is a candidate, never a confirmed room. Unknown units produce no area.
 PDF room areas require supplied closed vectors and explicit calibration.
+
+Text rows preserve `raw_text`, `style`, `font_file`, and `big_font_file`.
+Python decodes identified keyboard-mapped Arabic SHX fonts, including scoped
+MTEXT font switches, before indexing. Normal Latin/Unicode fonts remain intact.
+Frame attributes, positioned label/value pairs and cell/grid boundaries supply
+sheet facts. Clean drawing-code filenames supply a sourced fallback number.
+Native TABLE cells and embedded Excel OLE workbooks (BIFF or XLSX Package streams)
+produce positioned text with cell locators. Existing xlrd/openpyxl read cached
+values without running macros or formulas. Embedded image-only OLE content is
+not OCRed by this reader. No new dependencies are introduced.
+
+Block counts use effective dynamic names per layout, excluding frame and legend
+containers and symbols inside identified legend/table regions. Unknown anonymous
+blocks are omitted. Rooms require one recognised room-name label inside the
+smallest valid outline; ambiguous outlines and non-plan sheets yield no rooms.
 
 ## Dependencies and licences
 
