@@ -2618,6 +2618,30 @@ REFUSED_STEP = {
     "en": "the step «{step}» could not be done as it was sent.",
     "ar": "خطوة «{step}» ماكانش ينفع تتعمل بالشكل اللي اتبعتت بيه.",
 }
+# Real walk 2: plain truth checks and replacements in a final reply.
+TRUTH_EMPTY_DOCUMENT = {
+    "en": "The document is still empty. Its text has not been written yet.",
+    "ar": "المستند لسه فاضي. نصه لسه ماتكتبش.",
+}
+TRUTH_CONTRACT_UNREAD = {
+    "en": "These contract values have not been checked against the tender files in this request.",
+    "ar": "قيم شروط العقد دي لسه ماتراجعتش على ملفات المناقصة في الطلب ده.",
+}
+TRUTH_LETTER_MONEY = {
+    "en": (
+        "The letter has values that are not verified against the project records. "
+        "Do not use them yet."
+    ),
+    "ar": "الخطاب فيه قيم لسه ماتراجعتش على سجلات المشروع. ماتستخدمهاش لسه.",
+}
+REPLY_MISSING_VALUE = {"en": "not found", "ar": "مش موجود"}
+REPLY_RECORDS = {"en": "project records", "ar": "سجلات المشروع"}
+REPLY_TABLE = {"en": "table", "ar": "الجدول"}
+REPLY_YOUR_QUOTES = {
+    "en": "If you have alternative offers, add them for comparison",
+    "ar": "لو عندك عروض بديلة، ضيفها عشان نقارنها",
+}
+
 TRUTH_EMPTY_DELIVERABLE = {
     "en": "The reply speaks of priced items, but the Deliverable this Brief made has no items.",
     "ar": "الرد بيتكلم عن بنود متسعّرة، بس المخرج اللي اتعمل في التكليف ده مافيهوش أي بند.",
