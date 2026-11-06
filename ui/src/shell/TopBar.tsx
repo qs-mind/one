@@ -200,7 +200,7 @@ export function TopBar(props: TopBarProps) {
             data-chat-button
             aria-expanded={props.chatOpen}
             title={props.waiting > 0 ? count("decisionsWaiting", props.waiting) : undefined}
-            className={`${button} flex items-center gap-2`}
+            className={`${button} flex shrink-0 items-center gap-2`}
             onClick={props.onChat}
           >
             {t("projectChat")}

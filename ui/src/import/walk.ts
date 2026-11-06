@@ -4,7 +4,7 @@
 import { api } from "../api";
 
 /** One file and the path of its folder inside what was dropped ("" for a file dropped on its own). */
-export type Picked = { file: File; folder: string };
+export type Picked = { file: File | { name: string; size: number }; folder: string; read?: () => Promise<File> };
 
 /** What came in: added and duplicates are counted; files kept but not read yet are counted; the rest are named. */
 export type Report = {
@@ -103,7 +103,7 @@ export function oldProjects(picked: Picked[]): { name: string; picked: Picked[] 
   for (const one of picked) {
     const [root = "", project, ...rest] = one.folder.split("/");
     const name = project ?? (root || one.file.name.replace(/\.[^.]+$/, ""));
-    const inside = project ? { file: one.file, folder: [project, ...rest].join("/") } : one;
+    const inside = project ? { ...one, folder: [project, ...rest].join("/") } : one;
     groups.set(name, [...(groups.get(name) ?? []), inside]);
   }
   return [...groups].map(([name, files]) => ({ name, picked: files }));
@@ -130,14 +130,15 @@ export async function upload(
 ): Promise<Report> {
   const report: Report = { added: 0, duplicates: 0, notRead: 0, tooBig: [], unreadable: [], locked: [], empty: [], zips: 0, failed: [], ids: [] };
   onProgress(0, picked.length);
-  for (const [index, { file, folder }] of picked.entries()) {
+  for (const [index, { file, folder, read }] of picked.entries()) {
     if (file.size > MAX_FILE_BYTES) {
       report.tooBig.push(file.name);
     } else {
       const query = `name=${encodeURIComponent(file.name)}${folder ? `&folder=${encodeURIComponent(folder)}` : ""}`;
-      const response = await api(`/projects/${encodeURIComponent(projectId)}/files?${query}`, {
+      const bytes = await (read ? read() : Promise.resolve(file as File)).catch(() => undefined);
+      const response = bytes && await api(`/projects/${encodeURIComponent(projectId)}/files?${query}`, {
         method: "POST",
-        body: file,
+        body: bytes,
       }).catch(() => undefined);
       const body = response?.ok ? ((await response.json().catch(() => undefined)) as FileAnswer | ZipAnswer | undefined) : undefined;
       if (body && "zip" in body && body.zip) {

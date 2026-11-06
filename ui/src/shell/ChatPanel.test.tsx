@@ -27,7 +27,7 @@ describe("the chat in the shell", () => {
     await user.type(await box(), "سعّر البند ده{enter}");
 
     const answer = await findReply(/مرحبا Hello/);
-    expect(answer.closest("[dir]")).toHaveAttribute("dir", "auto"); // mixed Arabic and English lines render right
+    expect(answer.closest("[dir]")).toHaveAttribute("dir", "rtl"); // the Arabic reply fixes paragraph direction; English runs are isolated
     expect(screen.getByText("سعّر البند ده")).toBeInTheDocument();
     const [, init] = calls(fetch, "POST", "/api/chat")[0]!;
     const body = bodyOf(init) as { id: string; messages: { parts: { text: string }[] }[] };

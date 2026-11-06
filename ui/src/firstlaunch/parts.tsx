@@ -121,6 +121,7 @@ export function StepScreen({
   onSkip,
   next,
   failed,
+  compact = false,
 }: {
   title: string;
   help?: ReactNode;
@@ -133,23 +134,32 @@ export function StepScreen({
   /** The step's main action, at the end of the row. */
   next?: ReactNode;
   failed?: ReactNode;
+  /** Ready keeps its import actions in natural flow, without a height-clipping animation. */
+  compact?: boolean;
 }) {
   useLanguage();
   const heading = useRef<HTMLHeadingElement>(null);
   const id = useId();
   useEffect(() => heading.current?.focus({ preventScroll: true }), [title]);
   return (
-    <section aria-labelledby={id} data-step="" className="flex flex-1 flex-col gap-8">
+    <section aria-labelledby={id} data-step="" className={`flex flex-1 flex-col ${compact ? "gap-4" : "gap-8"}`}>
       <div className="flex flex-col gap-3">
         <h1 id={id} ref={heading} tabIndex={-1} className="text-2xl font-semibold text-ink outline-none">
           {title}
         </h1>
         {help && <p className="text-slate">{help}</p>}
       </div>
-      <AutoHeight className="flex flex-col gap-8">
-        {children}
-        <Alert>{failed ?? (nav.notSaved && t("setupNotSaved"))}</Alert>
-      </AutoHeight>
+      {compact ? (
+        <div data-step-content className="flex shrink-0 flex-col gap-4">
+          {children}
+          <Alert>{failed ?? (nav.notSaved && t("setupNotSaved"))}</Alert>
+        </div>
+      ) : (
+        <AutoHeight className="flex flex-col gap-8">
+          {children}
+          <Alert>{failed ?? (nav.notSaved && t("setupNotSaved"))}</Alert>
+        </AutoHeight>
+      )}
       {/* on Paper, with a Paper fade above it, so the step scrolls softly under it */}
       <div
         data-step-bar=""

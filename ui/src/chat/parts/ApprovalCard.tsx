@@ -1,3 +1,4 @@
+import { BidiText } from "../bidi";
 // A card the engineer must answer: an approval, a Spending Cap pause, a Brief Budget and the like. The core stored it
 // before it was shown; the answer goes to POST /cards/{id}. Raising a cap saves the new caps as they are typed, then
 // goes on (its own button, once the last one is saved). A card with a payload (Plan 5) is drawn by its kind's
@@ -10,7 +11,7 @@
 // An answer the core marks as costing money or not to be taken back (`hold`, core: stream.HOLD) is a press-and-hold
 // (HoldButton), never one click; every other answer, saying no among them, stays one click. ApprovalQueue shows a
 // Brief's cards with one open at a time; the rest wait behind it, said as "2 more waiting".
-import { type JSX, useId, useRef, useState } from "react";
+import { type JSX, useId, useRef, useEffect, useState } from "react";
 import { coreLine, fixOf, send } from "../../core";
 import { useProject } from "../../records/project";
 import { FixAction } from "../../shell/FixAction";
@@ -20,6 +21,8 @@ import { HoldButton } from "../../ui/HoldButton";
 import { type CardAnswer, cardKinds } from "./cardKinds";
 import { FoldMark } from "./Fold";
 import type { CardData } from "./types";
+import { useRowState } from "./rowState";
+import { openRowsDocument, updateRowsDocument } from "../../workspace/rowsDocuments";
 
 /** The event an answered card sends up to the chat. */
 export const CARD_ANSWERED = "qsone:card-answered";
@@ -150,23 +153,32 @@ export function ApprovalCard({
   card,
   lang: given,
   onAnswered,
+  inDocument = false,
 }: {
   id: string;
   card: CardData;
   lang?: Language;
   onAnswered?: () => void;
+  inDocument?: boolean;
 }) {
   const page = useLanguage();
   const lang = given ?? page;
   const titleId = useId();
-  const [chosen, setChosen] = useState<string>();
-  const [sending, setSending] = useState(false);
-  const [raising, setRaising] = useState(false);
-  const [failed, setFailed] = useState<Text>();
-  const [sent, setSent] = useState<CardAnswer>({});
-  const [unfolded, setUnfolded] = useState(false);
+  const sharedId = card.kind === "rows" ? id : undefined;
+  const [chosen, setChosen] = useRowState<string | undefined>(sharedId, "chosen", undefined);
+  const [sending, setSending] = useRowState<boolean>(sharedId, "sending", false);
+  const [raising, setRaising] = useRowState<boolean>(sharedId, "raising", false);
+  const [failed, setFailed] = useRowState<Text | undefined>(sharedId, "failed", undefined);
+  const [sent, setSent] = useRowState<CardAnswer>(sharedId, "sent", {});
+  const [unfolded, setUnfolded] = useRowState<boolean>(sharedId, "unfolded", false);
   const box = useRef<HTMLElement>(null);
-  const readOnly = Boolean(useProject()?.archived_at); // an archived project's chat: nothing here can be pressed
+  useEffect(() => {
+    if (card.kind === "rows" && !inDocument) updateRowsDocument({ id,
+      card: chosen && card.status !== "settled" ? { ...card, status: "settled", choice: chosen, ...sent } : card,
+      lang, onAnswered });
+  }, [id, card, chosen, sent, lang, onAnswered, inDocument]);
+  const project = useProject();
+  const readOnly = Boolean(project?.archived_at); // an archived project's chat: nothing here can be pressed
   const settled = card.status === "settled" ? (card.choice ?? chosen) : chosen;
   const payload = card.payload;
   const Kind = payload ? cardKinds[card.kind] : undefined;
@@ -189,6 +201,7 @@ export function ApprovalCard({
     if (response?.ok) {
       setSent(extra);
       setChosen(choice);
+      if (card.kind === "rows") updateRowsDocument({ id, card: { ...card, status: "settled", choice, ...extra }, lang, onAnswered });
       setRaising(false);
       onAnswered?.();
       // the chat follows the Brief again: what the Lead QS says next shows (ChatLog)
@@ -224,8 +237,8 @@ export function ApprovalCard({
             {/* the trace: what it asked, cut with an ellipsis; under it the answer given and when the core took it */}
             <span className="flex w-full min-w-0 items-baseline gap-1.5">
               <FoldMark open={unfolded} lang={lang} />
-              <span dir="auto" data-card-question className="min-w-0 flex-1 truncate font-semibold">
-                {pick(card.title, lang)}
+              <span dir={dir(lang)} data-card-question className="flex min-w-0 flex-1 items-baseline truncate font-semibold">
+                <BidiText text={pick(card.title, lang)} fitNames />
               </span>
             </span>
             <span className="flex w-full min-w-0 items-baseline gap-1.5 ps-[1.125rem] text-sm text-slate">
@@ -248,12 +261,17 @@ export function ApprovalCard({
           {pick(card.title, lang)}
         </h3>
       )}
+      {card.kind === "rows" && project && !done && !inDocument && (
+        <button type="button" className="self-start rounded-md border border-ink px-3 py-1 text-sm"
+          onClick={() => openRowsDocument({ id, card, lang, onAnswered })}>{t("openAsDocument", lang)}</button>
+      )}
       <div hidden={done && !unfolded} className="flex min-w-0 flex-col gap-2">
         <p dir="auto">{pick(card.detail, lang)}</p>
         {!done && <FixAction fix={fixOf(card.fix)} lang={lang} />}
         {Kind && (
           <Kind
             card={shown}
+            stateId={sharedId}
             sending={busy}
             onAnswer={(choice, extra) => void answer(choice, extra)}
             label={(option) => optionLabel(card.kind, option, lang)}

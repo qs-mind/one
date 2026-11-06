@@ -1,6 +1,9 @@
-// Where a tender folder comes in when it is picked with "Choose folder" (the browser's folder chooser,
-// `<input webkitdirectory>`; One's window has it too). A dropped folder is the window's (shell/WindowDrop.tsx).
-import { useEffect, useRef } from "react";
+// Choose a tender folder: the native directory dialog in ONE, webkitdirectory in a browser.
+// Files enter the same importer as a dropped folder (shell/WindowDrop.tsx).
+import { isTauri } from "@tauri-apps/api/core";
+import { nativeFolder } from "./native";
+import { pick, texts, useLanguage } from "../i18n";
+import { useEffect, useRef, useState } from "react";
 import { importFolders } from "./importer";
 
 let chooser: ((old: boolean) => void) | null = null;
@@ -12,11 +15,18 @@ export function chooseFolder(old: boolean) {
 
 /** The one folder chooser, kept mounted, so a menu that closes when the system dialog opens does not lose it. */
 export function FolderChooser() {
+  const lang = useLanguage();
+  const [failed, setFailed] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const old = useRef(false);
   useEffect(() => {
     chooser = (asOld) => {
       old.current = asOld;
+      setFailed(false);
+      if (isTauri()) {
+        void nativeFolder().then((files) => files && importFolders(files, { old: asOld, chosen: true })).catch(() => setFailed(true));
+        return;
+      }
       if (!input.current) return;
       input.current.value = "";
       input.current.click();
@@ -26,18 +36,21 @@ export function FolderChooser() {
     };
   }, []);
   return (
-    <input
-      ref={input}
-      type="file"
-      hidden
-      multiple
-      data-folder-chooser
-      // folder picking: not in React's input types
-      {...{ webkitdirectory: "", directory: "" }}
-      onChange={(event) => {
-        const files = event.target.files;
-        if (files?.length) void importFolders(Array.from(files), { old: old.current });
-      }}
-    />
+    <>
+      {failed && <p role="alert" className="text-copper">{pick(texts.importFailed, lang)}</p>}
+      <input
+        ref={input}
+        type="file"
+        hidden
+        multiple
+        data-folder-chooser
+        // folder picking: not in React's input types
+        {...{ webkitdirectory: "", directory: "" }}
+        onChange={(event) => {
+          const files = event.target.files;
+          if (files?.length) void importFolders(Array.from(files), { old: old.current });
+        }}
+      />
+    </>
   );
 }

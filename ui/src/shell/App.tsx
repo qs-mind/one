@@ -36,7 +36,7 @@ import { FloatingPanel } from "./FloatingPanel";
 import { GeneralChat } from "./GeneralChat";
 import { useNoticeCount } from "./Notices";
 import { Palette } from "./Palette";
-import { moveRegion, useNarrow, useSmall } from "./regions";
+import { cycleTab, moveRegion, useNarrow, useSmall } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
 import { showsWaitingCard, useChats } from "./useChats";
 import { useClientBoqSample } from "../workspace/clientBoqSample";
@@ -68,7 +68,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   const ai = useAiSettings();
   const sample = sampleMode();
   const sources = useMemo(() => (project ? sourcesFor(project.id) : undefined), [project?.id, sourcesFor, sample]);
-  const documents = useDocuments(sources);
+  const documents = useDocuments(sources, project?.id);
   // sample numbers are said once: in the open Deliverable's facts («الأرقام عينة»), else by the top bar
   const opened = useOpened();
   const boqSample = useClientBoqSample(opened?.key.startsWith("clientboq:") ? opened.key.slice("clientboq:".length) : null);
@@ -265,6 +265,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   useEffect(() => {
     // shortcuts by KeyboardEvent.code, so they work with the Arabic layout too (decision 10)
     function onKey(event: KeyboardEvent) {
+      cycleTab(event);
       if (isMod(event) && matches(event, "KeyK")) {
         event.preventDefault();
         setPaletteOrigin(undefined);
@@ -357,7 +358,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
   return (
     <DirectionProvider dir={dir()}>
       <DocumentsContext.Provider value={documents}>
-        <div className={`flex h-dvh flex-col text-ink ${project ? "bg-stone" : "bg-paper"}`}>
+        <div data-app-focus className={`flex h-dvh flex-col text-ink ${project ? "bg-stone" : "bg-paper"}`}>
           <TopBar
             project={project}
             status={status}

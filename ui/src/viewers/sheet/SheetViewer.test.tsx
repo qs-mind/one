@@ -614,3 +614,21 @@ describe("deliverables api", () => {
     expect(await deliverablesApi.view(P, D)).toMatchObject({ ok: false, error: texts.sheetNoAnswer, status: 0 });
   });
 });
+
+
+it("fits all A–H file columns in the document and wraps narrow heading text (sample BOQ)", () => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1060);
+  try {
+    const fileColumns: ViewColumn[] = [
+      { key: "code", label: {en: "#", ar: "#"}, kind: "text", frozen: true, edit: false, wrap: false, width: 48 },
+      ..."ABCDEFGH".split("").map((key): ViewColumn => ({key, label: {en:key, ar:key}, kind: key === "B" ? "text" : "number", frozen:false, edit:false, wrap:["B", "D", "E", "F"].includes(key), width:["B", "D", "E", "F"].includes(key) ? 280 : 120})),
+    ];
+    const view = sheet({variant:"file_sheet", columns:fileColumns, total:null, rows:[{id:"r20", item_id:"r20", kind:"item", version:1, code:"20", cells:{B:{text:"Sample concrete description"}, H:{text:"80640"}}}]});
+    const {container} = render(<SheetViewer projectId={P} view={view} mode="workspace" readOnly />);
+    const widths = container.querySelector<HTMLElement>(".rdg")!.style.gridTemplateColumns.match(/[\d.]+(?=px)/g)!.map(Number);
+    expect(widths).toHaveLength(9);
+    expect(widths.reduce((a,b) => a+b,0)).toBeLessThanOrEqual(1044);
+    expect(widths[2]).toBeGreaterThanOrEqual(120);
+  } finally { width.mockRestore(); vi.unstubAllGlobals(); }
+});

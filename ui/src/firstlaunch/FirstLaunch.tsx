@@ -158,7 +158,7 @@ export function FirstLaunch({
         <span aria-hidden="true">·</span>
         <span>{t("setupTitle")}</span>
       </header>
-      <main className="flex flex-1 justify-center px-4 pt-6 sm:pt-16">
+      <main className={`flex flex-1 justify-center px-4 pt-6 ${screen === "ready" ? "" : "sm:pt-16"}`}>
         <div className="flex w-full max-w-[36rem] flex-col gap-8">
           {!only && <Dots at={at} />}
           <div key={screen} data-way={way} className="fl-step flex flex-1 flex-col">
@@ -223,7 +223,7 @@ function Ready({
     </button>
   );
   return (
-    <StepScreen title={t("readyTitle")} help={aiSkipped && ai.connected !== true ? t("aiLinkLater") : undefined} nav={nav} skip={false} next={start}>
+    <StepScreen compact title={t("readyTitle")} help={aiSkipped && ai.connected !== true ? t("aiLinkLater") : undefined} nav={nav} skip={false} next={start}>
       {/* AI settings open once the app shows: the flow ends first */}
       <RolesLine ai={ai} onChange={() => (openPanel("ai"), onStart())} />
       {onImport && (
@@ -235,7 +235,7 @@ function Ready({
               handlers.onDrop();
               onImport(event.dataTransfer, false);
             }}
-            className={`flex flex-col items-center gap-4 rounded-lg border-2 border-dashed px-6 py-12 text-center ${
+            className={`flex flex-col items-center gap-4 rounded-lg border-2 border-dashed px-6 py-6 text-center ${
               over ? "border-ink bg-stone" : "border-slate/30"
             }`}
           >

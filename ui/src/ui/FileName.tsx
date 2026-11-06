@@ -48,10 +48,11 @@ export function FileName({ name, className = "", fit = false }: { name: string; 
   const { head, tail, extension } = nameParts(name);
   if (fit) {
     const spaced = /\s$/.test(head);
+    const direction = ARABIC.test(STRONG.exec(name)?.[0] ?? "") ? "rtl" : "ltr";
     return (
       <Tip label={name} when={cut}>
-        <bdi dir="auto" data-file-name className={`inline-flex min-w-0 max-w-full ${className}`}>
-          <span data-cut className="min-w-0 truncate">
+        <bdi dir={direction} data-file-name className={`inline-flex min-w-0 max-w-full ${className}`}>
+          <span data-cut dir={direction} className="min-w-0 truncate">
             {head}
           </span>
           {tail ? (

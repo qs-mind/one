@@ -49,7 +49,7 @@ describe("FileName", () => {
     const { container } = render(<FileName name={name} fit />);
     const outer = container.querySelector("[data-file-name]")!;
     expect(outer.tagName).toBe("BDI");
-    expect(outer).toHaveAttribute("dir", "auto");
+    expect(outer).toHaveAttribute("dir", "rtl");
     expect(outer).toHaveClass("inline-flex", "min-w-0", "max-w-full");
     const [head, tail] = [...outer.children];
     expect(head).toHaveClass("min-w-0", "truncate");

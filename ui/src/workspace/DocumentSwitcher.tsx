@@ -9,6 +9,7 @@ import type { ClientBoqInfo, DocKey, FileInfo, Opened } from "../project/types";
 import { FileName } from "../ui/FileName";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { workspaceApi } from "./api";
+import { viewOf } from "./views";
 import { useClientBoqSample } from "./clientBoqSample";
 
 export type DocumentSwitcherProps = {
@@ -45,7 +46,8 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
   const file = kind === "file" ? files.find((f) => f.id === id) : undefined;
   // a Deliverable's entry says it holds sample numbers; a client BOQ's view did, when it was read
   const boqSample = useClientBoqSample(boq ? boq.file_id : null);
-  const sample = (current?.sample ?? false) || boqSample;
+  const view = kind === "view" ? viewOf(id) : undefined;
+  const sample = (current?.sample ?? false) || boqSample || (view?.sample ?? false);
 
   const title: ReactNode = current ? (
     <span dir="auto" lang={current.language}>
@@ -57,6 +59,8 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
     </>
   ) : file ? (
     <FileName name={file.name} />
+  ) : view ? (
+    <span dir="auto">{view.title}</span>
   ) : (
     t("projectFiles")
   );

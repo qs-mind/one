@@ -1,5 +1,5 @@
 // The source mark: when a source opens, a Copper ink box (or underline) draws round the exact figure, from the
-// inline-start side (the right in Arabic), and fades after about 1.5 s; the row it stands in flashes Stone. With
+// inline-start side (the right in Arabic), and fades after 3 s; the row it stands in flashes Stone. With
 // reduced motion the mark and the flash show whole at once and go at once.
 import { DUR, play, reducedMotion } from "../ui/motion";
 import { markPath, visibleRect } from "./geometry";
@@ -10,7 +10,7 @@ import { elementsFor } from "./targets";
 const COPPER = "var(--color-copper, #a6491b)";
 const STONE = "var(--color-stone, #f2eee7)";
 /** How long the mark stays before it fades. */
-export const MARK_HOLD_MS = 1500;
+export const MARK_HOLD_MS = 3000;
 /** How long a source that is opening (the document switching, a file's text loading) is waited for. */
 export const REVEAL_WAIT_MS = 2000;
 
@@ -28,23 +28,41 @@ export function readingDirection(el: Element): "rtl" | "ltr" {
   return document.documentElement.dir === "rtl" ? "rtl" : "ltr";
 }
 
-/** Where `figure` is written inside `el` (the first time), or null: the box goes round the figure, not its row. */
-function figureRect(el: Element, figures: string[]): DOMRect | null {
+/** Compare numeric spelling without arithmetic: grouped figures and zero decimal places name the same value. */
+function numericText(text: string): string | null {
+  const plain = text.replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x6f0))
+    .replace(/[,٬]/g, "").replace(/٫/g, ".");
+  if (!/^-?\d+(?:\.\d+)?$/.test(plain)) return null;
+  return plain.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+}
+
+/** Match a whole numeric token, so 15 does not mark the 15 inside 115. */
+function figureRange(el: Element, figures: string[]): Range | null {
   if (!figures.length || typeof document.createRange !== "function") return null;
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent ?? "";
     for (const figure of figures) {
-      const at = figure ? text.indexOf(figure) : -1;
+      const numeric = numericText(figure);
+      const match = numeric === null ? null : [...text.matchAll(/-?[0-9٠-٩۰-۹]+(?:[,٬.٫][0-9٠-٩۰-۹]+)*/g)]
+        .find((part) => numericText(part[0]) === numeric);
+      const at = match?.index ?? (numeric === null && figure ? text.indexOf(figure) : -1);
       if (at < 0) continue;
       const range = document.createRange();
       range.setStart(node, at);
-      range.setEnd(node, at + figure.length);
-      const r = typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : null;
-      if (r && r.width > 0 && r.height > 0) return r;
+      range.setEnd(node, at + (match?.[0].length ?? figure.length));
+      return range;
     }
   }
   return null;
+}
+
+/** The figure's own box, retaining the original text's offsets and punctuation. */
+function figureRect(el: Element, figures: string[]): DOMRect | null {
+  const range = figureRange(el, figures);
+  const rect = range && typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : null;
+  return rect && rect.width > 0 && rect.height > 0 ? rect : null;
 }
 
 let last: (() => void) | null = null; // a newer mark takes over at once
@@ -69,7 +87,9 @@ export async function markSource(el: Element, { shape = "box", figures = [], row
     return exact ?? shown;
   };
   const first = box() ?? visible;
-  const pen = stroke(markPath(first, shape, direction), COPPER, 1.5, "mark");
+  const pen = stroke(markPath(first, shape, direction), COPPER, 2, "mark");
+  // Use a solid stroke so visibility does not depend on normalized SVG dash animation in WebKitGTK.
+  pen.style.strokeDasharray = "none";
   const shownRow = row && visibleRect(row);
   const flash = shownRow ? rectShape(shownRow, STONE, "flash") : null;
   const stop = trackRects([el, ...(row ? [row] : [])], () => {
@@ -94,7 +114,6 @@ export async function markSource(el: Element, { shape = "box", figures = [], row
     await wait(MARK_HOLD_MS);
     return remove();
   }
-  void play(pen, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], DUR.roll);
   if (flash) void play(flash, [{ opacity: 0 }, { opacity: 1 }], DUR.base);
   await wait(MARK_HOLD_MS);
   if (gone) return;
@@ -125,7 +144,13 @@ export async function revealSource(keys: string[], figures: string[] = []): Prom
     await nextFrame();
   }
   if (!el) return !!shown(pages);
-  el.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  // A raw file registers its row on the first cell. Search the row for the cited figure
+  // before scrolling, otherwise the mark can land on A while the source is in H.
+  const inRow = el.closest('[role="row"]') ?? el;
+  const figure = figureRange(inRow, figures);
+  const figureElement = figure?.startContainer.parentElement;
+  if (figureElement) el = figureElement;
+  el.scrollIntoView?.({ block: "center", inline: "center" });
   // still moving (scrolling into view): marked once it has stopped
   let before = el.getBoundingClientRect();
   for (let i = 0; i < 60; i++) {

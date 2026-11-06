@@ -6,6 +6,7 @@ import { fill, setLanguage, texts } from "../i18n";
 import type { ClientBoqInfo, DocKey, FileInfo } from "../project/types";
 import { DocumentSwitcher } from "./DocumentSwitcher";
 import { workspaceApi } from "./api";
+import { openView } from "./views";
 
 const old = entry({ id: "d-old", title: "الكميات القديمة", updated_at: "2026-11-01T09:00:00+00:00" });
 const fresh = entry({ id: "d-new", title: "المقايسة المسعّرة", updated_at: "2026-11-05T09:00:00+00:00", revision: 2, sample: true });
@@ -139,4 +140,12 @@ describe("DocumentSwitcher", () => {
     await userEvent.click(screen.getByRole("button", { name: /المقايسة المسعّرة/ }));
     expect(screen.getByRole("menuitem", { name: /Project files/ })).toBeTruthy();
   });
+});
+
+it("names the sample top-items view opened as a document", () => {
+  const view = { title: "Top electrical items — sample", sample: true, blocks: [], sources: {}, unsourced: [] };
+  openView("sample-top-items", view);
+  show({ opened: workspaceApi.current()! });
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(view.title);
+  expect(screen.getByText(texts.sampleNumbers.ar)).toBeInTheDocument();
 });

@@ -262,3 +262,18 @@ describe("DocumentView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(texts.documentFailed.ar);
   });
 });
+
+
+it("keeps a file row source reachable on its amount cell when early columns scroll away (sample)", async () => {
+  const view = {
+    ...sheet({id:"file-sheet-sample", sample:true, total:null}), variant:"file_sheet", sheet:"Sample", sheets:[{name:"Sample", hidden:false}],
+    columns:[
+      {key:"A", label:{en:"A",ar:"A"}, kind:"text" as const, edit:false, frozen:false, wrap:false, width:120},
+      {key:"H", label:{en:"H",ar:"H"}, kind:"number" as const, edit:false, frozen:false, wrap:false, width:120},
+    ],
+    rows:[{id:"r20", item_id:"r20", kind:"item" as const, version:1, code:"20", cells:{A:{text:"Sample item"},H:{text:"80640"}}}],
+  };
+  show({key:"file:f3", anchor:null}, {sheets:{f3:{Sample:view}}});
+  const amount = await screen.findByText("80640");
+  expect(amount).toHaveAttribute("data-source-at", "file:f3#sheet=Sample&row=20");
+});

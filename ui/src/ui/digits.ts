@@ -1,6 +1,6 @@
 // One way numbers read on screen, in both languages: Western digits, "," for thousands and "." for decimals
 // (viewers/sheet/format.ts formats the ledger's numbers so). A number written with Arabic-Indic digits or separators
-// («٦٤٠٬٩٨٣٫٣٥», by the engineer or the Lead QS) reads «640,983.35»: in ONE's fonts «٫» looks like a comma, so the
+// («٦٤٠٬٩٨٣٫٣٥», in ONE's output) reads «640,983.35». Engineer-authored text is preserved. In ONE's fonts «٫» looks like a comma, so the
 // decimal read as a thousands mark («640,983,35»).
 
 import { fill, t } from "../i18n";

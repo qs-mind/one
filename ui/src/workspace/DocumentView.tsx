@@ -9,6 +9,8 @@ import { FileDoc } from "./docs/FileDoc";
 import { FilesDoc } from "./docs/FilesDoc";
 import { ViewPart } from "../chat/parts/view/ViewPart";
 import { viewOf } from "./views";
+import { useRowsDocument } from "./rowsDocuments";
+import { ApprovalCard } from "../chat/parts/ApprovalCard";
 
 export function DocumentView(props: {
   projectId: string;
@@ -26,6 +28,7 @@ export function DocumentView(props: {
   const at = opened.key.indexOf(":");
   const kind = opened.key.slice(0, at) as DocKind;
   const id = opened.key.slice(at + 1);
+  const rows = useRowsDocument(kind === "view" ? id : "");
   // each document starts fresh: its own scroll, page and selection
   switch (kind) {
     case "deliverable":
@@ -39,6 +42,7 @@ export function DocumentView(props: {
     case "files":
       return <FilesDoc />;
     case "view": {
+      if (rows) return <div className="h-full overflow-auto p-4"><ApprovalCard {...rows} inDocument /></div>;
       // a view the Lead QS showed, wider than the chat: here at the document's width
       const view = viewOf(id);
       return view ? (

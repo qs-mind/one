@@ -6,7 +6,8 @@ import { createHistory } from "./history";
 
 const listeners = new Set<() => void>();
 const moves = new Set<() => void>(); // the place in the open document moved: saved, nothing re-renders
-const history = createHistory();
+let history = createHistory();
+const histories = new Map<string, ReturnType<typeof createHistory>>();
 const home: DocKey = "files:all";
 let current: Opened | null = null;
 let exists: (key: DocKey) => boolean = () => true;
@@ -39,10 +40,16 @@ export const workspaceApi = {
     current.anchor = anchor;
     for (const listener of [...moves]) listener();
   },
-  /** On project open: the saved document, or Project files when there is none or it is gone. Clears the history. */
-  reset(opened: Opened | null, check: (key: DocKey) => boolean) {
+  /** On project open: restore its session history; reset without a project starts a fresh session (tests). */
+  reset(opened: Opened | null, check: (key: DocKey) => boolean, projectId?: string) {
     exists = check;
-    history.clear();
+    if (projectId) {
+      history = histories.get(projectId) ?? createHistory();
+      histories.set(projectId, history);
+    } else {
+      histories.clear();
+      history = createHistory();
+    }
     set(opened && check(opened.key) ? opened : { key: home, anchor: null });
   },
   /** A document was replaced by a new version (a file uploaded again): the new one takes its place, open or in the

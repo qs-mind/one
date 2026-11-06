@@ -1,6 +1,6 @@
 import type { Channel } from "@tauri-apps/api/core";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -80,6 +80,8 @@ describe("HealthGate while ONE is open", () => {
       </HealthGate>,
     );
     expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
+    // The DOM can appear before the passive mount effect has flushed.
+    await waitFor(() => expect(mounts).toBe(1));
     const before = mounts;
 
     up = false;

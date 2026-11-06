@@ -139,12 +139,26 @@ export function SheetViewer(props: SheetViewerProps) {
       ...c,
       width: oneLineWidth(c, pick(c.label, view.language), view.rows, measure, c.kind === "calc" ? totalText : [], sizes),
     }));
+    // Raw Excel sheets have several wide heading columns, not one description column.
+    // Share the available room across them; wrapped headings gain height instead of hiding G/H.
+    if (full && view.variant === "file_sheet" && room > 0) {
+      const available = (room - SCROLLBAR) / space;
+      const minima = ordered.map((c) => c.frozen ? c.width : c.wrap
+        ? (c.kind === "text" ? 120 : 72)
+        : oneLineWidth({ ...c, width: 40 }, pick(c.label, view.language), view.rows, measure, [], sizes));
+      const minimum = minima.reduce((sum, width) => sum + shownWidth(width), 0);
+      const natural = ordered.reduce((sum, c) => sum + shownWidth(c.width), 0);
+      if (natural > available) {
+        const ratio = Math.max(0, Math.min(1, (available - minimum) / Math.max(1, natural - minimum)));
+        return ordered.map((c, i) => ({ ...c, width: Math.floor(minima[i]! + Math.max(0, c.width - minima[i]!) * ratio) }));
+      }
+    }
     const title = titleColumnOf(ordered);
     // in the Deliverable's units (at 100 %), as the widths are
     const extra = Math.floor((room - SCROLLBAR) / space - ordered.reduce((sum, c) => sum + shownWidth(c.width), 0));
     if (!full || !title || room <= 0 || extra === 0) return ordered;
     return ordered.map((c) => (c.key === title ? { ...c, width: Math.max(c.width + extra, Math.min(c.width, TITLE_MIN)) } : c));
-  }, [view.columns, view.rows, view.total, view.language, full, room, measure, fontsLoaded, space, textSize]);
+  }, [view.columns, view.rows, view.total, view.language, view.variant, full, room, measure, fontsLoaded, space, textSize]);
   const byKey = useMemo(() => new Map(columns.map((c) => [c.key, c])), [columns]);
   const titleColumn = titleColumnOf(columns);
   const gridColumns = useMemo<SheetColumn[]>(

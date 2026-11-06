@@ -91,7 +91,7 @@ function OwnText({ text }: { text: string }) {
   return runs.map((run, i) =>
     typeof run === "string" ? (
       <p key={i} dir="auto" className="min-h-[1lh] whitespace-pre-wrap">
-        <BidiText text={run} />
+        <BidiText text={run} preserveDigits />
       </p>
     ) : (
       <div key={i} className="my-1 max-w-full overflow-x-auto">
@@ -136,6 +136,7 @@ function BriefReply({
         <Reply
           key="text"
           text={text}
+          lang={progress.find((part) => part.data.lang)?.data.lang}
           unsourced={partsOf(parts, "unsourced").flatMap((one) => one.data.values)}
           sourced={Object.assign({}, ...partsOf(parts, "sourced").map((one) => one.data.numbers))}
           projectId={projectId}
@@ -158,8 +159,8 @@ function BriefReply({
       {partsOf(parts, "files_read").map((found) => (
         <div key={found.id} role="status" className="flex flex-col gap-1">
           {found.data.lines.map((line, index) => (
-            <p key={index} dir="auto">
-              {pick(line, said)}
+            <p key={index} dir={dir(said)}>
+              <BidiText text={pick(line, said)} />
             </p>
           ))}
         </div>

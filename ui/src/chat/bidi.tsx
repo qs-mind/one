@@ -1,10 +1,11 @@
-// Mixed Arabic and English in one block. Each block takes its base direction from its own first strong letter
-// (dir="auto"). Inside it, a run in the other script (a file name, a cell like H18, an English word in an Arabic line)
+// Mixed Arabic and English in one block. Prose sets the direction; leading ONE and file names are labels.
+// Inside it, a run in the other script (a file name, a cell like H18, an English word in an Arabic line)
 // is isolated in a <bdi>, so the Unicode bidi rules cannot pull the punctuation and numbers around it to its side:
 // «إجمالي البنود في ملف boq-priced.xls:» ends with its colon at the Arabic end, and 100,912,880.78 stays after it.
 // Runs are cut only between words, never inside one, so Arabic letters always stay joined.
 import { Fragment } from "react";
 import { westernNumbers } from "../ui/digits";
+import { FileName } from "../ui/FileName";
 
 const LATIN = "\\p{Script=Latin}";
 const ARABIC = "\\p{Script=Arabic}";
@@ -13,8 +14,8 @@ const latinUnit = `(?:\\p{Nd}+(?:[.,]\\p{Nd}+)*)?${LATIN}[${LATIN}\\p{Nd}\\p{M}]
 const arabicUnit = `[${ARABIC}\\u0640][${ARABIC}\\p{M}\\u0640\\u200c\\u200d]*`;
 // words of one script with the spaces (and bare numbers) between them: "Project Records", "Section 3 Concrete"
 const run = (unit: string) => new RegExp(`${unit}(?:\\s+(?:\\p{Nd}+\\s+)*${unit})*`, "gu");
-const latinRun = run(latinUnit);
-const arabicRun = run(arabicUnit);
+const latinRun = new RegExp(`\\p{Nd}{4}-\\p{Nd}{2}-\\p{Nd}{2}|\\p{Nd}+(?:[.]\\p{Nd}+)+(?:\\([A-Za-z]+\\))|${run(latinUnit).source}`, "gu");
+const arabicRun = new RegExp(`\\p{Nd}{4}-\\p{Nd}{2}-\\p{Nd}{2}|${run(arabicUnit).source}`, "gu");
 const RTL = /[\p{Script=Arabic}\p{Script=Hebrew}]/u;
 const STRONG = /[\p{L}]/u;
 
@@ -23,6 +24,12 @@ export function baseDirection(text: string): "rtl" | "ltr" | null {
   const first = STRONG.exec(text)?.[0];
   if (!first) return null;
   return RTL.test(first) ? "rtl" : "ltr";
+}
+
+/** Names and ONE are labels, not the language of the surrounding sentence. */
+export function proseDirection(text: string): "rtl" | "ltr" | null {
+  const prose = text.replace(/\bONE\b|[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+/g, "");
+  return baseDirection(prose) ?? baseDirection(text);
 }
 
 export type Piece = { text: string; isolate: boolean };
@@ -45,7 +52,9 @@ export function pieces(text: string, base: "rtl" | "ltr" | null): Piece[] {
 type Node = { type: string; value?: string; children?: Node[]; data?: object };
 
 const BLOCKS = new Set(["paragraph", "heading", "tableCell"]);
-const isolate = (children: Node[]): Node => ({ type: "isolate", data: { hName: "bdi" }, children });
+const isolate = (children: Node[], direction: "rtl" | "ltr" | "auto" = "auto"): Node => ({
+  type: "isolate", data: { hName: "bdi", hProperties: { dir: direction, style: `unicode-bidi: isolate${children.some((child) => /^\d{4}-\d{2}-\d{2}$/.test(child.value ?? "")) ? "; white-space: nowrap" : ""}` } }, children,
+});
 
 /** Text as dir="auto" reads it: a <bdi> (here: inline code) does not count. */
 function plain(node: Node): string {
@@ -59,7 +68,7 @@ function wrap(node: Node, base: "rtl" | "ltr" | null) {
   node.children = node.children.flatMap((child): Node[] => {
     if (child.type === "text") {
       return pieces(child.value ?? "", base).map((piece) =>
-        piece.isolate ? isolate([{ type: "text", value: piece.text }]) : { type: "text", value: piece.text },
+        piece.isolate ? isolate([{ type: "text", value: piece.text }], baseDirection(piece.text) ?? "ltr") : { type: "text", value: piece.text },
       );
     }
     if (child.type === "inlineCode") return [isolate([child])]; // code is often a file name or a formula
@@ -69,20 +78,28 @@ function wrap(node: Node, base: "rtl" | "ltr" | null) {
 }
 
 /** A remark step: in each paragraph, heading and table cell, the runs in the other script are isolated. */
-export function isolateOtherScript() {
+export function isolateOtherScript(replyDirection?: "rtl" | "ltr") {
   const walk = (node: Node) => {
-    if (BLOCKS.has(node.type)) return wrap(node, baseDirection(plain(node)));
+    if (BLOCKS.has(node.type)) {
+      const direction = replyDirection ?? proseDirection(plain(node));
+      node.data = { ...node.data, hProperties: { dir: direction ?? "auto" } };
+      return wrap(node, direction);
+    }
     for (const child of node.children ?? []) walk(child);
   };
   return () => walk;
 }
 
-/** Plain text (the engineer's own message, a card's cell) with the other script's runs isolated. */
-export function BidiText({ text }: { text: string }) {
+/** Plain text with other-script runs isolated. Engineer-authored text opts out of number formatting. */
+export function BidiText({ text, fitNames = false, preserveDigits = false }: { text: string; fitNames?: boolean; preserveDigits?: boolean }) {
   return (
     <>
-      {pieces(westernNumbers(text), baseDirection(text)).map((piece, i) =>
-        piece.isolate ? <bdi key={i}>{piece.text}</bdi> : <Fragment key={i}>{piece.text}</Fragment>,
+      {pieces(preserveDigits ? text : westernNumbers(text), proseDirection(text)).map((piece, i) =>
+        fitNames && /\.[A-Za-z0-9]{1,8}$/.test(piece.text) ? (
+          <FileName key={i} name={piece.text} fit />
+        ) : piece.isolate ? <bdi key={i} dir={baseDirection(piece.text) ?? "ltr"} style={{ unicodeBidi: "isolate", whiteSpace: /^\d{4}-\d{2}-\d{2}$/.test(piece.text) ? "nowrap" : undefined }}>{piece.text}</bdi> : fitNames ? (
+          <span key={i} className="shrink-0 whitespace-pre">{piece.text}</span>
+        ) : <Fragment key={i}>{piece.text}</Fragment>,
       )}
     </>
   );
