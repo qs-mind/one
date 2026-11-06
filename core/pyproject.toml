@@ -48,7 +48,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "xlwt"]
+dev = ["pytest", "ruff", "xlwt", "pyyaml"]  # pyyaml (MIT): the command line's walk files
 
 [tool.hatch.build.targets.wheel]
 packages = ["qsone"]
