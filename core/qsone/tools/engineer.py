@@ -166,15 +166,34 @@ def answered(store: Store, card_id: str) -> dict | None:
 async def _ask(ctx: ToolContext, args: AskArgs) -> str:
     brief = ctx.store.brief(ctx.brief_id)["text"]
 
+    # Question framing adds no requested fact. Ownership and choice qualifiers
+    # deliberately stay: "your rate" differs from a tender's rate.
+    framing = set(
+        normalise(
+            "what is are the a an and or can could would you me tell give show please "
+            "ما هو هي هل ممكن قول لي لو سمحت من فضلك ايه كام"
+        ).split()
+    )
+
     def tokens(text):
-        return re.findall(r"\w+", normalise(text).casefold())
+        return [
+            word for word in re.findall(r"\w+", normalise(text).casefold()) if word not in framing
+        ]
 
     original = tokens(brief)
     for q in args.questions:
         proposed = tokens(q.text)
         overlap = len(set(original) & set(proposed)) / max(1, len(set(proposed)))
         similar = SequenceMatcher(None, " ".join(original), " ".join(proposed)).ratio()
-        if similar >= 0.72 or (len(proposed) >= 2 and overlap >= 0.8):
+        # Shared QS nouns do not make the same request: a new qualifier such as
+        # "your"/"عندك", or a different fact (rate vs grade), changes what is asked.
+        new_words = set(proposed) - set(original)
+        owned_rate = bool(set(proposed) & {"your", "عندك", "سعرك", "اسعارك"}) and bool(
+            set(proposed) & {"rate", "rates", "price", "prices", "سعر", "اسعار", "سعرك", "اسعارك"}
+        )
+        choice = bool(set(proposed) & {"choose", "prefer", "اختيارك", "تفضل"})
+        restates = not new_words and (similar >= 0.72 or (len(proposed) >= 2 and overlap >= 0.8))
+        if restates and (proposed == original or not (owned_rate or choice)):
             raise ModelRetry(
                 "Do not send the Brief's request back as a question: answer from the files "
                 "or say plainly what was not found. Ask only for their own prices or choices."

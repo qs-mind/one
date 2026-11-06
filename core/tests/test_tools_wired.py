@@ -218,7 +218,14 @@ def test_a_scripted_lead_reads_a_file_then_asks_the_engineer(serve_app):
         copy.fill(copy.DOING_FILES_READ_PAGE, name=copy.file_name("مواصفات - عينة.pdf"), page="1")
         in progress
     )
-    assert copy.DOING_ASK in progress
+    all_chunks = before + after
+    card_at = next(i for i, c in enumerate(all_chunks) if c["type"] == "data-card")
+    wait_at = next(
+        i
+        for i, c in enumerate(all_chunks)
+        if c["type"] == "data-progress" and c["data"]["text"] == copy.DOING_ASK
+    )
+    assert card_at < wait_at
     assert said(after).endswith("الدرجة C30 والخرسانة جاهزة - عينة")  # the results reached it
     read, asked = holder["seen"]["files_read"], holder["seen"]["ask_engineer"]
     assert "Concrete grade C30" in read and f"file:{holder['file']}#page=1" in read

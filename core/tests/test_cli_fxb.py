@@ -174,7 +174,8 @@ def test_drawings_map_includes_sheets(adapter):
     assert result["files"][0]["sheets"][0]["number"] == "A1"
 
 
-def test_stop_retains_session_on_slow_shutdown(adapter, monkeypatch):
+@pytest.mark.parametrize("finishes", [False, True])
+def test_stop_retains_session_on_slow_shutdown(adapter, monkeypatch, finishes):
     from qsone.cli import session
     from qsone.cli.texts import CliError
 
@@ -190,11 +191,14 @@ def test_stop_retains_session_on_slow_shutdown(adapter, monkeypatch):
     )
     session.save(commands.path, saved)
     original = Path.read_text
+    elapsed = [0]
     monkeypatch.setattr(
         Path,
         "read_text",
         lambda path, *a, **kw: (
-            "987654 (python) S " + " ".join(["0"] * 18 + ["123"])
+            "987654 (python) "
+            + ("Z " if finishes and elapsed[0] >= 12 else "S ")
+            + " ".join(["0"] * 18 + ["123"])
             if str(path) == "/proc/987654/stat"
             else original(path, *a, **kw)
         ),
@@ -203,11 +207,22 @@ def test_stop_retains_session_on_slow_shutdown(adapter, monkeypatch):
     monkeypatch.setattr(Path, "read_bytes", lambda path: ("\0".join(expected) + "\0").encode())
     killed = []
     monkeypatch.setattr(session.os, "kill", lambda *a: killed.append(a))
-    times = iter([0, 11])
-    monkeypatch.setattr(session.time, "monotonic", lambda: next(times))
-    with pytest.raises(CliError, match="still shutting down"):
-        session.stop(commands.path)
-    assert commands.path.exists() and len(killed) == 1
+    times = iter([0, 11, 12, 61])
+
+    def clock():
+        elapsed[0] = next(times)
+        return elapsed[0]
+
+    monkeypatch.setattr(session.time, "monotonic", clock)
+    monkeypatch.setattr(session.time, "sleep", lambda _: None)
+    if finishes:
+        assert session.stop(commands.path) == {"state": "stopped"}
+        assert not commands.path.exists()
+    else:
+        with pytest.raises(CliError, match="still shutting down"):
+            session.stop(commands.path)
+        assert commands.path.exists()
+    assert len(killed) == 1
 
 
 def test_stop_refuses_reused_pid_even_if_zombie(adapter, monkeypatch):
