@@ -118,7 +118,9 @@ def require_local_sockets():
 def test_pdf_route_handler(rec, monkeypatch):
     f = add_file(rec, "sample.docx", word(), actor="engineer")
     router = projects.router(SimpleNamespace(get=lambda pid: rec))
-    endpoint = next(r.endpoint for r in router.routes if r.path.endswith("/{file_id}/pdf"))
+    endpoint = next(
+        r.endpoint for r in router.routes if getattr(r, "path", "").endswith("/{file_id}/pdf")
+    )
     monkeypatch.setattr(office, "find_soffice", lambda: None)
     with pytest.raises(RecordsError) as error:
         endpoint(rec.id, f.id)
