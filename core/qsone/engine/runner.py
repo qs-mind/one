@@ -1840,7 +1840,11 @@ class Engine:
         """Every unfinished Brief that is not running now, in every project and General."""
         found = []
         for place in self._places():
-            for b in place.store.unfinished():
+            try:
+                briefs = place.store.unfinished()
+            except RecordsError:
+                continue  # a project closed while it was read (a project switch): asked again later
+            for b in briefs:
                 if b["id"] in self._briefs:
                     continue
                 found.append(

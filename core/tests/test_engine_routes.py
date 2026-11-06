@@ -129,6 +129,21 @@ def test_every_route_needs_the_secret():
             assert client.request(method, path).status_code == 401, path
 
 
+def test_unfinished_skips_a_project_that_closes_while_it_is_read(monkeypatch):
+    """Real walk: switching projects closed one while the start asked for unfinished Briefs, and
+    the whole answer was 409 PROJECT_NOT_OPEN."""
+    from qsone.engine.store import Store
+    from qsone.records.project import RecordsError
+
+    def closed(self):
+        raise RecordsError(copy.PROJECT_NOT_OPEN, status=409)
+
+    monkeypatch.setattr(Store, "unfinished", closed)
+    with TestClient(app_with(links(lead=scripted()))) as client:
+        r = client.get("/briefs/unfinished", headers=AUTH)
+        assert r.status_code == 200 and r.json() == {"briefs": []}
+
+
 def test_briefs_routes_when_nothing_runs():
     with TestClient(app_with(links(lead=scripted()))) as client:
         assert client.get("/briefs/unfinished", headers=AUTH).json() == {"briefs": []}
