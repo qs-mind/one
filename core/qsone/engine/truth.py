@@ -680,6 +680,30 @@ def place_text(conn, place: Place) -> list[str] | None:
     return [t for (t,) in rows] or None
 
 
+_ITEM_CODE = re.compile(
+    r"(?:(?<![؀-ۿ])(?:بند|البند)\s*(?:رقم\s*)?|\bitem\s+(?:no\.?\s*)?)"
+    r"(?P<code>[0-9٠-٩A-Za-z][0-9٠-٩A-Za-z./-]*[0-9٠-٩A-Za-z]|[0-9٠-٩])",
+    re.I,
+)
+
+
+def _tokens(text: str) -> set[str]:
+    return set(re.split(r"[\s|،,:;()«»\"']+", text.translate(_DIGITS)))
+
+
+def _item_codes(conn, segment: str) -> list[str]:
+    """The client BOQ codes a segment names as items («بند 17», "item 03/02")."""
+    named = [m["code"].translate(_DIGITS) for m in _ITEM_CODE.finditer(segment)]
+    if not named:
+        return []
+    found = conn.execute(
+        "SELECT code FROM items WHERE kind = 'boq_item' AND code IN"
+        " (SELECT value FROM json_each(?))",
+        (json.dumps(named),),
+    ).fetchall()
+    return sorted({c for (c,) in found})
+
+
 def miscited(conn, text: str) -> list[Problem]:
     """Each number a reply gives at a cited place (a sheet's row, a page) that the place does not
     have, and each cited place no project file has. One Problem for the model, with a flag for
@@ -702,6 +726,15 @@ def miscited(conn, text: str) -> list[Problem]:
                 line = f"«{segment[:100]}» cites {where['en']}, which no project file has."
                 wrong.append((line, copy.fill(copy.TRUTH_NO_PLACE, place=where)))
             continue
+        rows = [p for p in places if p.sheet is not None]
+        for code in _item_codes(conn, segment) if rows else ():
+            if not any(code in _tokens(t) for t in texts):  # the row of another item
+                where = rows[0].words()
+                line = (
+                    f"«{segment[:100]}» prices item {code} from {where['en']}, which is not "
+                    f"item {code}'s row."
+                )
+                wrong.append((line, copy.fill(copy.TRUTH_OTHER_ROW, code=code, place=where)))
         have = numbers_guard.known_values(texts)
         for written, value in numbers:
             if value in have:

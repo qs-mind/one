@@ -1973,6 +1973,13 @@ SOURCE_NOT_EVIDENCE = {
         "أو سعر من QS Mind، أو رد المهندس."
     ),
 }
+CLIENT_ITEMS_IMPORTED = {
+    "en": "The client's BOQ items come only from the engineer's import or an accepted change. "
+    "Record a breakdown's parts as resource items, and a condition or a contract's data as its "
+    "own kind; a new row in a Deliverable is proposed there as a change.",
+    "ar": "بنود مقايسة العميل بتيجي من استيراد المهندس أو تعديل اتقبل بس. سجّل مكونات التحليل "
+    "كموارد، والشروط وبيانات العقد كنوع لوحدها؛ والصف الجديد في مستند بيتقترح هناك كتعديل.",
+}
 NUMBER_NEEDS_CALC = {
     "en": (
         "A computed number comes only from the QS Calc Engine. "
@@ -2491,6 +2498,10 @@ TRUTH_MISCITED = {
 TRUTH_NO_PLACE = {
     "en": "The reply cites {place}, which no project file has.",
     "ar": "الرد بيستشهد بـ{place}، ومفيش ملف في المشروع فيه المكان ده.",
+}
+TRUTH_OTHER_ROW = {
+    "en": "The reply prices item {code} from {place}, which is another item's row.",
+    "ar": "الرد بيسعّر البند {code} من {place}، والصف ده بتاع بند تاني.",
 }
 NO_NUMBERS = {"en": "no numbers", "ar": "مفيش أرقام"}
 

@@ -11,6 +11,7 @@ import pytest
 
 from qsone.engine import truth
 from qsone.engine.types import Unsourced
+from qsone.records import ledger
 from qsone.records.files import add_file
 from tests.engine_fakes import scripted
 from tests.engine_fakes import text as said
@@ -108,3 +109,13 @@ async def test_a_number_read_from_a_cited_page_is_not_marked(make_engine, projec
     events = await finish(engine, await engine.start_brief(project, "ضمان العطاء كام؟"))
     marked = [v for e in events if isinstance(e, Unsourced) for v in e.values]
     assert "350,000" not in marked
+
+
+def test_a_cited_row_must_be_the_items_row(files):
+    with files.write("engineer") as c:  # the client's item 17, as an import writes it
+        at = files.clock()
+        ledger.write_item(c, at=at, actor="engineer", kind="boq_item", code="17", fields={})
+    # row 2 has 72, but it is item 16's row
+    [found] = problems(files, "تسعير بند 17: الفئة 72 جنيه للمتر (شيت «مقايسة»، صف 2).")
+    assert "item 17" in found.fix and "17" in found.flag["ar"]
+    assert problems(files, "تسعير بند 17: الفئة 72 جنيه للمتر (شيت «مقايسة»، صف 3).") == []

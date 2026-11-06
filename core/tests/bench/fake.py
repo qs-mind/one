@@ -275,7 +275,8 @@ def _extra(seen: Seen) -> Step | None:
         "Site hoarding (bench extra item, not in the client's BOQ)",
         "سور مؤقت للموقع (بند تجريبي زيادة، مش في مقايسة العميل)",
     )
-    args = {"kind": "boq_item", "code": EXTRA_CODE, "fields": {"description": description}}
+    # an item beyond the client's BOQ is its own kind: client items come only from an import
+    args = {"kind": "extra_item", "code": EXTRA_CODE, "fields": {"description": description}}
     return _call("extra", "add_item", args)
 
 
