@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { setLanguage, texts } from "../i18n";
+import { DocumentsContext } from "../workspace/documents";
 import { Reply } from "./Reply";
 
 beforeEach(() => setLanguage("ar"));
@@ -81,6 +82,23 @@ describe("Reply", () => {
       expect(item).toHaveAttribute("dir", "auto");
       expect(item).toHaveClass("ms-5");
     }
+  });
+
+  it("never shows ONE's ids: a document's reads as its name, any other goes", () => {
+    const docs = {
+      deliverables: [],
+      clientBoqs: [],
+      desks: [],
+      files: [{ id: "1b2746c511134ef18d8b1c38e591d9a0", name: "مقايسة - عينة.xlsx", status: "read" as const, note: null, replaces: null }],
+    };
+    render(
+      <DocumentsContext.Provider value={docs}>
+        <Reply text={"المستند (المعرف): 1b2746c511134ef18d8b1c38e591d9a0\n\nImported 53 items (Import ID: 8ec3c3de5f2a4b0c9d1e2f3a4b5c6d7e)."} />
+      </DocumentsContext.Provider>,
+    );
+    expect(screen.getByText(/المستند/)).toHaveTextContent("المستند مقايسة - عينة.xlsx");
+    expect(screen.getByText(/Imported/)).toHaveTextContent(/^Imported 53 items\.$/);
+    expect(document.body.textContent).not.toMatch(/[0-9a-f]{8}/);
   });
 
   it("never renders raw HTML", () => {

@@ -8,6 +8,7 @@ import { fill, t, useLanguage } from "../i18n";
 import { sourceLineHandlers } from "../sources/line";
 import { useSourceCard } from "../sources/useSourceCard";
 import { isolateOtherScript } from "./bidi";
+import { useDocumentNames, withoutIds } from "./ids";
 import type { SourcedData } from "./parts/types";
 
 type BlockProps = ExtraProps & { className?: string; children?: ReactNode };
@@ -124,6 +125,7 @@ export function Reply({
     ];
   }, [key, sourcedKey, lang]);
   const source = useSourceCard(projectId ?? "");
+  const names = useDocumentNames(); // an id the Lead QS wrote reads as its document's name, or goes
   const shown: Components = {
     ...components,
     data: ({ value, children }) => {
@@ -147,7 +149,7 @@ export function Reply({
   return (
     <div ref={source.host} className="relative flex flex-col gap-2">
       <Markdown remarkPlugins={plugins} components={shown} skipHtml>
-        {text}
+        {withoutIds(text, names)}
       </Markdown>
       {source.card}
       {unsourced.length > 0 && <p className="text-slate">{t("noSourceNote")}</p>}
