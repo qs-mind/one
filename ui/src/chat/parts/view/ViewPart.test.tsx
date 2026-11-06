@@ -6,6 +6,8 @@ import { fill, setLanguage, texts } from "../../../i18n";
 import { BlockBoundary } from "./BlockBoundary";
 import type { ViewBlock, ViewData } from "./types";
 import { ViewPart } from "./ViewPart";
+import { workspaceApi } from "../../../workspace/api";
+import { DocumentView } from "../../../workspace/DocumentView";
 
 // Sample data only: a view as the core sends it, its numbers resolved to their cells and sources.
 const DAY = "2026-11-02";
@@ -192,5 +194,30 @@ describe("ViewPart", () => {
     expect(mark).toHaveTextContent("777");
     expect(mark).toHaveAttribute("title", texts.noSource.en);
     expect(screen.getByText(texts.noSourceNote.en)).toBeInTheDocument();
+  });
+});
+
+describe("a view wider than the chat", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("shows a short card that opens it as a document, at the document's width", async () => {
+    // the table scrolls sideways: wider than its place in the chat
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("data-view-scroll") ? 600 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(260);
+    render(<ViewPart id="part-1" view={viewOf([table])} projectId="p1" />);
+    expect(document.querySelector("table")).toBeNull();
+    expect(screen.getByText("1 row")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: texts.openAsDocument.en }));
+    expect(workspaceApi.current()?.key).toBe("view:part-1");
+    render(<DocumentView projectId="p1" sources={{} as never} opened={{ key: "view:part-1", anchor: null }} />);
+    expect(document.querySelector("table")).not.toBeNull(); // whole there
+  });
+
+  it("a view that fits stays whole in the chat", () => {
+    render(<ViewPart id="part-2" view={viewOf([table])} projectId="p1" />);
+    expect(document.querySelector("table")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: texts.openAsDocument.en })).toBeNull();
   });
 });

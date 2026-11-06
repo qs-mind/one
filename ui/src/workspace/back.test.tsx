@@ -118,13 +118,14 @@ describe("files dropped on a letter's text", () => {
     expect(workspaceApi.current()?.key).toBe(`deliverable:${DOC}`);
   });
 
-  it("dropped on the top bar, the window does not open them", async () => {
+  it("dropped on the top bar, the window does not open them: they go to Project files", async () => {
     open(`deliverable:${DOC}`, viewRoutes(letter()));
     await screen.findByText("الأسعار سارية حالياً لمدة ٣٠ يوماً");
     const bar = document.querySelector('[data-region="topbar"]')!;
     const transfer = { types: ["Files"], files: [new File(["x"], NAME)], items: [] };
     expect(fireEvent.dragOver(bar, { dataTransfer: transfer })).toBe(false);
     expect(fireEvent.drop(bar, { dataTransfer: transfer })).toBe(false);
-    expect(workspaceApi.current()?.key).toBe(`deliverable:${DOC}`); // nothing else happened
+    // a drop anywhere in the window adds the files to the open project (real walk: the top bar ignored it)
+    await waitFor(() => expect(workspaceApi.current()?.key).toBe("files:all"));
   });
 });

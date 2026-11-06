@@ -58,7 +58,7 @@ export function Table({ block }: { block: TableBlock }) {
   const firstNumber = block.columns.length - (block.rows[0]?.numbers.length ?? 0);
   const cell = "border-b border-stone px-2 py-1";
   return (
-    <div className="overflow-x-auto">
+    <div data-view-scroll className="overflow-x-auto">
       <table className="border-collapse text-start">
         <thead>
           <tr>

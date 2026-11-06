@@ -643,6 +643,7 @@ export const texts = {
   submission: { en: "Submission {date}, {days} days left", ar: "التسليم {date}، فاضل {days} يوم" },
   boqSoFar: { en: "BOQ so far", ar: "المقايسة لحد دلوقتي" },
   sampleData: { en: "Sample data", ar: "بيانات تجريبية" },
+  openAsDocument: { en: "Open as a document", ar: "افتح كمستند" },
   continueInProject: { en: "Continue in «{name}»", ar: "كمّل في «{name}»" },
   createProjectNamed: { en: "Create the project «{name}»", ar: "اعمل مشروع «{name}»" },
   pageNotShown: { en: "This page could not be shown.", ar: "مقدرناش نعرض الصفحة دي." },
@@ -1153,6 +1154,10 @@ export const counted = {
       few: "الـ{n} ملفات دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
       other: "الـ{n} ملف دول لأنهي مشروع؟ اختار واحد، أو اعمل مشروع جديد.",
     },
+  },
+  viewRows: {
+    en: { one: "1 row", other: "{n} rows" },
+    ar: { zero: "مفيش صفوف", one: "صف واحد", two: "صفين", few: "{n} صفوف", other: "{n} صف" },
   },
   boqItems: {
     en: { one: "{n} item", other: "{n} items" },

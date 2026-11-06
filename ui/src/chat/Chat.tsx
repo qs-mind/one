@@ -142,7 +142,7 @@ function BriefReply({
         />
       ) : null;
     const [one] = partsOf([part], "view");
-    if (one) return <ViewPart key={`view:${one.id}`} view={one.data} projectId={projectId} />;
+    if (one) return <ViewPart key={`view:${one.id}`} id={one.id} view={one.data} projectId={projectId} />;
     const [card] = partsOf([part], "card");
     if (card) return cardAt(card.id);
     const [understood] = partsOf([part], "understood");

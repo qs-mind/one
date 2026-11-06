@@ -20,7 +20,7 @@ import { markFor } from "./reveal";
 import { LiveWorkingLine } from "./WorkingLine";
 
 const FADE_MS = 200;
-const DOC_KINDS = ["deliverable:", "file:", "clientboq:", "files:"];
+const DOC_KINDS = ["deliverable:", "file:", "clientboq:", "files:", "view:"];
 const isDocKey = (key: string): key is DocKey => DOC_KINDS.some((kind) => key.startsWith(kind));
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));

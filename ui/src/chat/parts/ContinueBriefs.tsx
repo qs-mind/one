@@ -68,7 +68,7 @@ export function ContinueBriefs({
             data-continue-brief={brief.id}
             className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-x-3 gap-y-1 rounded-[14px] border border-copper px-4 py-1.5"
           >
-            <p dir="auto" title={line} className="min-w-0 flex-1 truncate">
+            <p dir="auto" className="min-w-0 flex-1 basis-40 break-words">
               {line}
             </p>
             <div className="flex shrink-0 gap-1.5">

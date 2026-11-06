@@ -7,6 +7,8 @@ import { ClientBoqDoc } from "./docs/ClientBoqDoc";
 import { DeliverableDoc } from "./docs/DeliverableDoc";
 import { FileDoc } from "./docs/FileDoc";
 import { FilesDoc } from "./docs/FilesDoc";
+import { ViewPart } from "../chat/parts/view/ViewPart";
+import { viewOf } from "./views";
 
 export function DocumentView(props: {
   projectId: string;
@@ -36,5 +38,14 @@ export function DocumentView(props: {
       return <FileDoc key={opened.key} sources={sources} fileId={id} opened={opened} notice={props.notice} />;
     case "files":
       return <FilesDoc />;
+    case "view": {
+      // a view the Lead QS showed, wider than the chat: here at the document's width
+      const view = viewOf(id);
+      return view ? (
+        <div key={opened.key} className="h-full overflow-auto p-4">
+          <ViewPart view={view} projectId={projectId} whole />
+        </div>
+      ) : null;
+    }
   }
 }
