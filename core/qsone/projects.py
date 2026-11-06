@@ -367,7 +367,10 @@ def _hit(h: search.Hit) -> dict:
 
 
 def router(
-    projects: Projects, meaning: Meaning | None = None, engine: "Engine | None" = None
+    projects: Projects,
+    meaning: Meaning | None = None,
+    engine: "Engine | None" = None,
+    mapping=None,
 ) -> APIRouter:
     """With `meaning`, search uses the search model once it is ready. With `engine`, a
     project whose Brief runs stays open until the Brief ends."""
@@ -375,8 +378,13 @@ def router(
 
     r = APIRouter()
     r.include_router(compare_router(projects))
+    from qsone.records.mapping.routes import router as map_router
+
+    r.include_router(map_router(projects))
 
     def wake() -> None:
+        if mapping is not None:
+            mapping.wake()
         if meaning is not None:
             meaning.wake()
 

@@ -2840,6 +2840,22 @@ OCR_ARABIC_MISSING = {
     ),
 }
 
+MAP_PROGRESS = {
+    "en": "Reading {done} of {total} files",
+    "ar": "بنقرا {done} من {total} ملف",
+}
+MAP_FAILED = {
+    "en": "ONE could not map this file locally. The original is kept.",
+    "ar": "ONE مقدرش يقرا خريطة الملف ده محليًا. الأصل محفوظ.",
+}
+MAP_ARABIC_MISSING = {
+    "en": "Arabic OCR data is missing. ONE kept reading the other files.",
+    "ar": "بيانات قراية الصور بالعربي مش موجودة. ONE كمل قراية باقي الملفات.",
+}
+MAP_CURSOR_INVALID = {
+    "en": "This map page cursor is invalid. Open the map again.",
+    "ar": "مؤشر صفحة الخريطة مش صحيح. افتح الخريطة تاني.",
+}
 
 FILE_DRAWINGS_MISSING = {
     "en": "Kept. ONE's drawing reader is unavailable on this computer.",
