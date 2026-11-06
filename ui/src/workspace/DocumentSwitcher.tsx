@@ -9,7 +9,7 @@ import type { ClientBoqInfo, DocKey, FileInfo, Opened } from "../project/types";
 import { FileName } from "../ui/FileName";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { workspaceApi } from "./api";
-import { viewOf } from "./views";
+import { projectMapKey, viewOf } from "./views";
 import { useClientBoqSample } from "./clientBoqSample";
 
 export type DocumentSwitcherProps = {
@@ -62,7 +62,7 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
   ) : view ? (
     <span dir="auto">{view.title}</span>
   ) : (
-    t("projectFiles")
+    opened.key === projectMapKey ? t("projectMap") : t("projectFiles")
   );
   const state = current ? [statusWord(current), current.revision !== null ? fill(t("docRevision"), { n: current.revision }) : null] : [];
   const stateWords = state.filter(Boolean).join(" · ");
@@ -132,6 +132,7 @@ export function DocumentSwitcher({ deliverables, clientBoqs, files, opened, work
                 </button>
               );
             })}
+            <button type="button" role="menuitem" className={item} onClick={() => pick(projectMapKey)}>{t("projectMap")}</button>
             <button type="button" role="menuitem" className={item} onClick={() => pick("files:all")}>
               <Dot on={working.has("files:all")} />
               {t("projectFiles")}

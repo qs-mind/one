@@ -8,6 +8,7 @@ import { DeliverableDoc } from "./docs/DeliverableDoc";
 import { FileDoc } from "./docs/FileDoc";
 import { FilesDoc } from "./docs/FilesDoc";
 import { ViewPart } from "../chat/parts/view/ViewPart";
+import { ProjectMapDoc } from "./docs/ProjectMapDoc";
 import { viewOf } from "./views";
 import { useRowsDocument } from "./rowsDocuments";
 import { ApprovalCard } from "../chat/parts/ApprovalCard";
@@ -42,6 +43,7 @@ export function DocumentView(props: {
     case "files":
       return <FilesDoc />;
     case "view": {
+      if (id === "project-map") return <ProjectMapDoc key={projectId} projectId={projectId} sources={sources} />;
       if (rows) return <div className="h-full overflow-auto p-4"><ApprovalCard {...rows} inDocument /></div>;
       // a view the Lead QS showed, wider than the chat: here at the document's width
       const view = viewOf(id);

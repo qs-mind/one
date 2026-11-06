@@ -72,7 +72,7 @@ function exists(lists: Lists, key: DocKey): boolean {
   if (kind === "deliverable") return !lists.deliverables || lists.deliverables.some((d) => d.id === id);
   if (kind === "file") return !lists.files || lists.files.some((f) => f.id === id);
   if (kind === "clientboq") return !lists.clientBoqs || lists.clientBoqs.some((b) => b.file_id === id);
-  if (kind === "view") return viewOf(id) !== undefined;
+  if (kind === "view") return id === "project-map" || viewOf(id) !== undefined;
   return false;
 }
 
@@ -86,7 +86,7 @@ export function titleOf(docs: Documents, key: string): string | null {
     const boq = docs.clientBoqs.find((b) => b.file_id === id);
     return boq ? fill(t("clientBoqTitle"), { name: boq.name }) : null;
   }
-  if (kind === "view") return viewOf(id)?.title ?? null;
+  if (kind === "view") return id === "project-map" ? t("projectMap") : viewOf(id)?.title ?? null;
   return null;
 }
 

@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { dir, fill, t, useLanguage, type Text } from "../../i18n";
 import type { ProjectSources } from "../../project/types";
 import { SourceError } from "../../project/sources";
 import { FilePages, SMALL, LARGE, type FilePage } from "./FileDoc";
 import { compareApi, type Citation, type CompareFile, type Comparison, type ChangedPage } from "./compareApi";
+
+/** Shared source columns: revision comparisons and Project Map links use the same page layout. */
+export function SourcePair({children, overlay = false}: {children: ReactNode; overlay?: boolean}) {
+  return <div className={`grid min-h-0 flex-1 gap-3 ${overlay ? "lg:grid-cols-3" : "grid-cols-2"}`}>{children}</div>;
+}
 
 function Page({ sources, citation, width }: { sources: ProjectSources; citation: Citation; width: number }) {
   const state: FilePage = { page: citation.page, pages: citation.page, setPage: () => {}, mode: "image", setMode: () => {}, pageOf: fill(t("page"), { page: citation.page }) };
@@ -81,11 +86,11 @@ export function CompareDoc({ projectId, fileId, sources, onClose }: { projectId:
         <p>{t(({ sheet: "compareSheet", title: "compareTitle", order: "compareOrder" } as const)[selectedPage.method])}</p>
         <p>{t("compareRemoved")}: <bdi>{selectedPage.removed.join(" ")}</bdi></p>
         <p>{t("compareAdded")}: <bdi>{selectedPage.added.join(" ")}</bdi></p>
-        <div className="grid gap-3 lg:grid-cols-3">
+        <SourcePair overlay>
           <figure><figcaption>{t("compareOld")} · {cite(selectedPage.old)}</figcaption><Page sources={sources} citation={selectedPage.old} width={width} /></figure>
           <figure><figcaption>{t("compareNewer")} · {cite(selectedPage.new)}</figcaption><Page sources={sources} citation={selectedPage.new} width={width} /></figure>
           {selectedPage.overlay && <figure><figcaption>{t("compareOverlay")} · {t("compareLegend")}</figcaption><Overlay projectId={projectId} change={selectedPage} width={width} /></figure>}
-        </div>
+        </SourcePair>
       </>}
       {([ ["compareUnpairedOld", result.unpaired_old], ["compareUnpairedNew", result.unpaired_new] ] as const).map(([label, pages]) => pages.length > 0 && <div key={label}>
         <h3>{t(label)}</h3><ul>{pages.map((page) => <li key={page.page}>{cite(page)}</li>)}</ul>

@@ -5,6 +5,27 @@ export type Language = "ar" | "en";
 export type Text = { en: string; ar: string };
 
 export const texts = {
+  projectMap: {en:"Project Map", ar:"خريطة المشروع"},
+  mapEmpty: {en:"No files in this project yet.", ar:"لسه مفيش ملفات في المشروع."},
+  mapSummary: {en:"Tender summary", ar:"ملخص المناقصة"},
+  mapLinks: {en:"Links", ar:"الروابط"},
+  mapUnchecked: {en:"Read by ONE, not checked", ar:"ONE قراها، لسه متراجعتش"},
+  mapConfirmed: {en:"Confirmed", ar:"متأكد منها"},
+  mapBlank: {en:"Blank in the template", ar:"فاضية في النموذج"},
+  mapConflict: {en:"Conflict — choose a value", ar:"فيه تعارض — اختار القيمة"},
+  mapConfirm: {en:"Confirm", ar:"تأكيد"},
+  mapChoose: {en:"Use this value", ar:"اعتمد القيمة دي"},
+  mapMore: {en:"More files", ar:"ملفات أكتر"},
+  mapMoreFacts: {en:"More facts", ar:"معلومات أكتر"},
+  mapMoreLinks: {en:"More links", ar:"روابط أكتر"},
+  mapFailed: {en:"Could not update the Project Map. Try again.", ar:"مقدرناش نحدّث خريطة المشروع. جرّب تاني."},
+  mapLoading: {en:"Loading map…", ar:"بنحمّل الخريطة…"},
+  mapPages: {en:"{n} pages", ar:"{n} صفحة"},
+  mapText: {en:"Text", ar:"نص"},
+  mapOcr: {en:"OCR", ar:"قراءة ضوئية"},
+  mapMixed: {en:"Text + OCR", ar:"نص وقراءة ضوئية"},
+  mapStored: {en:"Not read yet", ar:"لسه متقراش"},
+
   regionSelect: { en: "Comment on a region", ar: "علّق على منطقة" },
   regionDrag: { en: "Drag a box on the page, then write your comment.", ar: "اسحب مربع على الصفحة، وبعدها اكتب تعليقك." },
   regionUnavailable: { en: "ONE could not locate regions on this page.", ar: "ONE مقدرش يحدد المناطق في الصفحة دي." },
