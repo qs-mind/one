@@ -30,7 +30,7 @@ def test_word_boxes_and_low_confidence():
 
 
 @pytest.mark.parametrize("second_line", [(1, 1, 2), (1, 2, 1), (2, 1, 1)])
-def test_words_group_into_lines_with_union_boxes(rec, second_line):
+def test_words_keep_individual_boxes_across_lines(rec, second_line):
     block, paragraph, line = second_line
     page = ocr.parse_tsv(
         HEADER
@@ -41,11 +41,15 @@ def test_words_group_into_lines_with_union_boxes(rec, second_line):
         points=(500, 1000),
     )
     pieces = page.pieces(1)
-    assert len(pieces) == 2
-    assert [p.text for p in pieces] == ["Concrete sample", "Quantity"]
-    assert [p.locator["box"] for p in pieces] == [[50, 95, 150, 125], [50, 150, 90, 170]]
-    assert [p.locator["confidence"] for p in pieces] == [82, 32]
-    assert [p.locator["ocr_low_confidence"] for p in pieces] == [False, True]
+    assert len(pieces) == 3
+    assert [p.text for p in pieces] == ["Concrete", "sample", "Quantity"]
+    assert [p.locator["box"] for p in pieces] == [
+        [50, 100, 90, 120],
+        [100, 95, 150, 125],
+        [50, 150, 90, 170],
+    ]
+    assert [p.locator["confidence"] for p in pieces] == [95, 82, 32]
+    assert [p.locator["ocr_low_confidence"] for p in pieces] == [False, False, True]
     file_id = files.add_file(rec, "sample.pdf", sample_pdf([[]]), actor="engineer").id
     files.add_ocr_pages(rec, file_id, {1: pieces}, read_by="tesseract", actor="engineer")
     with rec.read() as conn:
@@ -65,11 +69,11 @@ def test_arabic_line_keeps_tesseract_reading_order():
         pixels=(1000, 2000),
         points=(500, 1000),
     )
-    [piece] = page.pieces(1)
-    assert piece.text == "خرسانة مسلحة"
-    assert piece.locator["box"] == [50, 50, 140, 70]
-    assert piece.locator["confidence"] == 90
-    assert piece.locator["ocr_low_confidence"] is False
+    pieces = page.pieces(1)
+    assert [p.text for p in pieces] == ["خرسانة", "مسلحة"]
+    assert [p.locator["box"] for p in pieces] == [[100, 50, 140, 70], [50, 50, 90, 70]]
+    assert [p.locator["confidence"] for p in pieces] == [95, 90]
+    assert all(p.locator["ocr_low_confidence"] is False for p in pieces)
 
 
 def test_real_english_ocr():
@@ -312,6 +316,60 @@ def test_ocr_pdfium_calls_do_not_overlap(monkeypatch):
 
     monkeypatch.setattr(render, "page_png", render_page)
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(lambda page: file_tools._image("pdf", b"sample", page), [1, 2]))
+        results = list(
+            pool.map(lambda page: file_tools._image("pdf", sample_pdf([[], []]), page), [1, 2])
+        )
     assert results == [b"sample image", b"sample image"]
     assert most == 1
+
+
+def test_ocr_number_citation_uses_word_box(rec):
+    from qsone.engine import tools_records  # noqa: F401
+    from qsone.records import regions
+
+    page = ocr.Page(
+        [ocr.Word("Quantity", [10, 20, 60, 30], 99), ocr.Word("12.50", [100, 20, 130, 30], 99)],
+        False,
+    )
+    fid = files.add_file(rec, "scan sample.pdf", sample_pdf([[]]), actor="engineer").id
+    pieces = page.pieces(1)
+    files.add_ocr_pages(rec, fid, {1: pieces}, read_by="tesseract", actor="engineer")
+    number = next(p for p in pieces if "12.50" in p.text)
+    assert number.locator["box"] == [100, 20, 130, 30]
+    ctx = ctx_for(rec)
+    args = tools_records.SourceArgs(
+        kind="file", file_id=fid, locator=number.locator, dated="2026-11-06"
+    )
+    evidence = tools_records.evidence(ctx, rec, args)
+    source = tools_records._write_source(rec, evidence, "lead_qs")
+    with rec.read() as conn:
+        locator = json.loads(
+            conn.execute(
+                "SELECT locator FROM sources WHERE id=?", (source["source_id"],)
+            ).fetchone()[0]
+        )
+    assert locator["box"] == [100, 20, 130, 30]
+    assert regions.page_boxes(rec, fid, 1, "12.50")["boxes"] == [[100, 20, 130, 30]]
+
+
+@pytest.mark.parametrize("size", [(595, 842), (1684, 2384), (2384, 3370)])
+def test_ocr_render_resolution_and_budget(monkeypatch, size):
+    import io
+    import math
+
+    from pypdf import PdfWriter
+
+    from qsone.tools import files as file_tools
+
+    writer = PdfWriter()
+    writer.add_blank_page(*size)
+    out = io.BytesIO()
+    writer.write(out)
+    widths = []
+    monkeypatch.setattr(
+        render, "page_png", lambda data, page, width: widths.append(width) or b"png"
+    )
+    file_tools._image("pdf", out.getvalue(), 1)
+    scale = min(300 / 72, math.sqrt(40_000_000 / (size[0] * size[1])))
+    assert widths[0] == pytest.approx(size[0] * scale, abs=1)
+    assert widths[0] * math.ceil(size[1] * widths[0] / size[0]) <= 40_000_000

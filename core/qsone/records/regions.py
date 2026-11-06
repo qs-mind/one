@@ -1,6 +1,7 @@
 """PDF number locations in displayed page points, top-left origin, entirely in memory."""
 
 import ctypes
+import json
 import math
 import re
 from contextlib import closing
@@ -23,13 +24,8 @@ def _number(text):
         return None
 
 
-def page_boxes(rec: Records, file_id: str, page: int, value: str = "") -> dict:
-    """All matching values, never a guessed location; repeated values return every match.
-
-    Dimensions and boxes follow the displayed CropBox and page rotation, matching page_png.
-    No value asks only for dimensions (used when a source already has its own box).
-    """
-    data = files.read_original(rec, file_id)
+def pdf_numbers(data: bytes, page: int) -> dict:
+    """Native numeric tokens and glyph boxes in the displayed CropBox/rotation frame."""
     try:
         with pdfium.PdfDocument(data) as doc:
             if not 1 <= page <= len(doc):
@@ -37,53 +33,71 @@ def page_boxes(rec: Records, file_id: str, page: int, value: str = "") -> dict:
             with closing(doc[page - 1]) as p:
                 width, height = p.get_size()
                 boxes = []
-                target = _number(value) if value else None
-                if target is not None and target.is_finite():
-                    with closing(p.get_textpage()) as text:
-                        # One Unicode scalar per PDFium char index, not text-string offsets.
-                        chars = "".join(
-                            chr(raw.FPDFText_GetUnicode(text, i)) for i in range(text.count_chars())
-                        )
-                        for match in _TOKEN.finditer(chars):
-                            if _number(match.group()) != target:
-                                continue
-                            points = []
-                            for i in range(match.start(), match.end()):
-                                left, bottom, right, top = text.get_charbox(i)
-                                for x, y in (
-                                    (left, bottom),
-                                    (left, top),
-                                    (right, bottom),
-                                    (right, top),
-                                ):
-                                    dx, dy = ctypes.c_int(), ctypes.c_int()
-                                    # Sub-point precision, with page rotation/crop.
-                                    raw.FPDF_PageToDevice(
-                                        p,
-                                        0,
-                                        0,
-                                        round(width * 1000),
-                                        round(height * 1000),
-                                        0,
-                                        x,
-                                        y,
-                                        dx,
-                                        dy,
-                                    )
-                                    points.append((dx.value / 1000, dy.value / 1000))
-                            box = [
-                                max(0, min(x for x, _ in points)),
-                                max(0, min(y for _, y in points)),
-                                min(width, max(x for x, _ in points)),
-                                min(height, max(y for _, y in points)),
-                            ]
-                            if box[0] < box[2] and box[1] < box[3]:
-                                boxes.append(box)
-                return {"width": width, "height": height, "boxes": boxes}
+                with closing(p.get_textpage()) as text:
+                    # One Unicode scalar per PDFium char index, not text-string offsets.
+                    chars = "".join(
+                        chr(raw.FPDFText_GetUnicode(text, i)) for i in range(text.count_chars())
+                    )
+                    for match in _TOKEN.finditer(chars):
+                        points = []
+                        for i in range(match.start(), match.end()):
+                            left, bottom, right, top = text.get_charbox(i)
+                            for x, y in (
+                                (left, bottom),
+                                (left, top),
+                                (right, bottom),
+                                (right, top),
+                            ):
+                                dx, dy = ctypes.c_int(), ctypes.c_int()
+                                # Sub-point precision, with page rotation/crop.
+                                raw.FPDF_PageToDevice(
+                                    p,
+                                    0,
+                                    0,
+                                    round(width * 1000),
+                                    round(height * 1000),
+                                    0,
+                                    x,
+                                    y,
+                                    dx,
+                                    dy,
+                                )
+                                points.append((dx.value / 1000, dy.value / 1000))
+                        box = [
+                            max(0, min(x for x, _ in points)),
+                            max(0, min(y for _, y in points)),
+                            min(width, max(x for x, _ in points)),
+                            min(height, max(y for _, y in points)),
+                        ]
+                        if box[0] < box[2] and box[1] < box[3]:
+                            boxes.append({"text": match.group(), "box": box})
+                return {"width": width, "height": height, "numbers": boxes}
     except RecordsError:
         raise
     except Exception:
         raise RecordsError(copy.FILE_UNREADABLE, status=409, field="file") from None
+
+
+def page_boxes(rec: Records, file_id: str, page: int, value: str = "") -> dict:
+    data = files.read_original(rec, file_id)
+    found = pdf_numbers(data, page)
+    target = _number(value) if value else None
+    boxes = [
+        n["box"] for n in found["numbers"] if target is not None and _number(n["text"]) == target
+    ]
+    if target is not None and target.is_finite():
+        with rec.read() as conn:
+            rows = conn.execute(
+                "SELECT locator, text FROM chunks WHERE file_id = ?"
+                " AND json_extract(locator, '$.page') = ?"
+                " AND json_extract(locator, '$.read_by') IS NOT NULL ORDER BY seq",
+                (file_id, page),
+            ).fetchall()
+        for locator, text in rows:
+            loc = json.loads(locator)
+            if _number(text) == target and loc.get("box") and loc["box"] not in boxes:
+                boxes.append(loc["box"])
+    return {"width": found["width"], "height": found["height"], "boxes": boxes}
 
 
 def check_region(rec: Records, anchor) -> dict:

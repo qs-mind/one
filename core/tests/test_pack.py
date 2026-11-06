@@ -332,3 +332,99 @@ def test_password_protected_source_is_a_plain_refusal():
         validate_steps(
             [{"kind": "file", "file_id": "f", "ranges": [[1, 1]]}], lambda _: out.getvalue()
         )
+
+
+def test_same_page_in_two_steps_gets_one_page_number_each():
+    steps = [
+        {"kind": "file", "file_id": "f", "ranges": [[1, 1]]},
+        {"kind": "file", "file_id": "f", "ranges": [[1, 1]]},
+        {"kind": "page_numbers"},
+    ]
+    typst = pytest.importorskip("typst")
+    original = typst.compile(b"Sample original")
+    result = PdfReader(BytesIO(build(steps, lambda _: original, "en")))
+    assert [page.extract_text().count("Page") for page in result.pages] == [1, 1]
+    assert "Page 1 of 2" in result.pages[0].extract_text()
+    assert "Page 2 of 2" in result.pages[1].extract_text()
+
+
+def test_page_number_is_inside_inset_cropbox():
+    import pypdfium2 as pdfium
+    from pypdf.generic import RectangleObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(400, 500)
+    page.cropbox = RectangleObject([40, 60, 360, 460])
+    original = BytesIO()
+    writer.write(original)
+    data = build(
+        [
+            {"kind": "file", "file_id": "f", "ranges": [[1, 1]]},
+            {"kind": "page_numbers"},
+        ],
+        lambda _: original.getvalue(),
+        "en",
+    )
+    with pdfium.PdfDocument(data) as doc:
+        page = doc[0]
+        text = page.get_textpage()
+        try:
+            assert "Page 1 of 1" in text.get_text_range()
+            for i in range(text.count_chars()):
+                left, bottom, right, top = text.get_charbox(i)
+                assert 40 <= left <= right <= 360
+                assert 60 <= bottom <= top <= 460
+        finally:
+            text.close()
+            page.close()
+
+
+@pytest.mark.parametrize("extension", ["doc", "docx", "xls", "xlsx", "odt", "ods"])
+def test_pack_converts_office_file_steps(rec, monkeypatch, extension):
+    from qsone.deliverables.pack import build_view
+    from qsone.records import files, office
+
+    monkeypatch.setattr(office, "find_soffice", lambda: None)
+    f = files.add_file(rec, f"Sample.{extension}", b"sample office bytes", actor="engineer")
+    calls = []
+    monkeypatch.setattr(office, "find_soffice", lambda: "sample-soffice")
+
+    def convert(data, name):
+        calls.append((data, name))
+        return source()
+
+    monkeypatch.setattr(office, "to_pdf", convert)
+    d = store.create(
+        rec, kind="pack", variant="tender", title="Sample", language="en", actor="lead_qs"
+    )
+    proposed = changes.propose(
+        rec,
+        d,
+        [{"op": "set_pack", "steps": [{"kind": "file", "file_id": f.id, "ranges": [[2, 2]]}]}],
+        actor="lead_qs",
+        reason="Sample",
+    )
+    changes.accept(rec, d, [proposed[0].id], actor="engineer")
+    result = PdfReader(BytesIO(build_view(rec, store.view(rec, d))))
+    assert len(result.pages) == 1
+    assert result.pages[0].mediabox.width == 300
+    assert calls and all(call == (b"sample office bytes", f"Sample.{extension}") for call in calls)
+
+
+def test_pack_office_missing_libreoffice_uses_plain_message(rec, monkeypatch):
+    from qsone import copy
+    from qsone.deliverables.pack import build_view
+    from qsone.records import files, office
+
+    monkeypatch.setattr(office, "find_soffice", lambda: None)
+    f = files.add_file(rec, "Sample.doc", b"sample office bytes", actor="engineer")
+    with pytest.raises(RecordsError) as error:
+        build_view(
+            rec,
+            {
+                "kind": "pack",
+                "language": "en",
+                "steps": [{"kind": "file", "file_id": f.id, "ranges": [[1, 1]]}],
+            },
+        )
+    assert error.value.text == copy.FILE_LIBREOFFICE_MISSING

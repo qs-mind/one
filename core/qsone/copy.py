@@ -2743,6 +2743,10 @@ PACK_LOCKED = {
 }
 
 # Revision comparison: observed words/pixels only, never inferred engineering changes.
+COMPARE_PAIRING_REVIEW = {
+    "en": "This sheet pairing needs a look: more than one sheet number was found on a page.",
+    "ar": "ربط اللوحتين محتاج نظرة: لقينا أكتر من رقم لوحة في صفحة.",
+}
 COMPARE_TEXT = {"en": "Page words changed.", "ar": "كلمات الصفحة اتغيّرت."}
 COMPARE_PIXELS = {"en": "Page image changed.", "ar": "صورة الصفحة اتغيّرت."}
 COMPARE_TEXT_PIXELS = {"en": "Page words and image changed.", "ar": "كلمات وصورة الصفحة اتغيّروا."}

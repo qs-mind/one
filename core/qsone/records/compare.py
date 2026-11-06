@@ -5,6 +5,7 @@ reported as evidence, not certainty. Pixels are compared at LARGE (1400 px); no 
 OCR, AI inference, decrypted temporary files, or persistent image cache.
 """
 
+import io
 import json
 import re
 import unicodedata
@@ -13,6 +14,7 @@ from datetime import UTC, datetime
 from difflib import SequenceMatcher
 
 import numpy as np
+import pdfplumber
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
@@ -25,23 +27,43 @@ _SHEET = re.compile(r"(?<!\w)[A-Z]{1,5}\s*[-–]\s*\d{1,5}(?:[.-]\d+)?(?!\w)", r
 _ARABIC = re.compile(r"لوحة\s*(?:رقم)?\s*[:：#-]?\s*([\w.-]+)")
 
 
-def identity(text: str) -> tuple[str, str]:
-    normalized = unicodedata.normalize("NFKC", text)
-    normalized = "".join(str(unicodedata.digit(c)) if c.isdecimal() else c for c in normalized)
-    match = _SHEET.search(normalized)
-    arabic = _ARABIC.search(normalized)
-    sheet = re.sub(r"\s+", "", match[0]).upper().replace("–", "-") if match else ""
-    if not sheet and arabic:
-        sheet = arabic[1].casefold()
+def _normalized(text: str) -> str:
+    text = unicodedata.normalize("NFKC", text)
+    return "".join(str(unicodedata.digit(c)) if c.isdecimal() else c for c in text)
+
+
+def _sheet_candidates(text: str) -> list[str]:
+    candidates = []
+    for match in _SHEET.finditer(_normalized(text)):
+        value = re.sub(r"\s+", "", match[0]).upper().replace("–", "-")
+        prefix, number = value.split("-", 1)
+        # Common standards and concrete strength grades are not drawing identifiers.
+        if prefix in {"BS", "EN", "ISO", "ASTM", "DIN", "ACI", "ECP"}:
+            continue
+        if prefix == "C" and number.isdigit() and int(number) <= 100:
+            continue
+        candidates.append((match.start(), value))
+    candidates.extend((m.start(), m[1].casefold()) for m in _ARABIC.finditer(_normalized(text)))
+    return [value for _, value in sorted(candidates)]
+
+
+def identity(text: str, title_block: str = "") -> tuple[str, str]:
+    normalized = _normalized(text)
+    matches = _sheet_candidates(title_block) or _sheet_candidates(normalized)
+    sheet = matches[-1] if matches else ""
     lines = [" ".join(line.split()).casefold() for line in normalized.splitlines() if line.strip()]
-    title = next(
-        (line for line in lines if not _SHEET.search(line) and not _ARABIC.search(line)), ""
-    )
+    title = next((line for line in lines if not _sheet_candidates(line)), "")
     return sheet, title
 
 
-def pair_pages(old: list[str], new: list[str]) -> list[tuple[int, int, str]]:
-    ids = [[identity(t) for t in pages] for pages in (old, new)]
+def pair_pages(
+    old: list[str], new: list[str], *, title_blocks: tuple[list[str], list[str]] | None = None
+) -> list[tuple[int, int, str]]:
+    blocks = title_blocks or ([""] * len(old), [""] * len(new))
+    ids = [
+        [identity(t, block) for t, block in zip(pages, titles, strict=True)]
+        for pages, titles in zip((old, new), blocks, strict=True)
+    ]
     remaining = [set(range(len(old))), set(range(len(new)))]
     pairs = []
     for field, method in ((0, "sheet"), (1, "title")):
@@ -124,6 +146,46 @@ def _images(old: bytes, new: bytes, before: int, after: int, width: int):
                 doc.close()
 
 
+def _title_blocks(data: bytes, chunks: list[tuple[str, str]]) -> list[str]:
+    """Words in the bottom-right quarter of the displayed page, in reading order."""
+    ocr_words: dict[int, list[dict]] = {}
+    for locator, text in chunks:
+        loc = json.loads(locator)
+        if loc.get("read_by") and loc.get("page"):
+            words = loc.get("words") or (
+                [{"text": text, "box": loc["box"]}] if "box" in loc else []
+            )
+            ocr_words.setdefault(loc["page"], []).extend(words)
+    blocks = []
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        for page in pdf.pages:
+            x0, y0, x1, y1 = page.cropbox or page.bbox
+            if page.chars:
+                words = [
+                    {
+                        "text": word["text"],
+                        "box": [
+                            word["x0"] - x0,
+                            word["top"] - y0,
+                            word["x1"] - x0,
+                            word["bottom"] - y0,
+                        ],
+                    }
+                    for word in page.extract_words()
+                ]
+            else:
+                words = ocr_words.get(page.page_number, [])
+            selected = [
+                w
+                for w in words
+                if (x1 - x0) / 2 <= (w["box"][0] + w["box"][2]) / 2 <= x1 - x0
+                and (y1 - y0) / 2 <= (w["box"][1] + w["box"][3]) / 2 <= y1 - y0
+            ]
+            selected.sort(key=lambda w: (w["box"][1], w["box"][0]))
+            blocks.append(" ".join(w["text"] for w in selected))
+    return blocks
+
+
 def _file(rec: Records, file_id: str):
     with rec.read() as conn:
         row = conn.execute(
@@ -139,6 +201,7 @@ def _file(rec: Records, file_id: str):
     data = files.read_original(rec, file_id)
     try:
         count = render.page_count(data)
+        title_blocks = _title_blocks(data, chunks)
     except Exception:
         raise RecordsError(copy.FILE_UNREADABLE, status=409, field="file") from None
     texts = [""] * count
@@ -146,13 +209,13 @@ def _file(rec: Records, file_id: str):
         page = json.loads(locator).get("page")
         if isinstance(page, int) and 1 <= page <= count:
             texts[page - 1] += text + "\n"
-    return data, texts, {"file_id": file_id, "name": row[0], "date": row[2]}
+    return data, texts, {"file_id": file_id, "name": row[0], "date": row[2]}, title_blocks
 
 
 def compare_files(rec: Records, old_file_id: str, new_file_id: str) -> dict:
     old, new = _file(rec, old_file_id), _file(rec, new_file_id)
     pairs, changed = [], []
-    for before, after, method in pair_pages(old[1], new[1]):
+    for before, after, method in pair_pages(old[1], new[1], title_blocks=(old[3], new[3])):
         removed, added = [], []
         a, b = old[1][before - 1].split(), new[1][after - 1].split()
         for tag, i, j, k, end in SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
@@ -165,6 +228,11 @@ def compare_files(rec: Records, old_file_id: str, new_file_id: str) -> dict:
         except Exception:
             raise RecordsError(copy.FILE_UNREADABLE, status=409, field="file") from None
         pair = {"old": old[2] | {"page": before}, "new": new[2] | {"page": after}, "method": method}
+        if method == "sheet" and any(
+            len(set(_sheet_candidates(item[1][page - 1]))) > 1
+            for item, page in ((old, before), (new, after))
+        ):
+            pair["pairing_note"] = copy.COMPARE_PAIRING_REVIEW
         pairs.append(pair)
         if added or removed or pixels:
             line = (

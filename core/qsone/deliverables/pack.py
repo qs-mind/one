@@ -11,7 +11,8 @@ from pypdf.errors import PdfReadError
 
 from qsone import copy
 from qsone.export.pdf import _compile
-from qsone.records.files import read_original
+from qsone.records import office
+from qsone.records.files import file_info, read_original
 from qsone.records.project import RecordsError
 
 
@@ -158,7 +159,11 @@ def build(steps, read, language, *, apply_seal=True):
         if kind == "file":
             for first, last in step["ranges"]:
                 for n in range(first - 1, last):
-                    writer.add_page(readers[step["file_id"]].pages[n])
+                    reader = readers[step["file_id"]]
+                    # A fresh page dictionary alone still shares its content stream in
+                    # pypdf. Reset source translations so overlays cannot mutate siblings.
+                    writer.reset_translation(reader)
+                    writer.add_page(reader.pages[n].clone(writer, force_duplicate=True))
         elif kind in ("cover", "divider"):
             writer.add_page(_draw(step["text"][language], language, large=True))
         if "title" in step and len(writer.pages) > start:
@@ -177,9 +182,11 @@ def build(steps, read, language, *, apply_seal=True):
             else:
                 continue
             overlay = _draw(
-                text, language, float(page.mediabox.width), float(page.mediabox.height), position
+                text, language, float(page.cropbox.width), float(page.cropbox.height), position
             )
-            page.merge_page(overlay)
+            page.merge_translated_page(
+                overlay, float(page.cropbox.left), float(page.cropbox.bottom)
+            )
     out = BytesIO()
     writer.write(out)
     data = out.getvalue()
@@ -190,20 +197,38 @@ def build(steps, read, language, *, apply_seal=True):
     return data
 
 
+def _source_pdf(rec, file_id):
+    info = file_info(rec, file_id)
+    if info is None:
+        raise RecordsError(copy.FILE_NOT_FOUND, status=404, field="file_id")
+    data = read_original(rec, file_id)
+    # Use the kept filename, not extraction status: an Office original can be stored
+    # unread until LibreOffice becomes available. Converted bytes are never persisted.
+    extension = info.name.rsplit(".", 1)[-1].lower()
+    if extension in {"doc", "docx", "xls", "xlsx", "odt", "ods"}:
+        if office.find_soffice() is None:
+            raise RecordsError(copy.FILE_LIBREOFFICE_MISSING, status=503, field="file_id")
+        converted = office.to_pdf(data, info.name)
+        if converted is None:
+            raise RecordsError(copy.FILE_OFFICE_CONVERSION_FAILED, status=422, field="file_id")
+        return converted
+    return data
+
+
 def build_view(rec, view, *, exporting=False):
     if view["kind"] != "pack":
         raise refusal("kind")
     if exporting and view["status"] != "signed_off":
         raise RecordsError(copy.EXPORT_LABELS["needs_signoff"], status=409)
     return build(
-        view["steps"], lambda fid: read_original(rec, fid), view["language"], apply_seal=exporting
+        view["steps"], lambda fid: _source_pdf(rec, fid), view["language"], apply_seal=exporting
     )
 
 
 def validate_op(rec, head, op):
     if set(op) - {"op", "steps", "expect"}:
         raise refusal()
-    validate_steps(op.get("steps"), lambda fid: read_original(rec, fid))
+    validate_steps(op.get("steps"), lambda fid: _source_pdf(rec, fid))
     expected = head["template"]["version"]
     if op.get("expect", expected) != expected:
         raise RecordsError(copy.CHANGE_STALE, status=409)
@@ -213,7 +238,7 @@ def validate_op(rec, head, op):
 def apply_op(conn, rec, head, op, actor, reason):
     from qsone.records import audit
 
-    validate_steps(op["steps"], lambda fid: read_original(rec, fid))
+    validate_steps(op["steps"], lambda fid: _source_pdf(rec, fid))
     cursor = conn.execute("SELECT * FROM deliverables WHERE id = ?", (head["id"],))
     old = dict(zip([d[0] for d in cursor.description], cursor.fetchone(), strict=True))
     old["template"] = json.loads(old["template"])

@@ -201,3 +201,82 @@ def test_continuation_without_header_and_small_page_offset(rec):
     preview = boq.preview(rec, f, None)
     assert len(preview["sheets"]) == 1
     assert preview["overview"]["items"] == 2
+
+
+@pytest.mark.parametrize("unit", ["م3", "م.ط", "كجم/سم2"])
+def test_arabic_units_stay_whole(unit):
+    import typst
+
+    from qsone.records.boq_pdf import cell_text
+
+    data = typst.compile(('#set text(font: "DejaVu Sans")\n' + unit).encode())
+    with pdfplumber.open(io.BytesIO(data)) as doc:
+        assert cell_text(doc.pages[0].chars) == unit
+
+
+def test_cropbox_number_matches_regions(rec):
+    import typst
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import RectangleObject
+
+    from qsone.records import boq_pdf, regions
+
+    data = typst.compile(
+        b"#set page(width: 420pt, height: 200pt, margin: 30pt)\n"
+        b"#table(columns: (50pt, 150pt, 80pt), [Item], [Description], "
+        b"[Quantity], [1], [Sample], [12.50])"
+    )
+    writer = PdfWriter()
+    page = writer.add_page(PdfReader(io.BytesIO(data)).pages[0])
+    page.cropbox = RectangleObject([20, 0, 400, 180])
+    out = io.BytesIO()
+    writer.write(out)
+    fid = add_file(rec, "cropped sample.pdf", out.getvalue(), actor="engineer").id
+    sheets, _ = boq_pdf.sheets(out.getvalue())
+    number = next(c for row in sheets[0].cells.values() for c in row.values() if c.value == "12.50")
+    assert number.locator["box"] == pytest.approx(
+        regions.page_boxes(rec, fid, 1, "12.50")["boxes"][0], abs=0.01
+    )
+
+
+@pytest.mark.parametrize("ruled", [True, False])
+def test_scanned_table_reads_stored_ocr_words(rec, ruled):
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, NameObject, RectangleObject
+
+    from qsone.records import boq_pdf
+    from qsone.records.extract import Piece
+    from qsone.records.files import add_ocr_pages
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(420, 180)
+    page.cropbox = RectangleObject([20, 0, 400, 180])
+    stream = DecodedStreamObject()
+    # A synthetic scan's table ruling, with no PDF text objects.
+    commands = [f"{x} 70 m {x} 160 l S" for x in (30, 80, 240, 300, 390)]
+    commands += [f"30 {y} m 390 {y} l S" for y in (70, 100, 130, 160)]
+    stream.set_data("\n".join(commands if ruled else []).encode())
+    page[NameObject("/Contents")] = writer._add_object(stream)
+    out = io.BytesIO()
+    writer.write(out)
+    file_id = add_file(rec, "Scanned sample.pdf", out.getvalue(), actor="engineer").id
+    pieces = []
+    for y, texts in (
+        (25, ["Item", "Description", "Unit", "Quantity"]),
+        (55, ["1", "Concrete", "م3", "12.50"]),
+        (85, ["2", "Concrete", "م3", "20.00"]),
+    ):
+        for x, text in zip((15, 65, 225, 285), texts, strict=True):
+            pieces.append(Piece({"page": 1, "box": [x, y, x + 40, y + 10]}, text))
+    add_ocr_pages(rec, file_id, {1: pieces}, read_by="tesseract", actor="engineer")
+    names, sheet = boq_pdf.read_stored(rec, file_id, "PDF 1.1")
+    assert names == [("PDF 1.1", False)]
+    row = next(row for row in sheet.cells.values() if row.get(4) and row[4].value == "12.50")
+    assert row[3].value == "م3"
+    assert row[4].locator == {"page": 1, "box": [285, 55, 325, 65]}
+    header, columns = boq.guess(sheet, sheet.last_row)
+    plan = boq.plan_sheet(
+        rec, boq.workbook(rec, file_id), sheet, header_row=header, columns=columns
+    )
+    assert plan.items == 2
+    assert sheet.needs_reading == []

@@ -20,6 +20,7 @@ import asyncio
 import io
 import json
 import logging
+import math
 import re
 import threading
 from dataclasses import dataclass, field
@@ -567,7 +568,17 @@ def _jpeg_png(data: bytes) -> bytes:
 def _image(kind: str, data: bytes, page: int) -> bytes:
     with _OCR_IMAGES:
         if kind == "pdf":
-            return render.page_png(data, page, PAGE_WIDTH)
+            with pdfium.PdfDocument(data) as doc:
+                pdf_page = doc[page - 1]
+                try:
+                    width, height = pdf_page.get_size()
+                finally:
+                    pdf_page.close()
+            scale = min(300 / 72, math.sqrt(40_000_000 / (width * height)))
+            pixels = max(1, math.floor(width * scale))
+            while pixels * math.ceil(height * pixels / width) > 40_000_000:
+                pixels -= 1
+            return render.page_png(data, page, pixels)
         if kind == "jpg":
             return _jpeg_png(data)
         return data  # a PNG goes as it is

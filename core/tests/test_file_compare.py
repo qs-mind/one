@@ -166,3 +166,36 @@ def test_page_box_alignment_does_not_stretch_the_drawing():
     overlay, count, _ = _images(old, new, 1, 1, 600)
     assert overlay.shape == (500, 600, 4)
     assert count == 0  # same drawing in a larger blank page box, no stretching
+
+
+def test_sheet_identity_uses_last_candidate_and_ignores_grades_and_standards():
+    from qsone.records.compare import identity
+
+    assert identity("SEE S-201 … S-101")[0] == "S-101"
+    assert identity("C-30 TO BS-8110")[0] == ""
+
+
+def test_title_block_sheet_wins_over_later_reference_and_warns(rec):
+    # The title-block identifier is deliberately first in PDF content order.
+    drawing = (
+        "#place(top + left, dx: 120pt, dy: 140pt)[S-101]\n"
+        "#place(top + left, dx: 5pt, dy: 5pt)[SEE S-201]"
+    )
+    old = add(rec, [drawing, "S-201\n\nOther sample"])
+    new = add(rec, ["S-201\n\nOther sample", drawing], "new-sample.pdf")
+    result = compare_files(rec, old, new)
+    assert [(p["old"]["page"], p["new"]["page"], p["method"]) for p in result["pairs"]] == [
+        (1, 2, "sheet"),
+        (2, 1, "sheet"),
+    ]
+    note = result["pairs"][0]["pairing_note"]
+    assert set(note) == {"en", "ar"}
+    assert "look" in note["en"]
+    assert "pairing_note" not in result["pairs"][1]
+
+
+def test_concrete_grade_is_not_used_to_pair_pages(rec):
+    old = add(rec, ["C-30 TO BS-8110"])
+    new = add(rec, ["C-30 TO BS-8110"], "new-sample.pdf")
+    result = compare_files(rec, old, new)
+    assert result["pairs"][0]["method"] != "sheet"
