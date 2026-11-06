@@ -164,9 +164,6 @@ def create_app(
     mapping = Mapping(
         registry,
         passes=lambda rec: {"approved": mapping_passes},
-        foreground=lambda _: any(
-            engine.active(pid, include_mapping=False) is not None for pid, _ in registry.opened()
-        ),
     )
     sender = usage.Sender()
     account = Account()  # the QS Mind account; its vault keeps the Backup key

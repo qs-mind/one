@@ -552,3 +552,42 @@ def test_ai_failure_is_not_resubmitted_until_wake(rec, monkeypatch):
     service._last_drop = 0
     service._work()
     assert len(calls) == 2 and calls[1] == [f.id]
+
+
+def test_foreground_wait_does_not_block_local_read(rec):
+    from types import SimpleNamespace
+
+    from qsone.records.mapping.service import Mapping
+
+    f = files.add_file(rec, "sample-wait.txt", b"Sample tender", actor="engineer")
+    service = Mapping(SimpleNamespace(opened=lambda: [("B", rec)]), foreground=lambda _: True)
+
+    def wait(_):
+        if store.detail(rec, f.id)["local_state"] == "done":
+            service._quit.set()
+
+    service._wake.wait = wait
+    service._work()
+    assert store.detail(rec, f.id)["local_state"] == "done"
+
+
+def test_mapping_model_contention_ignores_waiting_and_idle_briefs():
+    from types import SimpleNamespace as NS
+
+    from qsone.records.mapping.service import model_busy
+
+    engine = NS(
+        _briefs={
+            "a": NS(
+                finished=False,
+                mapping_files=None,
+                state="waiting_engineer",
+                agents={"x": NS(state="thinking")},
+            )
+        }
+    )
+    assert not model_busy(engine)
+    engine._briefs["a"].state = "running"
+    assert model_busy(engine)
+    engine._briefs["a"].agents["x"].state = "done"
+    assert not model_busy(engine)

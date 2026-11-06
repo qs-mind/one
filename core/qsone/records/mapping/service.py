@@ -62,19 +62,21 @@ class Mapping:
             for pid, rec in opened:
                 if self._quit.is_set():
                     break
-                if self.foreground(pid):
-                    continue
                 try:
                     worked = (
                         worker.step(
                             rec,
                             original=self._original,
                             **{k: v for k, v in self.passes(rec).items() if k != "approved"},
-                            cancelled=lambda pid=pid: self._quit.is_set() or self.foreground(pid),
+                            cancelled=self._quit.is_set,
                         )
                         or worked
                     )
-                    if not worked and time.monotonic() - self._last_drop >= 5:
+                    if (
+                        not worked
+                        and not self.foreground(pid)
+                        and time.monotonic() - self._last_drop >= 5
+                    ):
                         with rec.read() as c:
                             pending = [
                                 r[0]
@@ -103,3 +105,21 @@ class Mapping:
                         "Map slice interrupted: project=%s cause=%s", pid, type(error).__name__
                     )
             self._wake.wait(0.05 if worked else 5)
+
+
+def model_busy(engine, model_name=None):
+    """Only an executing foreground agent competes for the model request slot.
+
+    Local file slices never use this gate. A waiting card releases the slot.
+    """
+    return any(
+        not brief.finished
+        and brief.mapping_files is None
+        and brief.state == "running"
+        and any(
+            agent.state in ("thinking", "working")
+            and (model_name is None or agent.model == model_name)
+            for agent in brief.agents.values()
+        )
+        for brief in list(engine._briefs.values())
+    )

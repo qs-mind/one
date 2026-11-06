@@ -2954,3 +2954,18 @@ READ_REPEAT_LIMIT = {
     "en": "ONE stopped searching after three repeated reads and will answer from the files read.",
     "ar": "ONE وقف البحث بعد تكرار القراية تلات مرات وهيرد من الملفات اللي قراها.",
 }
+
+MAP_AI_TIMEOUT = {"en": "the AI request timed out", "ar": "طلب الذكاء الاصطناعي خلّص وقته"}
+MAP_AI_INVALID_OUTPUT = {
+    "en": "the AI returned invalid output",
+    "ar": "الذكاء الاصطناعي رجّع نتيجة مش صالحة",
+}
+MAP_AI_ERROR_TYPE = {
+    "en": "the AI request failed ({kind})",
+    "ar": "طلب الذكاء الاصطناعي فشل ({kind})",
+}
+
+MAP_AI_TOO_LARGE = {
+    "en": "the AI request was too large for the provider",
+    "ar": "طلب الذكاء الاصطناعي كان أكبر من الحد اللي المزوّد بيقبله",
+}
