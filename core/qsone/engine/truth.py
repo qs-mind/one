@@ -49,6 +49,8 @@ _PLACEHOLDER = re.compile(
 _LETTERS = re.compile(r"[^\W\d_]{2,}")
 
 
+# A letter's field the engineer fills (bidder, tender number, signature): never invented.
+FOR_ENGINEER = re.compile(r"يملأه\s+المهندس|يملاه\s+المهندس|to be filled by the engineer", re.I)
 # ONE's insides are no blank: a record id, or a bit of JSON (the Brissa reply, 6 Nov 2026).
 _ID = re.compile(r"\b[0-9a-f]{32}\b")
 _JSONISH = re.compile(r"[{}\"]|^\s*\w+\s*:")
@@ -60,6 +62,8 @@ def placeholders(text: str) -> list[str]:
     for m in _PLACEHOLDER.finditer(text or ""):
         inside = m.group("square") or m.group("curly") or m.group("angle") or ""
         if _ID.search(inside) or (m.group("square") and _JSONISH.search(inside)):
+            continue
+        if FOR_ENGINEER.search(inside):  # a field marked for the engineer to fill is no blank
             continue
         if _LETTERS.search(inside) and m.group(0) not in found:
             found.append(m.group(0))
@@ -1028,4 +1032,37 @@ def letter_problems(conn, text: str, *, day: date, has_total: bool, said: str = 
                 f"The project's files state VAT ({places}); the letter quotes a price and does "
                 "not say whether VAT is in it. Say it, citing the file."
             )
+        if term == "vat" and stated and has_total and said:
+            if not (_VAT_AMOUNT.search(text or "") and _WITH_VAT.search(text or "")):
+                wrong.append(
+                    "A priced letter gives the VAT amount and the total with VAT beside the "
+                    "total: each worked out with calculate (the total × the file's VAT rate, "
+                    'cited to it) and put in as {"type": "num"}.'
+                )
+    if has_total:
+        missing = [name for name, words in _BID_FIELDS if not words.search(text or "")]
+        if missing:
+            wrong.append(
+                f"A priced letter has the bid fields: {', '.join(missing)}. ONE never invents "
+                "them: write each as a field the engineer fills, e.g. «مقدم العطاء: [يملأه "
+                'المهندس: اسم مقدم العطاء]» or "Bidder: [to be filled by the engineer]".'
+            )
     return wrong
+
+
+_VAT_AMOUNT = re.compile(r"قيم[ةه]\s+(?:ال)?ضريب[ةه]|مبلغ\s+(?:ال)?ضريب[ةه]|\bvat\s+amount\b", re.I)
+_WITH_VAT = re.compile(
+    r"شامل(?:ا|ًا|اً)?\s+(?:ال)?ضريب[ةه]|شامل(?:ة)?\s+ضريب[ةه]|\b(?:incl(?:uding|\.)?|with)\s+vat\b",
+    re.I,
+)
+_BID_FIELDS = (
+    (
+        "bidder",
+        re.compile(r"مقد[ّ]?م\s+العطاء|اسم\s+(?:الشركة|المقاول)|\b(?:bidder|tenderer)\b", re.I),
+    ),
+    (
+        "tender number",
+        re.compile(r"رقم\s+(?:المناقص[ةه]|العطاء|الممارس[ةه])|\btender\s+(?:no|number|ref)", re.I),
+    ),
+    ("signature", re.compile(r"التوقيع|توقيع|\bsignature\b|\bsigned\b", re.I)),
+)
