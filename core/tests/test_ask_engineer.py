@@ -84,7 +84,7 @@ async def test_the_brief_waits_for_every_answer(rec):
 
 def test_the_job_card_says_it_waits_for_the_engineer():
     tool = REGISTRY["ask_engineer"]
-    assert tool.activity(tool.args.model_validate(TWO)) == copy.DOING_ASK
+    assert tool.activity(tool.args.model_validate(TWO)) == copy.TOOL_WORDS["ask_engineer"]
     assert tool.risk == "read" and not tool.untrusted and not tool.writes
 
 
@@ -244,6 +244,11 @@ async def test_kill_and_continue_while_a_question_waits(make_engine, project, da
     assert states(events)[-1] == "done"
     assert "waiting_engineer" in states(events)
     assert any(isinstance(e, Asked) and e.card.id == new.id for e in events)
-    assert any(isinstance(e, Progress) and e.text == copy.DOING_ASK for e in events)
+    assert not any(isinstance(e, Progress) and e.text == copy.DOING_ASK for e in events)
+    card_at = next(i for i, e in enumerate(events) if isinstance(e, Asked) and e.card.id == new.id)
+    waiting_at = next(
+        i for i, e in enumerate(events) if getattr(e, "state", None) == "waiting_engineer"
+    )
+    assert card_at < waiting_at
     [answer] = _returns(lead2.seen[-1])
     assert '"q1": "موقع"' in answer and f"card:{new.id}" in answer

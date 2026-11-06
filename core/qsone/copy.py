@@ -2934,8 +2934,8 @@ MAP_AI_FAILED = {
 }
 
 READ_ALREADY = {
-    "en": "already read in this Brief; use the text above or read another page/file.",
-    "ar": "ONE قرا ده في الطلب ده؛ استخدم النص اللي فوق أو اقرا صفحة أو ملف تاني.",
+    "en": "already read in this Brief; use the text already read or read another page/file.",
+    "ar": "ONE قرا ده في الطلب ده؛ استخدم النص اللي اتقرا أو اقرا صفحة أو ملف تاني.",
 }
 READ_REPEAT_NOW = (
     "Stop searching: three identical reads were repeated. Answer using only what you have. "
@@ -2944,9 +2944,9 @@ READ_REPEAT_NOW = (
     "with its file and page, not an unknown value to search for. No more tools."
 )
 READ_TEMPLATE_BLANK = {
-    "en": "A dotted/underscored template field above is left blank in the tender documents. "
+    "en": "A dotted/underscored template field is left blank in the tender documents. "
     "Report that with its file and page; do not invent its value.",
-    "ar": "الخانة اللي فيها نقط أو شرطات تحت السطر فوق متسابة فاضية في مستندات المناقصة. "
+    "ar": "الخانة اللي فيها نقط أو شرطات سفلية متسابة فاضية في مستندات المناقصة. "
     "قول ده مع اسم الملف والصفحة؛ ماتخمنش قيمتها.",
 }
 

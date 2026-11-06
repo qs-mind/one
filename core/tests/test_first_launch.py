@@ -7,7 +7,6 @@ never the real one. Synthetic «عينة» data only."""
 import asyncio
 import json
 import sys
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -502,9 +501,8 @@ def test_open_link_only_opens_fixed_urls(client, no_browser):
     assert set(routes.LINKS) == {"terms", "privacy", "releases", "sign_in"}
 
 
-def test_a_retired_checker_model_found_behind_the_check_is_dropped(data_dir):
-    """The answer waits on the typed model only; the Checking QS's model is checked behind, and
-    one the provider refuses (Google's retired ones) is noted, so it is no default."""
+def test_a_retired_unchosen_checker_model_is_never_probed(data_dir):
+    """Only the chosen model is probed, even if the list contains a retired one."""
     settings.save_ai(
         "standard",
         [
@@ -527,44 +525,8 @@ def test_a_retired_checker_model_found_behind_the_check_is_dropped(data_dir):
     with make_client([link]) as client:
         body = {"via": "standard", "connector": "standard:g"}
         assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
-        for _ in range(50):
-            if connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite")):
-                break
-            time.sleep(0.05)
-    assert connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite"))
-
-
-async def test_background_defaults_only_check_listed_models(data_dir):
-    link = google_link()
-    link.sheet = [c for c in link.sheet if c.choice.model == "models/gemini-3.1-flash-lite"]
-    listed_model = link.models["models/gemini-3.1-flash-lite"] = scripted(text("OK"))
-    absent_model = link.models["models/gemini-2.5-flash-lite"] = scripted(text("OK"))
-    await routes._check_defaults([cards.priced(c) for c in link.sheet], set(), [link])
-    assert listed_model.calls == 1
-    assert absent_model.calls == 0
-
-
-async def test_background_defaults_filter_unlisted_and_refused_choices(data_dir, monkeypatch):
-    link = google_link()
-    available, refused, absent = [c.choice for c in link.sheet[1:]]
-    link.sheet = [c for c in link.sheet if c.choice != absent]
-    connectors.note_refused(refused)
-    models = {choice: scripted(text("OK")) for choice in (available, refused, absent)}
-    link.models.update({choice.model: model for choice, model in models.items()})
-    monkeypatch.setattr(
-        roles,
-        "defaults",
-        lambda listed: {
-            "lead": available,
-            "checker": refused,
-            "quick": absent,
-        },
-    )
-    checked = set()
-    await routes._check_defaults(link.sheet, checked, [link])
-    assert checked == {available}
-    assert models[available].calls == 1
-    assert models[refused].calls == models[absent].calls == 0
+    assert link.models["models/gemini-3.1-flash-lite"].calls == 1
+    assert not connectors.refused(ModelChoice("standard:g", "models/gemini-2.5-flash-lite"))
 
 
 async def test_connection_check_uses_connected_model_over_a_stale_saved_role(data_dir, monkeypatch):
@@ -600,6 +562,4 @@ async def test_connection_check_uses_connected_model_over_a_stale_saved_role(dat
     )
     response = await endpoint(routes.CheckIn(via="standard", connector="standard:g"))
     assert json.loads(response.body) == {"ok": True}
-    assert checked[0] == "standard:g/models/gemini-3.1-flash-lite"
-    if routes._BEHIND:
-        await asyncio.gather(*routes._BEHIND)
+    assert checked == ["standard:g/models/gemini-3.1-flash-lite"]

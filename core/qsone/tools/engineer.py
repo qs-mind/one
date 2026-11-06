@@ -13,6 +13,7 @@ Importing this module registers the tool. No PydanticAI here."""
 import json
 import re
 from datetime import datetime
+from difflib import SequenceMatcher
 from typing import Annotated
 from uuid import uuid4
 
@@ -22,6 +23,7 @@ from qsone import copy
 from qsone.engine.store import Store
 from qsone.engine.tools import ModelRetry, Tool, ToolContext, register
 from qsone.engine.types import Card, read_answer
+from qsone.records.arabic import normalise
 from qsone.tools.cite import SourceRef, render
 
 MAX_QUESTIONS = 20  # in one card (Mizan rule 10)
@@ -162,6 +164,21 @@ def answered(store: Store, card_id: str) -> dict | None:
 
 
 async def _ask(ctx: ToolContext, args: AskArgs) -> str:
+    brief = ctx.store.brief(ctx.brief_id)["text"]
+
+    def tokens(text):
+        return re.findall(r"\w+", normalise(text).casefold())
+
+    original = tokens(brief)
+    for q in args.questions:
+        proposed = tokens(q.text)
+        overlap = len(set(original) & set(proposed)) / max(1, len(set(proposed)))
+        similar = SequenceMatcher(None, " ".join(original), " ".join(proposed)).ratio()
+        if similar >= 0.72 or (len(proposed) >= 2 and overlap >= 0.8):
+            raise ModelRetry(
+                "Do not send the Brief's request back as a question: answer from the files "
+                "or say plainly what was not found. Ask only for their own prices or choices."
+            )
     _check_language(ctx, args)
     questions = [q.model_dump(exclude_defaults=True) for q in args.questions]
     card = Card(
@@ -207,7 +224,7 @@ register(
         args=AskArgs,
         risk="read",
         run=_ask,
-        activity=lambda _: copy.DOING_ASK,
+        activity=lambda _: copy.TOOL_WORDS["ask_engineer"],
         lead_only=True,
         example=_EXAMPLE,
         roles=frozenset({"lead"}),

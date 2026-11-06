@@ -118,7 +118,7 @@ class SearchArgs(_Args):
     where: Literal["project", "engineer", "both"] = "project"
 
 
-_SEARCH_EXAMPLE = {"query": "عزل الرطوبة", "also": ["damp proofing"], "k": 5}
+_SEARCH_EXAMPLE = {"query": "retention", "also": ["محتجز"]}
 
 _SEARCH_DOC = f"""Search file words/meaning or exact codes/numbers. query: short phrase (one
 quoted phrase is exact); alternatives/other language in also, never OR/AND/NOT.
@@ -428,7 +428,7 @@ engineer: card_id/question from ask_engineer; connector: call_id. Quote covers: 
 supply_and_install/install. where=engineer keeps it across projects after approval.
 Returns source_id/date.
 Example:
-{"kind": "contract", "title": "Sample", "file_id": "<file id>", "locator": {"page": 1}}"""
+""" + _json(_SOURCE_EXAMPLE)
 
 # An undated file (founder question pending): "received" dates it the day One received it,
 # labelled `dated_how: "received"` («تاريخ الاستلام» / "date received", `copy.DATED_RECEIVED`);
@@ -824,8 +824,8 @@ _NUMBER_DOC = f"""Record sourced numbers; calculations use calculate. item: id/c
 quantity/rate/amount/price/other. value: exact decimal source text, no thousands separators.
 unit required for quantities/rates (m3 for EGP/m3); currency: three letters for rates/amounts.
 source_id: add_source; dated: YYYY-MM-DD, defaults to source date; where=engineer: Engineer Records.
-BOQ rates need an engineer-named code/row/card, pricing request or own priced copy; otherwise
-prices_propose/resource. Returns number_id; repeats write nothing.
+BOQ rates need an engineer-named item/code/row/card, any pricing request or
+engineer's own priced copy; otherwise prices_propose/resource. Returns number_id; no duplicates.
 Example:
 {_json(_NUMBER_EXAMPLE)}"""
 

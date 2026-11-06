@@ -90,7 +90,7 @@ from qsone.engine import (
 )
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.costs import CallRefused, CapReached, CostedModel, Spending
-from qsone.engine.data_text import new_fence
+from qsone.engine.data_text import as_data, new_fence
 from qsone.engine.mcp_server import McpGate, RunScope
 from qsone.engine.store import UNFINISHED, CostBook, Store
 from qsone.engine.team import TeamSetup
@@ -699,8 +699,8 @@ class _Brief:
         self.waiting[card.id] = (card, future)
         before = self.step
         state: BriefState = "paused_cap" if card.kind == "cap" else "waiting_engineer"
-        self.set_state(state, copy.fill(copy.STEP_WAITING, title=card.title))
         self.emit(Asked(self.brief_id, card))
+        self.set_state(state, copy.fill(copy.STEP_WAITING, title=card.title))
         if self.lead_run_id is not None:
             self._agent(self.lead_run_id, state="waiting")
         self._waiting_count()
@@ -1213,6 +1213,15 @@ class _Brief:
                     calls[c.tool_call_id] = ToolFailed("Stopped by the Spending Cap.")
             results = DeferredToolResults(calls=calls)
         prompt = (prompt or copy.REPORT_NOW) if report else (None if own else self.text)
+        if not own and not report and prompt is not None and self.lead_ctx.rec is not None:
+            from qsone.engine.map_digest import digest
+
+            navigation = digest(self.lead_ctx.rec)
+            if navigation:
+                prompt += "\n\n" + as_data(
+                    navigation, source="project_map", fence=self.lead_ctx.fence
+                )
+                self.store.mark_untrusted(self.brief_id)
         earlier = self._earlier()
         effort = self.lead_effort(choice)
         # the Lead is sent the tool groups its Brief opened (tool_groups)
