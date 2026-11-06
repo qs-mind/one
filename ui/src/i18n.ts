@@ -35,7 +35,8 @@ export const texts = {
     ar: "محرك ONE مش شغّال، فالشات مش هيشتغل. السجل بتاعه هنا:",
   },
   retry: { en: "Retry", ar: "جرّب تاني" },
-  coreDownTitle: { en: "ONE's core stopped", ar: "محرك ONE وقف" },
+  coreRestarting: { en: "ONE's engine is restarting…", ar: "محرك ONE بيعيد التشغيل…" },
+  coreRestartingLong: { en: "It is taking longer than usual. Its log:", ar: "واخد وقت أطول من العادي. السجل بتاعه:" },
   screenFailed: {
     en: "Something went wrong on this screen. Your work is saved in the project; reload to carry on.",
     ar: "حصلت مشكلة في الشاشة دي. شغلك محفوظ في المشروع؛ حمّلها تاني وكمّل.",

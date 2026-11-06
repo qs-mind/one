@@ -74,7 +74,12 @@ export function switchProject(next: Project) {
   if (before && leaving) closeAfter(before.id, leaving);
 }
 
-/** Opens the remembered project in the core. One that no longer opens is forgotten, and the answer is "failed". */
+/** How often, and how far apart, a remembered project is asked for while the core is still coming back. */
+const RESTORE_TRIES = 10;
+const RESTORE_MS = 1000;
+
+/** Opens the remembered project in the core. One the core says no longer opens is forgotten, and the answer is
+ * "failed"; while the core is still coming back (no answer, or the proxy's 5xx) it is asked again, and kept. */
 export async function restoreProject(): Promise<"none" | "opened" | "failed"> {
   let id: string | null = null;
   try {
@@ -83,15 +88,21 @@ export async function restoreProject(): Promise<"none" | "opened" | "failed"> {
     return "none";
   }
   if (!id) return "none";
-  const response = await api(`/projects/${encodeURIComponent(id)}/open`, { method: "POST" }).catch(
-    () => undefined,
-  );
-  if (response?.ok) {
-    setCurrentProject((await response.json()) as Project);
-    return "opened";
+  for (let tries = 1; ; tries++) {
+    const response = await api(`/projects/${encodeURIComponent(id)}/open`, { method: "POST" }).catch(
+      () => undefined,
+    );
+    if (response?.ok) {
+      setCurrentProject((await response.json()) as Project);
+      return "opened";
+    }
+    if (response && response.status < 500) {
+      remember(undefined); // the core's own refusal: gone, damaged
+      return "failed";
+    }
+    if (tries >= RESTORE_TRIES) return "failed"; // still remembered for the next start
+    await new Promise((resolve) => setTimeout(resolve, RESTORE_MS));
   }
-  remember(undefined);
-  return "failed";
 }
 
 /** Re-renders the component when the current project changes. */

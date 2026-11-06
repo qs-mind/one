@@ -12,6 +12,7 @@ import type { SelectionItem } from "../project/types";
 import { SelectionText } from "../chat/Chat";
 import { sentFrom, takeSentFrom } from "../chat/sent";
 import { dir, t, type texts, useLanguage } from "../i18n";
+import { useCoreLost } from "../app/CoreDown";
 import { ArchivedLine } from "../records/Archived";
 import { useProject } from "../records/project";
 import { type Ai, keyOf } from "../settings/AiSettings";
@@ -93,6 +94,8 @@ export function CommandBar({
   const queue = useMessageQueue(chat.chatId);
   const project = useProject();
   const archived = Boolean(project?.archived_at) && project?.id === chat.chatId; // read-only: nothing to send
+  const coreLost = useCoreLost() !== null; // the core is restarting: nothing is sent until it is back
+  const canSend = chat.canSend && !coreLost;
 
   /** The words in the box go on the queue, with the selection they were written for. */
   function enqueue() {
@@ -103,6 +106,7 @@ export function CommandBar({
 
   /** The next queued message goes, as if sent now: a new Brief. One that does not go waits at the head. */
   async function sendNext() {
+    if (latestLost.current) return; // the queue waits for the core
     const item = queue.take();
     if (!item) return;
     const model = picked && settings?.sheet.some((x) => keyOf(x) === keyOf(picked)) ? picked : undefined;
@@ -113,6 +117,8 @@ export function CommandBar({
   }
   const latest = useRef(chat);
   latest.current = chat;
+  const latestLost = useRef(coreLost);
+  latestLost.current = coreLost;
 
   // When the Brief ends (and the queue is not paused), the next queued message goes by itself.
   const wasRunning = useRef(chat.running);
@@ -134,7 +140,7 @@ export function CommandBar({
   }
 
   async function submit(words: string, typed: boolean) {
-    if (!words.trim() || !chat.canSend) return;
+    if (!words.trim() || !canSend) return;
     if (typed) {
       if (text.current) sentFrom(text.current.getBoundingClientRect()); // the chat moves the words on from here
       setDraft("");
@@ -195,7 +201,7 @@ export function CommandBar({
             <button
               key={key}
               type="button"
-              disabled={!chat.canSend}
+              disabled={!canSend}
               onClick={() => void submit(t(key), false)}
               className="rounded-lg border border-ink/15 px-3 py-1 text-sm hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-40"
             >
@@ -291,7 +297,7 @@ export function CommandBar({
             type="submit"
             aria-label={chat.running ? t("queueAdd") : t("send")}
             title={chat.running ? t("queueAdd") : t("send")}
-            disabled={!hasWords || !chat.canSend}
+            disabled={!hasWords || !canSend}
             className={`${round} bg-ink text-paper disabled:cursor-default disabled:opacity-20 disabled:active:scale-100`}
           >
             <Arrow />
