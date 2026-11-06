@@ -126,10 +126,7 @@ export const texts = {
     ar: "لسه مفيش نماذج. هتظهر هنا أول ما ذكاء اصطناعي متوصّل يرد.",
   },
   roleNotSaved: { en: "The choice was not saved. Try again.", ar: "الاختيار ماتحفظش. جرّب تاني." },
-  pricePerMillion: {
-    en: "{in} USD in, {out} USD out per million tokens",
-    ar: "{in} دولار للداخل، {out} دولار للخارج لكل مليون توكن",
-  },
+  pricePerMillion: { en: "{in} in / {out} out per million tokens", ar: "{in} داخل / {out} خارج لكل مليون توكن" },
   priceSource: { en: "source: {source}", ar: "المصدر: {source}" },
   priceUnknown: { en: "price unknown", ar: "السعر مش معروف" },
   enterPrice: { en: "Enter a model's price", ar: "اكتب سعر نموذج" },
@@ -844,7 +841,6 @@ export const texts = {
   },
   readyLater: { en: "Start without a folder", ar: "ابدأ من غير فولدر" },
   readyStart: { en: "Start", ar: "ابدأ" },
-  readyRolePrice: { en: "${in}/${out} per million tokens", ar: "${in}/${out} لكل مليون توكن" },
   readyRolesChange: { en: "Change the models", ar: "غيّر النماذج" },
   // Task 11: tender folder import and the "I understood this" card.
   windowDropProject: { en: "Drop to add to this project", ar: "سيبهم هنا يتضافوا للمشروع ده" },

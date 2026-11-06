@@ -10,6 +10,7 @@ import { coreLine, send } from "../core";
 import { Feedback, secondary } from "../firstlaunch/parts";
 import { fill, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { AutoHeight } from "../ui/AutoHeight";
+import { perMillion } from "../ui/digits";
 import { SavedCheck } from "../ui/InkCheck";
 import { looksLikeAmount, SaveNote, useSaving } from "../ui/live";
 import { UndoNotice } from "../ui/UndoNotice";
@@ -451,7 +452,7 @@ function StatusLine({ status, onAgain }: { status: "checking" | ClaudeCodeStatus
 function priceText(card: ModelCard): string {
   if (card.on_device) return t("onDevice");
   if (card.price_in == null || card.price_out == null) return t("priceUnknown");
-  const price = fill(t("pricePerMillion"), { in: card.price_in, out: card.price_out });
+  const price = perMillion(card.price_in, card.price_out);
   return card.price_source ? `${price} · ${fill(t("priceSource"), { source: card.price_source })}` : price;
 }
 

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { crashReport, reportCrash, resetCrashReports } from "../app/crash";
 import { language, setLanguage, texts } from "../i18n";
+import { perMillion } from "../ui/digits";
 import { ConsentNeeded, resetConsent } from "./ConnectAi";
 import { FirstLaunch, SetupGate } from "./FirstLaunch";
 import { closeSetup, type Setup, type Step, STEPS } from "./parts";
@@ -336,10 +337,10 @@ describe("FirstLaunch", () => {
     await user.click(await screen.findByRole("button", { name: texts.setupSkip.en }));
     const line = await screen.findByText((_, el) => el?.tagName === "P" && (el.textContent ?? "").startsWith(texts.roleLead.en));
     expect(line.textContent).toBe(
-      `${texts.roleLead.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens) · ` +
+      `${texts.roleLead.en}: Gemini 3.1 Flash Lite (${perMillion("0.25", "1.5")}) · ` +
         `${texts.roleChecker.en}: gemma-3-27b-it (${texts.priceUnknown.en}) · ` +
-        `${texts.roleSpecialist.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens) · ` +
-        `${texts.roleQuick.en}: Gemini 3.1 Flash Lite ($0.25/$1.5 per million tokens)`,
+        `${texts.roleSpecialist.en}: Gemini 3.1 Flash Lite (${perMillion("0.25", "1.5")}) · ` +
+        `${texts.roleQuick.en}: Gemini 3.1 Flash Lite (${perMillion("0.25", "1.5")})`,
     );
     expect(screen.getByText(/genai-prices 0\.2\.1/)).toBeInTheDocument(); // every price with its source
     await user.click(screen.getByRole("button", { name: texts.readyRolesChange.en }));
