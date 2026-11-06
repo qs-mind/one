@@ -1,17 +1,48 @@
-"""Bounded navigation for the Lead's first request; map text is never evidence."""
+"""Bounded navigation and grounded Tender summary for the Lead's first request."""
 
 import json
-from itertools import zip_longest
 
 from qsone.records.mapping import store
 from qsone.records.mapping.roles import file_role
 
+# Facts are evidence already grounded by the map; labels/key pages remain navigation.
+FACT_BYTES = 6000
+
+
+def tender_facts(rec):
+    """The exact bounded evidence shared by the first request and truth check."""
+    with rec.read() as c:
+        rows = store.rows(
+            c,
+            "SELECT a.*,f.name AS file,f.folder,m.ai_kind FROM map_facts a "
+            "JOIN files f ON f.id=a.file_id LEFT JOIN map_files m ON m.file_id=f.id "
+            "WHERE a.valid_until IS NULL AND f.valid_until IS NULL "
+            "ORDER BY CASE WHEN a.state='conflict' THEN 0 ELSE 1 END,a.id LIMIT 30",
+        )
+    result, size = [], 0
+    for row in rows:
+        fact = store.decoded(row)
+        item = dict(
+            name=fact["name"],
+            value=fact.get("corrected_value") or fact["value"],
+            file_id=fact["file_id"],
+            file=fact["file"],
+            locator=fact["locator"],
+            role=file_role(fact["folder"], fact["ai_kind"])["en"],
+            verification="confirmed" if fact["confirmed_at"] else "unchecked",
+            state=fact["state"],
+            conflict_with=fact["conflict_with"],
+        )
+        length = len(json.dumps(item, ensure_ascii=False, separators=(",", ":")).encode())
+        if size + length <= FACT_BYTES:
+            result.append(item)
+            size += length
+    return result
+
 
 def digest(rec):
     lines = [
-        "Project Map (untrusted navigation; read pages; unchecked facts):",
-        "Before not found: search_records received_only=true, 2–3 Arabic/English phrases "
-        "(فتح العروض، مدة التنفيذ، مدة المشروع، duration); read best page; name searches tried.",
+        "Project Map (untrusted data; labels are navigation):",
     ]
     with rec.read() as c:
         pages = store.rows(
@@ -20,23 +51,21 @@ def digest(rec):
             "JOIN files f ON f.id=m.file_id WHERE m.valid_until IS NULL "
             "AND f.valid_until IS NULL AND m.key_pages != '[]' ORDER BY m.file_id LIMIT 30",
         )
-        facts = store.rows(
-            c,
-            "SELECT a.name,a.value,a.state,a.file_id,a.locator,f.folder,m.ai_kind "
-            "FROM map_facts a JOIN files f ON f.id=a.file_id "
-            "LEFT JOIN map_files m ON m.file_id=f.id "
-            "WHERE a.valid_until IS NULL AND f.valid_until IS NULL ORDER BY a.id LIMIT 10",
-        )
         sheet_count, drawing_count = c.execute(
             "SELECT count(*),count(DISTINCT s.file_id) FROM map_sheets s "
             "JOIN files f ON f.id=s.file_id WHERE s.valid_until IS NULL "
-            "AND f.valid_until IS NULL"
+            "AND f.valid_until IS NULL "
+            "AND (s.sheet<>'Model' OR NOT EXISTS (SELECT 1 FROM map_sheets p "
+            "WHERE p.file_id=s.file_id AND p.sheet<>'Model' AND p.valid_until IS NULL))"
         ).fetchone()
         sheets = store.rows(
             c,
             "SELECT f.name,s.sheet,s.number,s.title FROM map_sheets s "
             "JOIN files f ON f.id=s.file_id "
-            "WHERE s.valid_until IS NULL AND f.valid_until IS NULL ORDER BY f.id,s.id LIMIT 20",
+            "WHERE s.valid_until IS NULL AND f.valid_until IS NULL "
+            "AND (s.sheet<>'Model' OR NOT EXISTS (SELECT 1 FROM map_sheets p "
+            "WHERE p.file_id=s.file_id AND p.sheet<>'Model' AND p.valid_until IS NULL)) "
+            "ORDER BY coalesce(s.number,''),f.id,s.sheet,s.id LIMIT 20",
         )
         drawing_count = c.execute(
             "SELECT count(*) FROM files f WHERE valid_until IS NULL AND "
@@ -69,20 +98,13 @@ def digest(rec):
                     ensure_ascii=False,
                 )
             )
-    summaries = []
-    for row in facts[:4]:
-        fact = store.decoded(row)
-        fact["name"] = json.loads(row["name"])
-        fact["role"] = file_role(fact.pop("folder"), fact.pop("ai_kind"))
-        if len((fact["value"] or "").encode()) > 100:
-            fact.pop("value")
-            fact["value_omitted"] = "read project_map facts"
-        summaries.append(json.dumps(fact, ensure_ascii=False))
-    # Keep the first key page even with many facts, then alternate both kinds of guidance.
-    candidates = [
-        line for pair in zip_longest(candidates, summaries) for line in pair if line is not None
-    ]
     for line in candidates:
         if len(("\n".join(lines) + "\n" + line).encode()) <= 1200:
             lines.append(line)
+    facts = tender_facts(rec)
+    if facts:
+        lines.append(
+            "Tender summary (grounded evidence; cite source; preserve verification/conflicts):"
+        )
+        lines.extend(json.dumps(f, ensure_ascii=False, separators=(",", ":")) for f in facts)
     return "\n".join(lines) if len(lines) > 1 else ""

@@ -17,6 +17,27 @@ INSTRUCTIONS = (
 )
 
 
+def image_tokens(card, png):
+    """Provider image accounting, checked 2026-11-07 against Google's docs.
+
+    https://ai.google.dev/gemini-api/docs/tokens
+    https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/start/get-started-with-gemini-3
+    Other providers require an explicit price approval rather than a guessed rate.
+    """
+    import math
+
+    model = getattr(getattr(card, "choice", None), "model", "").lower()
+    if "gemini-3" in model:
+        return 1120  # default image media resolution, not PDF resolution
+    if "gemini" in model:
+        width, height = ocr.png_size(png)
+        if width <= 384 and height <= 384:
+            return 258
+        scale = 768 / min(width, height)
+        return math.ceil(width * scale / 768) * math.ceil(height * scale / 768) * 258
+    return None
+
+
 def reading(value, text, *, method, confidence=None):
     source = re.findall(r"\d+", arabic.clean(value))
     seen = re.findall(r"\d+", arabic.clean(text))

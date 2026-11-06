@@ -492,4 +492,9 @@ MIGRATIONS: list[str] = [
     "ALTER TABLE map_facts ADD COLUMN evidence TEXT;"
     "ALTER TABLE map_facts ADD COLUMN picture_check TEXT "
     "CHECK(picture_check IS NULL OR json_valid(picture_check));",
+    "CREATE TABLE map_rejected_facts ("
+    "id TEXT PRIMARY KEY, proposal TEXT NOT NULL CHECK(json_valid(proposal)),"
+    "reason TEXT NOT NULL, recorded_at TEXT NOT NULL);"
+    "CREATE TRIGGER map_rejected_facts_no_delete BEFORE DELETE ON map_rejected_facts "
+    "BEGIN SELECT RAISE(ABORT, 'Map proposals are retained'); END;",
 ]

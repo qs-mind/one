@@ -71,3 +71,59 @@ async def test_lead_answers_electrical_sheets_and_mccb_from_local_map(
     assert "E-101: Main single line diagram; MCCB: 7 pcs" in reply(events)
     assert "source: sample-electrical.pdf" in reply(events)
     assert not [event for event in events if isinstance(event, (Asked, Unsourced))]
+
+
+async def test_lead_answers_opening_from_grounded_summary_without_page_read(
+    make_engine, project, registry
+):
+    from pydantic_ai.messages import UserPromptPart
+
+    from qsone.records.mapping import facts
+
+    rec = registry.get(project)
+    file = files.add_file(
+        rec,
+        "sample-tender.pdf",
+        sample_pdf([["Sample"] for _ in range(7)]),
+        folder="01 المستلم",
+        actor="t",
+    )
+    words = "فتح العروض 16/04/1448"
+    with rec.write("one") as c:
+        c.execute(
+            "UPDATE chunks SET text=? WHERE file_id=? AND json_extract(locator,'$.page')=7",
+            (words, file.id),
+        )
+    assert facts.accept(
+        rec,
+        [
+            dict(
+                name={"en": "Opening of offers", "ar": "فتح العروض"},
+                value="16/04/1448",
+                file_id=file.id,
+                locator={"page": 7},
+                state="found",
+                evidence=words,
+            )
+        ],
+        picture_fallback=False,
+    )
+
+    def answer(messages, info):
+        prompts = [
+            p.content
+            for m in messages
+            if isinstance(m, ModelRequest)
+            for p in m.parts
+            if isinstance(p, UserPromptPart)
+        ]
+        assert "16/04/1448" in str(prompts) and "unchecked" in str(prompts)
+        return "فتح العروض 16/04/1448 (sample-tender.pdf، صفحة 7)، قريته ولسه مش متأكد منه."
+
+    lead = scripted(answer)
+    engine = await started(make_engine(links(lead=lead)))
+    brief = await engine.start_brief(project, "هات تاريخ فتح العروض")
+    events = await asyncio.wait_for(finish(engine, brief), 10)
+    assert lead.calls == 1
+    assert "16/04/1448" in reply(events)
+    assert not [event for event in events if isinstance(event, (Asked, Unsourced))]

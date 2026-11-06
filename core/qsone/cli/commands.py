@@ -184,12 +184,14 @@ class Commands:
                 return result | {"state": "done" if settled else "timeout"}
             time.sleep(min(0.5, max(0, deadline - time.monotonic())))
 
-    def map_entries(self, project, name):
+    def map_entries(self, project, name, *, rejected=False):
         route = f"/projects/{project}/map/{name}"
-        result = self.client.get(route)
+        params = {"rejected": True} if rejected else {}
+        key = "rejected" if rejected else name
+        result = self.client.get(route, **params)
         while result.get("next_cursor"):
-            page = self.client.get(route, cursor=result["next_cursor"])
-            result[name].extend(page[name])
+            page = self.client.get(route, cursor=result["next_cursor"], **params)
+            result[key].extend(page[key])
             result["next_cursor"] = page.get("next_cursor")
         return result
 
@@ -316,7 +318,7 @@ class Commands:
         if cmd == "map":
             return self.map(p, group=args.group, file=args.file, cursor=args.cursor, wait=args.wait)
         if cmd in ("facts", "links"):
-            return self.map_entries(p, cmd)
+            return self.map_entries(p, cmd, rejected=getattr(args, "rejected", False))
         if cmd == "fact":
             return c.post(
                 base + f"/map/facts/{args.fact}",

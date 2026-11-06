@@ -21,6 +21,7 @@ class MapArgs(BaseModel):
     parent: str | None = None
     cursor: str | None = None
     limit: int = Field(10, ge=1, le=100)
+    rejected_cursor: str | None = None
 
     @model_validator(mode="after")
     def mode_limit(self):
@@ -59,7 +60,9 @@ def local_evidence(rec, row, args):
         sheets = store.rows(
             c,
             "SELECT file_id,sheet,number,title,revision,scale,discipline,counts,"
-            "source FROM map_sheets WHERE file_id=? AND valid_until IS NULL "
+            "source FROM map_sheets s WHERE file_id=? AND valid_until IS NULL "
+            "AND (sheet<>'Model' OR NOT EXISTS (SELECT 1 FROM map_sheets p "
+            "WHERE p.file_id=s.file_id AND p.sheet<>'Model' AND p.valid_until IS NULL)) "
             "ORDER BY sheet,id LIMIT ? OFFSET ?",
             (fid, args.limit + 1, offset),
         )
@@ -85,6 +88,12 @@ async def read_map(ctx, args):
         result = drawing_evidence(ctx.rec, args)
     elif args.mode in ("facts", "links"):
         result = store.entries(ctx.rec, args.mode, cursor=args.cursor, limit=args.limit)
+        if args.mode == "facts":
+            rejected = store.rejected_entries(
+                ctx.rec, cursor=args.rejected_cursor, limit=args.limit
+            )
+            result["rejected"] = rejected["rejected"]
+            result["rejected_next_cursor"] = rejected["next_cursor"]
     elif args.mode == "file":
         # Exclude full structure/page text and keep all child collections paged.
         with ctx.rec.read() as c:
@@ -152,6 +161,7 @@ register(
         "for a complete list; counts(label optional block-name filter) gives sourced sheet/file "
         "counts and project_total. file_id filters either mode; page paginates. Headings, BOQ "
         "tables, drawing sheets and block counts include sources. cursor pages files/facts/links; "
+        "rejected_cursor pages unverified proposals; "
         "page pages sheets/tables; counts_page pages blocks. Read cited prose with files_read.",
         MapArgs,
         "read",
@@ -178,6 +188,7 @@ def drawing_evidence(rec, args):
                 "ORDER BY coalesce(s.number,''),s.file_id,s.sheet,s.id",
             )
         ]
+    paper_files = {row["file_id"] for row in rows if row["sheet"] != "Model"}
     project_total, file_totals, entries = 0, {}, []
     for row in rows:
         row["layout"] = row["sheet"]
@@ -185,6 +196,8 @@ def drawing_evidence(rec, args):
 
         row["role"] = file_role(row.pop("folder", None), row.pop("ai_kind", None))
         if args.mode == "sheets":
+            if row["sheet"] == "Model" and row["file_id"] in paper_files:
+                continue
             row.pop("counts", None)
             if args.file_id is None or row["file_id"] == args.file_id:
                 entries.append({k: row[k] for k in ("number", "title", "file", "layout")})
@@ -206,11 +219,23 @@ def drawing_evidence(rec, args):
                 | {"counts": {name: count}, "total": count, "sheet_total": total}
                 for name, count in sorted(counts.items())
             )
-    start = (args.page - 1) * args.limit
+    # Page by both rows and UTF-8 bytes before the dispatcher's 8 KB guard.
+    # Rebuild the same deterministic partitions on every request, so page 1
+    # through next_page covers all sheets even with long Arabic titles.
+    pages, batch, size = [], [], 0
+    for entry in entries:
+        width = len(json.dumps(entry, ensure_ascii=False).encode()) + 2
+        if batch and (len(batch) >= args.limit or size + width > 6500):
+            pages.append(batch)
+            batch, size = [], 0
+        batch.append(entry)
+        size += width
+    if batch:
+        pages.append(batch)
     result = {
-        args.mode: entries[start : start + args.limit],
+        args.mode: pages[args.page - 1] if args.page <= len(pages) else [],
         "total": len(entries),
-        "next_page": args.page + 1 if start + args.limit < len(entries) else None,
+        "next_page": args.page + 1 if args.page < len(pages) else None,
     }
     if args.mode == "counts":
         result.update(

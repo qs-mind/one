@@ -246,6 +246,16 @@ def detail(rec, file_id):
                     (*args, out["valid_until"]),
                 )
             ]
+    from collections import Counter
+
+    counts = Counter()
+    for sheet in out["sheets"]:
+        counts.update(sheet["counts"])
+    out["file_counts"] = dict(counts)
+    out["file_counts_source"] = {"file_id": file_id}
+    if any(sheet["sheet"] != "Model" for sheet in out["sheets"]):
+        out["sheets"] = [sheet for sheet in out["sheets"] if sheet["sheet"] != "Model"]
+    out["sheets"].sort(key=lambda sheet: (sheet["number"] or "", sheet["sheet"]))
     return out
 
 
@@ -327,3 +337,35 @@ def _pass_summary(c):
             "facts", {"state": "done", "note": None, "attempts": 1, "failed_batches": 0}
         )["counts"] = json.loads(counts[0])
     return result
+
+
+def retain_rejected(rec, proposals):
+    """Keep private proposals in the encrypted project DB, never application logs."""
+    import hashlib
+
+    with rec.write(ACTOR) as c:
+        for proposal, reason in proposals:
+            raw = json.dumps(proposal, ensure_ascii=False, sort_keys=True)
+            key = hashlib.sha256((reason + raw).encode()).hexdigest()
+            c.execute(
+                "INSERT OR IGNORE INTO map_rejected_facts (id,proposal,reason,recorded_at) "
+                "VALUES (?,?,?,?)",
+                (key, raw, reason, rec.clock()),
+            )
+
+
+def rejected_entries(rec, *, cursor=None, limit=100):
+    limit = max(1, min(limit, 200))
+    with rec.read() as c:
+        found = rows(
+            c,
+            "SELECT * FROM map_rejected_facts WHERE id>? ORDER BY id LIMIT ?",
+            (cursor or "", limit + 1),
+        )
+    return {
+        "rejected": [
+            dict(r, proposal=json.loads(r["proposal"]), verification=copy.MAP_FACT_REJECTED)
+            for r in found[:limit]
+        ],
+        "next_cursor": found[limit - 1]["id"] if len(found) > limit else None,
+    }

@@ -27,8 +27,9 @@ def test_dwg_fixture_in_map(rec):
     data = (Path(__file__).parent / "fixtures/drawings/test-plan.dwg").read_bytes()
     f = files.add_file(rec, "sample.dwg", data, actor="engineer")
     drain(rec)
-    sheets = store.detail(rec, f.id)["sheets"]
-    assert next(s for s in sheets if s["sheet"] == "Model")["counts"]["DOOR"] == 3
+    detail = store.detail(rec, f.id)
+    assert all(s["sheet"] != "Model" for s in detail["sheets"])
+    assert detail["file_counts"]["DOOR"] == 3
 
 
 def test_scanned_drawing_uses_stored_words(rec, monkeypatch):
