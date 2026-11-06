@@ -1094,3 +1094,25 @@ async def test_a_settled_card_says_when_and_a_paid_one_asks_for_a_hold(make_engi
     reply = engine.chat_messages(project)[-1]
     [stored] = [p["data"] for p in reply["parts"] if p["type"] == "data-card"]
     assert stored["settled_at"] and stored["hold"] == asked["hold"]
+
+
+async def test_retired_model_retries_new_default_in_same_brief(make_engine, project):
+    from qsone.engine import connectors
+
+    def gone(messages, info):
+        raise ModelHTTPError(404, OPUS.choice.model, "no longer available - sample")
+
+    engine = await started(
+        make_engine(links(lead=scripted(gone), specialist=scripted(said("رد بديل - عينة"))))
+    )
+    brief = await engine.start_brief(project, BRIEF)
+    events = await finish(engine, brief)
+    assert states(events)[-1] == "done"
+    assert connectors.refused(OPUS.choice)
+    [run] = store_of(engine, project).runs(brief)
+    assert run["choice"] == SONNET.choice
+    assert any(
+        isinstance(e, Progress)
+        and e.text == copy.fill(copy.MODEL_STOPPED, model=OPUS.choice.model, provider="Claude")
+        for e in events
+    )

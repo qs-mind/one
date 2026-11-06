@@ -30,10 +30,10 @@ from pydantic_ai.messages import NativeToolReturnPart
 from pydantic_ai.usage import UsageLimits
 
 from qsone import copy
-from qsone.engine import cards, connectors
+from qsone.engine import cards, connectors, roles
 from qsone.engine.connectors import claude_code
 from qsone.engine.costs import CostedModel, Spending, usd_text
-from qsone.engine.types import ModelCard, ModelChoice, Role, TeamHost, Text
+from qsone.engine.types import ModelCard, ModelChoice, Progress, Role, TeamHost, Text
 
 log = logging.getLogger("qsone.engine.oneshot")
 
@@ -111,7 +111,7 @@ def _subscription(models: Models, order: Sequence[Role]) -> tuple[ModelCard, Rol
     if claude_code.ID not in models.connectors:
         return None
     for role in order:
-        card = models.card(models.roles.get(role))
+        card = models.card(roles.available(models.sheet, models.roles).get(role))
         if card is not None and card.choice.connector == claude_code.ID:
             return card, role
     for card in models.sheet:
@@ -122,7 +122,7 @@ def _subscription(models: Models, order: Sequence[Role]) -> tuple[ModelCard, Rol
 
 def _page_model(models: Models) -> tuple[ModelCard, Role] | None:
     for role in _PAGE_ROLES:
-        card = models.card(models.roles.get(role))
+        card = models.card(roles.available(models.sheet, models.roles).get(role))
         if card is not None and card.images and _model_link(models, card):
             return card, role
     return _subscription(models, _PAGE_ROLES)
@@ -130,7 +130,7 @@ def _page_model(models: Models) -> tuple[ModelCard, Role] | None:
 
 def _search_model(models: Models) -> tuple[ModelCard, Role] | None:
     for role in _SEARCH_ROLES:
-        card = models.card(models.roles.get(role))
+        card = models.card(roles.available(models.sheet, models.roles).get(role))
         if card is not None and card.choice.connector == "anthropic" and _model_link(models, card):
             return card, role
     return _subscription(models, _SEARCH_ROLES)
@@ -162,11 +162,28 @@ def _costed(models: Models, card: ModelCard, role: Role) -> CostedModel:
 
 async def _once(models: Models, card: ModelCard, role: Role, agent: Agent, prompt) -> Any:
     """One request through `CostedModel`; a provider's error becomes its plain words."""
-    try:
-        return await agent.run(prompt, usage_limits=UsageLimits(request_limit=1))
-    except connectors.PROVIDER_ERRORS as error:
-        log.warning("A one-shot call through %s failed: %s", card.choice.connector, error)
-        raise OneShotFailed(connectors.plain_error(error, models.link(card).name)) from None
+    for attempt in range(2):
+        try:
+            with agent.override(model=_costed(models, card, role)):
+                return await agent.run(prompt, usage_limits=UsageLimits(request_limit=1))
+        except connectors.PROVIDER_ERRORS as error:
+            provider = models.link(card).name
+            if connectors.model_unavailable(error):
+                connectors.note_refused(card.choice)
+                models.host.emit(
+                    Progress(
+                        models.brief_id,
+                        models.run_id,
+                        {"en": "ONE", "ar": "ONE"},
+                        copy.fill(copy.MODEL_STOPPED, model=card.choice.model, provider=provider),
+                    )
+                )
+                new = models.card(roles.available(models.sheet, models.roles).get(role))
+                if attempt == 0 and new is not None and _model_link(models, new):
+                    card = new
+                    continue
+            log.warning("A one-shot call through %s failed: %s", card.choice.connector, error)
+            raise OneShotFailed(connectors.plain_error(error, provider)) from None
 
 
 async def _on_subscription(
@@ -385,7 +402,7 @@ async def map_text(models: Models, prompt: str, output_type, instructions: str):
     """A text-only mapping request, using the quick role first and normal cost checks."""
     found = None
     for role in ("quick", "specialist", "lead"):
-        card = models.card(models.roles.get(role))
+        card = models.card(roles.available(models.sheet, models.roles).get(role))
         if card is not None and _model_link(models, card):
             found = card, role
             break
@@ -411,7 +428,7 @@ async def map_text(models: Models, prompt: str, output_type, instructions: str):
 
 def map_model(models: Models):
     for role in ("quick", "specialist", "lead"):
-        card = models.card(models.roles.get(role))
+        card = models.card(roles.available(models.sheet, models.roles).get(role))
         if card is not None and _model_link(models, card):
             return card
     found = _subscription(models, ("quick", "specialist", "lead"))

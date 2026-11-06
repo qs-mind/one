@@ -2969,3 +2969,9 @@ MAP_AI_TOO_LARGE = {
     "en": "the AI request was too large for the provider",
     "ar": "طلب الذكاء الاصطناعي كان أكبر من الحد اللي المزوّد بيقبله",
 }
+
+
+MODEL_STOPPED = {
+    "en": "ONE stopped using {model}: {provider} says it is no longer available.",
+    "ar": "ONE بطل يستخدم {model}: {provider} بيقول إنه مبقاش متاح.",
+}
