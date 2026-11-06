@@ -17,29 +17,36 @@ import {
 const root = () => document.documentElement.style.fontSize;
 
 describe("the window's scale", () => {
-  it("is 100 % at 1920×1080 and on any larger window: nothing grows past today's sizes", () => {
+  it("is 100 % at 1920×1000 and on any larger window: nothing grows past today's sizes", () => {
+    expect(fluidScale(1920, 1000)).toBe(1);
     expect(fluidScale(1920, 1080)).toBe(1);
     expect(fluidScale(2560, 1440)).toBe(1);
     expect(fluidScale(3840, 2160)).toBe(1);
   });
 
-  it("is 80 % at 1280×720, and no smaller below it", () => {
+  it("is 80 % at 1280×650, and no smaller below it", () => {
+    expect(fluidScale(1280, 650)).toBeCloseTo(0.8, 10);
     expect(fluidScale(1280, 720)).toBeCloseTo(0.8, 10);
     expect(fluidScale(1024, 600)).toBeCloseTo(0.8, 10);
   });
 
   it("goes down in a line between the two, by the smaller of width's and height's", () => {
     expect(fluidScale(1600, 1080)).toBeCloseTo(0.9, 10); // halfway across
-    expect(fluidScale(1920, 900)).toBeCloseTo(0.9, 10); // halfway down
-    expect(fluidScale(1366, 768)).toBeCloseTo(Math.min(0.8 + 0.2 * (86 / 640), 0.8 + 0.2 * (48 / 360)), 10);
+    expect(fluidScale(1920, 825)).toBeCloseTo(0.9, 10); // halfway down
+    expect(fluidScale(1366, 768)).toBeCloseTo(0.8 + 0.2 * (86 / 640), 10); // by its width
     expect(fluidScale(1536, 864)).toBeCloseTo(0.88, 10);
   });
 
   it("shrinks a tall narrow window by its width, and a wide short one by its height", () => {
     expect(fluidScale(1280, 1400)).toBeCloseTo(0.8, 10);
     expect(fluidScale(1600, 1400)).toBeCloseTo(0.9, 10);
-    expect(fluidScale(2560, 720)).toBeCloseTo(0.8, 10);
-    expect(fluidScale(2560, 900)).toBeCloseTo(0.9, 10);
+    expect(fluidScale(2560, 650)).toBeCloseTo(0.8, 10);
+    expect(fluidScale(2560, 825)).toBeCloseTo(0.9, 10);
+  });
+
+  it("is 100 % in a maximised window on a 1080p screen, and a maximised 1366×768 one's is about its width's", () => {
+    expect(fluidScale(1920, 1009)).toBe(1); // 1080 less the taskbar and the title bar
+    expect(fluidScale(1366, 698)).toBeCloseTo(0.8 + 0.2 * (86 / 640), 2);
   });
 });
 
@@ -96,7 +103,7 @@ describe("the engineer's zoom", () => {
   const press = (target: EventTarget, code: string, init: KeyboardEventInit = {}) =>
     target.dispatchEvent(new KeyboardEvent("keydown", { code, ctrlKey: true, bubbles: true, cancelable: true, ...init }));
 
-  it("steps with Ctrl and = (or +), - and 0, by the key's place (so the Arabic layout works), and is kept in the core", () => {
+  it("steps with Ctrl and = (or +), - and 0, by the key's place (so the Arabic layout works), and is kept in the core", async () => {
     const fetch = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response("{}"));
     vi.stubGlobal("fetch", fetch);
     windowOf(1920, 1080);
@@ -112,15 +119,32 @@ describe("the engineer's zoom", () => {
     press(document.body, "Digit0");
     expect(currentZoom()).toBe(1);
     expect(root()).toBe("16px");
-    const saves = fetch.mock.calls.map(([url, init]) => [url, JSON.parse(String((init as RequestInit).body))]);
-    expect(saves).toEqual([
-      ["/api/settings/zoom", { zoom: 1.1 }],
-      ["/api/settings/zoom", { zoom: 1.2 }],
-      ["/api/settings/zoom", { zoom: 1.3 }],
-      ["/api/settings/zoom", { zoom: 1.2 }],
-      ["/api/settings/zoom", { zoom: 1 }],
-    ]);
-    expect(fetch.mock.calls.every(([, init]) => (init as RequestInit).method === "PUT")).toBe(true);
+    // the first press's save, then only the newest: the presses came faster than the core answered
+    await vi.waitFor(() => expect(savesOf(fetch)).toEqual([1.1, 1]));
+    expect(fetch.mock.calls.every(([url, init]) => url === "/api/settings/zoom" && (init as RequestInit).method === "PUT")).toBe(true);
+  });
+
+  it("saves in order: one save at a time, then the newest, so an older zoom is never the one kept", async () => {
+    const answers: (() => void)[] = [];
+    const fetch = vi.fn(
+      (_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>((resolve) => answers.push(() => resolve(new Response("{}")))),
+    );
+    vi.stubGlobal("fetch", fetch);
+    windowOf(1920, 1080);
+    setZoom(1.1);
+    setZoom(1.2);
+    setZoom(1.3);
+    setZoom(1.4);
+    expect(savesOf(fetch)).toEqual([1.1]); // one in flight; 1.2 and 1.3 are passed over
+    answers.shift()!();
+    await vi.waitFor(() => expect(savesOf(fetch)).toEqual([1.1, 1.4]));
+    setZoom(1.3);
+    expect(savesOf(fetch)).toEqual([1.1, 1.4]); // 1.4 still in flight
+    answers.shift()!();
+    await vi.waitFor(() => expect(savesOf(fetch)).toEqual([1.1, 1.4, 1.3]));
+    answers.shift()!();
+    await vi.waitFor(() => expect(answers).toEqual([]));
+    expect(currentZoom()).toBe(1.3);
   });
 
   it("never fires while the engineer types in a field, and needs Ctrl", () => {
@@ -163,6 +187,11 @@ describe("the engineer's zoom", () => {
     expect(sessionStorage.length).toBe(0);
   });
 });
+
+/** The zooms sent to the core, in order. */
+function savesOf(fetch: { mock: { calls: [RequestInfo | URL, RequestInit?][] } }): number[] {
+  return fetch.mock.calls.map(([, init]) => (JSON.parse(String(init?.body)) as { zoom: number }).zoom);
+}
 
 /** Back to 100 % with the save stubbed out. */
 function setZoomQuietly(zoom: number) {

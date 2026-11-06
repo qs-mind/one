@@ -129,6 +129,15 @@ fn main() {
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
+            // The first launch (no window state kept yet) opens maximised, so the screen has the most room for
+            // the data; later launches keep the size, place and maximised state the window-state plugin remembers.
+            let first_launch = app.path().app_config_dir().is_ok_and(|dir| {
+                !dir.join(tauri_plugin_window_state::DEFAULT_FILENAME)
+                    .exists()
+            });
+            if first_launch && let Some(window) = app.get_webview_window("main") {
+                let _ = window.maximize();
+            }
             Ok(())
         })
         .build(context)

@@ -9,7 +9,7 @@ import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
 import { FileName } from "../ui/FileName";
 import { workspaceApi } from "../workspace/api";
-import { DocumentsContext } from "../workspace/documents";
+import { DocumentsContext, startUpload } from "../workspace/documents";
 import { chooseFolder } from "../import/FolderDrop";
 import { importInto } from "../import/importer";
 import { holdsFolder } from "../import/walk";
@@ -177,7 +177,7 @@ function EmptyFiles({ adding, onChoose, problems, children }: { adding: boolean;
         data-empty-drop
         className="row-start-2 flex w-full max-w-xl flex-col items-center gap-2 rounded-[14px] border border-dashed border-slate bg-paper px-8 py-10 text-center"
       >
-        <h2 className="text-xl font-semibold text-ink">{t("emptyFilesTitle")}</h2>
+        <h2 className="text-lg font-semibold text-ink">{t("emptyFilesTitle")}</h2>
         <p className="max-w-md text-slate">{t("emptyFilesWhat")}</p>
         <div className="mt-3 flex flex-col items-center gap-2">
           <button
@@ -262,6 +262,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
   async function add(chosen: File[]) {
     if (!id || chosen.length === 0) return;
     setAdding(true);
+    const ended = startUpload(); // the chat stops asking for the files at once
     setProblems([]);
     for (const file of chosen) {
       const added = await uploadFile(id, file);
@@ -275,6 +276,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
       }
     }
     setAdding(false);
+    ended();
   }
 
   // as the open document, it adds the files dropped on the workspace, once its own list is read

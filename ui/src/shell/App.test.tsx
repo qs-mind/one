@@ -537,7 +537,7 @@ describe("the import reports and the backup question", () => {
       },
     });
     const user = userEvent.setup();
-    render(<App sourcesFor={() => fakeSources({})} />);
+    render(<App sourcesFor={() => fakeSources({ files: [fileA] })} />); // the question waits for the first file
     await box();
     await user.click(screen.getByRole("button", { name: texts.closeChat.ar }));
     expect(screen.queryByRole("complementary", { name: texts.projectChat.ar })).toBeNull();
