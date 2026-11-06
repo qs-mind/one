@@ -203,6 +203,22 @@ describe("RecordsPanel", () => {
     expect(await screen.findByText(texts.fileDuplicate.ar)).toBeInTheDocument();
   });
 
+  it("files added together are reported in the chat once, with every one of them", async () => {
+    const reported: unknown[] = [];
+    core({
+      [`POST ${files}`]: upload,
+      [`POST ${files}/report`]: (_, init) => {
+        reported.push(JSON.parse(String(init.body)));
+        return Response.json({ id: "r1", lines: [] }, { status: 201 });
+      },
+    });
+    const user = userEvent.setup();
+    const { container } = panel();
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(input, [new File(["x"], "a - عينة.pdf"), new File(["y"], "b - عينة.xlsx")]);
+    await waitFor(() => expect(reported).toEqual([{ file_ids: ["f-a - عينة.pdf", "f-b - عينة.xlsx"] }]));
+  });
+
   it("the same file under another name says so on the new name, once per drop, in slate", async () => {
     // real walk: same.xlsx showed «موجود بالفعل» on the older row and its own name never came
     const kept = fileInfo("🏗️ مقايسة - عينة.xlsx");

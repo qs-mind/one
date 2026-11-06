@@ -11,7 +11,7 @@ import { FileName } from "../ui/FileName";
 import { workspaceApi } from "../workspace/api";
 import { DocumentsContext, startUpload } from "../workspace/documents";
 import { chooseFolder } from "../import/FolderDrop";
-import { importInto } from "../import/importer";
+import { importInto, reportDrop } from "../import/importer";
 import { holdsFolder } from "../import/walk";
 
 type Hit = {
@@ -278,6 +278,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     setAdding(true);
     const ended = startUpload(); // the chat stops asking for the files at once
     setProblems([]);
+    const landed: string[] = [];
     for (const file of chosen) {
       const added = await uploadFile(id, file);
       if (added.ok && added.info.duplicate && added.info.same_as) {
@@ -286,6 +287,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
         setProblems((list) => [...list, { name: file.name, line, quiet: true }]);
       } else if (added.ok) {
         const { info } = added;
+        landed.push(info.id);
         // the newest first; a new version takes the place of the one it replaces
         setFiles((list = []) => [info, ...list.filter((f) => f.id !== info.id && f.id !== info.replaces)]);
       } else {
@@ -295,6 +297,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     }
     setAdding(false);
     ended();
+    await reportDrop(id, landed); // one report in the project chat for the whole drop
   }
 
   // as the open document, it adds the files dropped on the workspace, once its own list is read

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from keyring.errors import KeyringError
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from qsone import activity, copy, settings
 from qsone.backup import keys as backup_keys
 from qsone.meaning.service import Meaning, ModelFailed
-from qsone.records import audit, files, search, unzip, vault
+from qsone.records import audit, files, report, search, unzip, vault
 from qsone.records.project import FILE_NAME, Records, RecordsError
 
 if TYPE_CHECKING:
@@ -263,6 +263,11 @@ class NameTaken(RecordsError):
         self.project = project
 
 
+class ReportIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    file_ids: list[Annotated[str, Field(max_length=80)]] = Field(max_length=5000)
+
+
 class ProjectIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -437,6 +442,16 @@ def router(
         )
         wake()  # embedding happens in the background; the upload never waits for it
         return JSONResponse(found, status_code=status)
+
+    @r.post("/projects/{project_id}/files/report")
+    async def report_files(project_id: str, body: ReportIn) -> Response:
+        """Once per drop, after its files landed: what ONE found in them, from its own reading,
+        kept for the project chat (201); 204 when none of them is in the project."""
+        rec = await run_in_threadpool(projects.get, project_id)
+        found = await run_in_threadpool(report.make, rec, body.file_ids)
+        if found is None:
+            return Response(status_code=204)
+        return JSONResponse(found, status_code=201)
 
     @r.get("/projects/{project_id}/search")
     def search_project(

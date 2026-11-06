@@ -371,6 +371,36 @@ def _result_value(stored: str):
     return ToolFailed(found["failed"])
 
 
+def _with_reports(messages: list[dict], rec) -> list[dict]:
+    """`messages` with each files report (records/report.py) as one message from ONE, after the
+    Briefs that began before it."""
+    from qsone.records import report
+
+    kept = report.kept(rec)
+    if not kept:
+        return messages
+    with rec.read() as c:
+        began = dict(c.execute("SELECT id, created_at FROM briefs").fetchall())
+    out, reports = [], iter(kept)
+    nxt = next(reports, None)
+    for m in messages:
+        if m["role"] == "user":
+            at = began.get(m["id"].removesuffix("-question"), "")
+            while nxt is not None and nxt["at"] < at:
+                out.append(_report_message(nxt))
+                nxt = next(reports, None)
+        out.append(m)
+    while nxt is not None:
+        out.append(_report_message(nxt))
+        nxt = next(reports, None)
+    return out
+
+
+def _report_message(found: dict) -> dict:
+    part = {"type": "data-files_read", "id": found["id"], "data": {"lines": found["lines"]}}
+    return {"id": f"files-{found['id']}", "role": "assistant", "parts": [part]}
+
+
 # The Brief task ------------------------------------------------------------------------------
 
 
@@ -1841,6 +1871,8 @@ class Engine:
                 events = _stored_events(place.store, brief, self, unfinished=waiting)
                 parts = message_parts(events, with_status=not waiting)
             messages.append({"id": reply_id(brief_id), "role": "assistant", "parts": parts})
+        if place.rec is not None:  # what ONE found in each drop of files, in its place in time
+            messages = _with_reports(messages, place.rec)
         return messages
 
     # Plan 7 ------------------------------------------------------------------------------------
