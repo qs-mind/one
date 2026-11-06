@@ -660,6 +660,7 @@ export const texts = {
   boqSoFar: { en: "BOQ so far", ar: "المقايسة لحد دلوقتي" },
   sampleData: { en: "Sample data", ar: "بيانات تجريبية" },
   openAsDocument: { en: "Open as a document", ar: "افتح كمستند" },
+  goBack: { en: "Back", ar: "رجوع" },
   continueInProject: { en: "Continue in «{name}»", ar: "كمّل في «{name}»" },
   createProjectNamed: { en: "Create the project «{name}»", ar: "اعمل مشروع «{name}»" },
   pageNotShown: { en: "This page could not be shown.", ar: "مقدرناش نعرض الصفحة دي." },

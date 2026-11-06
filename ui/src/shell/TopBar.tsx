@@ -10,14 +10,14 @@
 // chrome mirrors in Arabic.
 // The project button carries one small mark when another chat needs a look (chatActivity.ts): working, waiting for
 // you, failed, or done since you last looked; this chat is the one on the screen, so it is seen.
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Mark } from "../brand/Mark";
 import type { ProjectSources, ProjectStatus } from "../project/types";
 import { isMac } from "../project/keys";
 import { send } from "../core";
 import { openSetup } from "../firstlaunch/parts";
 import { chooseFolder } from "../import/FolderDrop";
-import { count, fill, language, setLanguage, t, useLanguage } from "../i18n";
+import { count, dir, fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { resetZoom, useZoom, zoomIn, zoomOut, ZOOMS } from "../ui/scale";
@@ -27,6 +27,7 @@ import { WaitingDot } from "./ChatPanel";
 import { elsewhere, GENERAL, useActivity, useOpenChat } from "./chatActivity";
 import { useCompact } from "./regions";
 import { StatusStrip } from "./StatusStrip";
+import { useCanGoBack, workspaceApi } from "../workspace/api";
 
 export type PanelKind = "ai" | "projects" | "records" | "deliverables" | "backup" | "close" | "confidential";
 
@@ -134,6 +135,8 @@ export function TopBar(props: TopBarProps) {
       }`}
     >
       <Mark size={18} />
+      {project && <BackButton />}
+      <ZoomToast />
       <button
         type="button"
         data-region-start
@@ -262,6 +265,47 @@ const zoomStep = "tap flex size-7 items-center justify-center rounded-lg hover:b
 
 /** More's zoom row: the engineer's zoom now, with − and + (steps of 10 %, 80 % to 150 %); the figure resets it. It
  * stays open while stepping, so the screen can be watched as it changes. */
+/** Back to the document before (as Alt with the back arrow): off when there is none; it points back in the page's
+ * direction. */
+function BackButton() {
+  useLanguage();
+  const can = useCanGoBack();
+  return (
+    <button
+      type="button"
+      aria-label={t("goBack")}
+      title={t("goBack")}
+      disabled={!can}
+      onClick={() => workspaceApi.back()}
+      className="-mx-1 shrink-0 rounded-md px-1.5 py-0.5 text-ink hover:bg-stone disabled:text-slate/50 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-ink"
+    >
+      <span aria-hidden="true">{dir() === "rtl" ? "→" : "←"}</span>
+    </button>
+  );
+}
+
+const ZOOM_TOAST_MS = 1000;
+
+/** The zoom as a percent for about a second after it changes, by keys or the menu: «110 %». */
+function ZoomToast() {
+  const zoom = useZoom();
+  const [shown, setShown] = useState<number | null>(null);
+  const first = useRef(zoom);
+  useEffect(() => {
+    if (first.current === zoom) return; // the saved zoom at start says nothing
+    first.current = Number.NaN;
+    setShown(zoom);
+    const timer = setTimeout(() => setShown(null), ZOOM_TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [zoom]);
+  if (shown === null) return null;
+  return (
+    <div role="status" data-zoom-toast className="pointer-events-none fixed left-1/2 top-14 z-50 -translate-x-1/2 rounded-full bg-ink px-3 py-1 text-sm text-paper">
+      <bdi dir="ltr">{Math.round(shown * 100)}%</bdi>
+    </div>
+  );
+}
+
 function ZoomRow() {
   useLanguage();
   const zoom = useZoom();

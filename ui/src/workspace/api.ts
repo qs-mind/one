@@ -69,6 +69,11 @@ export function subscribeMoved(listener: () => void): () => void {
   return () => moves.delete(listener);
 }
 
+/** Whether Back has a document to go to: the top bar's Back arrow is off without one. */
+export function useCanGoBack(): boolean {
+  return useSyncExternalStore(subscribeOpened, () => history.has(exists));
+}
+
 /** Re-renders the component when the open document changes. */
 export function useOpened(): Opened | null {
   return useSyncExternalStore(subscribeOpened, workspaceApi.current);
