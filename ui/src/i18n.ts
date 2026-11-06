@@ -355,6 +355,19 @@ export const texts = {
   dropHere: { en: "Drop PDF and Excel files here.", ar: "أفلت ملفات PDF و Excel هنا." },
   adding: { en: "Adding the files…", ar: "بنضيف الملفات…" },
   noFiles: { en: "No files yet.", ar: "لسه مفيش ملفات." },
+  // An empty project's Project files: one drop area, nothing else (records/RecordsPanel.tsx EmptyFiles).
+  emptyFilesTitle: { en: "Drop the tender files here", ar: "حط ملفات المناقصة هنا" },
+  emptyFilesWhat: {
+    en: "The BOQ, specs, supplier quotes and drawings, as PDF or Excel. ONE reads them and tells you what it found.",
+    ar: "المقايسة والمواصفات وعروض الأسعار والرسومات، PDF أو Excel. ONE هيقرأها ويقولك لقى فيها إيه.",
+  },
+  chooseFiles: { en: "Choose files", ar: "اختار ملفات" },
+  orTenderFolder: { en: "or the whole tender folder", ar: "أو فولدر المناقصة كله" },
+  // the project chat before anything is said, while the project has no files
+  emptyProject: {
+    en: "Start with the tender files and I'll tell you where to begin. Or ask me anything.",
+    ar: "ابدأ بملفات المناقصة، وأنا هقولك هنبدأ منين. أو اسألني أي حاجة.",
+  },
   filesFailed: { en: "The files could not be loaded. Try again.", ar: "مقدرناش نحمّل الملفات. جرّب تاني." },
   fileNotAdded: { en: "The file was not added. Try again.", ar: "الملف ماتضافش. جرّب تاني." },
   fileDuplicate: { en: "Already in Project Records.", ar: "موجود بالفعل في سجلات المشروع." },
@@ -1032,6 +1045,11 @@ export const texts = {
   docRevision: { en: "Revision {n}", ar: "إصدار {n}" },
   fullScreen: { en: "Full screen", ar: "ملء الشاشة" },
   leaveFullScreen: { en: "Leave full screen", ar: "اخرج من ملء الشاشة" },
+  // The engineer's zoom (More, and Ctrl/Cmd with = - 0): over the screen's own scale (ui/scale.ts).
+  zoom: { en: "Zoom", ar: "التكبير" },
+  zoomReset: { en: "Reset zoom", ar: "رجّع الحجم" },
+  zoomIn: { en: "Zoom in", ar: "كبّر" },
+  zoomOut: { en: "Zoom out", ar: "صغّر" },
   sampleNumbers: { en: "Sample numbers", ar: "الأرقام عينة" },
   docWorkingOn: { en: "being worked on", ar: "شغالين عليه" },
   docClientBoq: { en: "Client BOQ", ar: "مقايسة العميل" },

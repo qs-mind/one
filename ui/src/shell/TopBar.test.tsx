@@ -7,7 +7,7 @@ import { language, setLanguage, texts } from "../i18n";
 import { fakeSources } from "../project/fake";
 import { setCurrentProject } from "../records/project";
 import { App } from "./App";
-import { core, P1 } from "./testing";
+import { bodyOf, calls, core, P1 } from "./testing";
 
 const box = () => screen.findByRole("textbox", { name: texts.message.ar });
 const topBar = () => screen.getByRole("banner", { name: texts.topBar.ar });
@@ -173,5 +173,41 @@ describe("what is waiting", () => {
     await box();
     expect(within(topBar()).queryByRole("button", { name: texts.deliverablesButton.ar })).toBeNull();
     expect(within(topBar()).queryByRole("button", { name: texts.records.ar })).toBeNull();
+  });
+});
+
+describe("the zoom in More", () => {
+  const zoomSaved = { "PUT /api/settings/zoom": (init: RequestInit) => new Response(init.body as string) };
+
+  it("shows the zoom now, steps it with − and + (staying open), resets it from the figure, and keeps it in the core", async () => {
+    const fetch = core({ routes: zoomSaved });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: texts.more.ar }));
+    const row = await screen.findByText(texts.zoom.ar);
+    const reset = screen.getByRole("button", { name: `${texts.zoomReset.ar} (100%)` });
+    expect(reset).toHaveTextContent("100%");
+    await user.click(screen.getByRole("button", { name: texts.zoomIn.ar }));
+    await user.click(screen.getByRole("button", { name: texts.zoomIn.ar }));
+    expect(row).toBeVisible(); // a step keeps More open
+    expect(reset).toHaveTextContent("120%");
+    await user.click(screen.getByRole("button", { name: texts.zoomOut.ar }));
+    expect(reset).toHaveTextContent("110%");
+    await user.click(reset);
+    expect(reset).toHaveTextContent("100%");
+    const saved = calls(fetch, "PUT", "/api/settings/zoom").map(([, init]) => bodyOf(init).zoom);
+    expect(saved).toEqual([1.1, 1.2, 1.1, 1]);
+  });
+
+  it("can't go past 80 %: its step is disabled there", async () => {
+    core({ routes: zoomSaved });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: texts.more.ar }));
+    const out = await screen.findByRole("button", { name: texts.zoomOut.ar });
+    await user.click(out);
+    await user.click(out);
+    expect(out).toBeDisabled();
+    expect(screen.getByRole("button", { name: `${texts.zoomReset.ar} (80%)` })).toBeInTheDocument();
   });
 });

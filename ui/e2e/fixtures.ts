@@ -212,6 +212,8 @@ export type Core = {
   workspaceSaves: Workspace[];
   /** Every POST /api/chat body. */
   chats: Record<string, unknown>[];
+  /** The engineer's zoom as the core keeps it (1: 100 %). */
+  zoom: number;
   /** Calls no route here answers (they get 404), so a test can see what the screen asked that the mock lacks. */
   unknown: string[];
   /** Sends live events now: they answer the /activity request the screen holds open (the screen then reconnects, as
@@ -236,6 +238,7 @@ export async function mockCore(
     scene,
     workspaceSaves: [],
     chats: [],
+    zoom: 1,
     unknown: [],
     nextWorkspaceSave: (match = () => true) => new Promise((resolve) => waiters.push({ match, resolve })),
     emit(events) {
@@ -280,6 +283,12 @@ export async function mockCore(
     if (key === "GET /settings/ai-consent") return json(route, { at: "2026-11-05T08:00:00+00:00", text_version: 1 });
     if (key === "GET /settings/ai") return json(route, aiSettings);
     if (key === "GET /settings/ai/caps") return json(route, { caps: null, recommended: null });
+    // the engineer's zoom (ui/src/ui/scale.ts), kept as the core keeps it
+    if (key === "GET /settings/zoom") return json(route, { zoom: core.zoom });
+    if (key === "PUT /settings/zoom") {
+      core.zoom = (request.postDataJSON() as { zoom: number }).zoom;
+      return json(route, { zoom: core.zoom });
+    }
     if (key === "GET /briefs/unfinished") return json(route, { briefs: [] });
     if (key === "GET /projects") return json(route, { projects: projects.map((p) => ({ ...p, open: p.id === scene.project.id })) });
     const opened = /^POST \/projects\/([^/]+)\/(open|close)$/.exec(key);
@@ -352,6 +361,10 @@ export async function mockCore(
 
   return core;
 }
+
+/** The screen's scale now: the root font-size over 16 px (ui/src/ui/scale.ts). */
+export const scaleOf = (page: Page): Promise<number> =>
+  page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize) / 16);
 
 /** The open document's region. */
 export const documentRegion = (page: Page): Locator => page.locator('[data-region="document"]');

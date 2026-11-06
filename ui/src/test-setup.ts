@@ -4,6 +4,7 @@ import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 import { clearDrafts } from "./shell/drafts";
 import { clearClientBoqSamples } from "./workspace/clientBoqSample";
+import { resetScale } from "./ui/scale";
 
 // jsdom has no layout. The viewers (Plan 6) size themselves from their container, so grid containers (role="grid")
 // get a fixed size; React Flow (Plan 7) measures its pane and nodes, so an element with an inline width and height
@@ -82,6 +83,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   clearDrafts(); // the message boxes' unsent words live for the page, as they do in the app
   clearClientBoqSamples();
+  if (typeof document !== "undefined") resetScale(); // 100 %, no zoom, for the next test
   if (typeof document === "undefined") return; // a test that runs in Node, with no page
   localStorage.clear();
 });

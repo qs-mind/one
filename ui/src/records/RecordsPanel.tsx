@@ -1,6 +1,6 @@
 // Project Records for the open project: drop or add files, see what One could read in each, and search them.
 // Files go to the core one at a time as their raw bytes; the page never sends a file path.
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { type FormEvent, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
 import { api } from "../api";
 import { fill, language, pick, t, type Text, texts, useLanguage } from "../i18n";
 import type { FileInfo } from "../project/types";
@@ -9,6 +9,8 @@ import { MeaningStatus } from "./MeaningStatus";
 import { useProject } from "./project";
 import { FileName } from "../ui/FileName";
 import { workspaceApi } from "../workspace/api";
+import { DocumentsContext } from "../workspace/documents";
+import { chooseFolder } from "../import/FolderDrop";
 import { importInto } from "../import/importer";
 import { holdsFolder } from "../import/walk";
 
@@ -164,6 +166,49 @@ export function addToRecords(files: File[]) {
   for (const take of [...takers]) take();
 }
 
+/** An empty project's Project files: one thing, a drop area centred in the document and set high (its middle about a
+ * third down), that asks for the tender files and says what ONE does with them. One step to press, Choose files, and a
+ * quieter way to bring the whole tender folder (the folder chooser, import/FolderDrop.tsx; it goes into this project).
+ * Dropping anywhere on the document works as on the list. No search, no meaning line, no "no files" words. */
+function EmptyFiles({ adding, onChoose, problems, children }: { adding: boolean; onChoose(): void; problems: ReactNode; children: ReactNode }) {
+  return (
+    <div className="grid h-full grid-rows-[1fr_auto_2fr] justify-items-center px-3">
+      <div
+        data-empty-drop
+        className="row-start-2 flex w-full max-w-xl flex-col items-center gap-2 rounded-[14px] border border-dashed border-slate bg-paper px-8 py-10 text-center"
+      >
+        <h2 className="text-xl font-semibold text-ink">{t("emptyFilesTitle")}</h2>
+        <p className="max-w-md text-slate">{t("emptyFilesWhat")}</p>
+        <div className="mt-3 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            disabled={adding}
+            onClick={onChoose}
+            className="h-8 rounded-md bg-ink px-4 text-paper hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          >
+            {t("chooseFiles")}
+          </button>
+          <button
+            type="button"
+            disabled={adding}
+            onClick={() => chooseFolder(false)}
+            className="rounded-md px-2 py-0.5 text-slate underline-offset-2 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-ink"
+          >
+            {t("orTenderFolder")}
+          </button>
+        </div>
+        {children}
+        {adding && (
+          <p role="status" className="text-slate">
+            {t("adding")}
+          </p>
+        )}
+        {problems}
+      </div>
+    </div>
+  );
+}
+
 /** `layout="document"`: Project files as the workspace's open document, with no panel chrome (the workspace names
  * it); a file opens there. */
 type RecordsPanelProps =
@@ -204,6 +249,15 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
       turn.current?.abort();
     };
   }, [id]);
+
+  // files that came another way (a tender folder chosen or dropped, an agent's), as the live events list them: the
+  // list shows them too, so an empty project's drop area gives way to the list once its first file lands
+  const known = useContext(DocumentsContext)?.files;
+  useEffect(() => {
+    if (!asDocument || !known || files === undefined) return;
+    const missing = known.filter((k) => !files.some((f) => f.id === k.id || f.replaces === k.id));
+    if (missing.length) setFiles([...missing, ...files.filter((f) => !missing.some((m) => m.replaces === f.id))]);
+  }, [asDocument, known, files]);
 
   async function add(chosen: File[]) {
     if (!id || chosen.length === 0) return;
@@ -260,8 +314,40 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     setFound({ state: "found", note: body.note, results: body.results.slice(0, SHOWN) });
   }
 
+  const fileInput = (
+    <input
+      ref={chooser}
+      type="file"
+      multiple
+      hidden
+      tabIndex={-1}
+      onChange={(event) => {
+        const chosen = Array.from(event.target.files ?? []);
+        event.target.value = ""; // the same file can be chosen again
+        void add(chosen);
+      }}
+    />
+  );
+  const problemLines = problems.length > 0 && (
+    <div role="alert" className="flex flex-col gap-1 text-copper">
+      {problems.map((problem, index) => (
+        <p key={index}>
+          <span dir="auto" className="font-semibold">
+            {problem.name}
+          </span>{" "}
+          {pick(problem.line)}
+        </p>
+      ))}
+    </div>
+  );
+  // as the open document, nothing until the list is read (never the empty look for a moment), then one drop area
+  // while the project has no file
+  const reading = asDocument && !!project && files === undefined && !filesFailed;
+  const empty = asDocument && !!project && files?.length === 0 && !filesFailed;
+
   return (
     <section
+      aria-busy={reading || undefined}
       aria-labelledby={asDocument ? undefined : title}
       aria-label={asDocument ? t("projectFiles") : undefined}
       onDragOver={(event) => event.preventDefault()}
@@ -273,7 +359,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
       }}
       className={asDocument ? "h-full overflow-auto bg-paper p-3 text-ink" : "border-b border-stone px-4 py-4"}
     >
-      <div className={asDocument ? "flex flex-col gap-3" : "mx-auto flex max-w-2xl flex-col gap-3"}>
+      <div className={empty ? "h-full" : asDocument ? "flex flex-col gap-3" : "mx-auto flex max-w-2xl flex-col gap-3"}>
         {!asDocument && (
           <div className="flex items-center justify-between gap-4">
             <h2 id={title} className="font-semibold">
@@ -294,6 +380,10 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
               </button>
             )}
           </div>
+        ) : reading ? null : empty ? (
+          <EmptyFiles adding={adding} onChoose={() => chooser.current?.click()} problems={problemLines}>
+            {fileInput}
+          </EmptyFiles>
         ) : (
           <>
             {/* as the open document, one line: the room is the files' (dense, 5 Nov) */}
@@ -311,18 +401,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
               >
                 {t("addFiles")}
               </button>
-              <input
-                ref={chooser}
-                type="file"
-                multiple
-                hidden
-                tabIndex={-1}
-                onChange={(event) => {
-                  const chosen = Array.from(event.target.files ?? []);
-                  event.target.value = ""; // the same file can be chosen again
-                  void add(chosen);
-                }}
-              />
+              {fileInput}
               {adding && (
                 <p role="status" className="text-slate">
                   {t("adding")}
@@ -332,18 +411,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
 
             <MeaningStatus projectId={project.id} files={files?.length ?? 0} />
 
-            {problems.length > 0 && (
-              <div role="alert" className="flex flex-col gap-1 text-copper">
-                {problems.map((problem, index) => (
-                  <p key={index}>
-                    <span dir="auto" className="font-semibold">
-                      {problem.name}
-                    </span>{" "}
-                    {pick(problem.line)}
-                  </p>
-                ))}
-              </div>
-            )}
+            {problemLines}
 
             {filesFailed && (
               <p role="alert" className="text-copper">

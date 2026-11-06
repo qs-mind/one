@@ -10,13 +10,17 @@ import { ConsentNeeded } from "../firstlaunch/ConnectAi";
 import { dir, t, useLanguage } from "../i18n";
 import { TeamNow } from "../project/live/TeamNow";
 import { type Ai, AiSettings } from "../settings/AiSettings";
+import { currentScale } from "../ui/scale";
 import { useScrollEdges } from "../ui/useScrollEdges";
 import { Notices } from "./Notices";
 import type { ChatState } from "./useChats";
 
+/** At 100 %: the chat's width and its resize limits follow the screen's scale (they are drawn in rem). */
 export const CHAT_WIDTH = { min: 280, max: 480, start: 320, step: 16 };
 
 const clamp = (width: number) => Math.min(CHAT_WIDTH.max, Math.max(CHAT_WIDTH.min, Math.round(width)));
+/** A width kept at 100 %, drawn at the screen's scale (ui/scale.ts). */
+const rem = (px: number) => `${px / 16}rem`;
 
 export type ChatBodyProps = {
   chat: ChatState;
@@ -55,7 +59,7 @@ export function ChatBody({ chat, ai, aiMain, onAiClose, label, projectId, onOpen
 
 /** The copper dot of "waiting": on the folded edge and on the narrow window's chat button. */
 export function WaitingDot() {
-  return <span data-waiting-dot aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-copper" />;
+  return <span data-waiting-dot aria-hidden="true" className="size-[0.4375rem] shrink-0 rounded-full bg-copper" />;
 }
 
 export function ChatPanel({
@@ -126,7 +130,7 @@ export function ChatPanel({
       aria-label={t("projectChat")}
       data-region="chat"
       tabIndex={-1}
-      style={narrow ? (small ? undefined : { width: CHAT_WIDTH.start }) : { width }}
+      style={narrow ? (small ? undefined : { width: rem(CHAT_WIDTH.start) }) : { width: rem(width) }}
       onKeyDown={(event) => {
         // Esc closes the narrow panel; not one a popover from it (in a portal) or the message box used first
         if (!narrow || event.key !== "Escape" || event.defaultPrevented || !event.currentTarget.contains(event.target as Node)) return;
@@ -161,12 +165,13 @@ export function ChatPanel({
           onPointerMove={(event) => {
             const from = drag.current;
             if (!from) return;
-            const moved = rtl ? event.clientX - from.x : from.x - event.clientX;
+            // the pointer moves in screen px; the width is kept at 100 % (it follows the scale)
+            const moved = (rtl ? event.clientX - from.x : from.x - event.clientX) / currentScale();
             onWidth(clamp(from.width + moved));
           }}
           onPointerUp={() => (drag.current = null)}
           // in the 12 px gap beside the document
-          className="absolute inset-y-4 -start-[9px] z-10 w-1.5 cursor-col-resize rounded-full hover:bg-ink/10 focus-visible:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          className="absolute inset-y-4 -start-[0.5625rem] z-10 w-1.5 cursor-col-resize rounded-full hover:bg-ink/10 focus-visible:bg-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         />
       )}
       <div className={`flex items-start justify-between gap-3 px-3 ${narrow ? "pt-3" : "pt-1"}`}>

@@ -5,7 +5,8 @@ import type { ViewColumn, ViewRow } from "../../deliverables/types";
 import { pasteOps, parseTsv, pastedNumber, toHtml, toTsv } from "./clipboard";
 import { visibleRows } from "./collapse";
 import { formatDecimal } from "./format";
-import { linesHeight, rowHeight } from "./heights";
+import { textScale } from "../../ui/scale";
+import { COMPACT_PAD, linesHeight, oneLineWidth, rowHeight, shownWidth } from "./heights";
 import { extend, normalised } from "./selection";
 
 const size = { rows: 10, cols: 6 };
@@ -218,6 +219,28 @@ describe("heights", () => {
       return text.length * 7;
     });
     expect(fonts.some((f) => f.startsWith("700"))).toBe(true);
+  });
+
+  it("at a smaller scale the rows are measured as the cells are drawn: the padding at the screen's scale, the text at its floor", () => {
+    const sizes = { space: 0.8, text: textScale(0.8, "ar") }; // 1280×720, Arabic
+    expect(linesHeight(1, COMPACT_PAD)).toBe(32); // 100 %: the open document's one-line row
+    expect(linesHeight(1, COMPACT_PAD, sizes)).toBeCloseTo(24 * 0.9 + 8 * 0.8, 10);
+    expect(linesHeight(3, COMPACT_PAD, sizes)).toBeCloseTo(3 * 24 * 0.9 + 8 * 0.8, 10);
+    const fonts: string[] = [];
+    rowHeight(item("p1", "1-1"), columns, (text, font) => (fonts.push(font), text.length * 7), COMPACT_PAD, sizes);
+    expect(fonts[0]).toMatch(/^13\.5px /); // the grid's 15 px at Arabic's floor, as styles.css draws it
+  });
+
+  it("at a smaller scale a column is narrower on screen, and a one-line column still holds its longest value", () => {
+    const sizes = { space: 0.8, text: textScale(0.8, "en") };
+    expect(shownWidth(100)).toBe(112);
+    expect(shownWidth(100, sizes)).toBeCloseTo(89.6, 10);
+    const code = { key: "code", label: { en: "Item", ar: "البند" }, kind: "text" as const, edit: false, frozen: true, wrap: false, width: 40 };
+    const rows = [item("p1", "02-01-001-0001")];
+    const measured = (text: string, font: string) => text.length * parseFloat(font) * 0.5;
+    const width = oneLineWidth(code, "Item", rows, measured, [], sizes);
+    const longest = measured("02-01-001-0001", `${15 * sizes.text}px x`);
+    expect(shownWidth(width, sizes)).toBeGreaterThanOrEqual(longest + 24 * 0.8);
   });
 });
 

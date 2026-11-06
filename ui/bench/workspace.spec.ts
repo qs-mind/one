@@ -3,7 +3,9 @@
 // copper dot and «مستنيك قرار واحد» in the top bar, the decision card in the chat, and a number's source card open
 // with the supplier's quote and «توريد بس، من غير مصنعية»; (b) the bid letter with nothing waiting. Every number is
 // sample data, and the screen says «الأرقام عينة». The PNGs (boq-ar-1440.png, letter-en-640.png, …) go to this
-// test's output folder, and to $QSONE_WORKSPACE_SHOTS when it is set.
+// test's output folder, and to $QSONE_WORKSPACE_SHOTS when it is set. ONE's scale (ui/src/ui/scale.ts): the empty
+// project at 1366×768 and 1920×1080, and the priced BOQ at 1280×720, 1366×768, 1536×864 and 1920×1080
+// (empty-ar-1366x768.png, boq-en-1536x864.png, …), to $QSONE_SCALE_SHOTS when it is set.
 import { copyFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import type { Page, TestInfo } from "@playwright/test";
@@ -18,6 +20,16 @@ const SIZES = [
   { width: 1440, height: 900 },
   { width: 1000, height: 800 },
   { width: 640, height: 800 },
+];
+const SCALE_SIZES = [
+  { width: 1280, height: 720 },
+  { width: 1366, height: 768 },
+  { width: 1536, height: 864 },
+  { width: 1920, height: 1080 },
+];
+const EMPTY_SIZES = [
+  { width: 1366, height: 768 },
+  { width: 1920, height: 1080 },
 ];
 const words = {
   ar: {
@@ -34,10 +46,9 @@ const words = {
   },
 } as const;
 
-async function save(page: Page, info: TestInfo, name: string) {
+async function save(page: Page, info: TestInfo, name: string, extra = process.env.QSONE_WORKSPACE_SHOTS) {
   const file = info.outputPath(`${name}.png`);
   await page.screenshot({ path: file });
-  const extra = process.env.QSONE_WORKSPACE_SHOTS;
   if (extra) {
     mkdirSync(extra, { recursive: true });
     copyFileSync(file, path.join(extra, `${name}.png`));
@@ -52,6 +63,19 @@ for (const lang of ["ar", "en"] as const) {
     const sample = top.locator("[data-sample-label]");
     await walk.start(lang);
     await walk.createProject(lang === "ar" ? "مبنى إداري - عينة" : "Office building (sample)");
+
+    // the empty project: one drop area in the document, one line in the chat, nothing else
+    for (const size of EMPTY_SIZES) {
+      await page.setViewportSize(size);
+      await page.waitForTimeout(400);
+      const area = walk.document.locator("[data-empty-drop]");
+      await expect(area.getByRole("heading", { name: texts.emptyFilesTitle[lang] })).toBeVisible();
+      await expect(area.getByRole("button", { name: texts.chooseFiles[lang] })).toBeVisible();
+      await expect(walk.document.getByRole("searchbox")).toHaveCount(0);
+      await expect(walk.chat).toContainText(texts.emptyProject[lang]);
+      await save(page, info, `empty-${lang}-${size.width}x${size.height}`, process.env.QSONE_SCALE_SHOTS);
+    }
+    await page.setViewportSize(SIZES[0]!);
     await walk.addFiles(FILES, false);
 
     // the Brief: its rows card answered, its question left waiting
@@ -74,7 +98,8 @@ for (const lang of ["ar", "en"] as const) {
     await expect(walk.document).toHaveAttribute("aria-label", w.boq);
     const rate = walk.document.getByRole("gridcell", { name: /^3,450/ }).first();
     await expect(rate).toBeVisible();
-    for (const size of SIZES) {
+    for (const size of [...SIZES, ...SCALE_SIZES]) {
+      const scaleShot = SCALE_SIZES.includes(size);
       await page.setViewportSize(size);
       await page.waitForTimeout(400);
       await expect(sample, "the screen says the numbers are a sample").toContainText(texts.sampleNumbers[lang]);
@@ -99,7 +124,8 @@ for (const lang of ["ar", "en"] as const) {
         const over = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
         expect(over, "the source card is not over the chat").toBe(false);
       }
-      await save(page, info, `boq-${lang}-${size.width}`);
+      if (scaleShot) await save(page, info, `boq-${lang}-${size.width}x${size.height}`, process.env.QSONE_SCALE_SHOTS);
+      else await save(page, info, `boq-${lang}-${size.width}`);
     }
     await page.keyboard.press("Escape");
 

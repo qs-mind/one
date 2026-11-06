@@ -49,6 +49,7 @@ export function ProviderLogo({ provider, size = 14 }: { provider: string; size?:
       fill="currentColor"
       fillRule="evenodd"
       aria-hidden="true"
+      style={{ width: `${size / 16}rem`, height: `${size / 16}rem` }} // follows the screen's scale
       data-logo={id ?? "unknown"}
       className="shrink-0"
     >

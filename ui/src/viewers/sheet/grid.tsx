@@ -13,6 +13,7 @@ import {
   type RenderEditCellContentProps,
 } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
+import { useSizes } from "../../ui/scale";
 import { shownWidth } from "./heights";
 import { extend, inRange, normalised, type Arrow, type Cell, type Range } from "./selection";
 
@@ -39,8 +40,10 @@ export type GridProps<R extends SheetRow> = {
   rows: R[];
   direction: "rtl" | "ltr";
   rowHeight: (row: R) => number;
-  /** The column headers' row; 44 px unless the viewer is denser (the open document). */
+  /** The column headers' row, in px as drawn; 44 px at 100 % unless the viewer is denser (the open document). */
   headerHeight?: number;
+  /** The total row, in px as drawn; 35 px at 100 %. */
+  summaryHeight?: number;
   /** `tabIndex` is the grid's own for what the cell holds: 0 on the active cell only, so the grid is one Tab stop. */
   renderCell: (row: R, column: SheetColumn, selected: boolean, tabIndex: number) => ReactNode;
   onCommit: (row: R, column: SheetColumn, text: string) => void;
@@ -78,7 +81,8 @@ const theme = {
   "--rdg-row-hover-background-color": "var(--color-paper)",
   "--rdg-selection-color": "var(--color-copper)",
   "--rdg-frozen-column-shadow-color": "color-mix(in srgb, var(--color-ink) 15%, transparent)",
-  "--rdg-font-size": "15px",
+  // 15 px at 100 %, at the screen's scale and never under the body text's floor (heights.ts fontOf matches it)
+  "--rdg-font-size": "max(calc(15px * var(--ui-text-floor)), 0.9375rem)",
   blockSize: "100%",
   fontFamily: "inherit",
 } as CSSProperties;
@@ -120,6 +124,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
   const grid = useRef<DataGridHandle>(null);
   const dragging = useRef<Cell | null>(null);
   const size = { rows: rows.length, cols: columns.length };
+  const sizes = useSizes(); // the screen's scale: the columns are drawn at it
 
   const handle: GridHandle = {
     scrollTo: (cell) => grid.current?.scrollToCell({ rowIdx: cell.row, idx: cell.col }),
@@ -140,7 +145,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
       columns.map((column, col) => ({
         key: column.key,
         name: column.label,
-        width: shownWidth(column.width),
+        width: shownWidth(column.width, sizes),
         minWidth: 40,
         frozen: column.frozen,
         editable: (g: GridRow<R>) => canEdit(g.row, column),
@@ -158,7 +163,7 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
         renderEditCell: (p) => <Editor {...p} text={editText(p.row.row, column)} wrap={column.wrap} />,
         ...(summary ? { renderSummaryCell: ({ tabIndex }) => summary(column, tabIndex) } : {}),
       })),
-    [columns, selection, renderCell, canEdit, editText, summary],
+    [columns, selection, renderCell, canEdit, editText, summary, sizes.space],
   );
 
   function onCellMouseDown({ rowIdx, column }: { rowIdx: number; column: { idx: number } }, event: CellMouseEvent) {
@@ -235,7 +240,8 @@ export function Grid<R extends SheetRow>(props: GridProps<R>) {
         rows={gridRows}
         rowKeyGetter={(g) => g.row.id}
         rowHeight={(g) => props.rowHeight(g.row)}
-        headerRowHeight={props.headerHeight ?? 44}
+        headerRowHeight={props.headerHeight ?? 44 * sizes.space}
+        summaryRowHeight={props.summaryHeight ?? 35 * sizes.space}
         direction={direction}
         enableVirtualization={props.virtualize ?? true}
         bottomSummaryRows={summary ? [{}] : undefined}
