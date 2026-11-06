@@ -392,10 +392,12 @@ def test_trim_history_keeps_ids_and_errors():
         ModelResponse(parts=[TextPart("ok")]),
         ModelRequest(parts=[ToolReturnPart("find_items", big, tool_call_id="t3")]),
     ]
-    assert trim_history(messages) is messages  # under the limit: as it is
-    out = trim_history(messages, limit_tokens=6_000)
+    assert trim_history(messages, limit_tokens=500_000) is messages  # under the limit: as it is
+    out = trim_history(messages)  # two big results: over RESULTS_TOKENS
     trimmed, kept_error = out[2].parts
     assert "number_id=n-03-02" in trimmed.content and "39850.50" in trimmed.content
+    # a tool that only reads names the call that reads it again
+    assert 'call ledger_numbers {"item": "03/02"} to read it again' in trimmed.content
     assert len(trimmed.content) < 300 and trimmed.tool_call_id == "t1"
     assert kept_error.content == "value: send 39850.50"
     assert out[4].parts[0].content == big  # the latest result stays whole

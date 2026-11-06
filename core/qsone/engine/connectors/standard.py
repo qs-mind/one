@@ -15,7 +15,7 @@ from uuid import uuid4
 import httpx2
 import openai
 from genai_prices import data_snapshot
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIStreamedResponse
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from qsone import keys, settings
@@ -31,6 +31,23 @@ _NOT_CHAT = re.compile(
     r"moderation|babbage|davinci|banana)(?=$|[-_/.\d])",
     re.IGNORECASE,
 )
+
+
+class _OnceStreamed(OpenAIStreamedResponse):
+    """A streamed answer whose usage is the last one a chunk reported, never their sum.
+
+    Google's OpenAI-compatible endpoint repeats the whole prompt's count in every chunk; summed,
+    a 28,000-token request was recorded as 228,382 (the 6 Nov real walk). OpenAI and DeepSeek
+    report it once, in the last chunk, which this reads the same."""
+
+    def _add_usage(self, usage, *, reported: bool, cumulative: bool = False) -> None:
+        super()._add_usage(usage, reported=reported, cumulative=cumulative or reported)
+
+
+class _ChatModel(OpenAIChatModel):
+    @property
+    def _streamed_response_cls(self) -> type[OpenAIStreamedResponse]:
+        return _OnceStreamed
 
 
 class KeyInTheClear(ValueError):
@@ -129,7 +146,7 @@ class StandardLink:
         provider = OpenAIProvider(
             base_url=self.base_url, api_key=self._key(), http_client=self._http
         )
-        return OpenAIChatModel(model_id, provider=provider)
+        return _ChatModel(model_id, provider=provider)
 
 
 def _entries() -> list[dict]:

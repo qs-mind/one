@@ -373,10 +373,14 @@ def test_costs_count_tokens_and_say_when_a_price_is_unknown(book):
     now = datetime(2026, 11, 5, 8, 0, tzinfo=UTC)
     found = costs.summary(book, brief_id="b1", now=now)
     assert found["today"] == "0.50" and found["unpriced"]["today"] == 1
-    assert found["tokens"]["today"] == {"input": 41_000, "output": 100}
-    assert found["tokens"]["brief"] == {"input": 41_000, "output": 100}
+    assert found["tokens"]["today"] == {"input": 41_000, "output": 100, "cached": 0}
+    assert found["tokens"]["brief"] == {"input": 41_000, "output": 100, "cached": 0}
     empty = costs.summary(None, brief_id=None, now=now)
-    assert empty["unpriced"]["today"] == 0 and empty["tokens"]["today"] == {"input": 0, "output": 0}
+    assert empty["unpriced"]["today"] == 0 and empty["tokens"]["today"] == {
+        "input": 0,
+        "output": 0,
+        "cached": 0,
+    }
 
 
 async def test_on_device_is_free_and_never_asks(spending, host, book, general):
@@ -701,9 +705,9 @@ def add_sample_costs(book: CostBook) -> dict:
         "equivalent": {"brief": "0.75", "today": "0.75", "month": "0.75"},
         # every response's tokens, and the one whose price is unknown said, never a false 0
         "tokens": {
-            "brief": {"input": 3000, "output": 300},
-            "today": {"input": 4000, "output": 400},
-            "month": {"input": 4000, "output": 400},
+            "brief": {"input": 3000, "output": 300, "cached": 0},
+            "today": {"input": 4000, "output": 400, "cached": 0},
+            "month": {"input": 4000, "output": 400, "cached": 0},
         },
         "unpriced": {"brief": 1, "today": 1, "month": 1},
         "caps": {
