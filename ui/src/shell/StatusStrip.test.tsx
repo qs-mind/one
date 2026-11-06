@@ -1,6 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProjectStatus } from "../project/types";
+import type { DeliverableInfo, ProjectStatus } from "../project/types";
+import { workspaceApi } from "../workspace/api";
+import { DocumentsContext } from "../workspace/documents";
 import { count, setLanguage, texts } from "../i18n";
 import { fitting, StatusStrip } from "./StatusStrip";
 
@@ -24,6 +26,26 @@ describe("StatusStrip", () => {
     const chip = screen.getByRole("button", { name: new RegExp(texts.boqSoFar.en) });
     expect(chip.querySelector(".sr-only")?.textContent).toBe(new Intl.NumberFormat("en-GB", { style: "currency", currency: "EGP", notation: "compact", maximumFractionDigits: 1 }).format(48900000));
     expect(chip).toHaveTextContent(texts.sampleData.en); // still labelled sample data
+  });
+
+  it("counts the open document's notes, never another document's (real walk: the letter's note showed on the BOQ)", () => {
+    const docs = {
+      deliverables: [{ id: "letter", kind: "document", title: "خطاب - عينة", open_comments: 1 } as DeliverableInfo],
+      clientBoqs: [],
+      files: [],
+      desks: [],
+    };
+    const strip = () => (
+      <DocumentsContext.Provider value={docs}>
+        <StatusStrip status={{ open_comments: 1 }} />
+      </DocumentsContext.Provider>
+    );
+    workspaceApi.reset({ key: "clientboq:f1", anchor: null }, () => true);
+    const { rerender } = render(strip());
+    expect(screen.queryByText(count("openComments", 1))).toBeNull();
+    act(() => workspaceApi.open("deliverable:letter"));
+    rerender(strip());
+    expect(screen.getByText(count("openComments", 1))).toBeInTheDocument();
   });
 
   it("says what the BOQ so far covers: 4 of 325 items", () => {
