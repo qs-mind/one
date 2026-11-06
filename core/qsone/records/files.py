@@ -243,10 +243,11 @@ def read_pages(conn, file_id: str) -> set[int]:
 
 
 def add_ocr_pages(
-    rec: Records, file_id: str, pages: dict[int, str], *, read_by: str, actor: str
+    rec: Records, file_id: str, pages: dict[int, str | list[Piece]], *, read_by: str, actor: str
 ) -> int:
-    """Stores the text the engineer's AI read from page images (a scanned PDF page, or an image
-    as page 1): chunks with the locator {"page": n, "read_by": <model id>}, the word index,
+    """Stores OCR page text or word Pieces (a scanned PDF, or an image as page 1).
+    Local OCR Pieces retain boxes and confidence; AI text is chunked as before. Keeps
+    chunks with the locator {"page": n, "read_by": <model id>}, the word index,
     flags for lines that look like orders to an AI, the file's status, and one audit row. A
     page that already has text is left as it is; a page read as empty is kept as read. Vectors
     come from Plan 2b's worker, which embeds every chunk that has none. Returns how many pages
@@ -263,7 +264,7 @@ def add_ocr_pages(
             text = copy.fill(copy.FILE_PAGES_OUT_OF_RANGE, pages=str(count or 0))
             raise RecordsError(text, status=422, field="pages")
         done = read_pages(conn, file_id)
-        new = {n: display_text(t) for n, t in sorted(pages.items()) if n not in done}
+        new = {n: t for n, t in sorted(pages.items()) if n not in done}
         if not new:
             return 0
         (seq,) = conn.execute(
@@ -273,7 +274,16 @@ def add_ocr_pages(
         for n, text in new.items():
             locator = {"page": n, "read_by": read_by}
             # an empty page is kept as one empty chunk, so it counts as read
-            pieces += chunk([Piece(locator, text)]) or [Piece(locator, "")]
+            if isinstance(text, list):
+                # OCR words remain individual records: never merge their source boxes.
+                pieces += [Piece(p.locator | locator, display_text(p.text)) for p in text]
+            else:
+                pieces += chunk([Piece(locator, display_text(text))]) or [Piece(locator, "")]
+        # Scan whole OCR page phrases for injection, even though words stay separate.
+        flag_pieces = []
+        for n, text in new.items():
+            page_text = " ".join(p.text for p in text) if isinstance(text, list) else text
+            flag_pieces.append(Piece({"page": n, "read_by": read_by}, page_text))
         indexed = []
         for piece in pieces:
             cur = conn.execute(
@@ -287,7 +297,7 @@ def add_ocr_pages(
             "INSERT INTO file_flags(file_id, kind, locator, excerpt, count) VALUES (?, ?, ?, ?, ?)",
             (
                 (file_id, f.kind, json.dumps(f.locator, ensure_ascii=False), f.excerpt, f.count)
-                for f in hidden.ai_instruction_flags([p for p in pieces if p.text])
+                for f in hidden.ai_instruction_flags([p for p in flag_pieces if p.text])
             ),
         )
         complete = len(done) + len(new) >= count

@@ -20,6 +20,12 @@ from tests.samples import _png, sample_docx, sample_pdf, sample_xlsx
 pytestmark = pytest.mark.anyio
 
 
+@pytest.fixture(autouse=True)
+def no_local_ocr(monkeypatch):
+    # These tests exercise the established AI fallback; never download language models.
+    monkeypatch.setattr(files_tools.ocr, "find_tesseract", lambda: None)
+
+
 def ctx_for(rec, *, transcriber=None, answers=None, on_device=False, agent=None):
     services = fake_services(transcriber=transcriber)
     return tool_ctx(rec, answers=answers, on_device=on_device, agent=agent, services=services)
