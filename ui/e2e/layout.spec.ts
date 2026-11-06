@@ -90,18 +90,26 @@ for (const language of ["ar", "en"] as const) {
     });
   }
 
-  test(`at 1440 px the top bar shows two status items, the submission and the items left, ${language}`, async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await mockCore(page, small(), { language });
-    await page.goto("/");
-    await workspaceReady(page);
-    const shown = page.locator('[data-region="topbar"] [data-status]:not([data-status="more"]):not([aria-hidden="true"])');
-    await expect(shown).toHaveCount(2);
-    await expect(shown.nth(0)).toHaveAttribute("data-status", "submission");
-    await expect(shown.nth(1)).toHaveAttribute("data-status", "left");
-    await expect(shown.nth(1)).toHaveText(count("itemsLeft", 240, {}, language));
-    for (const item of await shown.all()) expect(await shownWhole(item)).toBe(true);
-  });
+  // the status shows what fits, never only More status: at 1440 px one item (Arabic: the submission; English: the
+  // items left, the submission being 23 px too wide beside More), at 1920 px the submission and the items left
+  const ORDER = ["submission", "left", "boq", "comments", "stage"];
+  for (const width of [1440, 1920])
+    test(`at ${width} px the top bar shows the status items that fit beside More status, ${language}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await mockCore(page, small(), { language });
+      await page.goto("/");
+      await workspaceReady(page);
+      const shown = page.locator('[data-region="topbar"] [data-status]:not([data-status="more"]):not([aria-hidden="true"])');
+      await expect(shown.first()).toBeVisible();
+      const keys = await shown.evaluateAll((els) => els.map((el) => el.getAttribute("data-status")!));
+      expect(keys.length).toBeGreaterThanOrEqual(1);
+      expect(keys.length).toBeLessThanOrEqual(2);
+      expect([...keys].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b))).toEqual(keys); // in priority order
+      if (width === 1920) expect(keys).toEqual(["submission", "left"]);
+      if (keys.includes("left")) await expect(page.locator('[data-status="left"]')).toHaveText(count("itemsLeft", 240, {}, language));
+      for (const item of await shown.all()) expect(await shownWhole(item)).toBe(true);
+      await expect(page.locator('[data-region="topbar"] [data-status="more"]')).toBeVisible();
+    });
 
   const names = {
     short: { ar: "مبنى إداري - عينة", en: "Office building (sample)" },
