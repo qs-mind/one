@@ -3,7 +3,7 @@
 // their source on click. An edit is sent as a Suggested change when the engineer leaves the paragraph or presses
 // Ctrl+Enter, and shows old → new with ✓ ✗ until he decides; nothing here diffs, computes or saves by itself.
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
-import { deliverablesApi } from "../../deliverables/api";
+import { deliverablesApi, type Accepted, type Rejected } from "../../deliverables/api";
 import type { Change, DocumentView, NumberCell, Op, Thread } from "../../deliverables/types";
 import type { LocateOptions } from "../../project/types";
 import { count, dir, fill, pick, t, useLanguage, type Text } from "../../i18n";
@@ -38,6 +38,9 @@ export type DocumentViewerProps = {
   onToggleFullScreen?: () => void;
   /** Whether the board is full screen now, for the toggle's words; left out, the full review mode counts as it. */
   fullScreen?: boolean;
+  /** After an accept or a reject in the text: its answer, with its Undo when it has one (Ctrl+Z, «تراجع»). */
+  onAccepted?: (answer: Accepted) => void;
+  onRejected?: (answer: Rejected) => void;
   ref?: Ref<DocumentHandle>;
 };
 
@@ -79,7 +82,7 @@ function textRange(block: Element, start: number, end: number): Range | null {
 }
 
 export function DocumentViewer(props: DocumentViewerProps) {
-  const { projectId, view, changes = NONE, comments = NONE, onChanged } = props;
+  const { projectId, view, changes = NONE, comments = NONE, onChanged, onAccepted, onRejected } = props;
   const screen = useLanguage();
   const direction = dir(view.language);
   const root = useRef<HTMLDivElement>(null);
@@ -154,9 +157,11 @@ export function DocumentViewer(props: DocumentViewerProps) {
         : await deliverablesApi.reject(projectId, view.id, [changeId]);
       if (!answer.ok) return say(answer.error);
       setDecided((ids) => new Set([...ids, changeId]));
+      if (accept) onAccepted?.(answer.data as Accepted);
+      else onRejected?.(answer.data as Rejected);
       onChanged?.();
     },
-    [projectId, view.id, onChanged],
+    [projectId, view.id, onChanged, onAccepted, onRejected],
   );
 
   const workspaceMode = props.mode === "workspace";
