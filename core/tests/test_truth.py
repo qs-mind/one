@@ -175,6 +175,25 @@ def test_quotes_and_items_say_what_they_cover():
 def test_a_letter_against_the_files_and_today(rec):
     add_file(rec, "05 إيميل العميل - عينة.txt", EMAIL, actor="engineer")
     add_file(rec, "04 عرض أسعار المورد - عينة.pdf", QUOTE, actor="engineer")
+    source = ledger.add_source(rec, kind="sample", title="عينة", actor="t", dated="2026-11-05")
+    with rec.write("t") as c:
+        item = ledger.write_item(c, at=rec.clock(), actor="t", kind="bill", fields={})
+        for name, value in (
+            ("total", "1426948.50"),
+            ("vat", "199772.79"),
+            ("with_vat", "1626721.29"),
+        ):
+            ledger.write_number(
+                c,
+                at=rec.clock(),
+                actor="t",
+                item_id=item,
+                name=name,
+                value=value,
+                currency="EGP",
+                source_id=source,
+                dated="2026-11-05",
+            )
     day = date(2026, 11, 5)
     bad = (
         "القاهرة في 6 نوفمبر 2026\n"

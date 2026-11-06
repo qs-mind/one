@@ -111,6 +111,23 @@ def clean_reply(text: str, *, shown: bool) -> str:
         if len(table) >= 3 and numbers_guard.numbers_in("\n".join(lines[k] for k in table)):
             lines = [line for k, line in enumerate(lines) if k not in set(table)]
     out = _ID.sub("", "\n".join(lines))
+    lang = "ar" if arabic(text) else "en"
+    from qsone.engine.tools import REGISTRY
+
+    for name in REGISTRY:
+        if "_" in name:
+            out = re.sub(rf"`?\b{re.escape(name)}\b`?", copy.REPLY_RECORDS[lang], out)
+    out = re.sub(r"\bfile\s*(?:id|number)\s*[:：]?\s*(?:`\s*`|[)）])", "", out, flags=re.I)
+    out = re.sub(r"ملف\s+رقم\s*[:：]?\s*(?:`\s*`|[)）])", "", out)
+    out = re.sub(
+        r"(?:The reply left blanks for values:\s*)?\[show\]",
+        copy.REPLY_MISSING_VALUE[lang],
+        out,
+        flags=re.I,
+    )
+    out = re.sub(r"\b(?:source\s+)?ledger\b|سجل النظام", copy.REPLY_RECORDS[lang], out, flags=re.I)
+    out = re.sub(r"أداة العرض\s*\(show\)|\(show\)", copy.REPLY_TABLE[lang], out, flags=re.I)
+    out = _ASK_ENGINEER.sub(copy.REPLY_YOUR_QUOTES[lang], out)
     out = re.sub(r"[ \t]+\n", "\n", out)
     return re.sub(r"\n{3,}", "\n\n", out).strip()
 
@@ -208,11 +225,14 @@ _ALL = re.compile(
 )
 _INTEGER = re.compile(r"(?<![\d.,٫])[0-9٠-٩]{1,6}(?![\d.,٫])")
 _DELIVERABLE_READY = re.compile(
-    r"(?:المخرج|المستند|مستند|مخرج|المقايس[ةه]\s+المسع[ّ]?ر[ةه]|deliverable)"
+    r"(?:خطاب(?: العطاء)?|الخطاب|المخرج|المستند|مستند|مخرج|المقايس[ةه]\s+المسع[ّ]?ر[ةه]|deliverable)"
     r"[^.!?؟\n]{0,40}(?:جاهز|اتعمل|أنشأت|انشأت|عملت|خلص)"
     r"|(?:أنشأت|انشأت|قمت\s+بإنشاء|عملت|جهزت|جه[ّ]?زت)[^.!?؟\n]{0,30}(?:مستند|مخرج|deliverable)"
     r"|\b(?:deliverable|priced boq)\b[^.!?\n]{0,30}\b(?:is ready|ready|created|made)\b"
-    r"|\b(?:created|made|prepared)\s+(?:the|a)\s+(?:deliverable|priced boq)\b",
+    r"|\b(?:created|made|prepared|wrote|written)\s+(?:the|a)\s+"
+    r"(?:deliverable|priced boq|letter|document)\b"
+    r"|\b(?:letter|document)\b[^.!?\n]{0,30}\b(?:ready|written|prepared)\b"
+    r"|(?:تم\s+(?:تجهيز|كتابة|إعداد)|كتبت|جهزت)[^.!?؟\n]{0,30}(?:خطاب|مستند)",
     re.IGNORECASE,
 )
 # A change made: «تم تثبيت الأسعار», «عدّلت», «اتغيرت», "updated", "changed".
@@ -227,7 +247,8 @@ _CARD = re.compile(r"البطاق[ةه]|الكارت|بطاق[ةه]|كارت|\bc
 # The end of a reply that says work goes on when nothing runs: «جاري التنفيذ…», «ثواني وهتكون».
 _PROMISE = re.compile(
     r"\bجار[يٍ]?\s|\bه(?:ن)?(?:بدأ|كم[ّ]?ل|شتغل|بعت|رجع|ظبط|نض[ّ]?ف)\w*|\bسأ(?:قوم|بدأ|كمل|رسل|عمل)"
-    r"|\bسوف\s|\bثواني\b|ثانية\s+واحدة|\bلحظ(?:ة|ات)\b|دقايق\s+و|\bحال[اًا]+\s*$|بشتغل\s+على|\bبنشتغل"
+    r"|هخلص|هعرضهولك|سأقوم|\bi am going to\b|\bسوف\s|\bثواني\b|ثانية\s+واحدة"
+    r"|\bلحظ(?:ة|ات)\b|دقايق\s+و|\bحال[اًا]+\s*$|بشتغل\s+على|\bبنشتغل"
     r"|\b(?:i will|i'll|we will|we'll|working on it|in progress|one moment|just a moment|"
     r"shortly|in a few (?:seconds|minutes)|let me now|starting now|will now)\b",
     re.IGNORECASE,
@@ -238,6 +259,9 @@ _OFFER = re.compile(
     re.IGNORECASE,
 )
 # Words for a specialist that ended up in the reply: «استمر يا بشمهندس، كمل تسعير… أنا متابع».
+_ASK_ENGINEER = re.compile(
+    r"(?:you may want to )?ask the engineer if they have received alternative offers", re.I
+)
 _TO_TEAM = re.compile(
     r"(?:^|[.!؟\n،,]\s*)(?:استمر|كم[ّ]?ل|ابدأ|خليك)\s+(?:يا|في|تسعير|الشغل|شغلك)"
     r"|أنا\s+متابع\s+معاك|انا\s+متابع\s+معاك|\b(?:keep going|carry on with|continue pricing|"
@@ -429,9 +453,10 @@ def undone(text: str, cov: Coverage | None, did: Brief) -> list[Problem]:
 _UNDER_WAY = re.compile(
     r"(?<![؀-ۿ])(?:بدأت|بدات|ابتديت)\s+(?:في|ب|أ|ا)|(?<![؀-ۿ])(?:بجه[ّ]?ز|بحض[ّ]?ر|بشتغل|بنشتغل"
     r"|بنجه[ّ]?ز|بسعّر|بطابق)(?![؀-ۿ])|جار[يٍ]\s|(?<![؀-ۿ])ه(?:قوم|بدأ|سع[ّ]?ر|طابق|حسب"
-    r"|جه[ّ]?ز|بعت|بلغ|كم[ّ]?ل|ضيف|راجع|حض[ّ]?ر|سج[ّ]?ل|عمل|ربط|نف[ّ]?ذ)\w*"
+    r"|خلص|عرضهولك|جه[ّ]?ز|بعت|بلغ|كم[ّ]?ل|ضيف|راجع|حض[ّ]?ر|سج[ّ]?ل|عمل|ربط|نف[ّ]?ذ)\w*"
     r"|\b(?:i(?:'ve| have) started|i am (?:now )?(?:preparing|working|building|pricing)"
-    r"|i'm (?:now )?(?:preparing|working|building|pricing)|i will|i'll|starting now)\b",
+    r"|i am going to|سأقوم|i'm (?:now )?(?:preparing|working|building|pricing)"
+    r"|i will|i'll|starting now)\b",
     re.I,
 )
 # Work that waits on the engineer is no promise: «لو بعتلي العرض هسعّره», "once you send it".
@@ -449,7 +474,13 @@ def promise(text: str, did: Brief | None = None) -> str | None:
     words are the promise, whatever the reply ends on."""
     if did is not None and not did.writes:
         for s in _sentences(text):
-            if _UNDER_WAY.search(s) and not (_OFFER.search(s) or _CONDITION.search(s)):
+            if _UNDER_WAY.search(s) and not _CONDITION.search(s):
+                return s
+    if did is not None:
+        for s in _sentences(text):
+            if re.search(r"هخلص|هعرضهولك|سأقوم|i am going to", s, re.I) and not _CONDITION.search(
+                s
+            ):
                 return s
     tail = _sentences(text)[-2:]
     for s in reversed(tail):
@@ -458,6 +489,54 @@ def promise(text: str, did: Brief | None = None) -> str | None:
         if _PROMISE.search(s):
             return s
     return None
+
+
+_CONTRACT = re.compile(
+    r"محتجز|استقطاع|غرامة|تأخير|سريان|صلاحية|دفعة|دفعه|تأمين|شروط العقد"
+    r"|\b(?:retention|advance|repayment|delay|validity|bid security|payment|contract)\b",
+    re.I,
+)
+
+
+def document_claims(conn, text: str, ids: list[str]) -> list[Problem]:
+    """Ready means written content, not an empty Document shell or blank paragraph."""
+    if not any(_DELIVERABLE_READY.search(s) and not _NOT.search(s) for s in _sentences(text)):
+        return []
+    docs = conn.execute(
+        "SELECT id, title, variant FROM deliverables WHERE kind = 'document'"
+        " ORDER BY updated_at DESC, rowid DESC"
+    ).fetchall()
+    selected = [d for d in docs if d[0] in ids or d[1] in text]
+    if not selected and re.search(r"خطاب|\bletter\b", text, re.I):
+        selected = [d for d in docs if d[2] == "letter"][:1]
+    elif not selected and re.search(r"مستند|\bdocument\b", text, re.I):
+        selected = docs[:1]
+    for doc, title, _variant in selected:
+        nodes = conn.execute(
+            "SELECT node FROM parts WHERE deliverable_id = ? AND kind = 'block' "
+            "AND valid_until IS NULL AND removed = 0",
+            (doc,),
+        ).fetchall()
+        if not any(_has_content(json.loads(node)) for (node,) in nodes):
+            return [
+                Problem(
+                    "empty_document",
+                    f"The document «{title}» is empty, despite your claim that it is ready. "
+                    "Write its blocks with deliverable_propose, or say plainly it is still empty.",
+                    copy.TRUTH_EMPTY_DOCUMENT,
+                )
+            ]
+    return []
+
+
+def _has_content(node) -> bool:
+    if isinstance(node, dict):
+        if node.get("type") in ("num", "cell"):
+            return True
+        if isinstance(node.get("text"), str) and node["text"].strip():
+            return True
+        return any(_has_content(v) for k, v in node.items() if k != "text")
+    return isinstance(node, list) and any(_has_content(v) for v in node)
 
 
 def reply_problems(
@@ -470,6 +549,23 @@ def reply_problems(
 ) -> list[Problem]:
     """Everything in a final reply the core sends back once for the model to fix."""
     found: list[Problem] = []
+    if (
+        cov is not None
+        and _CONTRACT.search(text)
+        and (numbers_guard.numbers_in(text) or re.search(r"[0-9٠-٩]+\s*[%٪]", text))
+    ):
+        if not did.done.intersection({"files_read", "search_records", "read_chunk"}):
+            found.append(
+                Problem(
+                    "contract_unread",
+                    "Contract values were stated without a successful files_read/search step "
+                    "in this Brief. "
+                    "Search the tender by words and meaning, read the top pages, "
+                    "and cite only values "
+                    "read on the cited page. If not found, say so without remembered figures.",
+                    copy.TRUTH_CONTRACT_UNREAD,
+                )
+            )
     if has_json(text):
         found.append(
             Problem(
@@ -515,7 +611,7 @@ def reply_problems(
                 copy.TRUTH_NO_CARD,
             )
         )
-    if did.specialists and _TO_TEAM.search(text or ""):
+    if (did.specialists and _TO_TEAM.search(text or "")) or _ASK_ENGINEER.search(text or ""):
         found.append(
             Problem(
                 "audience",
@@ -1015,6 +1111,32 @@ def letter_problems(conn, text: str, *, day: date, has_total: bool, said: str = 
     """What a letter says against the project's files and today's date (English, for the model).
     A date the engineer wrote (`said`, the Brief's text) is theirs to use."""
     wrong: list[str] = []
+    amounts = conn.execute(
+        "SELECT value FROM numbers WHERE valid_until IS NULL AND currency IS NOT NULL"
+    ).fetchall()
+    known_amounts = numbers_guard.known_values([v for (v,) in amounts])
+    for segment in re.split(r"[\n؛;]", text):
+        for match in numbers_guard._ANY_NUMBER.finditer(segment):
+            tail = segment[match.end() :].lstrip()
+            before = segment[: match.start()]
+            # Only monetary figures: a total label immediately before the number or a
+            # currency immediately beside it. Days, percentages and dates are separate facts.
+            currency = r"(?:جنيه|ريال|درهم|دولار|EGP|SAR|USD|AED|[$€£])"
+            money = re.match(currency, tail, re.I) or re.search(currency + r"\s*$", before, re.I)
+            total = re.search(
+                r"(?:إجمالي|اجمالي|قيم[ةه] العطاء|total|sum)[^0-9٠-٩،,;\n]{0,25}$", before, re.I
+            )
+            if not (money or total) or re.match(r"%|٪|days?\b|يوم", tail, re.I):
+                continue
+            written = match.group()
+            if written not in numbers_guard.numbers_in(segment):
+                continue
+            if numbers_guard.known_values([written]) - known_amounts:
+                wrong.append(
+                    f"The letter amount {written} is not in the project records. "
+                    "Read the BOQ total from calculate and use its number reference; "
+                    "if missing, use [يملأه المهندس: إجمالي العطاء]."
+                )
     known_dates = file_dates(conn) | {d for _, d in dates_in(said)}
     for written, d in dates_in(text):
         if d != day and d not in known_dates:

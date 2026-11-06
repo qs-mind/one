@@ -1564,6 +1564,46 @@ class _Brief:
         if rec is not None:  # each number at the row or page the reply cites for it
             with rec.read() as c:
                 found += truth.miscited(c, output)
+                ids = []
+                for run in self.store.runs(self.brief_id):
+                    for name, result in (
+                        agents.tool_returns(run["history"]) if run["history"] else ()
+                    ):
+                        if name not in {
+                            "deliverable_create",
+                            "deliverable_read",
+                            "deliverable_propose",
+                        }:
+                            continue
+                        try:
+                            data = json.loads(result)
+                        except ValueError:
+                            continue
+                        if isinstance(data, dict) and isinstance(data.get("id"), str):
+                            ids.append(data["id"])
+                found += truth.document_claims(c, output, ids)
+                if re.search(
+                    r"خطاب|\b(?:bid|covering|tender) letter\b", self.text + " " + output, re.I
+                ):
+                    wrong = truth.letter_problems(
+                        c,
+                        output,
+                        day=truth.today(self.engine.clock()),
+                        has_total=False,
+                        said=self.text,
+                    )
+                    marked = _marked(rec, output, self.results())
+                    if marked:
+                        wrong.append(
+                            "The letter has numbers with no source in this Brief: "
+                            + ", ".join(marked)
+                            + ". Read the project records and calculate totals before answering; "
+                            "write the letter in a Document with sourced number references."
+                        )
+                    if wrong:
+                        found.append(
+                            truth.Problem("letter", " ".join(wrong), copy.TRUTH_LETTER_MONEY)
+                        )
         return found
 
     async def _truthful(self, output: Any) -> Any:
@@ -1753,6 +1793,7 @@ class Engine:
         self._agent_slots = asyncio.Semaphore(max_agents)
         self._briefs: dict[str, _Brief] = {}
         self._outputs: dict[str, Any] = {}
+        self._brief_chats: dict[str, str] = {}
         self._ended_unseen: dict[str, dict] = {}  # chat id: its last Brief, done or failed, unseen
         self._close_after: set[str] = set()  # projects to close when their Brief ends
         self._general: Records | None = None
@@ -1931,6 +1972,7 @@ class Engine:
 
     def _launch(self, brief: _Brief) -> None:
         self._briefs[brief.brief_id] = brief
+        self._brief_chats[brief.brief_id] = brief.chat_id
         self._ended_unseen.pop(brief.chat_id, None)  # the chat's new Brief is what it does now
         brief.task = asyncio.create_task(brief.main(), name=f"brief-{brief.brief_id}")
 
@@ -1955,12 +1997,24 @@ class Engine:
         return brief.events()
 
     async def stop(self, brief_id: str) -> None:
-        """Raises `LookupError` when the Brief is not running."""
-        brief = self._brief(brief_id)
+        """Stop the current Brief in this chat, even if the screen still names its predecessor.
+
+        Resolve and cancel before the first await: a queued successor must not slip through
+        the handover. An unknown id cannot select another chat.
+        """
+        chat = self._brief_chats.get(brief_id)
+        current = self.active(chat) if chat is not None else None
+        brief = self._brief(current or brief_id)
         brief.cancel_mode = "stop"
         assert brief.task is not None
         brief.task.cancel()
         await asyncio.gather(brief.task, return_exceptions=True)
+        if not brief.finished:  # cancelled before main() entered its try/finally
+            brief._withdraw()
+            brief.set_state("stopped", brief._stopped_line())
+            brief.finished = True
+            self._ended(brief)
+            brief._notify()
 
     async def steer(self, brief_id: str, text: str) -> None:
         """Raises `LookupError` when the Brief is not running."""
