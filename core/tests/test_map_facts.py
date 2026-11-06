@@ -7,6 +7,7 @@ from tests.samples import sample_pdf
 
 
 def proposal(fid, value="10%", **extra):
+    extra.setdefault("evidence", value)
     return dict(
         name={"en": "Retention", "ar": "المحتجز"},
         value=value,
@@ -75,7 +76,13 @@ def test_candidate_fallback_and_scripted_pass(rec):
 
     def propose(pages):
         assert pages and pages[0]["text"] == "Bid validity 90 days"
-        return [dict(proposal(f.id, "90 days"), locator={"page": 2})]
+        return [
+            dict(
+                proposal(f.id, "90 days"),
+                locator={"page": 2},
+                name={"en": "Bid validity", "ar": "سريان العرض"},
+            )
+        ]
 
     assert facts.run(rec, read=read, propose=propose)
     assert seen == [(f.id, {"page": 2})]
@@ -287,6 +294,7 @@ def test_source_label_is_kept_and_local_content_penalty_not_delay(rec):
                 name={"en": "Opening of offers", "ar": "فتح العروض"},
                 source_label="فتح العروض",
                 value="16/04/1448",
+                evidence="فتح العروض 16/04/1448",
             )
         ],
     )
@@ -419,3 +427,74 @@ async def test_approved_facts_searches_existing_files_too(rec):
     with pytest.raises(facts.NoTenderFacts):
         await facts.run_approved(rec, read=read, request=request, file_ids={added.id})
     assert seen == {existing.id, added.id}
+
+
+def test_evidence_grounding_arabic_variants_numbers_and_conflicts(rec):
+    first = "على المتنافس تقديم الضمان الابتدائي بنسبة 1 بالمائة"
+    second = "الضمان الابتدائي (2%) إلى (1%)"
+    a = files.add_file(rec, "sample-a.txt", first.encode(), actor="engineer")
+    b = files.add_file(rec, "sample-b.txt", second.encode(), actor="engineer")
+
+    def item(fid, value, evidence):
+        return dict(
+            file_id=fid,
+            locator={"line": 1},
+            name={"en": "Bid security", "ar": "نسبة الضمان الابتدائي"},
+            source_label="الضمان الابتدائي",
+            value=value,
+            evidence=evidence,
+        )
+
+    ids = facts.accept(rec, [item(a.id, "1%", first), item(b.id, "1% إلى 2%", second)])
+    assert len(ids) == 2
+    saved = store.entries(rec, "facts")["facts"]
+    assert all(r["state"] == "conflict" and r["conflict_with"] for r in saved)
+    assert {r["file_id"] for r in saved} == {a.id, b.id}
+    assert not facts.accept(rec, [item(a.id, "10%", first), item(a.id, "2%", first)])
+    assert facts.evidence_matches("تَاريخ فَتح العروض ١٦ / ٠٤ / ١٤٤٨", "تاريخ فتح العروض 16/04/1448")
+    assert facts.evidence_matches("الضمان الإبتدائي للأميرسلطان", "الضمان الابتدائي للأمير سلطان")
+    assert facts.evidence_matches(first, "على المتنافس تقديم الضمان الابتدائى بنسة 1 بالمائة")
+    assert not facts.evidence_matches(first, "الدفعة المقدمة عشرون بالمائة")
+    assert not facts.evidence_matches(first, "[]")
+    assert not facts.accept(rec, [dict(item(a.id, "1%", ""))])
+
+
+@pytest.mark.anyio
+async def test_approved_grounding_accepts_range_format_and_longer_fact_name(rec):
+    from tests.test_project_map import drain
+
+    opening = "فتح العروض 16/04/1448"
+    security = "الضمان الابتدائي (2%) إلى (1%)"
+    first = files.add_file(rec, "sample-opening.txt", opening.encode(), actor="engineer")
+    second = files.add_file(rec, "sample-security.txt", security.encode(), actor="engineer")
+    drain(rec)
+    texts = {first.id: opening, second.id: security}
+
+    async def read(fid, loc):
+        return texts[fid]
+
+    async def request(*args):
+        return facts.Result(
+            facts=[
+                facts.Fact(
+                    name={"en": "Date of opening offers", "ar": "تاريخ فتح العروض"},
+                    value="16/04/1448",
+                    file_id=first.id,
+                    locator={"line": 1},
+                    state="found",
+                    evidence=opening,
+                    source_label="فتح العروض",
+                ),
+                facts.Fact(
+                    name={"en": "Bid security", "ar": "نسبة الضمان الابتدائي"},
+                    value="1% إلى 2%",
+                    file_id=second.id,
+                    locator={"line": 1},
+                    state="found",
+                    evidence=security,
+                    source_label="الضمان الابتدائي",
+                ),
+            ]
+        )
+
+    assert len(await facts.run_approved(rec, read=read, request=request, file_ids=set(texts))) == 2

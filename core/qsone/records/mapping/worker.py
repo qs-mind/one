@@ -274,6 +274,9 @@ def step(
     if cancelled():
         original.clear()
         return False
+    if files.reread_pdf(rec):
+        original.clear()
+        return True
     pending = _pending(rec)
     if not pending:
         store.seed(rec)

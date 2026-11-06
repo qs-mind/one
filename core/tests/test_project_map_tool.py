@@ -81,6 +81,7 @@ async def test_file_detail_includes_fact_verification_and_links(rec):
             dict(
                 name={"en": "Retention", "ar": "المحتجز"},
                 value="10%",
+                evidence="Retention 10%",
                 file_id=f.id,
                 locator={"page": 1},
             )

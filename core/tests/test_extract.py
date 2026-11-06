@@ -156,3 +156,102 @@ def test_a_long_merged_note_is_read_once_not_carried_as_a_heading():
         assert texts[2] == "أعمال النجارة | 12-1 | باب خشب - عينة | عدد | 1 | 4700", name
         # a heading is not repeated in a row that already holds it
         assert texts[-1] == "Supply and install access control - sample | Each | 3", name
+
+
+def test_reversed_arabic_quality_and_page_selection(rec, monkeypatch):
+    from qsone.records import extract as reader
+    from qsone.records import files, search
+
+    bad = "ىلع سفانتملا ميدقت نامضلا يئادتبالا ةبسنب 1 ةئاملاب )11( ةيكنبلا"
+    good = "على المتنافس تقديم الضمان الابتدائي بنسبة 1 بالمائة (11) البنكية"
+    assert reader.arabic_quality(good) > reader.arabic_quality(bad)
+    monkeypatch.setattr(reader, "_page_text", lambda _: bad)
+    monkeypatch.setattr(reader, "_inspector_text", lambda *_: "# " + good)
+    result = reader.extract("sample.pdf", sample_pdf([["Sample"]]))
+    assert result.pieces == [Piece({"page": 1}, good)]
+    assert result.page_sources == {1: "pdf-inspector"}
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Sample"]]), actor="engineer")
+    assert search.search(rec, "الضمان الابتدائي").hits[0].file_id == f.id
+
+
+def test_reversed_arabic_pypdf_fallback(monkeypatch):
+    from qsone.records import extract as reader
+
+    monkeypatch.setattr(reader, "_inspector_text", lambda *_: "")
+    monkeypatch.setattr(reader, "_pypdf_text", lambda *_: "ﻋﻠﻰ المتنافس تقديم الضمان الابتدائي")
+    text, source = reader.select_pdf_text(b"sample", 0, "ىلع سفانتملا نامضلا يئادتبالا")
+    assert text == "على المتنافس تقديم الضمان الابتدائي"
+    assert source == "pypdf"
+
+
+def test_background_rereads_older_pdf_once_keeps_ocr_and_original(rec, monkeypatch):
+    import json
+
+    from qsone.records import extract as reader
+    from qsone.records import files, search
+    from qsone.records.mapping import worker
+
+    data = sample_pdf([["Sample original"], ["Sample scan"]])
+    f = files.add_file(rec, "sample.pdf", data, actor="engineer")
+    with rec.write("one") as c:
+        c.execute("DELETE FROM meta WHERE key=?", ("extractor:" + f.id,))
+        c.execute(
+            "UPDATE chunks SET locator=? WHERE file_id=? AND seq=1",
+            (json.dumps({"page": 2, "read_by": "tesseract"}), f.id),
+        )
+    seen = []
+
+    def reread(name, raw):
+        seen.append(raw)
+        return reader.Extracted(
+            "pdf",
+            "read",
+            2,
+            [Piece({"page": 1}, "الضمان الابتدائي 1%")],
+            None,
+            page_sources={1: "pdf-inspector", 2: "pdfium"},
+        )
+
+    monkeypatch.setattr(files, "extract", reread)
+    assert worker.step(rec)
+    assert seen == [data]
+    assert files.read_original(rec, f.id) == data
+    assert search.search(rec, "الضمان الابتدائي").hits
+    assert not search.search(rec, "original").hits
+    assert json.loads(rec.meta()["pdf_sources:" + f.id]) == {"1": "pdf-inspector", "2": "pdfium"}
+    with rec.read() as c:
+        assert (
+            c.execute(
+                "SELECT count(*) FROM chunks WHERE file_id=? "
+                "AND json_extract(locator,'$.read_by')='tesseract'",
+                (f.id,),
+            ).fetchone()[0]
+            == 1
+        )
+    worker.step(rec)
+    assert seen == [data]
+
+
+def test_pdf_source_selection_keeps_good_pdfium_and_survives_failed_alternatives(monkeypatch):
+    from qsone.records import extract as reader
+
+    seen = []
+
+    def broken(*args):
+        seen.append(args[1])
+        raise ValueError("Synthetic damaged alternative")
+
+    monkeypatch.setattr(reader, "_inspector_text", broken)
+    monkeypatch.setattr(reader, "_pypdf_text", broken)
+    good = "على المتنافس تقديم الضمان الابتدائي"
+    assert reader.select_pdf_text(b"sample", 0, good) == (good, "pdfium")
+    assert seen == []
+    bad = "ىلع سفانتملا نامضلا يئادتبالا"
+    assert reader.select_pdf_text(b"sample", 1, bad) == (bad, "pdfium")
+    assert seen == [1, 1]
+
+
+def test_pdf_markdown_preserves_visible_blank_placeholders():
+    from qsone.records.extract import _plain_markdown
+
+    assert "____" in _plain_markdown("# الدفعة المقدمة\n| الدفعة | ____ |\n")

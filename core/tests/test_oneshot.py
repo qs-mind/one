@@ -503,3 +503,38 @@ async def test_retirement_retries_once_and_marks_both_failed_models(make):
     assert seen == ["gone", "gone"]
     assert connectors.refused(HAIKU.choice) and connectors.refused(SONNET.choice)
     assert oneshot.map_model(models) is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("always_invalid", [False, True])
+async def test_structured_one_validation_retry_is_costed(make, general, always_invalid):
+    from pydantic import BaseModel
+    from pydantic_ai.messages import ToolCallPart
+
+    class Output(BaseModel):
+        value: int
+
+    seen = []
+
+    async def answer(messages, info):
+        seen.append(messages)
+        args = {"value": "invalid"} if always_invalid or len(seen) == 1 else {"value": 1}
+        return ModelResponse(
+            parts=[ToolCallPart(info.output_tools[0].name, args)],
+            usage=RequestUsage(input_tokens=100, output_tokens=50),
+        )
+
+    link = FakeLink(
+        "anthropic", "Sample AI", "anthropic", models={HAIKU.choice.model: FunctionModel(answer)}
+    )
+    costs.save_caps({"budget_above": "100"})
+    models = make({"quick": HAIKU.choice}, [link], sheet=(HAIKU,))
+    if always_invalid:
+        with pytest.raises(OneShotFailed) as error:
+            await oneshot.map_text(models, "Sample", Output, "Return sample")
+        assert error.value.text == copy.MAP_AI_INVALID_OUTPUT
+    else:
+        assert (await oneshot.map_text(models, "Sample", Output, "Return sample")).value == 1
+    assert len(seen) == 2
+    assert sum(r[4] for r in costs_of(general)) == 200
+    assert sum(r[5] for r in costs_of(general)) == 100
