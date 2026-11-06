@@ -285,6 +285,24 @@ async def _no_wait(_seconds: float) -> None:
     return None
 
 
+async def test_the_bench_check_takes_what_the_check_route_passes(monkeypatch):
+    """journey/routes.py counts the check's usage (`on_usage`); the bench's stand-in took no such
+    argument, so the "standard" check failed with a TypeError on the bench."""
+    from qsone.engine import connectors
+    from tests.bench import __main__ as bench_main
+
+    passed: list = []
+
+    async def real(via, *, among=None, on_usage=None):
+        passed.append(on_usage)
+
+    monkeypatch.setattr(connectors, "check", real)
+    bench_main.check_keys()
+    used = []
+    assert await connectors.check("standard:local/m", among=[], on_usage=used.append) is None
+    assert passed == [used.append]
+
+
 def test_the_bench_gets_search_by_meaning_ready_from_the_fake_hub(data_dir):
     """The guard keeps Hugging Face out; the bench's model comes from the fake hub, so its
     screens never show «البحث بالمعنى مش جاهز»."""
