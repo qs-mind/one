@@ -10,7 +10,7 @@ import uuid
 from difflib import SequenceMatcher
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from qsone import copy
 from qsone.records import arabic
@@ -52,7 +52,7 @@ class Fact(BaseModel):
 
 
 class Result(BaseModel):
-    facts: list[Fact]
+    facts: list[Fact] = Field(max_length=100)
 
 
 def guide_score(text):
@@ -111,7 +111,46 @@ def grounded(text, p):
     if not evidence_matches(text, evidence):
         return False
     numbers = re.findall(r"\d+(?:[.,]\d+)*", arabic.clean(p.get("value", "")))
-    return all(contains(evidence, n) and contains(text, n) for n in numbers)
+    return all(number_present(evidence, n) and number_present(text, n) for n in numbers)
+
+
+def number_present(text, number):
+    from qsone.records.mapping.number_words import values
+
+    return contains(text, number) or (number.isdigit() and int(number) in values(text))
+
+
+def usable_label(c, p, text):
+    import json
+
+    label = p.get("source_label", "")
+    normalized = grounding_text(label) if isinstance(label, str) else ""
+    pages = {}
+    for loc, words in links.chunks(c, p["file_id"]):
+        if "page" in loc:
+            pages.setdefault(loc["page"], []).append(words)
+    title = c.execute("SELECT ai_title FROM map_files WHERE file_id=?", (p["file_id"],)).fetchone()
+    titles = json.loads(title[0]) if title and title[0] else {}
+    header = normalized and (
+        any(normalized == grounding_text(t) for t in titles.values())
+        or (
+            len(pages) > 1
+            and sum(normalized in grounding_text(" ".join(v)) for v in pages.values())
+            > len(pages) / 2
+        )
+    )
+    if (
+        normalized
+        and normalized in grounding_text(text)
+        and normalized in grounding_text(p.get("evidence", ""))
+        and not header
+    ):
+        return label
+    evidence = p.get("evidence", "")
+    if not isinstance(evidence, str):
+        return ""
+    prefix = re.split(r"[0-9٠-٩]", evidence, maxsplit=1)[0].strip(" :؛،-()")
+    return prefix if prefix != evidence and grounding_text(prefix) in grounding_text(text) else ""
 
 
 def shown(row):
@@ -122,7 +161,7 @@ def shown(row):
     return row
 
 
-def accept(rec, proposals):
+def accept(rec, proposals, *, picture_fallback=True):
     ids = []
     with rec.write(store.ACTOR) as c:
         for p in proposals:
@@ -142,28 +181,15 @@ def accept(rec, proposals):
                 else None
             )
             pieces = links.at(c, p.get("file_id"), locator)
+            if not pieces or not isinstance(p.get("evidence"), str):
+                continue
             text = "\n".join(t for _, t in pieces)
-            source_label = p.get("source_label", "")
-            if not source_label:
-                source_label = next(
-                    (
-                        label
-                        for label in name.values()
-                        if grounding_text(label) in grounding_text(text)
-                    ),
-                    "",
-                )
-            if (
-                not isinstance(source_label, str)
-                or not grounding_text(source_label)
-                or (
-                    grounding_text(source_label) not in grounding_text(text)
-                    or not any(
-                        grounding_text(source_label) in grounding_text(label)
-                        for label in name.values()
-                    )
-                )
-            ):
+            source_label = usable_label(c, p, text)
+            # Known semantic substitutions remain invalid regardless of label recovery.
+            ar_name = grounding_text(name["ar"])
+            if "فتحالعروض" in grounding_text(text) and "تقديم" in ar_name and "فتح" not in ar_name:
+                continue
+            if "تأخير" in name["ar"] and "المحتويالمحلي" in grounding_text(text):
                 continue
             blank = p.get("state") == "blank"
             evidence = p.get("evidence", "")
@@ -195,11 +221,23 @@ def accept(rec, proposals):
             if any(
                 store.decoded(r)["name"] == name
                 and store.decoded(r)["locator"] == locator
-                and r["value"] == value
+                and (
+                    r["value"] == value
+                    or (store.decoded(r).get("picture_check") or {}).get("text_value") == value
+                )
                 for r in old
             ):
                 continue
+            from qsone.records.mapping import picture
+
+            picture_check = (
+                picture.check(rec, p["file_id"], locator, evidence, value)
+                if picture_fallback
+                else None
+            )
             row = dict(
+                evidence=evidence,
+                picture_check=picture_check,
                 id=uuid.uuid4().hex,
                 name=name,
                 value=value,
@@ -466,7 +504,9 @@ def prompt(pages):
         + GUIDE
         + ". Return facts with name {en,ar}, value, file_id, locator "
         "(page or sheet+row), state found or blank, short verbatim evidence, and source_label. "
-        "source_label must be the document’s own label, copied verbatim into the name in "
+        "source_label is optional: words immediately before/around the value, "
+        "e.g. فتح العروض → 16/04/1448, never a document title, letterhead or file name. "
+        "Copy the label into the name in "
         "that language; translate it faithfully in the other language. فتح العروض is opening "
         "of offers, never submission. A local-content compliance penalty is not delay damages. "
         "A blank needs a visible empty placeholder; never infer a missing term. "
@@ -526,7 +566,7 @@ class NoTenderFacts(ValueError):
 PAGE_CHARS = 12000
 
 
-async def run_approved(rec, *, read, request, file_ids):
+async def run_approved(rec, *, read, request, file_ids, vision_request=None):
     """Only called by ai.run after the single drop approval; all reads are recorded."""
     pages = []
     # A changed file may point to tender terms in any existing project document.
@@ -547,11 +587,35 @@ async def run_approved(rec, *, read, request, file_ids):
                 p["source_label"] = next(
                     (label for label in p["name"].values() if contains(text, label)), ""
                 )
-            if p["source_label"]:
-                valid.append(p)
+            valid.append(p)
     if not valid:
         raise NoTenderFacts("NoTenderFacts: no grounded tender facts returned")
-    accepted = accept(rec, valid)
+    accepted = accept(rec, valid, picture_fallback=vision_request is None)
+    if vision_request is not None:
+        from qsone.records.mapping import picture
+
+        # A failed vision request may leave grounded facts persisted. Include those
+        # same proposals on the pass retry, without creating duplicate facts.
+        with rec.read() as c:
+            pending = [
+                store.decoded(row)
+                for row in store.rows(
+                    c, "SELECT * FROM map_facts WHERE valid_until IS NULL AND confirmed_at IS NULL"
+                )
+            ]
+        targets = {
+            row["id"]
+            for row in pending
+            if row["picture_check"] is None
+            and any(
+                row["file_id"] == p["file_id"]
+                and row["locator"] == p["locator"]
+                and row["name"] == p["name"]
+                and row["value"] == p["value"]
+                for p in valid
+            )
+        }
+        await picture.verify(rec, targets, request=vision_request)
     if not accepted and not store.entries(rec, "facts")["facts"]:
         raise NoTenderFacts("NoTenderFacts: all proposals rejected by grounding validation")
     return accepted

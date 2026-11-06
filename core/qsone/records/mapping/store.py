@@ -27,6 +27,7 @@ JSON_FIELDS = {
     "words",
     "evidence",
     "box",
+    "picture_check",
     "conflict_with",
 }
 TABLES = {"map_files", "map_tables", "map_sheets", "map_links", "map_facts"}
