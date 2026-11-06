@@ -285,6 +285,7 @@ class Meaning:
     def _look(self, pid: str, rec) -> None:
         """Vectors of another model go at once; text asks for the model; then indexing."""
         try:
+            search.ensure_index(rec)
             search.drop_stale_vectors(rec, self._embedder)
             done, total = search.vector_counts(rec, self._embedder)
         except RecordsError:

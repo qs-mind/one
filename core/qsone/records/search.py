@@ -84,23 +84,101 @@ def rrf(
     return sorted(scores.items(), key=lambda s: (-s[1], s[0]))
 
 
-def index_words(conn, chunks: Iterable[tuple[int, str]]) -> None:
-    """Adds (chunk id, display text) rows to the word index. Inside `Records.write`."""
-    conn.executemany(
-        "INSERT INTO chunks_fts(rowid, norm) VALUES (?, ?)",
-        ((chunk_id, arabic.normalise(text)) for chunk_id, text in chunks),
+INDEX_VERSION = "2"
+
+
+def _index_table(conn):
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS search_text (chunk_id INTEGER PRIMARY KEY "
+        "REFERENCES chunks(id) ON DELETE CASCADE, text TEXT NOT NULL)"
     )
 
 
+def _file_text(conn, file_id):
+    rows = conn.execute(
+        "SELECT id, locator, text FROM chunks WHERE file_id=?", (file_id,)
+    ).fetchall()
+    pages = conn.execute("SELECT pages FROM files WHERE id=?", (file_id,)).fetchone()[0] or 0
+    repeated = set()
+    if pages >= 4:
+        seen = {}
+        for _, locator, text in rows:
+            page = json.loads(locator).get("page")
+            if page is None:
+                continue
+            for line in text.splitlines():
+                key = re.sub(r"\d+", "#", " ".join(arabic.clean(line).split())).casefold()
+                if key:
+                    seen.setdefault(key, set()).add(page)
+        repeated = {key for key, places in seen.items() if len(places) * 2 >= pages}
+    return [
+        (
+            i,
+            "\n".join(
+                line
+                for line in text.splitlines()
+                if re.sub(r"\d+", "#", " ".join(arabic.clean(line).split())).casefold()
+                not in repeated
+            ).strip(),
+        )
+        for i, _, text in rows
+    ]
+
+
+def index_words(conn, chunks: Iterable[tuple[int, str]]) -> None:
+    """Refresh affected files' index text; originals remain untouched, including on OCR updates."""
+    _index_table(conn)
+    files = set()
+    supplied = dict(chunks)
+    for chunk_id in supplied:
+        row = conn.execute("SELECT file_id FROM chunks WHERE id=?", (chunk_id,)).fetchone()
+        if row:
+            files.add(row[0])
+    has_vectors = conn.execute("SELECT 1 FROM sqlite_master WHERE name='chunk_vectors'").fetchone()
+    for file_id in files:
+        pages = conn.execute("SELECT pages FROM files WHERE id=?", (file_id,)).fetchone()[0] or 0
+        rows = (
+            _file_text(conn, file_id)
+            if pages >= 4
+            else [
+                (i, text)
+                for i, text in supplied.items()
+                if conn.execute("SELECT file_id FROM chunks WHERE id=?", (i,)).fetchone()[0]
+                == file_id
+            ]
+        )
+        for chunk_id, text in rows:
+            old = conn.execute(
+                "SELECT text FROM search_text WHERE chunk_id=?", (chunk_id,)
+            ).fetchone()
+            conn.execute("DELETE FROM chunks_fts WHERE rowid=?", (chunk_id,))
+            conn.execute("DELETE FROM search_text WHERE chunk_id=?", (chunk_id,))
+            if has_vectors and (old is None or old[0] != text):
+                conn.execute("DELETE FROM chunk_vectors WHERE chunk_id=?", (chunk_id,))
+            if text:
+                conn.execute("INSERT INTO search_text VALUES (?,?)", (chunk_id, text))
+                conn.execute(
+                    "INSERT INTO chunks_fts(rowid,norm) VALUES (?,?)",
+                    (chunk_id, arabic.normalise(text)),
+                )
+
+
 def ensure_index(rec: Records) -> None:
-    """Rebuilds the word index when it was made by another normaliser version."""
+    """Rebuild index-only text once, without extracting files again."""
     version = str(arabic.NORMALISER_VERSION)
-    if rec.meta().get("normaliser_version") == version:
+    meta = rec.meta()
+    if (
+        meta.get("normaliser_version") == version
+        and meta.get("search_index_version") == INDEX_VERSION
+    ):
         return
     with rec.write(ACTOR, upkeep=True) as conn:
         conn.execute("INSERT INTO chunks_fts(chunks_fts) VALUES ('delete-all')")
+        conn.execute("DROP TABLE IF EXISTS chunk_vectors")
+        conn.execute("DELETE FROM meta WHERE key IN ('embed_model', 'embed_dims')")
         index_words(conn, conn.execute("SELECT id, text FROM chunks").fetchall())
         rec.set_meta(conn, "normaliser_version", version)
+        rec.set_meta(conn, "search_index_version", INDEX_VERSION)
 
 
 def _vectors_ready(conn, embedder: Embedder) -> bool:
@@ -141,6 +219,7 @@ def index_vectors(
     """Embeds the chunks that have no vector yet; each batch is committed on its own, so a stopped
     run resumes where it left off. A new model or size rebuilds the table. `should_stop` is asked
     before each batch, `progress(done)` told after each commit. Returns how many."""
+    ensure_index(rec)
     dims = int(embedder.dims)
     with rec.write(ACTOR, upkeep=True) as conn:
         if not _vectors_ready(conn, embedder):
@@ -155,8 +234,9 @@ def index_vectors(
     while not should_stop():
         with rec.read() as conn:
             todo = conn.execute(
-                "SELECT id, text FROM chunks WHERE id > ?"
-                " AND id NOT IN (SELECT chunk_id FROM chunk_vectors) ORDER BY id LIMIT ?",
+                "SELECT chunk_id, text FROM search_text WHERE chunk_id > ?"
+                " AND chunk_id NOT IN (SELECT chunk_id FROM chunk_vectors) "
+                "ORDER BY chunk_id LIMIT ?",
                 (last, batch),
             ).fetchall()
         if not todo:
@@ -175,15 +255,18 @@ def index_vectors(
 
 def vector_counts(rec: Records, embedder: Embedder) -> tuple[int, int]:
     """(chunks with a vector from this model, all chunks)."""
-    with rec.read() as conn:
-        (chunks,) = conn.execute("SELECT count(*) FROM chunks").fetchone()
+    with rec.write(ACTOR, upkeep=True) as conn:
+        _index_table(conn)
+        (chunks,) = conn.execute("SELECT count(*) FROM search_text").fetchone()
         if not _vectors_ready(conn, embedder):
             return 0, chunks
         (vectors,) = conn.execute("SELECT count(*) FROM chunk_vectors").fetchone()
     return vectors, chunks
 
 
-def _words(conn, match: str, include_old: bool, limit: int) -> list[tuple[int, float]]:
+def _words(
+    conn, match: str, include_old: bool, limit: int, file_ids=None
+) -> list[tuple[int, float]]:
     rows = conn.execute(
         "SELECT c.id, bm25(chunks_fts), c.file_id, c.locator FROM chunks_fts"
         " JOIN chunks c ON c.id = chunks_fts.rowid JOIN files f ON f.id = c.file_id"
@@ -193,6 +276,8 @@ def _words(conn, match: str, include_old: bool, limit: int) -> list[tuple[int, f
     )
     found, seen = [], set()
     for chunk_id, score, file_id, locator in rows:
+        if file_ids is not None and file_id not in file_ids:
+            continue
         key = _place_key(chunk_id, file_id, json.loads(locator))
         if key in seen:
             continue
@@ -204,7 +289,12 @@ def _words(conn, match: str, include_old: bool, limit: int) -> list[tuple[int, f
 
 
 def _meaning(
-    conn, vector: list[float], dims: int, include_old: bool, language: str | None = None
+    conn,
+    vector: list[float],
+    dims: int,
+    include_old: bool,
+    language: str | None = None,
+    file_ids=None,
 ) -> list[int]:
     """Top KNN first, then only chunks of current files (unless `include_old`) and, with
     `language`, only chunks written in it. MATERIALIZED keeps the KNN apart, as vec0 refuses any
@@ -233,6 +323,8 @@ def _meaning(
             )
         found, seen = [], set()
         for i, text, file_id, locator in rows:
+            if file_ids is not None and file_id not in file_ids:
+                continue
             if language is not None and qs_terms.language(text) != language:
                 continue
             key = _place_key(i, file_id, json.loads(locator))
@@ -312,6 +404,7 @@ def search(
     k: int = 10,
     include_old: bool = False,
     embedder: Embedder | None = None,
+    file_ids: set[str] | None = None,
 ) -> Result:
     """`also` holds the same question in other words (the agent writes the other language). The
     QS terms a query names are also looked up under their other names, Arabic and English."""
@@ -324,7 +417,7 @@ def search(
 
     if exact:
         with rec.read() as conn:
-            scored = _words(conn, f'"{norms[0]}"', include_old, k)
+            scored = _words(conn, f'"{norms[0]}"', include_old, k, file_ids)
             if scored or mode == "exact":
                 return Result("exact", _hits(conn, scored, {i: ("words",) for i, _ in scored}))
 
@@ -345,13 +438,19 @@ def search(
     matches = [(" OR ".join(_quoted(norm)), 1.0) for norm in plan.norms if norm]
     if plan.phrases:  # each name a phrase; its last word may go on ("payment" finds "payments")
         matches.append((" OR ".join(f'"{p}"*' for p in plan.phrases), TERMS_WEIGHT))
+    # A complete phrase/near match outweighs isolated query words.
+    matches += [(" AND ".join(_quoted(norm)), 2.0) for norm in plan.norms if len(norm.split()) > 1]
     lists: list[tuple[str, list[int], float]] = []
     with rec.read() as conn:
         for match, weight in matches:
-            found = _words(conn, match, include_old, LIST_SIZE)
+            found = _words(conn, match, include_old, LIST_SIZE, file_ids)
             lists.append(("words", [chunk_id for chunk_id, _ in found], weight))
         for vector, weight, language in vectors:
-            ids = _meaning(conn, vector, int(embedder.dims), include_old, language)
+            ids = (
+                _meaning(conn, vector, int(embedder.dims), include_old, language)
+                if file_ids is None
+                else _meaning(conn, vector, int(embedder.dims), include_old, language, file_ids)
+            )
             lists.append(("meaning", ids, weight))
         found_by: dict[int, tuple[str, ...]] = {}  # words lists come first, so ("words", "meaning")
         for kind, ids, _ in lists:
@@ -359,6 +458,9 @@ def search(
                 if kind not in found_by.get(i, ()):
                     found_by[i] = (*found_by.get(i, ()), kind)
         fused = rrf([ids for _, ids, _ in lists], weights=[w for *_, w in lists])
-        hits = _distinct_hits(_hits(conn, fused, found_by), k)
+        hits = _distinct_hits(
+            [h for h in _hits(conn, fused, found_by) if file_ids is None or h.file_id in file_ids],
+            k,
+        )
 
     return Result(hybrid, hits[:k])
