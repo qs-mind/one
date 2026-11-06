@@ -179,7 +179,13 @@ export function TopBar(props: TopBarProps) {
       <div className="ms-auto flex shrink-0 items-center gap-2">
         {project &&
           (props.waiting > 0 ? (
-            <button type="button" className={`${button} flex items-center gap-2 text-copper hover:text-copper`} onClick={props.onWaiting}>
+            <button
+              type="button"
+              // below 1000 px the dot is all that shows: its tooltip says what waits
+              title={narrow ? count("decisionsWaiting", props.waiting) : undefined}
+              className={`${button} flex items-center gap-2 text-copper hover:text-copper`}
+              onClick={props.onWaiting}
+            >
               <WaitingDot />
               {/* below 1000 px what is waiting is its dot (the chat button has it too): the words would run into the title */}
               <span className={narrow ? "sr-only" : undefined}>{count("decisionsWaiting", props.waiting)}</span>
@@ -189,7 +195,14 @@ export function TopBar(props: TopBarProps) {
           ))}
         {!narrow && searchField}
         {project && narrow && (
-          <button type="button" data-chat-button aria-expanded={props.chatOpen} className={`${button} flex items-center gap-2`} onClick={props.onChat}>
+          <button
+            type="button"
+            data-chat-button
+            aria-expanded={props.chatOpen}
+            title={props.waiting > 0 ? count("decisionsWaiting", props.waiting) : undefined}
+            className={`${button} flex items-center gap-2`}
+            onClick={props.onChat}
+          >
             {t("projectChat")}
             {props.waiting > 0 && <WaitingDot />}
           </button>

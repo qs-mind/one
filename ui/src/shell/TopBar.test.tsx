@@ -3,7 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { language, setLanguage, texts } from "../i18n";
+import { count, language, setLanguage, texts } from "../i18n";
 import { fakeSources } from "../project/fake";
 import { setCurrentProject } from "../records/project";
 import { resetZoom, zoomIn } from "../ui/scale";
@@ -147,6 +147,26 @@ describe("below 1000 px", () => {
     expect(order.slice(at, at + 2)).toEqual([`${texts.searchField.ar}Ctrl K`, "—"]);
     expect(order).not.toContain(texts.deliverablesButton.ar);
     expect(order).not.toContain(texts.records.ar);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("what is waiting, at 900 px", () => {
+  it("the copper dot has its name and a tooltip that say what waits", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("999px"),
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    setCurrentProject(P1);
+    core();
+    render(<App sourcesFor={() => fakeSources({ status: { waiting: 1 } })} />);
+    const said = count("decisionsWaiting", 1);
+    const dot = await within(topBar()).findByRole("button", { name: said });
+    expect(dot).toHaveAttribute("title", said);
+    const chat = within(topBar()).getByRole("button", { name: texts.projectChat.ar });
+    await waitFor(() => expect(chat).toHaveAttribute("title", said)); // its dot says the same
     vi.unstubAllGlobals();
   });
 });
