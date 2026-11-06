@@ -444,7 +444,7 @@ def stored_cards(brief_id: str, returns: list[tuple[str, str]]) -> list[Data]:
     result text)`: one for each Deliverable it made, as `deliverable_create` showed it."""
     found = []
     for name, text in returns:
-        if name not in ("deliverable_create", "pack_propose"):
+        if name not in ("deliverable_create", "pack_propose", "boq_price_from_sheet"):
             continue
         try:
             out = json.loads(text)
@@ -462,7 +462,12 @@ def unchecked(rec: Records, returns: list[tuple[str, str]]) -> list[DeliverableD
     ids: list[str] = []
     change_ids: list[str] = []
     for name, text in returns:
-        if name not in ("deliverable_create", "deliverable_propose", "pack_propose"):
+        if name not in (
+            "deliverable_create",
+            "deliverable_propose",
+            "pack_propose",
+            "boq_price_from_sheet",
+        ):
             continue
         try:
             out = json.loads(text)
@@ -470,7 +475,9 @@ def unchecked(rec: Records, returns: list[tuple[str, str]]) -> list[DeliverableD
             continue
         if not isinstance(out, dict):
             continue
-        if name in ("deliverable_create", "pack_propose") and isinstance(out.get("id"), str):
+        if name in ("deliverable_create", "pack_propose", "boq_price_from_sheet") and isinstance(
+            out.get("id"), str
+        ):
             ids.append(out["id"])
         elif name == "deliverable_propose" and isinstance(out.get("change_ids"), list):
             change_ids += [c for c in out["change_ids"] if isinstance(c, str)]

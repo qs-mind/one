@@ -84,6 +84,12 @@ def follow(client, saved, path, chat, *, body=None, guard=None, recover=False):
                 kind = event.get("type")
                 if kind == "text-delta":
                     result["reply"] += event["delta"]
+                elif kind == "data-redo":
+                    cut = event["data"]
+                    raw = result["reply"].encode("utf-16-le")
+                    result["reply"] = (raw[: 2 * cut["from"]] + raw[2 * cut["to"] :]).decode(
+                        "utf-16-le"
+                    )
                 elif kind == "data-card":
                     card = event["data"] | {"id": event["id"], "chat": chat}
                     if not (card["id"] in settled and card.get("status") == "pending"):

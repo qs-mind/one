@@ -6,6 +6,8 @@ Scripted models make exactly the mistakes gemini-3.1-flash-lite made on the tend
 
 # ruff: noqa: F811 (the engine fixtures, imported)
 
+import asyncio
+
 from qsone.engine.runner import _stored_events
 from qsone.engine.types import Data, Progress, TextDelta
 from qsone.records import ledger
@@ -146,3 +148,38 @@ async def test_the_work_log_names_an_item_by_its_code(make_engine, project, regi
     events = await finish(engine, await engine.start_brief(project, "البند الأول متسعّر؟"))
     [step] = [e for e in events if isinstance(e, Progress) and e.tool]
     assert "01-01-001" in step.text["ar"] and item not in step.text["ar"]
+
+
+async def test_unread_citation_cannot_be_laundered_by_project_text(make_engine, project, registry):
+    from qsone.records.files import add_file
+    from tests.samples import sample_pdf
+
+    rec = registry.get(project)
+    file = add_file(
+        rec,
+        "sample-contract.pdf",
+        sample_pdf([["Sample terms"], ["Security 350000 USD"]]),
+        actor="t",
+    )
+    lead = scripted(
+        call("files_read", {"file_id": file.id, "pages": "1"}),
+        said("Security is 350,000 USD, page 2."),
+        said("Security is 350,000 USD, page 2."),
+    )
+    engine = await started(make_engine(links(lead=lead)))
+    events = await asyncio.wait_for(
+        finish(engine, await engine.start_brief(project, "What is the security?")), 10
+    )
+    assert "not read in this Brief" in str(lead.seen[-1])
+    assert "350,000" not in reply(events)
+
+
+async def test_import_offer_is_routed_back_to_rows_card(make_engine, project):
+    lead = scripted(
+        said("I am ready to import the BOQ. Please confirm if I should proceed."),
+        said("I could not find the BOQ file."),
+    )
+    engine = await started(make_engine(links(lead=lead)))
+    await asyncio.wait_for(finish(engine, await engine.start_brief(project, "Import the BOQ.")), 10)
+    assert "boq_import" in str(lead.seen[1])
+    assert "rows card" in str(lead.seen[1])

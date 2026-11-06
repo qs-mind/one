@@ -1,6 +1,31 @@
 """CLI-only copy. Core replies keep their own bilingual copy."""
 
 TEXT = {
+    "review_unresolved": {
+        "en": (
+            "A blocking comment needs an accepted linked fix "
+            "and a current Code A or B check before closing."
+        ),
+        "ar": (
+            "الملاحظة المانعة محتاجة تعديل مقبول مربوط بيها ومراجعة حالية كود A أو B قبل ما تتقفل."
+        ),
+    },
+    "mode_not_defined": {
+        "en": "This walk does not define steps for the session's mode.",
+        "ar": "السيناريو ده مفيهوش خطوات لنوع الجلسة دي.",
+    },
+    "deliverable_missing": {
+        "en": "No Deliverable matches this step. Inspect the preceding Brief and its errors.",
+        "ar": "مفيش مُخرج مطابق للخطوة دي. راجع الطلب اللي قبلها وأخطاءه.",
+    },
+    "brief_failed": {
+        "en": "The Brief failed without a recorded error. Inspect this session's core.log.",
+        "ar": "الطلب فشل من غير رسالة خطأ مسجلة. راجع core.log بتاع الجلسة دي.",
+    },
+    "request_timeout": {
+        "en": "The core request timed out. Inspect core.log before retrying the step.",
+        "ar": "وقت طلب ONE خلص. راجع core.log قبل ما تعيد الخطوة.",
+    },
     "costs_unavailable": {
         "en": "Cost records could not be read. This step failed; no money cap was inferred.",
         "ar": "مقدرناش نقرا سجل التكلفة. الخطوة فشلت؛ ده مش معناه إن حد التكلفة اتوصل له.",

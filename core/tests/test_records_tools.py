@@ -462,3 +462,28 @@ def test_descriptions_are_short_recipes_with_an_example():
         doc = REGISTRY[name].description
         assert len(doc.split()) <= 120, (name, len(doc.split()))
         assert "\nExample:\n" in doc and doc.rstrip().endswith("}"), name
+
+
+@pytest.mark.anyio
+async def test_search_rejects_boolean_syntax_with_actionable_alternatives(ctx):
+    with pytest.raises(ModelRetry, match="also"):
+        await call("search_records", {"query": '"Delay Damages" OR "Liquidated Damages"'}, ctx)
+
+
+@pytest.mark.anyio
+async def test_search_all_terms_finds_the_requested_date_not_an_earlier_price(ctx, rec):
+    add_file(
+        rec,
+        "sample.csv",
+        "Date,Material,Price\n2025 / 09,الحديد,100\n2026 / 09,الحديد,200\n".encode(),
+        actor="t",
+    )
+    out = await call(
+        "search_records",
+        {"query": "الحديد", "all_terms": ["2026 / 09"]},
+        ctx,
+    )
+    result = json.loads(out.splitlines()[1])
+    assert len(result["hits"]) == 1
+    assert "200" in result["hits"][0]["text"]
+    assert result["hits"][0]["locator"]["line"] == 3

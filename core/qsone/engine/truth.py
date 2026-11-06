@@ -397,7 +397,7 @@ _CLAIMS = (  # (words, the tools that do it, what it is in the engineer's words)
         _PRICED_DONE,
         frozenset(
             {"record_number", "correct_number", "deliverable_create", "deliverable_propose",
-             "make_deliverable", "calculate", "prices_propose"}
+             "make_deliverable", "calculate", "prices_propose", "boq_price_from_sheet"}
         ),
         copy.CLAIM_PRICED,
     ),
@@ -585,6 +585,21 @@ def reply_problems(
                 "ONE's records (ledger_numbers, deliverable_read) or say plainly that the value "
                 "is missing. Never send a bracketed placeholder.",
                 copy.fill(copy.TRUTH_PLACEHOLDER, blanks=copy.listed(blanks)),
+            )
+        )
+    if (
+        re.search(r"\bimport\b|استورد", engineer_text, re.I)
+        and not (cov and cov.items)
+        and "boq_import" not in did.done
+        and re.search(r"confirm|proceed|shall I|تأكيد|أبدأ|ابدأ|اوافق|توافق", text, re.I)
+    ):
+        found.append(
+            Problem(
+                "import_card",
+                "The engineer already requested import. Call boq_preview then boq_import "
+                "now: boq_import shows ONE's rows card for column approval. "
+                "Never ask for plain-text "
+                "confirmation instead of the rows card. If the file is missing, say that plainly.",
             )
         )
     said = promise(text, did)
@@ -802,6 +817,10 @@ _PAGE = re.compile(
     r"|\((?:p|pp)\.?\s*(?P<pp>[0-9]+)",
     re.I,
 )
+_BARE_ROW = re.compile(
+    r"(?<!\w)(?:row|الصف|صف|السطر|سطر)\s*[:：]?\s*(?P<rows>[0-9٠-٩]+)",
+    re.I,
+)
 # A segment: a line, or a sentence of one; a decimal point («0.2», «17.1») never ends one.
 _SEGMENT = re.compile(r"(?<=[!?؟])\s+|(?<=\.)(?![0-9])\s+|\n+")
 _NUMS = re.compile(r"[0-9٠-٩]+")
@@ -814,8 +833,12 @@ class Place:
     sheet: str | None
     rows: tuple[int, ...] = ()
     pages: tuple[int, ...] = ()
+    file_name: str | None = None
 
     def words(self) -> dict:
+        if self.sheet == "":
+            rows = "/".join(map(str, self.rows))
+            return {"en": f"row {rows}", "ar": f"صف {rows}"}
         if self.sheet is not None:
             rows = "/".join(map(str, self.rows))
             return {
@@ -831,10 +854,14 @@ def _numbers_of(text: str) -> tuple[int, ...]:
 
 
 def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]:
-    """Each segment of a reply that cites a place, with its places and the numbers it gives
-    there: (segment, places, [(written, value)]). The citation's own numbers do not count."""
-    found = []
-    for segment in _SEGMENT.split(text or ""):
+    """Citations beside values, above a list, or in an explicit trailing Source line.
+
+    A new citation ends the previous scope. A trailing Source line applies only to the
+    preceding uncited lines, never across another citation. Markdown emphasis is presentation.
+    """
+    segments = _SEGMENT.split(re.sub(r"[*`]+", "", text or ""))
+    parsed = []
+    for segment in segments:
         places: list[Place] = []
         blank = segment
         for pattern in (_SHEET_ROW, _ROW_SHEET):
@@ -844,9 +871,28 @@ def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]
         for m in _PAGE.finditer(blank):
             places.append(Place(None, pages=_numbers_of(m["pages"] or m["pp"])))
             blank = blank.replace(m[0], " " * len(m[0]))
+        for m in _BARE_ROW.finditer(blank):
+            places.append(Place("", rows=_numbers_of(m["rows"])))
+            blank = blank.replace(m[0], " " * len(m[0]))
+        filename = re.search(r"[\w-]+\.(?:pdf|xlsx?|docx?|csv)\b", segment, re.I)
+        if filename:
+            places = [Place(p.sheet, p.rows, p.pages, filename[0]) for p in places]
+        parsed.append([segment, places, list(numbers_guard._counted(blank))])
+    active = []
+    pending = []
+    for entry in parsed:
+        segment, places, numbers = entry
         if places:
-            found.append((segment, places, list(numbers_guard._counted(blank))))
-    return found
+            if re.match(r"\s*(?:source|المصدر)\s*[:：]", segment, re.I):
+                for prior in pending:
+                    prior[1] = places
+            active = places
+            pending = []
+        elif active:
+            entry[1] = active
+        else:
+            pending.append(entry)
+    return [(segment, places, numbers) for segment, places, numbers in parsed if places]
 
 
 def _sheet_names(conn) -> dict[str, list[str]]:
@@ -879,6 +925,14 @@ def _sheet_of(conn, cited: str) -> list[str]:
 
 def place_text(conn, place: Place) -> list[str] | None:
     """The current files' text at `place`; None when no file has that place."""
+    if place.sheet == "":
+        rows = conn.execute(
+            "SELECT c.text FROM chunks c JOIN files f ON f.id = c.file_id"
+            " WHERE f.valid_until IS NULL AND json_extract(c.locator, '$.line') IN"
+            " (SELECT value FROM json_each(?))",
+            (json.dumps(list(place.rows)),),
+        ).fetchall()
+        return [t for (t,) in rows] or None
     if place.sheet is not None:
         sheets = _sheet_of(conn, place.sheet)
         if not sheets:
@@ -1203,3 +1257,92 @@ _BID_FIELDS = (
     ),
     ("signature", re.compile(r"التوقيع|توقيع|\bsignature\b|\bsigned\b", re.I)),
 )
+
+
+def read_passages(returns: list[tuple[str, str]]) -> list[tuple[str, dict, str]]:
+    """Only text actually returned by full read tools, not search hits or files in storage.
+
+    Parse the read tools' own locator lines. A continuation contributes only its returned
+    lines; neither a requested page range nor a source footer proves the text was returned.
+    """
+    found = []
+    decoder = json.JSONDecoder()
+    for name, result in returns:
+        if name not in {"files_read", "read_chunk"}:
+            continue
+        file, locator, lines, file_name = None, None, [], None
+
+        def flush(file, locator, lines, file_name):
+            text = "\n".join(lines).strip()
+            if file and locator and text and text != "[no text on this page]":
+                found.append((file, locator | {"_file_name": file_name}, text))
+
+        for line in result.splitlines():
+            if line.startswith("sources:") or line.startswith("<</data"):
+                break
+            if line.startswith("file_id: "):
+                file = line[9:].split(" |", 1)[0]
+                named = re.search(r"(?:^| \| )file: (.*?)(?: \||$)", line)
+                file_name = named[1] if named else None
+            if line.startswith("{"):
+                try:
+                    data, end = decoder.raw_decode(line)
+                except ValueError:
+                    data = {}
+                if isinstance(data, dict) and (
+                    "locator" in data or any(k in data for k in _PLACE_KEYS)
+                ):
+                    flush(file, locator, lines, file_name)
+                    file = data.get("file_id", file)
+                    file_name = data.get("file", file_name)
+                    locator = data.get("locator", data)
+                    lines = [line[end:].strip()]
+                    continue
+            if locator:
+                lines.append(line)
+        flush(file, locator, lines, file_name)
+    return found
+
+
+def unread_citations(text: str, returns: list[tuple[str, str]]) -> list[Problem]:
+    """A cited place must occur in this Brief's returned text, including specialists' reads."""
+    passages = read_passages(returns)
+    problems = []
+    for _, places, numbers in citations(text):
+        for place in places:
+
+            def matches(loc, coordinate, place=place):
+                if place.file_name and loc.get("_file_name") != place.file_name:
+                    return False
+                if place.sheet == "":
+                    return loc.get("line") == coordinate
+                if place.sheet is not None:
+                    return (
+                        str(loc.get("sheet", "")).strip().casefold()
+                        == place.sheet.strip().casefold()
+                        and loc.get("row") == coordinate
+                    )
+                return loc.get("page") == coordinate
+
+            coordinates = place.rows if place.sheet is not None else place.pages
+            read_text = [
+                words for _, loc, words in passages if any(matches(loc, n) for n in coordinates)
+            ]
+            have = numbers_guard.known_values(read_text)
+            if not all(any(matches(loc, n) for _, loc, _ in passages) for n in coordinates) or any(
+                value not in have for _, value in numbers
+            ):
+                where = place.words()
+                if any(p.fix.startswith(where["en"] + " was") for p in problems):
+                    continue
+                problems.append(
+                    Problem(
+                        "unread_citation",
+                        where["en"]
+                        + " was not read in this Brief. Read it with files_read or read_chunk "
+                        "before citing it; if unavailable, remove that claim "
+                        "and say what is missing.",
+                        copy.fill(copy.TRUTH_UNREAD_PLACE, place=where),
+                    )
+                )
+    return problems
