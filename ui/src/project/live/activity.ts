@@ -38,8 +38,6 @@ let desks = new Set<string>();
 let waiting: number | null = null;
 let leadState: "idle" | "thinking" = "idle";
 let list: readonly LiveAgent[] = [chatLeads.idle];
-let counts: ReadonlyMap<string, { members: number; working: number }> = new Map();
-let countsKey = "";
 const lastHeard = new Map<string, number>();
 let queue: ActivityEvent[] = [];
 let frame: number | undefined;
@@ -62,17 +60,6 @@ export function subscribeChanges(listener: (changes: Change[]) => void): () => v
 function publish(changes: Change[] = []) {
   const all = [...agents.values()];
   list = all.some((a) => a.kind === "lead") ? all : [chatLeads[leadState], ...all];
-  const next = new Map<string, { members: number; working: number }>();
-  for (const a of all) {
-    if (a.desk_id === null) continue;
-    const c = next.get(a.desk_id) ?? { members: 0, working: 0 };
-    next.set(a.desk_id, { members: c.members + 1, working: c.working + (busy(a) ? 1 : 0) });
-  }
-  const key = [...next].map(([id, c]) => `${id}:${c.members}:${c.working}`).join("|");
-  if (key !== countsKey) {
-    countsKey = key;
-    counts = next;
-  }
   for (const listener of [...listeners]) listener();
   if (changes.length) for (const listener of [...changeListeners]) listener(changes);
 }
@@ -214,11 +201,6 @@ export function leadFromChat(thinking: boolean) {
   if (next === leadState) return;
   leadState = next;
   publish();
-}
-
-/** Each Desk's members and how many of them are working, for the folded Desk line ("Pricing Desk: 2 working"). */
-export function deskCounts(): ReadonlyMap<string, { members: number; working: number }> {
-  return counts;
 }
 
 // Hooks -----------------------------------------------------------------------------------------------------------

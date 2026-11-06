@@ -4,7 +4,6 @@ import { texts } from "../../i18n";
 import { fakeSources } from "../fake";
 import type { AgentInfo, Team } from "../types";
 import {
-  deskCounts,
   leadFromChat,
   NO_NEWS_MS,
   startActivity,
@@ -164,20 +163,6 @@ describe("the live store", () => {
     const { result } = renderHook(() => useTeamAgents());
     expect(result.current.map((a) => a.id)).toContain("lost");
     expect(result.current.map((a) => a.id)).not.toContain("est");
-  });
-
-  it("Desk counts change only when membership or work changes", async () => {
-    const run = start({ desks: [desk], agents: [agent("est"), agent("idle", { state: "waiting" })] });
-    stops.push(run.stop);
-    await settle();
-    const first = deskCounts();
-    expect(first.get("pricing")).toEqual({ members: 2, working: 1 });
-    act(() => run.fake.emit({ type: "agent", agent: agent("est", { focus: { frame: "deliverable:x", anchor: null } }) }));
-    await settle();
-    expect(deskCounts()).toBe(first);
-    act(() => run.fake.emit({ type: "agent", agent: agent("idle", { state: "thinking" }) }));
-    await settle();
-    expect(deskCounts().get("pricing")).toEqual({ members: 2, working: 2 });
   });
 
   it("counts the cards waiting for the engineer", async () => {
