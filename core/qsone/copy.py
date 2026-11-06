@@ -566,6 +566,7 @@ TOOL_WORDS = {
     "find_items": {"en": "Looking up items", "ar": "بيدوّر على بنود"},
     "hand_to_project": {"en": "Passing the work to a project", "ar": "بيحوّل الشغل لمشروع"},
     "ledger_numbers": {"en": "Reading the project's numbers", "ar": "بيقرا أرقام المشروع"},
+    "rank_items": {"en": "Sorting the project's items", "ar": "بيرتّب بنود المشروع"},
     "make_deliverable": {"en": "Making a Deliverable", "ar": "بيعمل مُخرج"},
     "note_lesson": {"en": "Noting a lesson learned", "ar": "بيسجّل درس مستفاد"},
     "offer_new_project": {"en": "Suggesting a new project", "ar": "بيقترح مشروع جديد"},
@@ -620,6 +621,10 @@ TOOL_FIND_ITEMS = {
     "ar": "بيدوّر على بنود في سجل المصادر",
 }
 
+TOOL_RANK_ITEMS = {
+    "en": "Finding the top {top} items by {name}",
+    "ar": "بيطلّع أعلى {top} بنود في {name}",
+}
 TOOL_LEDGER_NUMBERS = {
     "en": "Reading the numbers of item {item}",
     "ar": "بيقرا أرقام البند {item}",

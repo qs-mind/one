@@ -22,6 +22,7 @@ import asyncio
 import json
 import re
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 from uuid import uuid4
 
@@ -303,6 +304,87 @@ def _numbers(rec: Records, ref: str) -> str:
 
 async def _ledger_numbers(ctx: ToolContext, args: ItemArgs) -> str:
     return await asyncio.to_thread(_numbers, _project(ctx), args.item)
+
+
+class RankArgs(_Args):
+    name: str = Field("amount", min_length=1, max_length=64)
+    top: int = Field(10, ge=1, le=50)
+    order: Literal["highest", "lowest"] = "highest"
+    kind: str = Field("boq_item", min_length=1, max_length=64)
+    code_prefix: str | None = Field(None, min_length=1, max_length=100)
+
+
+_RANK_EXAMPLE = {"name": "amount", "top": 5}
+
+_RANK_DOC = f"""The items with the highest (or lowest) current number of one name, in \
+one call: the top items of the BOQ by amount, the dearest rates. Each comes with its code, \
+description, number_id, exact value, unit, currency and source; and how many items have no \
+such number (with their first codes).
+- name: amount by default; rate, quantity, or another. top: 1 to 50. order: highest or lowest.
+- kind: boq_item by default. code_prefix: one section only.
+A total is worked out with calculate, from the number_ids.
+Example:
+{_json(_RANK_EXAMPLE)}"""
+
+_MISSING_SHOWN = 10
+
+
+def _rank(rec: Records, args: RankArgs) -> str:
+    where, values = ["i.kind = ?"], [args.kind]
+    if args.code_prefix is not None:
+        where.append("substr(i.code, 1, ?) = ?")
+        values += [len(args.code_prefix), args.code_prefix]
+    sql = " AND ".join(where)
+    with rec.read() as conn:
+        rows = conn.execute(
+            "SELECT i.id, i.code, i.fields, n.id, n.value, n.unit, n.currency, n.dated,"
+            " s.id, s.kind, s.title, s.file_id, s.locator FROM items i"
+            " JOIN numbers n ON n.item_id = i.id AND n.name = ? AND n.valid_until IS NULL"
+            f" JOIN sources s ON s.id = n.source_id WHERE {sql}",
+            (args.name, *values),
+        ).fetchall()
+        missing = conn.execute(
+            f"SELECT i.code FROM items i WHERE {sql} AND NOT EXISTS (SELECT 1 FROM numbers n"
+            " WHERE n.item_id = i.id AND n.name = ? AND n.valid_until IS NULL)"
+            " ORDER BY i.code COLLATE NOCASE, i.rowid",
+            (*values, args.name),
+        ).fetchall()
+
+    def size(row) -> Decimal:
+        try:
+            return Decimal(str(row[4]))
+        except ArithmeticError:
+            return Decimal("-Infinity") if args.order == "highest" else Decimal("Infinity")
+
+    rows.sort(key=size, reverse=args.order == "highest")
+    found = []
+    for item_id, code, fields, n_id, value, unit, currency, dated, *source in rows[: args.top]:
+        s_id, kind, title, f_id, loc = source
+        found.append(
+            {
+                "item_id": item_id,
+                "code": code,
+                "description": json.loads(fields).get("description"),
+                "number_id": n_id,
+                "value": value,
+                "unit": unit,
+                "currency": currency,
+                "dated": dated,
+                "source": {
+                    "id": s_id,
+                    "kind": kind,
+                    "title": title,
+                    "file_id": f_id,
+                    "locator": json.loads(loc),
+                },
+            }
+        )
+    gaps = {"count": len(missing), "codes": [c for (c,) in missing[:_MISSING_SHOWN]]}
+    return _json({"items": found, "with_number": len(rows), "missing": gaps})
+
+
+async def _rank_items(ctx: ToolContext, args: RankArgs) -> str:
+    return await asyncio.to_thread(_rank, _project(ctx), args)
 
 
 # Writing to the Source Ledger ------------------------------------------------------------------
@@ -956,6 +1038,15 @@ for _tool in (
         example=_NUMBERS_EXAMPLE,
     ),
     Tool(
+        "rank_items",
+        _RANK_DOC,
+        RankArgs,
+        "read",
+        _rank_items,
+        lambda a: copy.fill(copy.TOOL_RANK_ITEMS, top=str(a.top), name=_field(a.name)),
+        example=_RANK_EXAMPLE,
+    ),
+    Tool(
         "add_source",
         _SOURCE_DOC,
         SourceArgs,
@@ -1004,6 +1095,7 @@ RECORDS_TOOLS: tuple[str, ...] = (
     "read_chunk",
     "find_items",
     "ledger_numbers",
+    "rank_items",
     "add_source",
     "add_item",
     "record_number",
