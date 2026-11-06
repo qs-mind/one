@@ -39,7 +39,12 @@ export function Mark({ draw = false, size = 24, className = "shrink-0" }: { draw
       className={className}
       data-mark=""
       data-draw={draw ? "" : undefined}
-      style={draw ? ({ "--line-ms": `${LINE_MS}ms`, "--fill-at": `${DRAW_MS}ms`, "--fill-ms": `${FILL_MS}ms` } as CSSProperties) : undefined}
+      // drawn in rem, so it follows the screen's scale (ui/scale.ts); `size` is its px at 100 %
+      style={{
+        width: `${size / 16}rem`,
+        height: `${size / 16}rem`,
+        ...(draw ? ({ "--line-ms": `${LINE_MS}ms`, "--fill-at": `${DRAW_MS}ms`, "--fill-ms": `${FILL_MS}ms` } as CSSProperties) : {}),
+      }}
     >
       <defs>
         <linearGradient id={face} x1="0" y1="0" x2="1" y2="1">

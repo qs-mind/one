@@ -14,7 +14,7 @@ export const ACTIVITY_WORD: Record<ActivityState, keyof typeof texts> = {
   done: "activityDone",
 };
 
-const dot = "inline-block size-[7px] shrink-0 rounded-full";
+const dot = "inline-block size-[0.4375rem] shrink-0 rounded-full";
 
 export function ActivityMark({ state, label }: { state: ActivityState; label?: string }) {
   const reduced = useReducedMotion();

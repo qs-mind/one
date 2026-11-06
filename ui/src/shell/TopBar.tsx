@@ -20,6 +20,7 @@ import { chooseFolder } from "../import/FolderDrop";
 import { count, fill, language, setLanguage, t, useLanguage } from "../i18n";
 import type { Project } from "../records/project";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { resetZoom, useZoom, zoomIn, zoomOut, ZOOMS } from "../ui/scale";
 import { centreOf, withTransition } from "../ui/viewTransition";
 import { ActivityMark, activityWord } from "./ActivityMark";
 import { WaitingDot } from "./ChatPanel";
@@ -244,6 +245,7 @@ export function TopBar(props: TopBarProps) {
             <hr className="mx-3 my-1 border-ink/[0.06]" />
             {ai(more.current)}
             <PopoverClose asChild>{otherLanguage}</PopoverClose>
+            <ZoomRow />
             <PopoverClose asChild>
               <button type="button" title={t("setupAgainHelp")} className={button} onClick={() => openSetup()}>
                 {t("setupAgain")}
@@ -253,5 +255,45 @@ export function TopBar(props: TopBarProps) {
         </Popover>
       </div>
     </header>
+  );
+}
+
+const zoomStep = "tap flex size-7 items-center justify-center rounded-lg hover:bg-stone hover:text-ink focus-visible:outline-2 focus-visible:outline-ink";
+
+/** More's zoom row: the engineer's zoom now, with − and + (steps of 10 %, 80 % to 150 %); the figure resets it. It
+ * stays open while stepping, so the screen can be watched as it changes. */
+function ZoomRow() {
+  useLanguage();
+  const zoom = useZoom();
+  return (
+    <div data-zoom className="flex items-center justify-between gap-3 py-0.5 ps-3 pe-1 text-ink">
+      <span>{t("zoom")}</span>
+      {/* − figure +, in that order in both languages, as a figure reads */}
+      <span dir="ltr" className="flex items-center gap-1">
+        <button type="button" aria-label={t("zoomOut")} title={t("zoomOut")} disabled={zoom <= ZOOMS[0]} className={zoomStep} onClick={zoomOut}>
+          −
+        </button>
+        <button
+          type="button"
+          data-zoom-reset
+          aria-label={`${t("zoomReset")} (${Math.round(zoom * 100)}%)`}
+          title={t("zoomReset")}
+          className="min-w-12 rounded-lg px-1 py-0.5 text-center tabular-nums hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+          onClick={resetZoom}
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          type="button"
+          aria-label={t("zoomIn")}
+          title={t("zoomIn")}
+          disabled={zoom >= ZOOMS[ZOOMS.length - 1]!}
+          className={zoomStep}
+          onClick={zoomIn}
+        >
+          +
+        </button>
+      </span>
+    </div>
   );
 }

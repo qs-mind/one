@@ -5,6 +5,7 @@ import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { api, inInstalledApp } from "../api";
 import { systemLanguage } from "../firstlaunch/FirstLaunch";
 import { type Language, savedLanguage, t } from "../i18n";
+import { loadZoom } from "../ui/scale";
 import { SLOW_MS, StartScreen } from "./StartScreen";
 
 // Set by the dev server (scripts/core-dev.ts); the installed app asks the shell, which started the core.
@@ -93,6 +94,8 @@ export function HealthGate({ children, logPath }: { children: ReactNode; logPath
         .then((response) => response.ok)
         .catch(() => false);
     }
+    // the engineer's zoom, before ONE opens: the screen comes at its size, never jumping to it
+    if (up) await loadZoom();
     clearTimeout(slow.current);
     setState(up ? "up" : "down");
   }, [logPath]);

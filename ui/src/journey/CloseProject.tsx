@@ -183,7 +183,7 @@ export function CloseProject({
                       <button
                         type="button"
                         onClick={() => onOpenDeliverable(d.id)}
-                        className="-ms-3 flex w-[calc(100%+12px)] flex-col items-start gap-0.5 rounded-md px-3 py-1.5 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+                        className="-ms-3 flex w-[calc(100%+0.75rem)] flex-col items-start gap-0.5 rounded-md px-3 py-1.5 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
                       >
                         <span dir="auto" className="underline decoration-slate/40 underline-offset-4">
                           {d.name}
@@ -216,7 +216,7 @@ export function CloseProject({
                       <button
                         type="button"
                         onClick={() => onOpenDeliverable(r.id)}
-                        className="-ms-3 flex w-[calc(100%+12px)] items-baseline gap-2 rounded-md px-3 py-1.5 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
+                        className="-ms-3 flex w-[calc(100%+0.75rem)] items-baseline gap-2 rounded-md px-3 py-1.5 text-start hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink"
                       >
                         <span dir="auto" className="min-w-0 truncate underline decoration-slate/40 underline-offset-4">
                           {r.name}

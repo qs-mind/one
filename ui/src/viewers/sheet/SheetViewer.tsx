@@ -13,6 +13,7 @@ import { cellKey, cellName, commentMarks, pendingCells, SheetCell } from "./cell
 import { formatDecimal } from "./format";
 import { loadCollapsed, saveCollapsed, visibleRows } from "./collapse";
 import { Grid, type GridHandle, type SheetColumn } from "./grid";
+import { useSizes } from "../../ui/scale";
 import { COMPACT_PAD, linesHeight, makeMeasure, oneLineWidth, rowHeight, shownWidth, titleColumnOf } from "./heights";
 import { normalised, type Cell, type Range } from "./selection";
 import { SourcePopover } from "./SourcePopover";
@@ -95,7 +96,10 @@ export function SheetViewer(props: SheetViewerProps) {
   // the open document is denser: 32 px one-line rows under a 36 px header, so more of the bill shows
   const dense = props.mode === "workspace";
   const pad = dense ? COMPACT_PAD : undefined;
-  const headerH = dense ? DENSE_HEADER_H : HEADER_H;
+  // every px here is at 100 %, drawn at the screen's scale (ui/scale.ts), so the rows line up with their cells
+  const sizes = useSizes();
+  const { space, text: textSize } = sizes;
+  const headerH = (dense ? DENSE_HEADER_H : HEADER_H) * space;
   // In full mode the sheet fills the board's width: the room the columns leave goes to the description, so no empty
   // band sits beside the last column (the rows then need fewer lines). In a frame the columns keep their widths.
   const gridBox = useRef<HTMLDivElement>(null);
@@ -103,10 +107,10 @@ export function SheetViewer(props: SheetViewerProps) {
   useEffect(() => {
     const el = gridBox.current;
     if (!full || !el || typeof ResizeObserver === "undefined") return;
-    const sizes = new ResizeObserver(() => setRoom(el.clientWidth));
-    sizes.observe(el);
+    const observer = new ResizeObserver(() => setRoom(el.clientWidth));
+    observer.observe(el);
     setRoom(el.clientWidth);
-    return () => sizes.disconnect();
+    return () => observer.disconnect();
   }, [full]);
 
   // Row heights and one-line widths in the real font once it has loaded.
@@ -128,13 +132,14 @@ export function SheetViewer(props: SheetViewerProps) {
     const totalText = view.total ? [formatDecimal(view.total.value, view.total.currency ? 2 : undefined)] : [];
     const ordered = [...view.columns.filter((c) => c.frozen), ...view.columns.filter((c) => !c.frozen)].map((c) => ({
       ...c,
-      width: oneLineWidth(c, pick(c.label, view.language), view.rows, measure, c.kind === "calc" ? totalText : []),
+      width: oneLineWidth(c, pick(c.label, view.language), view.rows, measure, c.kind === "calc" ? totalText : [], sizes),
     }));
     const title = titleColumnOf(ordered);
-    const extra = room - ordered.reduce((sum, c) => sum + shownWidth(c.width), 0) - SCROLLBAR;
+    // in the Deliverable's units (at 100 %), as the widths are
+    const extra = Math.floor((room - SCROLLBAR) / space - ordered.reduce((sum, c) => sum + shownWidth(c.width), 0));
     if (!full || !title || room <= 0 || extra === 0) return ordered;
     return ordered.map((c) => (c.key === title ? { ...c, width: Math.max(c.width + extra, Math.min(c.width, TITLE_MIN)) } : c));
-  }, [view.columns, view.rows, view.total, view.language, full, room, measure, fontsLoaded]);
+  }, [view.columns, view.rows, view.total, view.language, full, room, measure, fontsLoaded, space, textSize]);
   const byKey = useMemo(() => new Map(columns.map((c) => [c.key, c])), [columns]);
   const titleColumn = titleColumnOf(columns);
   const gridColumns = useMemo<SheetColumn[]>(
@@ -185,11 +190,11 @@ export function SheetViewer(props: SheetViewerProps) {
     void fontsLoaded;
     const changed = new Set([...pending.keys()].map((k) => k.split("\u0000")[0]));
     return new Map(
-      rows.map((r) => [r.id, Math.max(rowHeight(r, columns, measure, pad), changed.has(r.id) ? linesHeight(2, pad) : 0)]),
+      rows.map((r) => [r.id, Math.max(rowHeight(r, columns, measure, pad, sizes), changed.has(r.id) ? linesHeight(2, pad, sizes) : 0)]),
     );
-  }, [rows, columns, measure, pending, fontsLoaded, pad]);
+  }, [rows, columns, measure, pending, fontsLoaded, pad, space, textSize]);
   const contentHeight =
-    headerH + [...heights.values()].reduce((sum, h) => sum + h, 0) + (view.total ? TOTAL_H : 0) + SCROLLBAR;
+    headerH + [...heights.values()].reduce((sum, h) => sum + h, 0) + (view.total ? TOTAL_H * space : 0) + SCROLLBAR;
 
   const [selection, setSelection] = useState<Range | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -455,8 +460,9 @@ export function SheetViewer(props: SheetViewerProps) {
           columns={gridColumns}
           rows={rows}
           direction={direction}
-          rowHeight={(row) => heights.get(row.id) ?? linesHeight(1, pad)}
+          rowHeight={(row) => heights.get(row.id) ?? linesHeight(1, pad, sizes)}
           headerHeight={headerH}
+          summaryHeight={TOTAL_H * sizes.space}
           rowClass={props.review ? rowClass : undefined}
           renderCell={renderCell}
           canEdit={canEdit}

@@ -7,7 +7,7 @@
 // document the window's width.
 import { expect, test, type Locator } from "@playwright/test";
 import { count, texts } from "../src/i18n";
-import { documentRegion, mockCore, openDocument, shownWhole, small, switcher, workspaceReady } from "./fixtures";
+import { documentRegion, mockCore, openDocument, scaleOf, shownWhole, small, switcher, workspaceReady } from "./fixtures";
 
 type Box = { x: number; y: number; width: number; height: number };
 const box = async (l: Locator) => (await l.boundingBox())!;
@@ -28,11 +28,14 @@ for (const language of ["ar", "en"] as const) {
     expect(overlaps(sheet, chat)).toBe(false);
     if (language === "ar") expect(sheet.x).toBeGreaterThan(chat.x);
     else expect(sheet.x).toBeLessThan(chat.x);
-    // dense: 8 px under the top bar and above the window's foot, 12 px from the window's side
-    expect(Math.abs(sheet.y - (bar.y + bar.height) - 8)).toBeLessThanOrEqual(1);
-    expect(Math.abs(900 - (sheet.y + sheet.height) - 8)).toBeLessThanOrEqual(1);
+    // dense: 8 px under the top bar and above the window's foot, 12 px from the window's side, at 100 %; at 1440×900
+    // every size is at the screen's scale (ui/src/ui/scale.ts: 85 %)
+    const scale = await scaleOf(page);
+    expect(scale).toBeCloseTo(0.85, 3);
+    expect(Math.abs(sheet.y - (bar.y + bar.height) - 8 * scale)).toBeLessThanOrEqual(1);
+    expect(Math.abs(900 - (sheet.y + sheet.height) - 8 * scale)).toBeLessThanOrEqual(1);
     const side = language === "ar" ? 1440 - (sheet.x + sheet.width) : sheet.x;
-    expect(Math.abs(side - 12)).toBeLessThanOrEqual(1);
+    expect(Math.abs(side - 12 * scale)).toBeLessThanOrEqual(1);
     // the document's title is in the top bar, after the project's name; its state beside it
     await expect(switcher(page)).toContainText("تسعير المقايسة - عينة");
     await expect(page.locator('[data-region="topbar"]')).toContainText(texts.sampleNumbers[language]);
@@ -141,8 +144,8 @@ for (const language of ["ar", "en"] as const) {
       if (width >= 1000) await expect(bar).toContainText(count("decisionsWaiting", 1, {}, language));
       await expect(label).toContainText(texts.sampleNumbers[language]);
       expect(await shownWhole(label), "«الأرقام عينة» is seen whole").toBe(true);
-      // the title keeps a few words: its button never shrinks to the ▾ alone
-      expect((await box(switcher(page))).width, "the title keeps a few words").toBeGreaterThanOrEqual(80);
+      // the title keeps a few words: its button never shrinks to the ▾ alone (80 px at 100 %, at the screen's scale)
+      expect((await box(switcher(page))).width, "the title keeps a few words").toBeGreaterThanOrEqual(80 * (await scaleOf(page)));
     });
 
   test(`a document picked from the switcher shows in place, is kept, and Back returns, ${language}`, async ({ page }) => {

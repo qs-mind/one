@@ -4,6 +4,7 @@
 import { type CSSProperties, useMemo, useRef, useState } from "react";
 import type { NumberCell } from "../../../deliverables/types";
 import { t, useLanguage } from "../../../i18n";
+import { scaled } from "../../../ui/scale";
 import { SourcePopover } from "../../../viewers/sheet/SourcePopover";
 import { baseDirection } from "../../bidi";
 import { BlockBoundary } from "./BlockBoundary";
@@ -13,7 +14,7 @@ import { viewBlocks } from "./registry";
 import type { ViewBlock, ViewData } from "./types";
 import { Words } from "./Words";
 
-const POPOVER_WIDTH = 320; // SourcePopover's w-80
+const POPOVER_WIDTH = 320; // SourcePopover's w-80, at 100 % (scaled: at the screen's scale)
 
 type Opened = { cell: NumberCell; style: CSSProperties; from: HTMLElement; focus: boolean };
 
@@ -43,7 +44,7 @@ export function ViewPart({ view, projectId }: { view: ViewData; projectId?: stri
       // under the chip, lined up with its start edge (the right edge in an Arabic view), and never past the view's
       // other edge: the popover is 20rem wide at most, and 90% of the view
       const rtl = getComputedStyle(box.current!).direction === "rtl";
-      const room = Math.max(root.width - Math.min(POPOVER_WIDTH, root.width * 0.9), 0);
+      const room = Math.max(root.width - Math.min(scaled(POPOVER_WIDTH), root.width * 0.9), 0);
       const offset = Math.min(Math.max(rtl ? root.right - at.right : at.left - root.left, 0), room);
       const side = rtl ? { right: offset } : { left: offset };
       setOpened({ cell, style: { top: at.bottom - root.top, ...side }, from, focus });

@@ -11,7 +11,7 @@ export function DialogContent({ className = "", children, ...props }: ComponentP
     <Radix.Portal>
       <Radix.Overlay className="fixed inset-0 z-50 bg-ink/30" />
       <Radix.Content
-        className={`fixed inset-x-0 top-[12vh] z-50 mx-auto w-[min(640px,calc(100vw-32px))] rounded-[14px] border border-ink/10 bg-paper text-ink shadow-lg shadow-ink/12 outline-none ${className}`}
+        className={`fixed inset-x-0 top-[12vh] z-50 mx-auto w-[min(40rem,calc(100vw-2rem))] rounded-[14px] border border-ink/10 bg-paper text-ink shadow-lg shadow-ink/12 outline-none ${className}`}
         {...props}
       >
         {children}

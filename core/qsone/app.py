@@ -72,6 +72,24 @@ class UsageIn(BaseModel):
     on: bool
 
 
+# The engineer's own zoom (Ctrl/Cmd with = or -) over the screen's fluid scale:
+# 80 % to 150 %, in steps of 10 %.
+ZOOM_SETTING = "zoom"
+ZOOMS = tuple(round(0.8 + 0.1 * n, 1) for n in range(8))
+
+
+class ZoomIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    zoom: float = Field(ge=0.8, le=1.5)
+
+
+def saved_zoom() -> float:
+    """The saved zoom, or 1 when none is saved or it is not one of the steps."""
+    value = settings.load().get(ZOOM_SETTING)
+    return value if isinstance(value, float) and value in ZOOMS else 1.0
+
+
 class CrashIn(BaseModel):
     """A crash of the screen or the shell: class and where in our code, never a message."""
 
@@ -286,6 +304,19 @@ def create_app(
         except OSError:
             return JSONResponse({}, status_code=503)  # the screen says it in its own words
         return JSONResponse({"on": body.on})
+
+    @app.get("/settings/zoom")
+    def zoom() -> dict:
+        return {"zoom": saved_zoom()}
+
+    @app.put("/settings/zoom")
+    def choose_zoom(body: ZoomIn) -> JSONResponse:
+        step = round(body.zoom, 1)  # a step of 10 %: 1.1 stays 1.1, never 1.1000000000000001
+        try:
+            settings.save(ZOOM_SETTING, step)
+        except OSError:
+            return JSONResponse({}, status_code=503)  # the screen keeps the zoom for this session
+        return JSONResponse({"zoom": step})
 
     @app.post("/usage/crash", status_code=204)
     def screen_crash(body: CrashIn) -> Response:

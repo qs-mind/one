@@ -8,6 +8,7 @@ import type { DeliverableInfo, ProjectSources, ProjectStatus } from "../project/
 import { count, fill, language, pick, t, useLanguage } from "../i18n";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { RollingNumber } from "../ui/RollingNumber";
+import { scaled } from "../ui/scale";
 
 const locale = () => (language() === "ar" ? "ar-EG-u-nu-latn" : "en-GB");
 
@@ -35,7 +36,7 @@ function statusLine(d: DeliverableInfo): string {
 }
 
 const chip = "whitespace-nowrap rounded-lg px-3 py-1.5";
-const GAP = 8; // gap-2
+const GAP = 8; // gap-2, at 100 % (drawn at the screen's scale)
 /** At most this many status items show in the bar; the rest are in More status. */
 export const SHOWN_MOST = 2;
 /** Which item stays longest when the bar is short: lower stays longer. */
@@ -43,15 +44,15 @@ const PRIORITY: Record<string, number> = { submission: 0, left: 1, boq: 2, comme
 
 /** Which of `widths` (in priority order) show in `room` px: all of them when they are two at most and fit; else at
  * most two that fit beside a `more` px button, in order, passing over one too wide for what is left. */
-export function fitting(widths: readonly number[], room: number, more: number): number[] {
-  const total = widths.reduce((sum, w) => sum + w, 0) + GAP * Math.max(0, widths.length - 1);
+export function fitting(widths: readonly number[], room: number, more: number, gap = GAP): number[] {
+  const total = widths.reduce((sum, w) => sum + w, 0) + gap * Math.max(0, widths.length - 1);
   if (widths.length <= SHOWN_MOST && total <= room) return widths.map((_, i) => i);
   const shown: number[] = [];
   let used = more;
   for (const [i, w] of widths.entries()) {
     if (shown.length === SHOWN_MOST) break;
-    if (used + GAP + w > room) continue;
-    used += GAP + w;
+    if (used + gap + w > room) continue;
+    used += gap + w;
     shown.push(i);
   }
   return shown;
@@ -154,7 +155,7 @@ export function StatusStrip({
       const widths = order.map((item) => width(item.key));
       if (!widths.some(Boolean)) return setShown(null); // nothing laid out (no layout engine): show them all
       const more = width("more");
-      const fit = fitting(widths, room, more);
+      const fit = fitting(widths, room, more, scaled(GAP));
       const all = fit.length >= items.length;
       setShown(all ? null : new Set(fit.map((i) => order[i]!.key)));
       setFloor(all ? 0 : more);

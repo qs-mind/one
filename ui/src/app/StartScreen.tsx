@@ -89,7 +89,7 @@ export function StartScreen({
       </p>
       <div ref={content} className="flex w-full flex-col items-center">
         <Mark draw={draw} size={112} />
-        <p className="start-one mt-7 font-logo text-[30px] leading-none font-bold" style={{ animationDelay: `${ONE_AT}ms` }}>
+        <p className="start-one mt-7 font-logo text-[1.875rem] leading-none font-bold" style={{ animationDelay: `${ONE_AT}ms` }}>
           ONE
         </p>
         <p className="mt-3 text-lg text-slate">

@@ -266,7 +266,7 @@ export function CommandBar({
           </div>
         </div>
       </div>
-      <div className={`absolute flex items-center gap-1.5 ${inPanel ? "bottom-[5px] end-[5px] [&>button]:size-7" : "bottom-1.5 end-1.5"}`}>
+      <div className={`absolute flex items-center gap-1.5 ${inPanel ? "bottom-[0.3125rem] end-[0.3125rem] [&>button]:size-7" : "bottom-1.5 end-1.5"}`}>
         {chat.running && hasWords && (
           <button type="button" aria-label={t("stop")} title={t("stop")} onClick={stop} className={`${round} bg-stone text-ink hover:bg-ink/10`}>
             <Square />

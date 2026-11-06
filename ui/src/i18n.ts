@@ -1032,6 +1032,11 @@ export const texts = {
   docRevision: { en: "Revision {n}", ar: "إصدار {n}" },
   fullScreen: { en: "Full screen", ar: "ملء الشاشة" },
   leaveFullScreen: { en: "Leave full screen", ar: "اخرج من ملء الشاشة" },
+  // The engineer's zoom (More, and Ctrl/Cmd with = - 0): over the screen's own scale (ui/scale.ts).
+  zoom: { en: "Zoom", ar: "التكبير" },
+  zoomReset: { en: "Reset zoom", ar: "رجّع الحجم" },
+  zoomIn: { en: "Zoom in", ar: "كبّر" },
+  zoomOut: { en: "Zoom out", ar: "صغّر" },
   sampleNumbers: { en: "Sample numbers", ar: "الأرقام عينة" },
   docWorkingOn: { en: "being worked on", ar: "شغالين عليه" },
   docClientBoq: { en: "Client BOQ", ar: "مقايسة العميل" },

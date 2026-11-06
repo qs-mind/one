@@ -10,7 +10,7 @@ import { HealthGate, PING_MS, STARTING_MS } from "./CoreDown";
 const logPath = "/tmp/qs-mind-one/core.log";
 
 function health(...answers: (Response | Error)[]) {
-  const fetch = vi.fn(async () => {
+  const fetch = vi.fn(async (_url?: RequestInfo | URL) => {
     const answer = answers.length > 1 ? answers.shift()! : answers[0]!;
     if (answer instanceof Error) throw answer;
     return answer;
@@ -51,7 +51,7 @@ describe("HealthGate", () => {
     // the start screen speaks the saved language, else the system's (jsdom's is English)
     await user.click(await screen.findByRole("button", { name: texts.retry.en }));
     expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls.filter(([url]) => url === "/api/health")).toHaveLength(2); // and the zoom, once it is up
   });
 });
 

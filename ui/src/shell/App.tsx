@@ -40,6 +40,7 @@ import { moveRegion, useNarrow, useSmall } from "./regions";
 import { type PanelKind, TopBar } from "./TopBar";
 import { showsWaitingCard, useChats } from "./useChats";
 import { useClientBoqSample } from "../workspace/clientBoqSample";
+import { useZoomKeys } from "../ui/scale";
 
 /** The dev-only sample mode (?sample=1): the screen shows sample data, labelled. Release builds drop it. */
 function sampleMode(): boolean {
@@ -75,6 +76,7 @@ function useNoFileOpening() {
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
   useNoFileOpening();
+  useZoomKeys();
   const project = useProject();
   const narrow = useNarrow();
   const small = useSmall();

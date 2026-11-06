@@ -5,7 +5,17 @@
    a word, such as the tanween in «حالياً»: it lifts the whole word by the mark's offset. Zain draws that tanween
    where it belongs (offset near zero) and its dots are part of each letter; IBM Plex Sans Arabic lifted the word.
    The type scale (dense, 5 Nov): 13 px for meta, 14 px body (15 px on an Arabic page), 18 px frame titles, 22 px page titles; nothing
-   under 12 px at 100%. The spacing scale is Tailwind's 1, 2, 3, 4, 6, 8 (4, 8, 12, 16, 24, 32 px). */
+   under 12 px at 100%. The spacing scale is Tailwind's 1, 2, 3, 4, 6, 8 (4, 8, 12, 16, 24, 32 px).
+   Every size is in rem and follows the root font-size, which follows the window and the engineer's zoom
+   (ui/src/ui/scale.ts): 100 % at 1920×1080 and up, 80 % at 1280×720. Text stops shrinking at --ui-text-floor, so body
+   text is never under 12.5 px (English) or 13.5 px (Arabic), and the other text sizes keep their ratio to it. Borders
+   and hairlines stay in px. */
+:root {
+  --ui-text-floor: 0.892857; /* 12.5 / 14 */
+}
+html:lang(ar) {
+  --ui-text-floor: 0.9; /* 13.5 / 15 */
+}
 @theme {
   --color-*: initial;
   --color-ink: #0e0f12;
@@ -14,13 +24,15 @@
   --color-slate: #6e6a64;
   --color-copper: #a6491b;
   --font-sans: "Kumbh Sans Variable", "Zain", system-ui, sans-serif;
-  --text-xs: 0.8125rem; /* 13 px: meta */
+  --text-xs: max(calc(13px * var(--ui-text-floor)), 0.8125rem); /* 13 px: meta */
   --text-xs--line-height: 1.5;
-  --text-sm: 0.875rem;
+  --text-sm: max(calc(14px * var(--ui-text-floor)), 0.875rem);
   --text-sm--line-height: 1.55;
-  --text-lg: 1.125rem; /* 18 px: frame titles */
+  --text-base: max(calc(16px * var(--ui-text-floor)), 1rem);
+  --text-lg: max(calc(18px * var(--ui-text-floor)), 1.125rem); /* 18 px: frame titles */
   --text-lg--line-height: 1.45;
-  --text-2xl: 1.375rem; /* 22 px: page titles */
+  --text-xl: max(calc(20px * var(--ui-text-floor)), 1.25rem);
+  --text-2xl: max(calc(22px * var(--ui-text-floor)), 1.375rem); /* 22 px: page titles */
   --text-2xl--line-height: 1.35;
 }
 
@@ -63,12 +75,12 @@
   body {
     background: var(--color-paper);
     color: var(--color-ink);
-    font-size: 14px;
+    font-size: max(calc(14px * var(--ui-text-floor)), 0.875rem); /* 14 px at 100 %, never under 12.5 px */
     line-height: 1.5;
   }
   /* Arabic needs more room between its lines for its dots and marks */
   html:lang(ar) body {
-    font-size: 15px;
+    font-size: max(calc(15px * var(--ui-text-floor)), 0.9375rem); /* 15 px at 100 %, never under 13.5 px */
     line-height: 1.65;
   }
   button:not(:disabled) {
@@ -300,7 +312,7 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
    only, no rule between columns, roomier cells, figures in tabular digits. */
 .rdg-cell {
   border-inline-end: none;
-  padding-inline: 12px;
+  padding-inline: 0.75rem; /* 12 px at 100 % (viewers/sheet/heights.ts INLINE_PAD) */
   font-variant-numeric: tabular-nums;
 }
 
