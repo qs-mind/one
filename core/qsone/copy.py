@@ -2388,8 +2388,12 @@ UPDATE_OFFLINE = {
 # The truth checks (engine/truth.py): the facts the core puts beside a Brief's reply, from its own
 # records, and the line for each claim the records do not show.
 TRUTH_COVERAGE = {
-    "en": "From ONE's records: {priced} of {items} priced · {made}",
-    "ar": "من سجلات ONE: اتسعّر {priced} من {items} · {made}",
+    "en": "From ONE's records: {items} · {priced} priced by ONE · {made}",
+    "ar": "من سجلات ONE: {items} · ONE سعّر {priced} · {made}",
+}
+TRUTH_CLIENT_RATES = {
+    "en": "{items}, {n} with the client's rates",
+    "ar": "{items}، فيهم {n} بسعر العميل",
 }
 TRUTH_NO_DELIVERABLE_YET = {"en": "no Deliverable yet", "ar": "مفيش مخرج لسه"}
 TRUTH_DELIVERABLES = {"en": "{n} made", "ar": "فيه {n}"}

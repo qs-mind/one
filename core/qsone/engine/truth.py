@@ -85,6 +85,7 @@ class Coverage:
     items: int  # BOQ items in the project
     priced: int  # of them, with a current rate
     deliverables: int  # Deliverables in the project (beside the chat or drafts)
+    client: int = 0  # of the priced, the rate the client's BOQ holds (a "boq" source): not ONE's
 
 
 def coverage(rec) -> Coverage:
@@ -95,6 +96,11 @@ def coverage(rec) -> Coverage:
             "SELECT count(DISTINCT i.id) FROM items i JOIN numbers n ON n.item_id = i.id"
             " WHERE i.kind = 'boq_item' AND n.name = 'rate' AND n.valid_until IS NULL"
         ).fetchone()
+        (client,) = c.execute(
+            "SELECT count(DISTINCT i.id) FROM items i JOIN numbers n ON n.item_id = i.id"
+            " JOIN sources s ON s.id = n.source_id WHERE i.kind = 'boq_item' AND n.name = 'rate'"
+            " AND n.valid_until IS NULL AND s.kind = 'boq'"
+        ).fetchone()
         made = 0
         for table in ("deliverables", "deliverable_drafts"):
             try:
@@ -102,7 +108,7 @@ def coverage(rec) -> Coverage:
             except Exception:  # noqa: BLE001 - an older file has no such table
                 n = 0
             made += n
-    return Coverage(items, priced, made)
+    return Coverage(items, priced, made, client)
 
 
 @dataclass
@@ -373,9 +379,12 @@ def facts(cov: Coverage | None, flags: list[dict]) -> dict | None:
         if not cov.deliverables
         else copy.fill(copy.TRUTH_DELIVERABLES, n=copy.counted(cov.deliverables, DELIVERABLES))
     )
+    # the client's own rates are not ONE's pricing: said apart, never read as ONE's work
+    items = copy.counted(cov.items, copy.ITEMS)
+    if cov.client:
+        items = copy.fill(copy.TRUTH_CLIENT_RATES, items=items, n=str(cov.client))
     text = copy.fill(
-        copy.TRUTH_COVERAGE, priced=str(cov.priced), items=copy.counted(cov.items, copy.ITEMS),
-        made=made,
+        copy.TRUTH_COVERAGE, items=items, priced=str(cov.priced - cov.client), made=made,
     )  # fmt: skip
     return {"text": text, "flags": flags}
 

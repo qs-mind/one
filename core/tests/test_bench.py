@@ -215,7 +215,7 @@ def test_the_guards_catch_the_weak_models_mistakes(bench, tmp_path):
     _, _, events = run(client, project, "bench:weak سعّر المقايسة كلها واكتب الخطاب")
     assert any(e["type"] == "data-redo" for e in events)  # sent back once
     [facts] = [e["data"] for e in events if e["type"] == "data-facts"]
-    assert facts["text"]["ar"] == "من سجلات ONE: اتسعّر 0 من 4 بنود · مفيش مخرج لسه"
+    assert facts["text"]["ar"] == "من سجلات ONE: 4 بنود · ONE سعّر 0 · مفيش مخرج لسه"
     flags = " ".join(f["ar"] for f in facts["flags"])
     assert "والسجلات فيها" in flags and "ومفيش مخرج لسه" in flags
     assert "مفيش حاجة شغالة" in flags
