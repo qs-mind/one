@@ -63,6 +63,9 @@ def book(general):
 
 @pytest.fixture
 def spending(book, fake_clock):
+    # these are about the Spending Caps; the Brief Budget card has its own tests
+    # (test_realwalk_stops)
+    costs.save_caps({"budget_above": "100"})
     return Spending(book, clock=fake_clock)  # 2026-11-05 08:00 UTC, 10:00 in Cairo
 
 

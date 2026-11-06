@@ -174,6 +174,9 @@ class Spending:
         self._asked: dict[tuple[str, Scope], Decimal] = {}  # the cap each pause was asked at
         self._warned: set[tuple[str, Scope]] = set()  # equivalent cost said at 80%
         self._unpriced: set[ModelChoice] = set()  # used without a price, if the settings fail
+        self._last: dict[
+            str, Decimal
+        ] = {}  # each Brief's last request's cost: the next one's guess
 
     def _spent(self, brief_id: str, *, count_equivalent: bool) -> dict[Scope, Decimal]:
         today = self.clock().astimezone(self.book.local_tz).date()
@@ -221,6 +224,7 @@ class Spending:
             if spent[scope] >= cap:
                 host.emit(self._notice(brief_id, "stopped", scope, spent[scope], cap, card))
                 raise CapReached(scope, spent[scope], cap)
+        await self._budget(host, brief_id, spent["brief"], limits.budget_above)
         for scope, cap in limit.items():
             if spent[scope] < cap * Decimal("0.8") or self._asked.get((brief_id, scope)) == cap:
                 continue
@@ -237,6 +241,25 @@ class Spending:
             if choice == "raise":  # the screen saved the new caps: check against them
                 return await self.before_request(host, brief_id=brief_id, card=card)
         return card
+
+    async def _budget(self, host: TeamHost, brief_id: str, spent: Decimal, line: Decimal) -> None:
+        """The Brief Budget card, once per Brief, before its spending passes the budget line: at
+        80% of it, or when the next request (guessed as the last one's cost) would pass it. A
+        Brief whose plan the engineer already said yes to is not asked again. "no" stops it with
+        a short report (the top 5 of SGH spent 0.50 USD in 50 steps with no card, 6 Nov 2026)."""
+        key = (brief_id, "budget")
+        if key in self._asked or getattr(host, "budget_approved", False):
+            return
+        guess = spent + self._last.get(brief_id, Decimal(0))
+        if spent <= 0 or (spent < line * Decimal("0.8") and guess < line):
+            return
+        self._asked[key] = line
+        detail = copy.fill(copy.BUDGET_SPENT, spent=usd_text(spent), line=usd_text(line))
+        card = Card(uuid4().hex, "budget", copy.BUDGET_TITLE, detail, ("yes", "no"))
+        if choice_of(card, await host.ask(card)) != "yes":
+            raise CapReached("brief", spent, line, report=True)
+        if hasattr(host, "budget_approved"):  # one Brief Budget card per Brief
+            host.budget_approved = True
 
     async def _ask_unknown_price(self, host: TeamHost, brief_id: str, card: ModelCard) -> ModelCard:
         """Once per model, kept: its price (the screen saves it, then answers "price"), or use
@@ -361,6 +384,8 @@ class Spending:
                 cache_write=cache_write,
             )
             basis = PRICE_UNKNOWN_BASIS if usd is None else (card.price_source or "")
+        if usd is not None and not card.subscription:
+            self._last[brief_id] = usd
         self.book.add(
             brief_id=brief_id,
             project_id=project_id,

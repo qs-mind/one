@@ -250,7 +250,11 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
     tool = REGISTRY.get(name)
     if tool is None:
         raise ModelRetry(f"There is no tool «{name}». Use one of the tools you were given.")
-    parsed = _validate(tool, args)
+    try:
+        parsed = _validate(tool, args)
+    except ModelRetry as e:
+        _refused(ctx, name, copy.words_for(e.message))
+        raise
     key = _write_key(tool, parsed) if tool.writes else None
     if key is not None:
         earlier = ctx.store.known_write(ctx.brief_id, key)
@@ -263,10 +267,16 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
         out = await tool.run(ctx, parsed)
     except RecordsError as e:
         say_refused(ctx, e.text)
+        _refused(ctx, name, e.text)
         raise ModelRetry(
             f"{tool.name}: {e.text['en']} Field: {e.field or 'none'}. "
             f"Example: {_example_text(tool)}"
         ) from None
+    except ModelRetry as e:
+        _refused(ctx, name, copy.words_for(e.message))
+        raise
+    if out.startswith("not done:"):
+        _refused(ctx, name, copy.words_for(out.split("\n", 1)[0]))
     page, note = _paged(tool, parsed, out)
     if tool.untrusted:
         page = data_text.as_data(page, source=tool.name, fence=ctx.fence)
@@ -275,6 +285,14 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
     if key is not None:
         ctx.store.remember_write(ctx.brief_id, key, result)
     return result
+
+
+def _refused(ctx: ToolContext, tool: str, text: Text | None) -> None:
+    """Tells the Brief that a call of `tool` was refused, with the reason in both languages when
+    ONE has it: a reply that says it was done is then flagged with this reason."""
+    note = getattr(ctx.host, "note_refusal", None)
+    if note is not None:
+        note(tool, text)
 
 
 _HEX_ID = re.compile(r"\s*\b[0-9a-f]{32}\b,?")

@@ -218,7 +218,8 @@ async def _plan_brief(ctx: ToolContext, args: PlanArgs) -> str:
     budget = brief_budget(
         items, list(setup.sheet), setup.roles, setup.measured, setup.lead_measured
     )
-    if budget.usd is None or budget.usd > caps().budget_above:
+    approved = getattr(ctx.host, "budget_approved", False)  # said yes once this Brief
+    if not approved and (budget.usd is None or budget.usd > caps().budget_above):
         detail = (
             copy.fill(copy.BUDGET_UNKNOWN, minutes=budget.minutes)
             if budget.usd is None
@@ -232,6 +233,8 @@ async def _plan_brief(ctx: ToolContext, args: PlanArgs) -> str:
         card = Card(uuid4().hex, "budget", copy.BUDGET_TITLE, detail, ("yes", "no"))
         if await _ask(ctx, card) != "yes":
             raise Denied("plan_brief")
+        if hasattr(ctx.host, "budget_approved"):  # the Spending Caps ask no budget card again
+            ctx.host.budget_approved = True
     result = _json({"planned": True, "steps": len(args.steps), "deliverables": args.deliverables})
     ctx.store.remember_write(ctx.brief_id, PLANNED, result)
     return result

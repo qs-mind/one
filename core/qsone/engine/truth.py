@@ -117,6 +117,11 @@ class Brief:
     specialists: tuple[str, ...] = ()  # the names of the specialists it built (en and ar)
     supply_only: tuple[str, ...] = ()  # the titles of supply-only quotes it cited
     tool_names: frozenset[str] = field(default_factory=frozenset)
+    done: set[str] = field(default_factory=set)  # the tools with a call that went through
+    refused: dict[str, dict] = field(default_factory=dict)  # tool: why ({en, ar}), when its last
+    # call was refused (a retry or a "not done") and none went through after
+    item_rows: int | None = None  # item rows in the Deliverables it made, and numbers it set or
+    # recorded on items; None when it made no Deliverable
 
 
 # The reply -----------------------------------------------------------------------------------
@@ -269,9 +274,121 @@ def overclaim(text: str, cov: Coverage | None, did: Brief) -> list[Problem]:
     return found
 
 
-def promise(text: str) -> str | None:
+# Claims of done work, each with the tools that do it: «استوردت البنود» with 0 items imported (the
+# import was refused), «أضفت البنود» after deliverable_propose was refused (6 Nov 2026).
+_IMPORTED = re.compile(
+    r"استورد(?:ت|نا)\b|اتستورد|تم\s+(?:ال)?استيراد|\b(?:i(?:'ve| have)?\s+)?imported\b", re.I
+)
+_ADDED = re.compile(
+    r"(?:^|[\s«(])(?:أ|ا)?ضف(?:ت|نا)\b|اتضاف(?:ت)?\b|تم[ّ]?\s+(?:إضافة|اضافة|تسجيل|إدراج|ادراج)"
+    r"|سج[ّ]?ل(?:ت|نا)\b|اتسج[ّ]?ل(?:ت)?\b|حط[ّ]?(?:يت|ينا)\b"
+    r"|\b(?:i(?:'ve| have)?\s+)?(?:added|recorded|inserted)\b|\bhave been (?:added|recorded)\b",
+    re.I,
+)
+_PRICED_DONE = re.compile(
+    # first person only: «اتسعّر 8 بنود من 325» reports the project, not this Brief's work
+    r"تم\s+(?:وضع|تسعير)|سع[ّ]?ر(?:ت|نا)\b|\bi(?:'ve| have)?\s+priced\b",
+    re.I,
+)
+# A sentence that says it was not done is no claim: «ماقدرتش أضيف», "could not import".
+_NOT = re.compile(
+    r"(?<![؀-ۿ])ما?[؀-ۿ]{2,}ش(?![؀-ۿ])|(?<![؀-ۿ])(?:مش|لم|لن|لا|ماتم|رفض\w*|مفيش)(?![؀-ۿ])"
+    r"|\b(?:not|no|never|couldn'?t|cannot|can'?t|unable|failed|refused|wasn'?t|didn'?t)\b",
+    re.I,
+)
+_CLAIMS = (  # (words, the tools that do it, what it is in the engineer's words)
+    (_IMPORTED, frozenset({"boq_import"}), copy.CLAIM_IMPORT),
+    (
+        _ADDED,
+        frozenset(
+            {"deliverable_create", "deliverable_propose", "make_deliverable", "record_number",
+             "add_item", "add_source", "correct_number", "boq_import", "note_lesson"}
+        ),
+        copy.CLAIM_ADD,
+    ),
+    (
+        _PRICED_DONE,
+        frozenset(
+            {"record_number", "correct_number", "deliverable_create", "deliverable_propose",
+             "make_deliverable", "calculate", "prices_propose"}
+        ),
+        copy.CLAIM_PRICED,
+    ),
+)  # fmt: skip
+
+
+def undone(text: str, cov: Coverage | None, did: Brief) -> list[Problem]:
+    """Claims of work done (imported, added, priced) that this Brief's tool calls do not show:
+    none of the tools that do it went through, or one was refused. A refusal's reason is in the
+    engineer's flag, in their words. A Deliverable this Brief made that holds no item is no
+    pricing."""
+    found: list[Problem] = []
+    seen: set[str] = set()
+    for s in _sentences(text):
+        if _NOT.search(s):
+            continue
+        for words, tools, what in _CLAIMS:
+            if what["en"] in seen or not words.search(s) or did.done & tools:
+                continue
+            refused = [t for t in sorted(tools) if t in did.refused]
+            if not refused and (did.writes or (words is _IMPORTED and cov and cov.items)):
+                continue  # something else was done, or an earlier Brief imported
+            seen.add(what["en"])
+            if refused:
+                why = did.refused[refused[0]]
+                fix = (
+                    f"Your reply says it was done («{s[:120]}»), but ONE refused {refused[0]}: "
+                    f"{why['en']} Nothing was done by it. Fix the call and make it again, or tell "
+                    "the engineer plainly that it was not done, why, and what is needed."
+                )
+                found.append(Problem("refused", fix, copy.fill(copy.TRUTH_REFUSED, why=why)))
+            else:
+                fix = (
+                    f"Your reply says it was done («{s[:120]}»), but no tool did it in this Brief. "
+                    "Do it with the tools now, or say plainly that it is not done yet."
+                )
+                found.append(Problem("undone", fix, copy.fill(copy.TRUTH_NOT_DONE, what=what)))
+    if did.item_rows == 0 and "record_number" not in did.done:
+        if any(PRICED.search(s) and not _NOT.search(s) for s in _sentences(text)):
+            found.append(
+                Problem(
+                    "empty",
+                    "Your reply speaks of priced items, but the Deliverable you made has no item "
+                    "rows (only headings). Add the items with their numbers (rows of item_id, or "
+                    "deliverable_propose), or say plainly that nothing is priced yet.",
+                    copy.TRUTH_EMPTY_DELIVERABLE,
+                )
+            )
+    return found
+
+
+# Work said to be under way or about to start when nothing ran: «بدأت في العمل على نسخة جديدة
+# … دلوقتي، أنا بجهز المسودة … هل حابب أبعتلك الجدول؟» after 3 s and no tool (6 Nov 2026).
+_UNDER_WAY = re.compile(
+    r"(?<![؀-ۿ])(?:بدأت|بدات|ابتديت)\s+(?:في|ب|أ|ا)|(?<![؀-ۿ])(?:بجه[ّ]?ز|بحض[ّ]?ر|بشتغل|بنشتغل"
+    r"|بنجه[ّ]?ز|بسعّر|بطابق)(?![؀-ۿ])|جار[يٍ]\s|(?<![؀-ۿ])ه(?:قوم|بدأ|سع[ّ]?ر|طابق|حسب"
+    r"|جه[ّ]?ز|بعت|بلغ|كم[ّ]?ل|ضيف|راجع|حض[ّ]?ر|سج[ّ]?ل|عمل|ربط|نف[ّ]?ذ)\w*"
+    r"|\b(?:i(?:'ve| have) started|i am (?:now )?(?:preparing|working|building|pricing)"
+    r"|i'm (?:now )?(?:preparing|working|building|pricing)|i will|i'll|starting now)\b",
+    re.I,
+)
+# Work that waits on the engineer is no promise: «لو بعتلي العرض هسعّره», "once you send it".
+_CONDITION = re.compile(
+    r"(?<![؀-ۿ])(?:لو|إذا|اذا|أول\s+ما|اول\s+ما|لما|بعد\s+ما)(?![؀-ۿ])"
+    r"|\b(?:if|once|when|after you)\b",
+    re.I,
+)
+
+
+def promise(text: str, did: Brief | None = None) -> str | None:
     """The promise a reply ends on (work said to be under way, or about to start), or None. An
-    offer ("if you want, I'll …", a question) is not a promise."""
+    offer ("if you want, I'll …", a question) is not a promise, unless `did` shows that the
+    Brief wrote nothing and the reply says work has begun or will be done: then the first such
+    words are the promise, whatever the reply ends on."""
+    if did is not None and not did.writes:
+        for s in _sentences(text):
+            if _UNDER_WAY.search(s) and not (_OFFER.search(s) or _CONDITION.search(s)):
+                return s
     tail = _sentences(text)[-2:]
     for s in reversed(tail):
         if _OFFER.search(s):
@@ -302,7 +419,7 @@ def reply_problems(
                 copy.fill(copy.TRUTH_PLACEHOLDER, blanks=copy.listed(blanks)),
             )
         )
-    said = promise(text)
+    said = promise(text, did)
     if said is not None:
         found.append(
             Problem(
@@ -314,6 +431,8 @@ def reply_problems(
             )
         )
     found += overclaim(text, cov, did)
+    kinds = {p.kind for p in found}
+    found += [p for p in undone(text, cov, did) if not (p.kind == "undone" and "changed" in kinds)]
     if understand_brief and not did.understood and _CARD.search(text or ""):
         why = f" It refused: {did.understood_refused}" if did.understood_refused else ""
         found.append(
@@ -436,6 +555,185 @@ def value_in(conn, file_id: str, place: dict, value: str) -> tuple[bool, str, li
     where = ", ".join(f"{k} {place[k]}" for k in _PLACE_KEYS if k in place)
     shown = sorted(have, key=lambda v: (len(v), v))[:12]
     return bool(wanted) and wanted <= have, f"{name}, {where}", shown
+
+
+# Citations in a reply's words: is each number where the reply says it is? --------------------
+#
+# The real walk (6 Nov 2026): «السعر 12 جنيه/م3 (من شيت "تسعير"، صف 16)» for an item the BOQ does
+# not have, ceramic 72 cited to row 18 (a different, empty item), the retention limit to page 59
+# (it is on page 58); and the bid security «350,000 دولار … الصفحة: 26» marked "no source yet"
+# although page 26 has it.
+
+_Q = "\"'«»“”‘’"
+_SHEET_ROW = re.compile(
+    rf"(?:شيت|الشيت|ورق[ةه]|الورق[ةه]|sheet)\s*[:：]?\s*[{_Q}]?(?P<sheet>[^{_Q}\n،,()\[\]:]{{1,40}}?)"
+    rf"[{_Q}]?\s*[،,]?\s*(?:في\s+)?(?:صف|الصف|سطر|row)\s*[:：]?\s*"
+    r"(?P<rows>[0-9٠-٩]+(?:\s*(?:[/،,-]|و)\s*[0-9٠-٩]+)*)",
+    re.I,
+)
+_ROW_SHEET = re.compile(  # "row 8 of sheet Electrical"
+    rf"\brow\s*(?P<rows>[0-9]+(?:\s*[/,-]\s*[0-9]+)*)\s+(?:of|in|on)\s+(?:the\s+)?sheet\s*"
+    rf"[{_Q}]?(?P<sheet>[^{_Q}\n,()\[\]:]{{1,40}}?)[{_Q}]?(?=[\s,.;)]|$)",
+    re.I,
+)
+_PAGE = re.compile(
+    r"(?<![؀-ۿ\w])(?:صفح[ةه]|الصفح[ةه]|ص\.|page|pages|pp?\.)\s*[:：]?\s*(?P<pages>[0-9٠-٩]+"
+    r"(?:\s*(?:[/،,-]|و)\s*[0-9٠-٩]+)*)"
+    r"|\((?:p|pp)\.?\s*(?P<pp>[0-9]+)",
+    re.I,
+)
+# A segment: a line, or a sentence of one; a decimal point («0.2», «17.1») never ends one.
+_SEGMENT = re.compile(r"(?<=[!?؟])\s+|(?<=\.)(?![0-9])\s+|\n+")
+_NUMS = re.compile(r"[0-9٠-٩]+")
+
+
+@dataclass(frozen=True)
+class Place:
+    """A place a reply cites: a sheet's rows, or pages."""
+
+    sheet: str | None
+    rows: tuple[int, ...] = ()
+    pages: tuple[int, ...] = ()
+
+    def words(self) -> dict:
+        if self.sheet is not None:
+            rows = "/".join(map(str, self.rows))
+            return {
+                "en": f"sheet «{self.sheet}», row {rows}",
+                "ar": f"شيت «{self.sheet}»، صف {rows}",
+            }
+        pages = "/".join(map(str, self.pages))
+        return {"en": f"page {pages}", "ar": f"صفحة {pages}"}
+
+
+def _numbers_of(text: str) -> tuple[int, ...]:
+    return tuple(int(n.translate(_DIGITS)) for n in _NUMS.findall(text))
+
+
+def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]:
+    """Each segment of a reply that cites a place, with its places and the numbers it gives
+    there: (segment, places, [(written, value)]). The citation's own numbers do not count."""
+    found = []
+    for segment in _SEGMENT.split(text or ""):
+        places: list[Place] = []
+        blank = segment
+        for pattern in (_SHEET_ROW, _ROW_SHEET):
+            for m in pattern.finditer(segment):
+                places.append(Place(m["sheet"].strip(), rows=_numbers_of(m["rows"])))
+                blank = blank.replace(m[0], " " * len(m[0]))
+        for m in _PAGE.finditer(blank):
+            places.append(Place(None, pages=_numbers_of(m["pages"] or m["pp"])))
+            blank = blank.replace(m[0], " " * len(m[0]))
+        if places:
+            found.append((segment, places, list(numbers_guard._counted(blank))))
+    return found
+
+
+def _sheet_names(conn) -> dict[str, list[str]]:
+    """{normalised name: [names as written]} of the current files' sheets."""
+    from qsone.records.arabic import normalise
+
+    rows = conn.execute(
+        "SELECT DISTINCT json_extract(c.locator, '$.sheet') FROM chunks c JOIN files f"
+        " ON f.id = c.file_id WHERE f.valid_until IS NULL"
+        " AND json_extract(c.locator, '$.sheet') IS NOT NULL"
+    ).fetchall()
+    out: dict[str, list[str]] = {}
+    for (name,) in rows:
+        out.setdefault(normalise(str(name)), []).append(str(name))
+    return out
+
+
+def _sheet_of(conn, cited: str) -> list[str]:
+    """The sheets a cited name names: the same name, trimmed and folded; else the one sheet whose
+    name holds it, or that it holds."""
+    from qsone.records.arabic import normalise
+
+    names = _sheet_names(conn)
+    key = normalise(cited)
+    if key in names:
+        return names[key]
+    near = [n for k, ns in names.items() if key and (key in k or k in key) for n in ns]
+    return near if len(near) == 1 else []
+
+
+def place_text(conn, place: Place) -> list[str] | None:
+    """The current files' text at `place`; None when no file has that place."""
+    if place.sheet is not None:
+        sheets = _sheet_of(conn, place.sheet)
+        if not sheets:
+            return None
+        rows = conn.execute(
+            "SELECT c.text FROM chunks c JOIN files f ON f.id = c.file_id"
+            " WHERE f.valid_until IS NULL AND json_extract(c.locator, '$.sheet') IN"
+            " (SELECT value FROM json_each(?)) AND json_extract(c.locator, '$.row') IN"
+            " (SELECT value FROM json_each(?))",
+            (json.dumps(sheets), json.dumps(list(place.rows))),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT c.text FROM chunks c JOIN files f ON f.id = c.file_id"
+            " WHERE f.valid_until IS NULL AND json_extract(c.locator, '$.page') IN"
+            " (SELECT value FROM json_each(?))",
+            (json.dumps(list(place.pages)),),
+        ).fetchall()
+    return [t for (t,) in rows] or None
+
+
+def miscited(conn, text: str) -> list[Problem]:
+    """Each number a reply gives at a cited place (a sheet's row, a page) that the place does not
+    have, and each cited place no project file has. One Problem for the model, with a flag for
+    the engineer for each of the first three."""
+    wrong: list[tuple[str, dict]] = []  # (the model's line, the engineer's flag)
+    for segment, places, numbers in citations(text):
+        if not numbers:
+            continue
+        texts: list[str] = []
+        missing = []
+        for place in places:
+            found = place_text(conn, place)
+            if found is None:
+                missing.append(place)
+            else:
+                texts += found
+        if missing and not texts:
+            for place in missing:
+                where = place.words()
+                line = f"«{segment[:100]}» cites {where['en']}, which no project file has."
+                wrong.append((line, copy.fill(copy.TRUTH_NO_PLACE, place=where)))
+            continue
+        have = numbers_guard.known_values(texts)
+        for written, value in numbers:
+            if value in have:
+                continue
+            where = (
+                places[0].words()
+                if len(places) == 1
+                else copy.listed([p.words()["en"] for p in places])
+            )
+            shown = sorted(have, key=lambda v: (len(v), v))[:8]
+            has = copy.listed(shown) if shown else copy.NO_NUMBERS
+            line = f"«{segment[:100]}» gives {written} at {where['en']}, which has {has['en']}."
+            flag = copy.fill(copy.TRUTH_MISCITED, value=written, place=where, have=has)
+            wrong.append((line, flag))
+    guide = (
+        " Cite the row or page that has the number (search_records, read_chunk), or say plainly "
+        "that ONE has no source for it. An item that is not in the BOQ is not priced as one."
+    )
+    return [
+        Problem("cited", line + (guide if i == 0 else ""), flag)
+        for i, (line, flag) in enumerate(wrong[:5])
+    ]
+
+
+def cited_values(conn, text: str) -> set[str]:
+    """Every number at the places a reply cites (normalised): a number read from a cited page
+    carries that source."""
+    found: set[str] = set()
+    for _, places, _ in citations(text):
+        for place in places:
+            found |= numbers_guard.known_values(place_text(conn, place) or [])
+    return found
 
 
 # Quotes: what they cover ----------------------------------------------------------------------

@@ -357,9 +357,12 @@ async def test_rates_and_amounts_are_copied_not_computed(ctx):
 
 
 async def test_rates_need_a_currency(ctx):
+    # the file does not state it: the engineer is asked (6 Nov 2026), and no currency is no import
     f = add_boq(ctx.rec, sample_boq_xlsx([["03/02", "خرسانة - عينة", "م3", 120, 10, 1200]]))
-    with pytest.raises(ModelRetry, match="currency"):
-        await run_import(ctx, f, columns=PRICED)
+    ctx.host.answers["question"] = json.dumps({"choice": "sent", "answers": {"currency": "؟"}})
+    out = await run_import(ctx, f, columns=PRICED)
+    assert out.startswith("not done:") and "currency" in out
+    assert count(ctx.rec, "numbers") == 0
     with pytest.raises(ModelRetry, match="currency"):
         await run_import(ctx, f, columns=PRICED, currency="XYZ")
 
