@@ -112,6 +112,8 @@ def add_file(
         found = _same_bytes(conn, sha256)  # the same bytes may have come in meanwhile
         if found is not None:
             return found
+        from qsone.records.mapping import store as map_store
+
         at = rec.clock()
         conn.executemany(
             "INSERT INTO file_pieces(sha256, seq, data) VALUES (?, ?, ?)",
@@ -126,6 +128,7 @@ def add_file(
         ).fetchone()
         replaces = None if old is None else old[0]
         if replaces is not None:
+            map_store.expire(conn, rec, replaces, at, actor=actor)
             conn.execute("UPDATE files SET valid_until = ? WHERE id = ?", (at, replaces))
             audit.record(
                 conn,
@@ -167,6 +170,7 @@ def add_file(
             before=None,
             after=row,
         )
+        map_store.enqueue(conn, rec, file_id, extracted.kind, extracted.pages, actor=actor)
         indexed = []
         for seq, piece in enumerate(chunks):
             cur = conn.execute(
@@ -243,13 +247,20 @@ def read_pages(conn, file_id: str) -> set[int]:
 
 
 def add_ocr_pages(
-    rec: Records, file_id: str, pages: dict[int, str | list[Piece]], *, read_by: str, actor: str
+    rec: Records,
+    file_id: str,
+    pages: dict[int, str | list[Piece]],
+    *,
+    read_by: str,
+    actor: str,
+    include_text_pages: bool = False,
 ) -> int:
     """Stores OCR page text or word Pieces (a scanned PDF, or an image as page 1).
     Local OCR Pieces retain boxes and confidence; AI text is chunked as before. Keeps
     chunks with the locator {"page": n, "read_by": <model id>}, the word index,
     flags for lines that look like orders to an AI, the file's status, and one audit row. A
-    page that already has text is left as it is; a page read as empty is kept as read. Vectors
+    page that already has text is left as it is (unless include_text_pages appends
+    local OCR to a sparse text layer); a page read as empty is kept as read. Vectors
     come from Plan 2b's worker, which embeds every chunk that has none. Returns how many pages
     were stored. Raises `RecordsError`: FILE_NOT_IN_PROJECT, or FILE_PAGES_OUT_OF_RANGE
     (field "pages")."""
@@ -264,7 +275,19 @@ def add_ocr_pages(
             text = copy.fill(copy.FILE_PAGES_OUT_OF_RANGE, pages=str(count or 0))
             raise RecordsError(text, status=422, field="pages")
         done = read_pages(conn, file_id)
-        new = {n: t for n, t in sorted(pages.items()) if n not in done}
+        already = done
+        if include_text_pages:
+            # Sparse text layers can still be scanned pages. Append OCR words while
+            # retaining original text and never duplicating a completed OCR page.
+            already = {
+                int(n)
+                for (n,) in conn.execute(
+                    "SELECT DISTINCT json_extract(locator, '$.page') FROM chunks "
+                    "WHERE file_id=? AND json_extract(locator, '$.read_by') IS NOT NULL",
+                    (file_id,),
+                )
+            }
+        new = {n: t for n, t in sorted(pages.items()) if n not in already}
         if not new:
             return 0
         (seq,) = conn.execute(
@@ -300,7 +323,7 @@ def add_ocr_pages(
                 for f in hidden.ai_instruction_flags([p for p in flag_pieces if p.text])
             ),
         )
-        complete = len(done) + len(new) >= count
+        complete = len(done | set(new)) >= count
         after = {"status": "read" if complete else "partly_read"}
         after["note"] = None if complete else "FILE_SCANNED_PAGES"
         conn.execute(

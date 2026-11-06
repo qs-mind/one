@@ -409,6 +409,64 @@ CREATE TRIGGER comments_no_delete BEFORE DELETE ON comments
   BEGIN SELECT RAISE(ABORT, 'Comments are never deleted'); END;
 """
 
+# Project Map: local reading now, AI facts and drawing fields filled by later jobs.
+MAP_SQL = """
+CREATE TABLE map_files (
+ file_id TEXT PRIMARY KEY REFERENCES files(id), kind TEXT NOT NULL,
+ read_how TEXT NOT NULL DEFAULT 'stored' CHECK(read_how IN ('text','ocr','mixed','stored')),
+ pages INTEGER, text_pages INTEGER NOT NULL DEFAULT 0,
+ scanned_pages TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(scanned_pages)),
+ ocr_done_pages TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(ocr_done_pages)),
+ structure TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(structure)),
+ local_state TEXT NOT NULL DEFAULT 'waiting'
+ CHECK(local_state IN ('waiting','reading','done','failed')),
+ note TEXT CHECK(note IS NULL OR json_valid(note)), ai_kind TEXT, ai_title TEXT, ai_group TEXT,
+ key_pages TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(key_pages)), ai_state TEXT,
+ ai_cost_usd TEXT, mapped_at TEXT, valid_until TEXT);
+CREATE INDEX map_files_queue ON map_files(local_state,file_id) WHERE valid_until IS NULL;
+CREATE INDEX map_files_group ON map_files(ai_group,file_id) WHERE valid_until IS NULL;
+CREATE INDEX files_map_current ON files(id,folder,kind) WHERE valid_until IS NULL;
+CREATE TABLE map_tables (
+ id TEXT PRIMARY KEY, file_id TEXT NOT NULL REFERENCES files(id),
+ locator TEXT NOT NULL CHECK(json_valid(locator)), header TEXT NOT NULL CHECK(json_valid(header)),
+ row_count INTEGER NOT NULL, looks_like_boq INTEGER NOT NULL CHECK(looks_like_boq IN (0,1)),
+ column_guess TEXT NOT NULL CHECK(json_valid(column_guess)), confidence REAL,
+ valid_until TEXT);
+CREATE TABLE map_sheets (
+ id TEXT PRIMARY KEY, file_id TEXT NOT NULL REFERENCES files(id), sheet TEXT NOT NULL,
+ number TEXT, title TEXT, revision TEXT, date TEXT, scale TEXT, discipline TEXT,
+ counts TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(counts)),
+ rooms TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(rooms)),
+ source TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(source)), state TEXT, valid_until TEXT);
+CREATE TABLE map_links (
+ id TEXT PRIMARY KEY, from_file_id TEXT NOT NULL REFERENCES files(id),
+ from_locator TEXT NOT NULL CHECK(json_valid(from_locator)),
+ to_file_id TEXT NOT NULL REFERENCES files(id),
+ to_locator TEXT NOT NULL CHECK(json_valid(to_locator)),
+ kind TEXT NOT NULL, words TEXT NOT NULL CHECK(json_valid(words)),
+ evidence TEXT NOT NULL CHECK(json_valid(evidence)),
+ "by" TEXT NOT NULL CHECK("by" IN ('one','ai','engineer')), state TEXT, valid_until TEXT);
+CREATE TABLE map_facts (
+ id TEXT PRIMARY KEY, name TEXT NOT NULL CHECK(json_valid(name)),
+ value TEXT, unit TEXT, currency TEXT,
+ file_id TEXT NOT NULL REFERENCES files(id), locator TEXT NOT NULL CHECK(json_valid(locator)),
+ box TEXT CHECK(box IS NULL OR json_valid(box)),
+ state TEXT NOT NULL CHECK(state IN ('found','blank','conflict')),
+ conflict_with TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(conflict_with)),
+ confirmed_by TEXT, confirmed_at TEXT, corrected_value TEXT, valid_until TEXT);
+"""
+for _table in ("map_tables", "map_sheets", "map_facts"):
+    MAP_SQL += f"CREATE INDEX {_table}_file ON {_table}(file_id,id) WHERE valid_until IS NULL;"
+MAP_SQL += """
+CREATE INDEX map_links_from ON map_links(from_file_id,id) WHERE valid_until IS NULL;
+CREATE INDEX map_links_to ON map_links(to_file_id,id) WHERE valid_until IS NULL;
+"""
+for _table in ("map_files", "map_tables", "map_sheets", "map_links", "map_facts"):
+    MAP_SQL += f"""
+CREATE TRIGGER {_table}_no_delete BEFORE DELETE ON {_table}
+ BEGIN SELECT RAISE(ABORT, 'Map records are retained'); END;
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -424,4 +482,5 @@ MIGRATIONS: list[str] = [
     CACHE_SQL,
     PACK_SQL,
     FILE_REGION_COMMENTS_SQL,
+    MAP_SQL,
 ]
