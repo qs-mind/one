@@ -263,23 +263,17 @@ def test_a_saved_role_on_a_refused_model_falls_back_to_the_default():
     assert roles.chosen(sheet)["quick"] == roles.defaults(sheet)["quick"] == DEEPSEEK.choice
 
 
-def test_the_model_typed_with_the_link_leads_and_nothing_costs_more(data_dir):
-    """Finding 12: the engineer typed gemini-3.1-flash-lite; no role goes to a costlier model."""
+def test_the_model_typed_with_the_link_does_every_job(data_dir):
+    """Finding 12: the engineer typed gemini-3.1-flash-lite; every role uses it."""
     link = standard.add("Google", GOOGLE_URL, STANDARD_KEY, model="gemini-3.1-flash-lite")
     saved = json.loads((data_dir / "settings.json").read_text(encoding="utf-8"))
     assert saved["ai"]["standard"][0]["model"] == "gemini-3.1-flash-lite"
     pro, flash = google("gemini-3.1-pro-preview", link.id), google("gemini-2.5-flash", link.id)
     lite, older = google("gemini-3.1-flash-lite", link.id), google("gemini-2.5-flash-lite", link.id)
     sheet = [pro, flash, lite, older, HAIKU]
-    r = roles.defaults(sheet)
-    assert r["lead"] == r["specialist"] == lite.choice
-    # quick: the cheapest of its provider; checking: another model, never costlier than typed
-    assert r["quick"] == older.choice and r["checker"] == older.choice
-    # another provider at or under the typed model's price checks it
-    assert roles.defaults([*sheet, DEEPSEEK])["checker"] == DEEPSEEK.choice
-    connectors.note_refused(older.choice)
-    r = roles.defaults(sheet)
-    assert set(r.values()) == {lite.choice}  # one model left: it does every job
+    # real walk: the Checking QS went to another Gemini; the typed model does every job
+    assert roles.defaults(sheet) == {role: lite.choice for role in roles.ROLES}
+    assert roles.defaults([*sheet, DEEPSEEK]) == {role: lite.choice for role in roles.ROLES}
     connectors.note_refused(lite.choice)
     assert roles.defaults(sheet)["lead"] == pro.choice  # a typed model refused: the usual ranking
 

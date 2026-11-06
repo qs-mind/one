@@ -378,6 +378,11 @@ MODEL_GONE = {
 }
 
 # The one tiny check (first launch, AI settings): there is no work to save yet.
+AI_CHECK_SLOW = {
+    "en": "{provider} did not answer within 10 seconds. Check the address and the model's name, "
+    "then try again.",
+    "ar": "{provider} مارَدّش في 10 ثواني. راجع العنوان واسم النموذج، وجرّب تاني.",
+}
 AI_CHECK_FAILED = {
     "en": "{provider} did not answer the check. Try again in a few minutes.",
     "ar": "{provider} مارَدّش على الفحص. جرّب تاني كمان كام دقيقة.",

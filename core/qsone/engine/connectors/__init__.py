@@ -9,6 +9,7 @@
 Keys live only in the key store, under the connector's id ("anthropic", "standard:<id>").
 """
 
+import asyncio
 import logging
 import re
 from collections.abc import Callable, Mapping, Sequence
@@ -38,6 +39,9 @@ log = logging.getLogger("qsone.engine.connectors")
 
 # What a provider raises when it does not answer as asked; anything else is a bug in One.
 PROVIDER_ERRORS = (ModelAPIError, anthropic.APIError, openai.APIError)
+CHECK_SECONDS = (
+    10  # one quick call: a provider that has not answered by then is said, not waited on
+)
 
 
 class NoKey(LookupError):
@@ -144,13 +148,19 @@ async def check(
     if connector.kind == "agent":
         return await connector.check()
     try:
-        answer = await model_request(
-            connector.model(model_id),
-            [ModelRequest.user_text_prompt("Reply OK")],
-            model_settings=ModelSettings(max_tokens=1),
+        answer = await asyncio.wait_for(
+            model_request(
+                connector.model(model_id),
+                [ModelRequest.user_text_prompt("Reply OK")],
+                model_settings=ModelSettings(max_tokens=1, timeout=CHECK_SECONDS),
+            ),
+            CHECK_SECONDS,
         )
     except NoKey:
         return copy.NO_AI
+    except TimeoutError:
+        log.warning("The check through %s took over %s s", connector.id, CHECK_SECONDS)
+        return copy.fill(copy.AI_CHECK_SLOW, provider=connector.name)
     except PROVIDER_ERRORS as error:
         log.warning("The check through %s failed: %s", connector.id, error)
         if getattr(error, "status_code", None) == 404:
