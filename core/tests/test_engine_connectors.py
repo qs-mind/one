@@ -352,6 +352,7 @@ def test_native_link_builds_a_cached_anthropic_model(monkeypatch):
     assert model.client.api_key == CLAUDE_KEY
     assert model.settings["anthropic_cache_instructions"] is True
     assert model.settings["anthropic_cache_tool_definitions"] is True
+    assert model.settings["anthropic_cache"] is True  # the conversation so far, each request
 
 
 # The Standard Link ---------------------------------------------------------------------------

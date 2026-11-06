@@ -103,6 +103,36 @@ def test_xlsx_hidden_sheet_rows_and_white_cells_are_flagged():
     assert "سطر مخفي" in " ".join(p.text for p in x.pieces)  # kept, not dropped
 
 
+def test_numbers_in_flags_and_text_read_as_excel_shows_them():
+    # real walk: «4.7699999999999996» and "17.100000000000001" in Lahun's and SGH's hidden rows
+    data = sample_xlsx({"BOQ": [["حديد - عينة", 4770, 4.77], ["17.1", 17.1, 0.3]]},
+                       hidden_rows={"BOQ": [1, 2]})  # fmt: skip
+    data = _stored(data, {"C1": "4.7699999999999996", "B2": "17.100000000000001",
+                          "C2": "0.30000000000000004"})  # fmt: skip
+    x = extract("عينة.xlsx", data)
+    (rows,) = [f for f in x.flags if f.kind == "hidden_rows"]
+    assert rows.excerpt == "حديد - عينة | 4770 | 4.77 / 17.1 | 17.1 | 0.3"
+    assert [p.text for p in x.pieces] == ["حديد - عينة | 4770 | 4.77", "17.1 | 17.1 | 0.3"]
+
+
+def _stored(data: bytes, cells: dict[str, str]) -> bytes:
+    """The workbook with each cell's number stored as `cells` gives it, as Excel writes a double
+    (openpyxl writes the shortest form)."""
+    import re
+    import zipfile
+
+    src, out = zipfile.ZipFile(io.BytesIO(data)), io.BytesIO()
+    with zipfile.ZipFile(out, "w") as dst:
+        for info in src.infolist():
+            body = src.read(info.filename)
+            if info.filename == "xl/worksheets/sheet1.xml":
+                for ref, text in cells.items():
+                    pattern = rf'(<c r="{ref}"[^>]*><v>)[^<]*(</v>)'.encode()
+                    body = re.sub(pattern, rb"\g<1>" + text.encode() + rb"\g<2>", body)
+            dst.writestr(info, body)
+    return out.getvalue()
+
+
 def test_xlsx_hidden_columns_tiny_fonts_and_white_on_a_fill():
     wb = openpyxl.Workbook()
     ws = wb.active

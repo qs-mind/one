@@ -202,6 +202,14 @@ async def _preview(ctx: ToolContext, args: PreviewArgs) -> str:
     span = f"{shown[0]}-{shown[-1]}" if shown else "1-1"
     data = {k: p[k] for k in ("sheets", "sheet", "header_guess", "columns_guess", "last_row")}
     data |= {"hidden_rows": p["hidden_rows"], "merged_rows": p["merged_rows"]}
+    whole = p["overview"]
+    if whole is not None:  # counted by code over every row, not from the rows shown
+        data["whole_sheet"] = whole | {"sections": [s["title"] for s in whole["sections"]][:20]}
+        notes.insert(
+            0,
+            "whole_sheet counts every row of the sheet by the guessed columns: quote its items, "
+            "sections and total, never a count of the rows shown here.",
+        )
     return cite.render(
         _preview_text(p),
         data=data,

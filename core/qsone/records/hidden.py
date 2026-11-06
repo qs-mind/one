@@ -16,7 +16,7 @@ from typing import Literal, Protocol
 
 import pypdfium2.raw as pdfium_c
 
-from qsone.records.arabic import display_text, normalise
+from qsone.records.arabic import display_number, display_text, normalise
 
 FlagKind = Literal[
     "white_text",
@@ -384,6 +384,14 @@ def _xlsx_sheets(z: zipfile.ZipFile) -> list[tuple[str, bool, str]]:
 _REF = re.compile(r"([A-Z]+)(\d+)")
 
 
+def _shown(stored: str) -> str:
+    """A number cell's stored text as Excel shows it."""
+    try:
+        return display_number(float(stored))
+    except ValueError:
+        return stored
+
+
 def _xlsx_cells(f, strings: list[str], styles: list[str | None]) -> Iterable[Cell]:
     hidden_cols: list[tuple[int, int]] = []
     for _, el in ET.iterparse(f):
@@ -405,6 +413,8 @@ def _xlsx_cells(f, strings: list[str], styles: list[str | None]) -> Iterable[Cel
                 elif kind == "s":
                     i = int(value.text)
                     text = strings[i] if i < len(strings) else ""
+                elif kind in (None, "n"):
+                    text = _shown(value.text)  # 4.7699999999999996 as Excel shows it: 4.77
                 else:
                     text = value.text
                 s = int(c.get("s", "0"))

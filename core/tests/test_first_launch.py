@@ -417,7 +417,7 @@ def test_a_standard_link_check_is_counted_in_costs(data_dir):
         body = {"via": "standard", "connector": "standard:deepseek"}
         assert client.post("/settings/ai/check", json=body, headers=AUTH).json() == {"ok": True}
         spent = client.get("/costs", headers=AUTH).json()
-    assert spent["tokens"]["today"] == {"input": 12, "output": 1}
+    assert spent["tokens"]["today"] == {"input": 12, "output": 1, "cached": 0}
 
 
 def test_check_waits_for_consent(no_consent, data_dir):

@@ -17,7 +17,6 @@ from qsone.engine.tools_records import RECORDS_TOOLS
 from qsone.engine.types import AgentSpec
 
 LEAD_WORDS, CHECKER_WORDS, SPECIALIST_WORDS = 600, 400, 300
-TRIM_TOKENS = 60_000
 _INSTRUCTIONS = Path(__file__).parent / "instructions"
 
 # Plan 5's tools by default (its decision 7), each once it is registered. Web work, price
@@ -62,14 +61,20 @@ def lead_spec() -> AgentSpec:
     """The Lead QS: the Project Records tools, every team tool, Plan 5's Lead tools and the
     outputs tools (Plan 6)."""
     from qsone.deliverables.tools import OUTPUTS_TOOLS
-    from qsone.engine import team  # registers the team tools; team imports this module
+    from qsone.engine import team, tool_groups  # team registers the team tools
 
     return AgentSpec(
         id="lead-qs",
         name=copy.ROLE_LEAD,
         role="lead",
         instructions=_instructions("lead_qs.txt"),
-        tools=(*RECORDS_TOOLS, *team.TEAM_TOOLS, *_registered(LEAD_TOOLS), *OUTPUTS_TOOLS),
+        tools=(
+            *RECORDS_TOOLS,
+            *team.TEAM_TOOLS,
+            *_registered(LEAD_TOOLS),
+            *OUTPUTS_TOOLS,
+            tool_groups.OPEN,  # most of these are sent when the Brief opens them
+        ),
         tier="lead",
     )
 
@@ -105,41 +110,81 @@ def build_agent(spec: AgentSpec, model, toolset, *, output_type=str):
 
 # History --------------------------------------------------------------------------------------
 
-_ID = re.compile(r'"(\w*id)"\s*:\s*"([^"]{1,80})"')
+# Every request carries the whole history: past this many tokens of tool results (ONE's estimate,
+# `request_size`), the oldest become short stubs. 3,500 holds a search's hits and a read page. Once
+# stubbed a result stays stubbed, so the start of the history stays the same for the cache.
+RESULTS_TOKENS = 3_500
+_ID = re.compile(r'"(\w*id)"\s*:\s*"([^"]{1,80})"|\b(file)(?:_id)?:\s?([0-9a-f]{32})\b')
 _VALUE = re.compile(r'"value"\s*:\s*"([^"]{1,40})"')
+_STUB = "[earlier "
 
 
-def _tokens(messages: list) -> int:
-    from pydantic_ai.messages import ModelMessagesTypeAdapter
+def _results(messages: list) -> int:
+    from pydantic_ai.messages import ModelRequest, RetryPromptPart, ToolReturnPart
 
-    return len(ModelMessagesTypeAdapter.dump_json(messages)) // 4  # about 4 bytes a token
+    from qsone.engine import request_size
+
+    return sum(
+        request_size.estimate(_text(p.content))
+        for m in messages
+        if isinstance(m, ModelRequest)
+        for p in m.parts
+        if isinstance(p, ToolReturnPart | RetryPromptPart)
+    )
 
 
-def _summary(tool_name: str, content) -> str:
-    text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
-    ids = list(dict.fromkeys(f"{k}={v}" for k, v in _ID.findall(text)))[:20]
+def _text(content) -> str:
+    return content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+
+
+def ids_in(content, most: int = 8) -> list[str]:
+    """The record ids a tool result (or a call's arguments) names, as "name=id", first `most`."""
+    found: dict[str, str] = {}  # id -> its first name
+    for a, b, c, d in _ID.findall(_text(content)):
+        found.setdefault(b or d, a or c)
+    return [f"{name}={value}" for value, name in found.items()][:most]
+
+
+def _summary(tool_name: str, content, args: dict | None = None) -> str:
+    """A stub for a tool result: its ids and values, and, for a tool that only reads, the call
+    that reads it again."""
+    text = _text(content)
+    ids = ids_in(text, 20)
     values = list(dict.fromkeys(_VALUE.findall(text)))[:20]
+    tool = REGISTRY.get(tool_name)
+    again = None
+    if args is not None and tool is not None and tool.risk == "read" and not tool.writes:
+        again = f"call {tool_name} {json.dumps(args, ensure_ascii=False)} to read it again"
     kept = "; ".join(
         part
         for part in (
             f"ids {', '.join(ids)}" if ids else "",
             f"values {', '.join(values)}" if values else "",
+            again or "",
         )
         if part
     )
-    return f"[earlier {tool_name} result, trimmed to save room{': ' + kept if kept else ''}]"
+    return f"{_STUB}{tool_name} result, trimmed to save room{': ' + kept if kept else ''}]"
 
 
-def trim_history(messages: list, *, limit_tokens: int = TRIM_TOKENS) -> list:
-    """Under `limit_tokens`, the history as it is. Over it, the oldest successful tool results
-    become short summaries that keep their ids and values, oldest first, until it fits. Errors
-    and the latest message stay whole; nothing else changes."""
+def trim_history(messages: list, *, limit_tokens: int = RESULTS_TOKENS) -> list:
+    """With at most `limit_tokens` of tool results, the history as it is. Over it, the oldest
+    successful tool results become short stubs (`_summary`), oldest first, until the rest fit.
+    Errors and the latest message stay whole; nothing else changes, and the saved history is
+    never changed in place."""
     from dataclasses import replace
 
-    from pydantic_ai.messages import ModelRequest, ToolReturnPart
+    from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
 
-    if _tokens(messages) <= limit_tokens:
+    if _results(messages) <= limit_tokens:
         return messages
+    calls = {
+        p.tool_call_id: p
+        for m in messages
+        if isinstance(m, ModelResponse)
+        for p in m.parts
+        if isinstance(p, ToolCallPart)
+    }
     out = list(messages)
     for i, message in enumerate(out[:-1]):
         if not isinstance(message, ModelRequest):
@@ -149,12 +194,17 @@ def trim_history(messages: list, *, limit_tokens: int = TRIM_TOKENS) -> list:
             if (
                 isinstance(part, ToolReturnPart)
                 and part.outcome == "success"
-                and not (isinstance(part.content, str) and part.content.startswith("[earlier "))
+                and not (isinstance(part.content, str) and part.content.startswith(_STUB))
             ):
-                parts[j] = replace(part, content=_summary(part.tool_name, part.content))
-        out[i] = replace(message, parts=parts)
-        if _tokens(out) <= limit_tokens:
-            break
+                call = calls.get(part.tool_call_id)
+                try:
+                    args = call.args_as_dict() if call is not None else None
+                except ValueError:
+                    args = None
+                parts[j] = replace(part, content=_summary(part.tool_name, part.content, args))
+                out[i] = replace(message, parts=parts)
+                if _results(out) <= limit_tokens:
+                    return out
     return out
 
 

@@ -111,6 +111,15 @@ FILE_EMPTY = {
     "en": "The file is empty.",
     "ar": "الملف فاضي.",
 }
+# After the name dropped (ui: records/RecordsPanel.tsx): the same bytes are kept once.
+FILE_SAME_AS = {
+    "en": "is the same file as {old}; kept once.",
+    "ar": "هو نفس {old}، اتحفظ مرة واحدة.",
+}
+FILE_SAME_AGAIN = {
+    "en": "is already here; kept once.",
+    "ar": "موجود بالفعل، اتحفظ مرة واحدة.",
+}
 
 FILE_NOT_READ_YET = {
     "en": "Kept in Project Records. ONE cannot read this kind of file yet.",
@@ -586,6 +595,7 @@ TOOL_WORDS = {
     },
     "use_desk": {"en": "Calling on a Desk", "ar": "بيستعين بقسم"},
     "web_read": {"en": "Reading a web page", "ar": "بيقرا صفحة ويب"},
+    "open_tools": {"en": "Getting tools ready", "ar": "بيجهّز أدواته"},
     "web_search": {"en": "Searching the web", "ar": "بيدوّر على الويب"},
 }
 
@@ -1002,6 +1012,44 @@ ROWS = Noun(
     en={"one": "1 row", "other": "{n} rows"},
     ar={"one": "صف واحد", "two": "صفين", "few": "{n} صفوف", "other": "{n} صف"},
 )
+SECTIONS = Noun(
+    en={"one": "1 section", "other": "{n} sections"},
+    ar={"one": "قسم واحد", "two": "قسمين", "few": "{n} أقسام", "other": "{n} قسم"},
+)
+FILES = Noun(
+    en={"one": "1 file", "other": "{n} files"},
+    ar={"one": "ملف واحد", "two": "ملفين", "few": "{n} ملفات", "other": "{n} ملف"},
+)
+
+# What ONE found in a drop of files, in the project chat (records/report.py). Every number in it
+# is read by the core, with the sheet, rows and cell it comes from.
+REPORT_HEAD = {"en": "ONE read {files}:", "ar": "ONE قرا {files}:"}
+REPORT_FILE = {"en": "{name}: {label}.", "ar": "{name}: {label}."}
+REPORT_NOT_READ = {"en": "{name}: {note}", "ar": "{name}: {note}"}
+REPORT_BOQ_SHEET = {
+    "en": "Sheet «{sheet}»: {items} in {sections} (rows {first}–{last}).",
+    "ar": "شيت «{sheet}»: {items} في {sections} (الصفوف {first}–{last}).",
+}
+REPORT_TOTAL = {
+    "en": "Its own total: {total} (row {row}, column {column}).",
+    "ar": "إجماليه في الملف: {total} (صف {row}، عمود {column}).",
+}
+REPORT_NO_TOTAL = {"en": "No total row in it.", "ar": "مفيش فيه صف إجمالي."}
+REPORT_MISSING = {
+    "en": "Not among the project's files yet: {missing}.",
+    "ar": "لسه مش موجود في ملفات المشروع: {missing}.",
+}
+REPORT_LABELS = {
+    "boq": {"en": "BOQ", "ar": "مقايسة"},
+    "specs": {"en": "Specifications", "ar": "مواصفات"},
+    "conditions": {"en": "Conditions of contract", "ar": "شروط التعاقد"},
+    "quote": {"en": "Quotation", "ar": "عرض سعر"},
+    "drawings": {"en": "Drawings", "ar": "رسومات"},
+    "price_list": {"en": "Price list", "ar": "قائمة أسعار"},
+    "sheet": {"en": "Spreadsheet, not a BOQ", "ar": "شيت إكسل، مش مقايسة"},
+    "image": {"en": "Image", "ar": "صورة"},
+    "document": {"en": "Document; ONE could not tell its kind", "ar": "مستند؛ ONE مقدرش يعرف نوعه"},
+}
 
 
 def listed(values: list[str]) -> dict[str, str]:

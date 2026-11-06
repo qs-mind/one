@@ -1,0 +1,131 @@
+"""The real tender files of the QS's walk (6 Nov 2026), read as dropped: Lahun's priced BOQ
+(Arabic, a sheet named «مقايسة » with a trailing space, build-up sheets hidden), the SGH
+fit-out BOQ (English, hidden rows) and the ministry's road specs PDF (806 pages, Arabic).
+
+The files live in the private docs repo (`docs/test-files/`), never in this public one: each
+test is skipped where they are not. They are read, never changed; no AI and no web here."""
+
+import os
+import warnings
+from pathlib import Path
+
+import pytest
+
+from qsone.records import boq
+from qsone.records.files import add_file
+
+
+def _test_files() -> Path | None:
+    if os.environ.get("QSONE_TEST_FILES"):
+        return Path(os.environ["QSONE_TEST_FILES"])
+    for parent in Path(__file__).resolve().parents:
+        found = parent / "docs" / "test-files"
+        if found.is_dir():
+            return found
+    return None
+
+
+FILES = _test_files()
+
+
+def real(path: str) -> bytes:
+    if FILES is None or not (FILES / path).is_file():
+        pytest.skip(f"the real file {path} is not on this computer")
+    return (FILES / path).read_bytes()
+
+
+LAHUN = "egypt/lahun-medical-center/boq-priced.xlsx"
+SGH = "saudi/sgh-makkah-opd-fitout/sgh-makkah-opd-fitout-boq.xlsx"
+MOMAH = "saudi/momah-road-specs/road-general-specs-part2-structures.pdf"
+
+
+@pytest.fixture(autouse=True)
+def _quiet():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # openpyxl on SGH's print area
+        yield
+
+
+def test_lahun_sheet_with_a_trailing_space_is_found(rec):
+    f = add_file(rec, "boq-priced.xlsx", real(LAHUN), actor="engineer").id
+    p = boq.preview(rec, f, "مقايسة")  # as a tool sends it: trimmed
+    assert p["sheet"] == "مقايسة "
+
+
+def test_lahun_overview_reads_the_whole_sheet(rec):
+    f = add_file(rec, "boq-priced.xlsx", real(LAHUN), actor="engineer").id
+    o = boq.preview(rec, f, None)["overview"]
+    assert o["items"] == 54 and o["sections_count"] == 4
+    assert o["total"] == {
+        "value": "640983.35",
+        "row": 66,
+        "column": "H",
+        "label": o["total"]["label"],
+    }
+
+
+def test_momah_clause_numbers_read_in_order():
+    import pypdfium2 as pdfium
+
+    from qsone.records.extract import _page_text
+
+    pdf = pdfium.PdfDocument(real(MOMAH))
+    try:
+        lines = _page_text(pdf[357].get_textpage()).splitlines()  # page 358
+    finally:
+        pdf.close()
+    assert "١٢-١-٢-تعاريف" in lines and "١٢-١-١- الوصف" in lines
+
+
+MOF = "saudi/mof-standard/tender-booklet-general-construction.pdf"
+IMAMU = "saudi/imamu-jakarta-institute/specs.pdf"
+
+
+def _page(path: str, index: int) -> str:
+    import pypdfium2 as pdfium
+
+    from qsone.records.extract import _page_text
+
+    pdf = pdfium.PdfDocument(real(path))
+    try:
+        return _page_text(pdf[index].get_textpage())
+    finally:
+        pdf.close()
+
+
+def test_lam_alef_reads_in_its_letters_order():
+    # real walk: «خلال» came out «خالل» (a lam-alef glyph mapped alef first): word search broke
+    mof = _page(MOF, 7)
+    assert "من خلال دور النشر" in mof and "خالل" not in mof  # a written «ال» stays
+    imamu = _page(IMAMU, 0)
+    assert "الإسلامية" in imamu and "اإلسالمية" not in imamu
+    assert "الأولى" in _page(IMAMU, 1)
+
+
+def test_lahun_columns_are_the_total_quantity_and_the_amount(rec):
+    f = add_file(rec, "boq-priced.xlsx", real(LAHUN), actor="engineer").id
+    p = boq.preview(rec, f, None)
+    assert p["header_guess"] == 3
+    assert p["columns_guess"] == {
+        "code": "A",
+        "description": "B",
+        "unit": "C",
+        "quantity": "F",  # «اجمالي كميات المقايسة والزيادة», not D (the original quantity)
+        "rate": "G",
+        "amount": "H",  # «اجمالي مقايسة»
+    }
+
+
+@pytest.mark.parametrize("sheet", ["Electrical", "Low Current", "Medical Gases"])
+def test_sgh_columns_stay_as_they_were(rec, sheet):
+    f = add_file(rec, "sgh-boq.xlsx", real(SGH), actor="engineer").id
+    p = boq.preview(rec, f, sheet)
+    assert p["header_guess"] == 3
+    assert p["columns_guess"] == {
+        "code": "A",
+        "description": "B",
+        "unit": "C",
+        "quantity": "D",
+        "rate": "E",
+        "amount": "F",
+    }

@@ -28,6 +28,7 @@ from qsone.records import files
 from qsone.tools.services import Services
 from qsone.tools.web import WEB_TOOLS
 from qsone.web import fetch
+from tests.bench.fake import openable
 from tests.conftest import AUTH, SECRET
 from tests.engine_fakes import FakeSleep, call, fake_claude_command, read_fake_log, scripted
 from tests.samples import sample_pdf
@@ -226,7 +227,8 @@ def test_a_scripted_lead_reads_a_file_then_asks_the_engineer(serve_app):
 
 def lists_files(seen: list):
     def step(messages, info):
-        seen.append({t.name for t in info.function_tools})
+        # the tools it can use: those sent, and those of the groups it can open
+        seen.append({t.name for t in info.function_tools} | openable(info))
         return call("files_list")
 
     return step

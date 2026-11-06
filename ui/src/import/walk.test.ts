@@ -145,6 +145,7 @@ describe("uploading", () => {
       empty: [],
       zips: 1,
       failed: ["away.pdf"],
+      ids: [],
     });
   });
 });

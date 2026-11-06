@@ -203,6 +203,29 @@ describe("importing a folder", () => {
     expect(screen.getByText(texts.importUnderstanding.en)).toBeInTheDocument();
   });
 
+  it("a drop is reported in the project chat once, with every file of it, before the Lead QS starts", async () => {
+    // real walk: dropping the tender files started nothing in the chat
+    let n = 0;
+    const reported: unknown[] = [];
+    const fetch = mockCore({
+      "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "2026-11-05T08:00:00Z", open: true }, { status: 201 }),
+      "POST /projects/p1/files": () => Response.json({ id: `f${++n}`, status: "read" }, { status: 201 }),
+      "POST /projects/p1/files/report": (body) => {
+        reported.push(body);
+        return Response.json({ id: "r1", lines: [] }, { status: 201 });
+      },
+      "POST /projects/p1/understand": () => new Response(null, { status: 409 }),
+    });
+    const started: string[] = [];
+    onBriefStarted((id) => started.push(id));
+    render(<ImportReports />);
+    await act(() => importFolders([file("عقد.pdf", "مناقصة/عقد.pdf"), file("BOQ.xlsx", "مناقصة/BOQ.xlsx")], { old: false }));
+    expect(reported).toEqual([{ file_ids: ["f1", "f2"] }]);
+    const order = keys(fetch);
+    expect(order.indexOf("POST /projects/p1/files/report")).toBeLessThan(order.indexOf("POST /projects/p1/understand"));
+    expect(started).toEqual(["p1"]); // the chat opens on the report
+  });
+
   it("old work is archived without the AI step and offers to understand it", async () => {
     let n = 0;
     const fetch = mockCore({

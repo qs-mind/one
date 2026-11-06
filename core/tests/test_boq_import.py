@@ -20,6 +20,7 @@ from qsone import copy
 from qsone.engine.tools import REGISTRY, call
 from qsone.records import boq, ledger
 from qsone.records.files import add_file
+from qsone.records.project import RecordsError
 from qsone.tools import boq as boq_tools  # noqa: F401 - registers boq_preview and boq_import
 from tests.fakes_tools import tool_ctx
 from tests.samples import sample_boq_xlsx, sample_pdf, sample_xlsx
@@ -228,6 +229,12 @@ def test_preview_guesses_english_headers_too(rec):
         ("Unit", "unit"),
         ("ملاحظات", None),
         ("مم", None),  # a short word must be the whole heading
+        ("اجمالي كميات المقايسة والزيادة", "quantity"),  # a total of quantities: not the amount
+        ("الكمية الإجمالية", "quantity"),
+        ("إجمالي الكمية", "quantity"),
+        ("Total Qty", "quantity"),
+        ("Total Amount", "amount"),
+        ("سعرمقايسة ", "rate"),  # «سعر» run into the next word
     ],
 )
 def test_headings_name_their_columns(heading, field):
@@ -253,6 +260,89 @@ async def test_preview_of_an_unknown_sheet_lists_the_sheets(ctx):
     f = add_boq(ctx.rec, sample_xlsx({"BOQ": [["a"]], "ملخص": [["b"]]}))
     with pytest.raises(ModelRetry, match="The sheets are: BOQ, ملخص"):
         await call("boq_preview", {"file_id": f, "sheet": "Bill 1"}, ctx)
+
+
+@pytest.mark.parametrize("stored", ["مقايسة ", "مقايسة ", " مقايـسة", "مقايسة  "])
+async def test_a_sheet_is_found_after_trimming_and_normalising(ctx, stored):
+    # real walk, Lahun: the sheet «مقايسة » (a trailing space) was listed but never imported
+    f = add_boq(ctx.rec, sample_boq_xlsx(ROWS, sheet=stored))
+    assert boq.preview(ctx.rec, f, "مقايسة")["sheet"] == stored
+    d = data_of(await run_import(ctx, f, sheet="مقايسة"))
+    assert (d["items"], d["headings"]) == (2, 1)
+    (n,) = ledger.numbers(ctx.rec, item(ctx.rec, "03/02")["id"])
+    assert source(ctx.rec, n.source_id)["locator"]["sheet"] == stored  # the cell as it is
+    again = data_of(await run_import(ctx, f, sheet="مقايسة", rows="4-6"))
+    assert again["items"] == 0 and again["already_imported_rows"] == 3  # never twice
+
+
+def test_two_sheets_the_same_after_trimming_need_the_exact_name(rec):
+    f = add_boq(rec, sample_xlsx({"BOQ ": [["a"]], " BOQ": [["b"]]}))
+    with pytest.raises(RecordsError, match="no sheet by that name"):
+        boq.preview(rec, f, "BOQ")
+    assert boq.preview(rec, f, " BOQ")["sheet"] == " BOQ"
+
+
+# Lahun's header (real walk): the original quantity, the added one, their total, the rate, the
+# amount. The total is the quantity; the amount is H, not F.
+LAHUN_HEADER = [
+    "م",
+    "بيــــــــــان ",
+    "الوحدة ",
+    "الكمية المقايسة الاصلية ",
+    "الكمية الزيادة عن المقايسة ",
+    "اجمالي كميات المقايسة والزيادة",
+    "سعرمقايسة ",
+    "اجمالي مقايسة ",
+    "ملاحظات",
+]
+
+
+def test_the_total_quantity_and_the_amount_are_guessed(rec):
+    rows = [[1, "تكسير بلاط - عينة", "م2", 50, 50, 100, 650, 65000]]
+    p = boq.preview(rec, add_boq(rec, book(rows, header=LAHUN_HEADER)), "BOQ")
+    assert p["header_guess"] == 3
+    assert p["columns_guess"] == {
+        "code": "A",
+        "description": "B",
+        "unit": "C",
+        "quantity": "F",
+        "rate": "G",
+        "amount": "H",
+    }
+
+
+def test_sheet_overview_reads_every_row_not_the_first_thirty(rec):
+    rows = [["", "أعمال مدنية - عينة", "", ""]]
+    rows += [[n, f"بند {n} - عينة", "م2", 10, 5, 50] for n in range(1, 41)]
+    rows += [["", "الأعمال الصحية - عينة", "", ""]]
+    rows += [[n, f"بند صحي {n} - عينة", "عدد", 2, 100, 200] for n in range(41, 55)]
+    rows += [["", "اجمالي المقايسة - عينة", "", "", "", 4800]]
+    p = boq.preview(rec, add_boq(rec, book(rows)), "BOQ")
+    assert len(p["rows"]) == boq.PREVIEW_ROWS  # what is shown: the first rows only
+    o = p["overview"]
+    assert (o["items"], o["sections_count"], o["first_row"], o["last_row"]) == (54, 2, 4, 60)
+    assert [s["title"] for s in o["sections"]] == ["أعمال مدنية - عينة", "الأعمال الصحية - عينة"]
+    assert o["total"] == {"value": "4800", "row": 60, "column": "F",
+                          "label": "اجمالي المقايسة - عينة"}  # fmt: skip
+
+
+async def test_preview_tool_gives_the_whole_sheet_counts(ctx):
+    rows = [[n, f"بند {n} - عينة", "م2", 10] for n in range(1, 41)]
+    f = add_boq(ctx.rec, sample_boq_xlsx(rows))
+    out = await call("boq_preview", {"file_id": f}, ctx)
+    whole = json.loads(out.split("data: ", 1)[1].splitlines()[0])["whole_sheet"]
+    assert whole["items"] == 40 and whole["total"] is None and "whole_sheet" in out
+
+
+def test_preview_shows_numbers_as_excel_does(rec):
+    # real walk: «4.7699999999999996» and "17.100000000000001", as Excel stores the doubles
+    data = book([["03/02", "حديد - عينة", "طن", 4.77, 0.3, 17.1]])
+    data = stored_as(stored_as(data, "D4", "4.7699999999999996"), "E4", "0.30000000000000004")
+    data = stored_as(data, "F4", "17.100000000000001")
+    p = boq.preview(rec, add_boq(rec, data), "BOQ")
+    (row,) = [r for r in p["rows"] if r["row"] == 4]
+    assert (row["cells"]["D"], row["cells"]["E"], row["cells"]["F"]) == ("4.77", "0.3", "17.1")
+    assert boq.exact(0.1 + 0.2, None) == (None, "decimals")  # the import never rounds it
 
 
 async def test_only_excel_files_are_imported(ctx):

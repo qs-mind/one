@@ -574,9 +574,13 @@ class CostBook:
         basis: str,
         at: datetime,
         effort: str | None = None,
+        cache_read: int = 0,
+        cache_write: int = 0,
     ) -> None:
         """`usd` is None when the price is unknown: it is kept as unknown, never as 0. `effort`
-        is the one the request was sent with (None: the provider's own).
+        is the one the request was sent with (None: the provider's own). `cache_read` and
+        `cache_write` are the input tokens the provider read from or wrote to its prompt cache,
+        counted within `input_tokens`.
         Raises `TypeError` for money that is not a `Decimal` and `ValueError` for a naive `at`."""
         if usd is not None and not isinstance(usd, Decimal):
             raise TypeError("money is a Decimal, never a float")
@@ -586,8 +590,9 @@ class CostBook:
         with self.rec.write(ENGINE) as c:
             c.execute(
                 "INSERT INTO ai_costs(at, local_day, brief_id, project_id, run_id, role,"
-                " connector, model, input_tokens, output_tokens, usd, equivalent, basis, effort)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " connector, model, input_tokens, output_tokens, usd, equivalent, basis, effort,"
+                " cache_read_tokens, cache_write_tokens)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     at.astimezone(UTC).isoformat(timespec="microseconds"),
                     local_day,
@@ -603,6 +608,8 @@ class CostBook:
                     int(equivalent),
                     basis,
                     effort,
+                    cache_read,
+                    cache_write,
                 ),
             )
 
@@ -644,8 +651,9 @@ class CostBook:
         unpriced_only: bool = False,
     ) -> dict[str, int]:
         """The tokens of what matches every filter given, priced or not, and how many responses
-        had no known price: {"input", "output", "unpriced"}. `unpriced_only` counts only those
-        (the caps of a model used without a price)."""
+        had no known price: {"input", "output", "cached", "unpriced"}, "cached" being the part of
+        "input" read from a provider's prompt cache. `unpriced_only` counts only those (the caps
+        of a model used without a price)."""
         where, args = ["1"], []
         if unpriced_only:
             where.append("usd IS NULL AND equivalent = 0")
@@ -662,10 +670,11 @@ class CostBook:
         with self.rec.read() as c:
             found = c.execute(
                 "SELECT coalesce(sum(input_tokens), 0), coalesce(sum(output_tokens), 0),"
-                f" coalesce(sum(usd IS NULL), 0) FROM ai_costs WHERE {' AND '.join(where)}",
+                " coalesce(sum(usd IS NULL), 0), coalesce(sum(cache_read_tokens), 0)"
+                f" FROM ai_costs WHERE {' AND '.join(where)}",
                 args,
             ).fetchone()
-        return {"input": found[0], "output": found[1], "unpriced": found[2]}
+        return {"input": found[0], "output": found[1], "cached": found[3], "unpriced": found[2]}
 
     def tokens_per_request(
         self, project_id: str | None, effort: str | None = None
