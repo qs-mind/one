@@ -12,10 +12,14 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from qsone.records import arabic
+from qsone.records import arabic, qs_terms
 from qsone.records.project import Records
 
 LIST_SIZE = 50  # each words or meaning list
+# A QS term's other names were written for it (qs_terms), so the lists they make weigh more than
+# the words as typed: on the search bench (tests/search_bench.py) 1.5 brought Arabic questions
+# to English files without losing same-language answers.
+TERMS_WEIGHT = 1.5
 ACTOR = "One"  # index upkeep changes no project data, so it writes no audit rows
 
 
@@ -67,12 +71,16 @@ def _useful(norm: str) -> str:
     return " ".join(w for w in norm.split() if not (len(w) == 1 and w.isdigit()))
 
 
-def rrf(lists: list[list[int]], k: int = 60) -> list[tuple[int, float]]:
-    """Reciprocal rank fusion, best first; ties go to the lower chunk id."""
+def rrf(
+    lists: list[list[int]], k: int = 60, weights: Sequence[float] | None = None
+) -> list[tuple[int, float]]:
+    """Reciprocal rank fusion, best first; ties go to the lower chunk id. Each list counts
+    once, or `weights[i]` times."""
     scores: dict[int, float] = {}
-    for ids in lists:
+    for n, ids in enumerate(lists):
+        weight = 1.0 if weights is None else weights[n]
         for rank, chunk_id in enumerate(ids, 1):
-            scores[chunk_id] = scores.get(chunk_id, 0.0) + 1 / (k + rank)
+            scores[chunk_id] = scores.get(chunk_id, 0.0) + weight / (k + rank)
     return sorted(scores.items(), key=lambda s: (-s[1], s[0]))
 
 
@@ -186,18 +194,21 @@ def _words(conn, match: str, include_old: bool, limit: int) -> list[tuple[int, f
     return [(chunk_id, -score) for chunk_id, score in rows]
 
 
-def _meaning(conn, vector: list[float], dims: int, include_old: bool) -> list[int]:
-    """Top KNN first, then only chunks of current files (unless `include_old`). MATERIALIZED keeps
-    the KNN apart, as vec0 refuses any other ORDER BY term in its own query."""
+def _meaning(
+    conn, vector: list[float], dims: int, include_old: bool, language: str | None = None
+) -> list[int]:
+    """Top KNN first, then only chunks of current files (unless `include_old`) and, with
+    `language`, only chunks written in it. MATERIALIZED keeps the KNN apart, as vec0 refuses any
+    other ORDER BY term in its own query."""
     rows = conn.execute(
         "WITH knn AS MATERIALIZED (SELECT chunk_id, distance FROM chunk_vectors"
         " WHERE embedding MATCH ? AND k = ?)"
-        " SELECT knn.chunk_id FROM knn JOIN chunks c ON c.id = knn.chunk_id"
+        " SELECT knn.chunk_id, c.text FROM knn JOIN chunks c ON c.id = knn.chunk_id"
         " JOIN files f ON f.id = c.file_id WHERE ? OR f.valid_until IS NULL"
         " ORDER BY knn.distance, knn.chunk_id",
         (_pack(vector, dims), LIST_SIZE, include_old),
     )
-    return [chunk_id for (chunk_id,) in rows]
+    return [i for i, text in rows if language is None or qs_terms.language(text) == language]
 
 
 def _hits(conn, scored: list[tuple[int, float]], found_by: dict[int, tuple[str, ...]]) -> list[Hit]:
@@ -223,6 +234,22 @@ def _quoted(norm: str) -> list[str]:
     return [f'"{token}"' for token in norm.split()]
 
 
+@dataclass(frozen=True)
+class _Plan:
+    """What one search looks up (qs_terms for the QS terms the texts name)."""
+
+    norms: list[str]  # the useful words of each text, for a words list each
+    typed: list[str]  # the texts with words, to embed
+    other: list[str]  # those terms in the language none of the texts is in, to embed
+    phrases: list[str]  # every name of those terms, for one more words list
+
+
+def _plan(texts: list[str]) -> _Plan:
+    norms = [_useful(arabic.normalise(t)) for t in texts]
+    other, phrases = qs_terms.expand(texts)
+    return _Plan(norms, [t for t, n in zip(texts, norms, strict=True) if n], other, phrases)
+
+
 def search(
     rec: Records,
     query: str,
@@ -233,7 +260,8 @@ def search(
     include_old: bool = False,
     embedder: Embedder | None = None,
 ) -> Result:
-    """`also` holds the same question in other words (the agent writes the other language)."""
+    """`also` holds the same question in other words (the agent writes the other language). The
+    QS terms a query names are also looked up under their other names, Arabic and English."""
     texts = [query, *also]
     norms = [arabic.normalise(t) for t in texts]
     exact = mode == "exact" or (mode == "auto" and looks_exact(query))
@@ -247,32 +275,37 @@ def search(
             if scored or mode == "exact":
                 return Result("exact", _hits(conn, scored, {i: ("words",) for i, _ in scored}))
 
-    norms = [_useful(n) for n in norms]
-    vectors = []
+    plan = _plan(texts)
+    # (vector, weight, language): a term list in the other language looks for passages in it
+    # only; in a project without that language it would bring noise.
+    vectors: list[tuple[list[float], float, str | None]] = []
     if embedder is not None:
         with rec.read() as conn:
             ready = _vectors_ready(conn, embedder)
         if ready:
-            vectors = [
-                embedder.embed_query(arabic.clean(t))
-                for t, n in zip(texts, norms, strict=True)
-                if n
+            vectors = [(embedder.embed_query(arabic.clean(t)), 1.0, None) for t in plan.typed]
+            vectors += [
+                (embedder.embed_query(arabic.clean(t)), TERMS_WEIGHT, qs_terms.language(t))
+                for t in plan.other
             ]
 
-    lists: list[tuple[str, list[int]]] = []
+    matches = [(" OR ".join(_quoted(norm)), 1.0) for norm in plan.norms if norm]
+    if plan.phrases:  # each name a phrase; its last word may go on ("payment" finds "payments")
+        matches.append((" OR ".join(f'"{p}"*' for p in plan.phrases), TERMS_WEIGHT))
+    lists: list[tuple[str, list[int], float]] = []
     with rec.read() as conn:
-        for norm in norms:
-            if norm:
-                found = _words(conn, " OR ".join(_quoted(norm)), include_old, LIST_SIZE)
-                lists.append(("words", [chunk_id for chunk_id, _ in found]))
-        for vector in vectors:
-            lists.append(("meaning", _meaning(conn, vector, int(embedder.dims), include_old)))
+        for match, weight in matches:
+            found = _words(conn, match, include_old, LIST_SIZE)
+            lists.append(("words", [chunk_id for chunk_id, _ in found], weight))
+        for vector, weight, language in vectors:
+            ids = _meaning(conn, vector, int(embedder.dims), include_old, language)
+            lists.append(("meaning", ids, weight))
         found_by: dict[int, tuple[str, ...]] = {}  # words lists come first, so ("words", "meaning")
-        for kind, ids in lists:
+        for kind, ids, _ in lists:
             for i in ids:
                 if kind not in found_by.get(i, ()):
                     found_by[i] = (*found_by.get(i, ()), kind)
-        fused = rrf([ids for _, ids in lists])[:k]
+        fused = rrf([ids for _, ids, _ in lists], weights=[w for *_, w in lists])[:k]
         hits = _hits(conn, fused, found_by)
 
     return Result(hybrid, hits[:k])
