@@ -130,3 +130,10 @@ async def test_a_currency_the_file_does_not_state_is_asked(registry, project):
         (currency,) = c.execute("SELECT currency FROM numbers WHERE name = 'rate'").fetchone()
     assert currency == "EGP"
     assert ledger  # imported for its numbers
+
+
+def test_a_trimmed_refusal_is_still_a_refusal():
+    from qsone.engine import agents
+
+    said = "not done: The BOQ's rates don't say their currency.\ninstead: boq_import again"
+    assert agents._summary("boq_import", said).startswith("not done:")
