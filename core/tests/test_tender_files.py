@@ -77,6 +77,31 @@ def test_momah_clause_numbers_read_in_order():
     assert "١٢-١-٢-تعاريف" in lines and "١٢-١-١- الوصف" in lines
 
 
+MOF = "saudi/mof-standard/tender-booklet-general-construction.pdf"
+IMAMU = "saudi/imamu-jakarta-institute/specs.pdf"
+
+
+def _page(path: str, index: int) -> str:
+    import pypdfium2 as pdfium
+
+    from qsone.records.extract import _page_text
+
+    pdf = pdfium.PdfDocument(real(path))
+    try:
+        return _page_text(pdf[index].get_textpage())
+    finally:
+        pdf.close()
+
+
+def test_lam_alef_reads_in_its_letters_order():
+    # real walk: «خلال» came out «خالل» (a lam-alef glyph mapped alef first): word search broke
+    mof = _page(MOF, 7)
+    assert "من خلال دور النشر" in mof and "خالل" not in mof  # a written «ال» stays
+    imamu = _page(IMAMU, 0)
+    assert "الإسلامية" in imamu and "اإلسالمية" not in imamu
+    assert "الأولى" in _page(IMAMU, 1)
+
+
 def test_lahun_columns_are_the_total_quantity_and_the_amount(rec):
     f = add_file(rec, "boq-priced.xlsx", real(LAHUN), actor="engineer").id
     p = boq.preview(rec, f, None)

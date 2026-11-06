@@ -197,15 +197,21 @@ _RTL_RUN = re.compile(
 )
 _RTL_TOKEN = re.compile(rf"{_AN}|[-\u2013:]")
 _ARABIC_LETTER = re.compile("[\u0621-\u064a]")
+# A lam-alef ligature («لا», «لأ», «لإ», «لآ», «لى») is one glyph; some PDFs map it to its two
+# letters alef first («خالل» for «خلال», MOF and imamu booklets). Its two letters share one box on
+# the page, which a written «ال» never does.
+_ALEF_LAM = re.compile("[\u0627\u0623\u0625\u0622\u0649]\u0644")
 
 
 def _page_text(textpage) -> str:
-    """The page's text, with Arabic-Indic clause numbers in reading order (`_RTL_RUN`): only in
-    a line with Arabic letters, and only where the page has the run left to right."""
+    """The page's text, with each lam-alef ligature in its letters' order (`_ALEF_LAM`) and
+    Arabic-Indic clause numbers in reading order (`_RTL_RUN`): only in a line with Arabic
+    letters, and only where the page has the run left to right."""
     text = textpage.get_text_range()
     tp = textpage.raw
     if len(text) != pdfium_c.FPDFText_CountChars(tp) or not _ARABIC_LETTER.search(text):
         return text  # a character index is not a place in the text: nothing is moved
+    text = _ligatures(tp, text)
     out, done = [], 0
     for m in _RTL_RUN.finditer(text):
         tokens = _RTL_TOKEN.findall(m[0])
@@ -220,6 +226,26 @@ def _page_text(textpage) -> str:
         out += [text[done : m.start()], "".join(reversed(tokens))]
         done = m.end()
     return "".join(out) + text[done:] if out else text
+
+
+def _box(tp, i: int) -> tuple[float, ...] | None:
+    box = [ctypes.c_double() for _ in range(4)]  # left, right, bottom, top
+    if not pdfium_c.FPDFText_GetCharBox(tp, i, *box):
+        return None
+    return tuple(b.value for b in box)
+
+
+def _ligatures(tp, text: str) -> str:
+    """`text` with each alef-then-lam pair drawn as one glyph turned to lam-then-alef."""
+    chars = None
+    for m in _ALEF_LAM.finditer(text):
+        i = m.start()
+        first = _box(tp, i)
+        if first is None or first[0] == first[1] or first != _box(tp, i + 1):
+            continue  # two glyphs: a written «ال»
+        chars = chars or list(text)
+        chars[i], chars[i + 1] = chars[i + 1], chars[i]
+    return text if chars is None else "".join(chars)
 
 
 def _left_to_right(tp, first: int, last: int) -> bool:
