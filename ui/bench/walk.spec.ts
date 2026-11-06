@@ -46,8 +46,17 @@ test("a view of sourced numbers, in Arabic (decision 16.1)", async ({ walk }) =>
   await expect.soft(view, "an Arabic view reads right to left").toHaveAttribute("dir", "rtl");
   await expect.soft(view.getByText("بيانات تجريبية"), "the view is labelled sample data").toBeVisible();
   await walk.shot("view");
-  await view.getByRole("button", { name: /جاي منين/ }).first().click();
-  await expect.soft(walk.page.getByRole("dialog", { name: "المصدر" }), "a number opens its source").toBeVisible();
+  // Wide views open at the document's width (62e56f4), with the same sourced blocks.
+  await view.getByRole("button", { name: "افتح كمستند", exact: true }).click();
+  const documentView = walk.document.getByRole("region", { name: "نظرة على المقايسة (عينة تجريبية)" });
+  await expect(documentView).toBeVisible();
+  await expect(documentView).toHaveAttribute("dir", "rtl");
+  await expect(documentView.getByText("بيانات تجريبية")).toBeVisible();
+  await expect(documentView.getByRole("table")).toBeVisible();
+  await documentView.getByRole("button", { name: /جاي منين/ }).first().click();
+  const source = walk.page.getByRole("dialog", { name: "المصدر" });
+  await expect.soft(source, "a number opens its source").toBeVisible();
+  await expect(source).toContainText("جدول كميات - عينة اختبار (sample BOQ).xlsx");
   await walk.shot("view-source");
 });
 
