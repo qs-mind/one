@@ -1264,3 +1264,44 @@ def test_csv_citation_uses_physical_start_line_after_multiline_fields():
     }
     assert walk.check("cited", {"value": 3200, "row": 4})
     assert not walk.check("cited", {"value": 3200, "row": 3})
+
+
+def test_upload_http_failure_continues(tmp_path):
+    from qsone.cli.commands import Commands
+
+    class Core:
+        def request(self, method, route, **kwargs):
+            if kwargs["params"]["name"] == "a.txt":
+                raise httpx.ReadTimeout("slow")
+            return {"status": "read"}
+
+    for name in ("a.txt", "b.txt"):
+        (tmp_path / name).write_text("Sample")
+    result = Commands(Core(), {}, None).files_add("p", [tmp_path])
+    assert [r["status"] for r in result["uploads"]] == ["failed", "read"]
+    assert result["added"] == 1 and result["failed"] == 1
+    assert "timed out" in result["uploads"][0]["error"]["en"]
+
+
+def test_map_wait_includes_running_passes(monkeypatch):
+    from qsone.cli.commands import Commands
+
+    monkeypatch.setattr("qsone.cli.commands.time.sleep", lambda _: None)
+
+    class Core:
+        polls = 0
+
+        def get(self, route, **kwargs):
+            if route.endswith("/messages"):
+                return {"messages": []}
+            self.polls += 1
+            return {
+                "files": [],
+                "status": {
+                    "passes": {"facts": {"state": "running" if self.polls == 1 else "done"}}
+                },
+            }
+
+    client = Core()
+    assert Commands(client, {}, None).map("p", wait=1)["state"] == "done"
+    assert client.polls == 2

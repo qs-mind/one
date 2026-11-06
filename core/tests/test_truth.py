@@ -410,3 +410,31 @@ def test_csv_row_citations_require_the_returned_physical_line():
     ]
     assert not truth.unread_citations("Price 3259.438571429, row 1902.", returns)
     assert truth.unread_citations("Price 3259.438571429, row 952.", returns)
+
+
+def test_search_hit_is_exact_read_passage():
+    import json
+
+    from qsone.engine import truth
+
+    result = json.dumps(
+        {
+            "hits": [
+                {
+                    "file_id": "sample",
+                    "file": "sample.pdf",
+                    "locator": {"page": 20},
+                    "text": "Security 2%",
+                }
+            ]
+        }
+    )
+    assert not truth.unread_citations(
+        "Security 2% (sample.pdf, page 20).", [("search_records", result)]
+    )
+    assert truth.unread_citations(
+        "Security 3% (sample.pdf, page 20).", [("search_records", result)]
+    )
+    assert truth.unread_citations(
+        "Security 2% (sample.pdf, page 50).", [("search_records", result)]
+    )

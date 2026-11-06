@@ -1701,7 +1701,7 @@ class _Brief:
             for run in self.store.runs(self.brief_id)
             if run["history"]
             for name, result in agents.tool_returns(run["history"])
-            if name in {"files_read", "read_chunk"}
+            if name in {"files_read", "read_chunk", "search_records"}
         ]
 
     def _reply_problems(self, output: str) -> list[truth.Problem]:
@@ -1808,8 +1808,6 @@ class _Brief:
     async def _finish(self, output: Any) -> None:
         if isinstance(output, str):
             clean = truth.clean_reply(output, shown=self._did().shown)
-            if truth.unread_citations(clean, self._read_returns()):
-                clean = copy.TRUTH_UNREAD_REPLY["ar" if truth.arabic(self.text) else "en"]
             if clean != output:  # JSON or ids that stayed after the retry: never on the screen
                 self.emit(Data(self.brief_id, "redo", self.brief_id, {"from": 0, "to": self.said}))
                 self.emit(TextDelta(self.brief_id, clean))
@@ -1817,6 +1815,12 @@ class _Brief:
                 output = clean
             results = self.results()
             marked = await asyncio.to_thread(_marked, self.place.rec, output, results)
+            unread_segments = [
+                segment
+                for segment, _, _ in truth.citations(output)
+                if truth.unread_citations(segment, self._read_returns())
+            ]
+            marked = list(dict.fromkeys([*marked, *unread_segments]))
             if marked:
                 self.emit(Unsourced(self.brief_id, tuple(marked)))
             self.worklog.truth = (self.worklog.truth or {}) | {"unsourced": marked}

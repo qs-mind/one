@@ -314,11 +314,16 @@ def _pass_summary(c):
         records = list(runs.values())
         failed = [r for r in records if r["state"] == "failed"]
         pending = [r for r in records if r["state"] in ("running", "retrying")]
-        latest = max(failed or pending or records, key=lambda r: r["at"])
+        latest = max(pending or failed or records, key=lambda r: r["at"])
         result[name] = {
             "state": latest["state"],
             "note": latest["note"],
             "attempts": max(r["attempts"] for r in records),
             "failed_batches": len(failed),
         }
+    counts = c.execute("SELECT value FROM meta WHERE key='project_map_fact_counts'").fetchone()
+    if counts:
+        result.setdefault(
+            "facts", {"state": "done", "note": None, "attempts": 1, "failed_batches": 0}
+        )["counts"] = json.loads(counts[0])
     return result

@@ -389,7 +389,7 @@ def _plain_markdown(text: str) -> str:
     return text.replace("**", "").replace("`", "").replace("|", " ")
 
 
-def select_pdf_text(data: bytes, index: int, text: str) -> tuple[str, str]:
+def select_pdf_text(data: bytes, index: int, text: str, *, inspector=None) -> tuple[str, str]:
     text = unicodedata.normalize("NFKC", text)
     score = arabic_quality(text)
     if score >= 0:
@@ -398,7 +398,12 @@ def select_pdf_text(data: bytes, index: int, text: str) -> tuple[str, str]:
     # its line order can be scrambled. Never write decrypted bytes to a path.
     for source, reader in (("pdf-inspector", _inspector_text), ("pypdf", _pypdf_text)):
         try:
-            candidate = unicodedata.normalize("NFKC", reader(data, index))
+            candidate = unicodedata.normalize(
+                "NFKC",
+                inspector(index)
+                if source == "pdf-inspector" and inspector
+                else reader(data, index),
+            )
             if source == "pdf-inspector":
                 candidate = _plain_markdown(candidate)
             if re.search(r"[ء-ي]", candidate) and arabic_quality(candidate) > score:
@@ -411,13 +416,27 @@ def select_pdf_text(data: bytes, index: int, text: str) -> tuple[str, str]:
 def _pdf(data: bytes) -> Extracted:
     pieces, flags, pdf = [], [], None
     sources = {}
+    inspector_pages = None
+
+    def inspector(index):
+        nonlocal inspector_pages
+        if inspector_pages is None:
+            import pdf_inspector
+
+            inspector_pages = {}
+            result = pdf_inspector.extract_pages_markdown_bytes(data)
+            inspector_pages.update({p.page: p.markdown for p in result.pages})
+        return inspector_pages.get(index, "")
+
     try:
         pdf = pdfium.PdfDocument(data)
         pages = len(pdf)
         for i in range(pages):
             page = pdf[i]
             textpage = page.get_textpage()
-            selected, sources[i + 1] = select_pdf_text(data, i, _page_text(textpage))
+            selected, sources[i + 1] = select_pdf_text(
+                data, i, _page_text(textpage), inspector=inspector
+            )
             text = display_text(selected, keep_blanks=True)
             flags += hidden.pdf_page_flags(page, textpage, i + 1)
             textpage.close()
