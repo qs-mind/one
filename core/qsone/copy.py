@@ -1895,8 +1895,8 @@ FILE_OLD_WORD = {
     ),
 }
 FILE_DWG_NOT_YET = {
-    "en": "Kept. ONE cannot read DWG drawings yet: save a DXF copy, or use the Qiyas Connector.",
-    "ar": "اتحفظ. ONE لسه مش بيقرا رسومات DWG: احفظ نسخة DXF، أو استخدم موصّل قياس.",
+    "en": "This drawing was kept before ONE’s drawing reader was available.",
+    "ar": "الرسم ده اتحفظ قبل ما قارئ الرسومات بتاع ONE يبقى متاح.",
 }
 FILE_IMAGE_STORED = {
     "en": "Kept. ONE reads the image when it is asked to.",
@@ -2839,3 +2839,27 @@ OCR_ARABIC_MISSING = {
         "أول ما ONE يقرا صفحة من الصورة."
     ),
 }
+
+
+FILE_DRAWINGS_MISSING = {
+    "en": "Kept. ONE's drawing reader is unavailable on this computer.",
+    "ar": "اتحفظ. قارئ الرسومات بتاع ONE مش متاح على الجهاز ده.",
+}
+FILE_DRAWINGS_LIMIT = {
+    "en": "Kept. This drawing exceeds the local reader's size limit.",
+    "ar": "اتحفظ. حجم الرسم ده أكبر من حد القارئ المحلي.",
+}
+FILE_DRAWINGS_REPAIRED = {
+    "en": "Read with repairs or limits. Some drawing content may be missing.",
+    "ar": "اتقرا بإصلاحات أو حدود. ممكن يكون فيه محتوى ناقص من الرسم.",
+}
+FILE_DRAWING_PREVIEW = {
+    "en": "A drawing preview is not available yet. The text ONE read is shown below.",
+    "ar": "معاينة الرسم لسه مش متاحة. النص اللي ONE قراه ظاهر تحت.",
+}
+REPORT_DRAWING = {
+    "en": "Drawing, {sheets} sheets: {index}",
+    "ar": "رسم، {sheets} لوحات: {index}",
+}
+
+REPORT_DRAWING_REV = {"en": "rev {revision}", "ar": "مراجعة {revision}"}

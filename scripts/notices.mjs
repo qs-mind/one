@@ -195,6 +195,7 @@ export function notices({ python, target }) {
     section("Screen (npm packages)", gate(npmPackages())),
     "\n",
     section("Shell (Rust crates)", gate(cargoPackages(target))),
+    section("Drawing reader (Rust crates)", gate(cargoPackages(target, path.join(root, "drawings", "Cargo.toml")))),
   ].join("");
 }
 

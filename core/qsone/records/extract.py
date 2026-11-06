@@ -1,6 +1,7 @@
 """Text from dropped files: PDF, Excel, CSV, plain text, Word, DXF, IFC and saved web pages, each
-in pieces with where it came from, and flags for text a person does not see. Images and DWG
-drawings are kept with a plain note. Readers use memory except optional LibreOffice conversion
+in pieces with where it came from, and flags for text a person does not see. Drawing bytes
+are read by the local subprocess; images are kept with a plain note. Readers use memory except
+optional LibreOffice conversion
 of older Office/OpenDocument files in a disposable folder."""
 
 import csv
@@ -71,7 +72,7 @@ _MAGIC = {
     "webp": b"RIFF",
 }
 # Kept but not read, each with the note that says what to do.
-_STORED = {"dwg": "FILE_DWG_NOT_YET"}
+_STORED = {}
 _IMAGES = {"png", "jpg", "webp"}
 
 
@@ -167,9 +168,11 @@ def extract(name: str, data: bytes) -> Extracted:
         return Extracted(kind, "stored", None, [], _STORED[kind])
     if kind in _IMAGES:
         return Extracted(kind, "stored", 1, [], "FILE_IMAGE_STORED")
-    if kind == "pdf":
+    if kind in ("dwg", "dxf"):
+        x = _drawing(name, data)
+    elif kind == "pdf":
         x = _pdf(data)
-    elif kind in ("xlsx", "xls", "docx", "dxf", "ifc"):
+    elif kind in ("xlsx", "xls", "docx", "ifc"):
         x = _reader(kind, data)
     else:
         x = _text(kind, data)
@@ -177,12 +180,40 @@ def extract(name: str, data: bytes) -> Extracted:
     return Extracted(x.kind, x.status, x.pages, x.pieces, x.note, x.flags + ai) if ai else x
 
 
+def _drawing(name: str, data: bytes) -> Extracted:
+    from qsone.records.drawings import read_drawing, sheets_from_drawing
+
+    drawing = read_drawing(name, data)
+    kind = name.rsplit(".", 1)[-1].lower()
+    if drawing.note and not drawing.repaired:
+        return Extracted(kind, "stored", None, [], drawing.note)
+    sheets = sheets_from_drawing(drawing)
+    pieces = [
+        Piece({"sheet": t.get("layout", "Model"), "handle": t["handle"]}, t["text"])
+        for t in drawing.texts
+        if t.get("text")
+    ]
+    for insert in drawing.inserts:
+        pieces.extend(
+            Piece(
+                {
+                    "sheet": insert.get("layout", "Model"),
+                    "handle": a.get("handle") or insert["handle"],
+                },
+                a["value"],
+            )
+            for a in insert.get("attributes", [])
+            if a.get("value")
+        )
+    return Extracted(
+        kind, "partly_read" if drawing.repaired else "read", len(sheets), pieces, drawing.note
+    )
+
+
 def _reader(kind: str, data: bytes) -> Extracted:
     # imported here: the readers import Piece from this module
-    from qsone.records.readers import docx, dxf, ifc
+    from qsone.records.readers import docx, ifc
 
-    if kind == "dxf" and dxf.is_binary(data):
-        return Extracted(kind, "stored", None, [], "FILE_DWG_NOT_YET")
     try:
         if kind in ("xlsx", "xls"):
             sheets, flags = _xlsx(data) if kind == "xlsx" else _xls(data)
@@ -194,7 +225,7 @@ def _reader(kind: str, data: bytes) -> Extracted:
             # vanished text is not in the pieces, but is still checked for orders to an AI
             flags += hidden.ai_instruction_flags(vanished)
             return Extracted(kind, "read", None, pieces, None, flags)
-        return Extracted(kind, "read", None, (dxf if kind == "dxf" else ifc).read(data), None)
+        return Extracted(kind, "read", None, ifc.read(data), None)
     except Exception as e:  # the readers raise many kinds of error on a damaged or locked file
         locked = "encrypt" in str(e).lower()  # xlrd: "Workbook is encrypted"
         return Extracted(

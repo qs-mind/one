@@ -130,6 +130,31 @@ def _what(rec: Records, f: dict) -> dict:
         return entry
     if f["kind"] in _DRAWING_KINDS:
         entry["label"] = "drawings"
+        if f["kind"] in ("dwg", "dxf") and f["status"] in ("read", "partly_read"):
+            from qsone.records.drawings import read_sheets
+
+            sheets = read_sheets(f["name"], read_original(rec, f["id"]))
+            entry["drawing"] = {
+                "sheets": f["pages"],
+                "index": {
+                    lang: "; ".join(
+                        " ".join(
+                            v
+                            for v in (
+                                s.number,
+                                s.title,
+                                copy.fill(copy.REPORT_DRAWING_REV, revision=s.revision)[lang]
+                                if s.revision
+                                else None,
+                            )
+                            if v
+                        )
+                        or s.layout
+                        for s in sheets[:10]
+                    )
+                    for lang in ("en", "ar")
+                },
+            }
         return entry
     label = _sorted_by_words(f["name"]) or _sorted_by_words(f["text"])
     if label is None and f["kind"] in _IMAGE_KINDS:
@@ -208,6 +233,8 @@ def _lines(entries: list[dict], missing: list[str]) -> list[dict]:
             continue
         label = copy.REPORT_LABELS[e["label"]]
         lines.append(copy.fill(copy.REPORT_FILE, name=name, label=label))
+        if drawing := e.get("drawing"):
+            lines.append(copy.fill(copy.REPORT_DRAWING, **drawing))
         if pdf := e.get("pdf"):
             lines.append(copy.fill(copy.REPORT_PDF_PAGES, pages=str(pdf["pages"])))
             if pdf["needs_reading"]:

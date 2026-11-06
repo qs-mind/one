@@ -17,7 +17,7 @@ export type SourcePlace = {
   locator?: SourceLocator | null;
 };
 
-const PLACES = ["page", "sheet", "row", "line"] as const;
+const PLACES = ["page", "sheet", "row", "line", "handle"] as const;
 
 /** A file's key, with the place in it when the locator names one: `file:f1#sheet=BOQ&row=41`. */
 export function fileKey(fileId: string, locator?: SourceLocator | null): string {
