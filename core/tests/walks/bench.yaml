@@ -1,0 +1,19 @@
+name: ONE scripted CLI sample
+max_usd: 3
+scripted:
+  - project: CLI sample {run}
+  - files:
+      - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
+  - ask: 'bench:question What do you need?'
+    answer:
+      question:
+        choice: sent
+        answers: {q1: Ready-mix, q2: Sample note}
+  - check: {reply_contains: 'bench reply', no_raw: true, max_usd: 1}
+  - ask: 'bench:boq Import the BOQ'
+    answer: {rows: keep}
+  - boq: show
+  - check: {boq_items: 4, boq_sections: 2, no_raw: true}
+  - ask: 'bench:chat Hello'
+  - boq: show
+  - check: {items_unchanged: true}

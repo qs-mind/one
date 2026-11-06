@@ -1,0 +1,58 @@
+name: sgh
+needs:
+- '{test_files}/saudi/sgh-makkah-opd-fitout/sgh-makkah-opd-fitout-boq.xlsx'
+max_usd: 3
+real:
+- project: sgh {run}
+- files:
+  - '{test_files}/saudi/sgh-makkah-opd-fitout/sgh-makkah-opd-fitout-boq.xlsx'
+- ask: Import this BOQ.
+  answer:
+    rows: keep
+    question:
+      choice: sent
+      answers:
+        currency: SAR
+- boq: show
+- check:
+    boq_items: 53
+- ask: What are the five biggest items by amount?
+- boq: show
+- check:
+    reply_contains:
+    - 127,000
+    - 88,290
+    - 80,000
+    - 78,750
+    - 75,100
+    boq_items: 53
+    items_unchanged: true
+    no_raw: true
+    max_usd: 3
+scripted:
+- project: CLI sample {run}
+- files:
+  - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
+- ask: bench:question What do you need?
+  answer:
+    question:
+      choice: sent
+      answers:
+        q1: Ready-mix
+        q2: Sample note
+- check:
+    reply_contains: bench reply
+    no_raw: true
+    max_usd: 1
+- ask: bench:boq Import the BOQ
+  answer:
+    rows: keep
+- boq: show
+- check:
+    boq_items: 4
+    boq_sections: 2
+    no_raw: true
+- ask: bench:chat Hello
+- boq: show
+- check:
+    items_unchanged: true

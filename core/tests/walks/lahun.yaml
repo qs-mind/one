@@ -1,0 +1,57 @@
+name: lahun
+needs:
+- '{test_files}/egypt/lahun-medical-center/boq-priced.xlsx'
+max_usd: 3
+real:
+- project: lahun {run}
+- files:
+  - '{test_files}/egypt/lahun-medical-center/boq-priced.xlsx'
+- ask: Import this BOQ and tell me its total.
+  answer:
+    rows: keep
+    question:
+      choice: sent
+      answers:
+        currency: EGP
+- boq: show
+- check:
+    reply_contains: 640,983.35
+    boq_items: 54
+    boq_sections: 4
+    card_meanings:
+      F: quantity
+      G: rate
+      H: amount
+    quantity_rows:
+      first: 54
+      last: 64
+      column: D
+    no_raw: true
+    max_usd: 3
+scripted:
+- project: CLI sample {run}
+- files:
+  - '{samples}/جدول كميات - عينة اختبار (sample BOQ).xlsx'
+- ask: bench:question What do you need?
+  answer:
+    question:
+      choice: sent
+      answers:
+        q1: Ready-mix
+        q2: Sample note
+- check:
+    reply_contains: bench reply
+    no_raw: true
+    max_usd: 1
+- ask: bench:boq Import the BOQ
+  answer:
+    rows: keep
+- boq: show
+- check:
+    boq_items: 4
+    boq_sections: 2
+    no_raw: true
+- ask: bench:chat Hello
+- boq: show
+- check:
+    items_unchanged: true
