@@ -9,6 +9,7 @@ import pytest
 
 from qsone.deliverables import store as documents
 from qsone.engine import truth
+from qsone.engine.types import reply_line
 from tests.engine_fakes import scripted
 from tests.engine_fakes import text as said
 from tests.test_engine_runner import (  # noqa: F401
@@ -187,7 +188,8 @@ def test_contract_values_without_read_are_flagged():
 
 def test_voice_and_letter_instructions():
     instructions = (Path(__file__).parents[1] / "qsone/engine/instructions/lead_qs.txt").read_text()
-    assert "Egyptian Arabic" in instructions
+    assert "Egyptian Arabic" in reply_line("قارن العروض")
+    assert "Egyptian Arabic" not in reply_line("Compare the quotes")
     assert "[يملأه المهندس:" in instructions
 
 

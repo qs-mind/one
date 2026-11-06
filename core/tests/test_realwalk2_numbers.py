@@ -418,28 +418,30 @@ async def scoped_pricing_sample(rec, brief):
         "يرجى تسعير بنود المقايسة من شيت التحليل",
         "price the BOQ from the build-up",
         "rate all items from the build-up",
+        "price the items",
+        "سعّر البنود",
+        "سعّر البنود - عينة",
+        "يرجى تسعير الأعمال",
+        "عايز الخرسانة اتسعّر من عرض المورد",
+        "سعّر بنود الدهانات",
+        "price the rebar items",
+        "cost the concrete",
+        "Please RATE the paint",
+        "price section 2",
+        "سعّر القسم ٢",
+        "price items 2-1, 2-2 from the build-up",
     ],
 )
-async def test_whole_boq_pricing_with_matching_build_up(rec, brief):
+async def test_any_pricing_request_authorises_boq_rates(rec, brief):
     ctx, args = await scoped_pricing_sample(rec, brief)
     for a in args:
         assert "number_id" in json.loads(await call("record_number", a, ctx))
 
 
-@pytest.mark.parametrize("brief", ["price section 2", "سعّر القسم ٢", "يرجى تسعير القسم 2"])
-async def test_section_pricing_stays_within_scope(rec, brief):
-    ctx, args = await scoped_pricing_sample(rec, brief)
-    with pytest.raises(ModelRetry):
-        await call("record_number", args[0], ctx)
-    for a in args[1:]:
-        assert "number_id" in json.loads(await call("record_number", a, ctx))
-
-
-async def test_scope_requires_matching_rate_source(rec):
+async def test_scope_allows_a_rate_without_matching_source_code(rec):
     ctx, args = await scoped_pricing_sample(rec, "price the BOQ from the build-up")
     wrong = args[0] | {"source_id": args[1]["source_id"], "value": args[1]["value"]}
-    with pytest.raises(ModelRetry, match="1-1"):
-        await call("record_number", wrong, ctx)
+    assert "number_id" in json.loads(await call("record_number", wrong, ctx))
 
 
 async def test_record_two_prices_does_not_authorise_scoped_pricing(rec):
@@ -449,12 +451,13 @@ async def test_record_two_prices_does_not_authorise_scoped_pricing(rec):
             await call("record_number", a, ctx)
 
 
-async def test_priced_copy_and_description_sources(rec):
+@pytest.mark.parametrize("source_code", ["1-1", "own-1"])
+async def test_priced_copy_and_description_sources(rec, source_code):
     from tests.samples import sample_xlsx
 
     ctx, args = await scoped_pricing_sample(rec, "Use my priced copy own-sample.xlsx")
     f = add_boq(
-        rec, book([["1-1", "Sample concrete slab C30", "m3", 2, 27]]), name="own-sample.xlsx"
+        rec, book([[source_code, "Sample concrete slab C30", "m3", 2, 27]]), name="own-sample.xlsx"
     )
     src = json.loads(
         await call(
@@ -493,18 +496,6 @@ async def test_priced_copy_and_description_sources(rec):
             )
         )
         a = args[idx] | {"source_id": src["source_id"]}
-        if idx == 1:
-            assert "number_id" in json.loads(await call("record_number", a, ctx))
-        else:
-            with pytest.raises(ModelRetry):  # C30 must not match the item's C25
-                await call("record_number", a, ctx)
-
-
-async def test_pricing_list_cannot_expand_to_the_whole_boq(rec):
-    ctx, args = await scoped_pricing_sample(rec, "price items 2-1, 2-2 from the build-up")
-    with pytest.raises(ModelRetry):
-        await call("record_number", args[0], ctx)
-    for a in args[1:]:
         assert "number_id" in json.loads(await call("record_number", a, ctx))
 
 
@@ -553,9 +544,23 @@ async def test_arabic_description_match_in_pricing_scope(rec):
 
 
 @pytest.mark.parametrize(
-    "brief", ["Record two prices from the BOQ as test prices only", "سجّل السعرين دول من المقايسة"]
+    "brief",
+    [
+        "Record two prices from the BOQ as test prices only",
+        "record these two test prices",
+        "سجّل السعرين دول من المقايسة",
+    ],
 )
 async def test_recording_prices_mentions_boq_without_requesting_pricing(rec, brief):
     ctx, args = await scoped_pricing_sample(rec, brief)
     with pytest.raises(ModelRetry):
         await call("record_number", args[0], ctx)
+
+
+def test_record_number_instructions_include_all_pricing_authorisations():
+    from qsone.engine.tools import REGISTRY
+
+    instructions = REGISTRY["record_number"].description
+    assert "engineer-named item" in instructions
+    assert "any pricing request" in instructions
+    assert "engineer's own priced copy" in instructions

@@ -2019,25 +2019,15 @@ BOQ_QUANTITY_MISSING = {
     ),
     "ar": "مفيش كمية في الملف للصفوف {rows} (العمود المختار وأعمدة الكمية فاضيين).",
 }
-BOQ_PRICE_SOURCE_MISMATCH = {
-    "en": (
-        "The source row does not identify BOQ item {item}. Use a row carrying its code "
-        "or matching description, or keep the price on its own."
-    ),
-    "ar": (
-        "صف المصدر مش بيشاور على بند المقايسة {item}. اختار صف فيه كوده أو وصفه، "
-        "أو سجّل السعر لوحده."
-    ),
-}
 BOQ_PRICE_ITEM_REQUIRED = {
     "en": (
-        "The engineer did not name item {item}, or this price is outside the requested scope "
-        "or its source does not identify that item. Use a source row carrying item {item}'s "
-        "code or matching description, name the intended BOQ item, or keep a standalone price."
+        "The engineer did not name item {item} or request pricing. "
+        "Name the intended BOQ item, request pricing, "
+        "or keep a standalone price."
     ),
     "ar": (
-        "البند {item} مش متحدد من المهندس، أو خارج المطلوب تسعيره، أو مصدر السعر مش بيشاور عليه. "
-        "اختار صف مصدر فيه كود البند {item} أو وصفه، أو حدّد بند المقايسة المقصود، "
+        "المهندس محددش البند {item} ولا طلب تسعير. "
+        "حدّد بند المقايسة المقصود، أو اطلب تسعير، "
         "أو سجّل السعر لوحده."
     ),
 }
@@ -2840,11 +2830,12 @@ OCR_ARABIC_MISSING = {
     "en": (
         "ONE read with English OCR only. Arabic reading needs the Arabic model "
         "(ara.traineddata). ONE could not download it to {folder}. "
-        "It will download when online, with enough free space, the next time a page needs OCR."
+        "It will download when online, with enough free space, "
+        "the next time ONE reads a page using OCR."
     ),
     "ar": (
         "ONE قرا بالإنجليزي بس. قراية العربي محتاجة نموذج العربي (ara.traineddata). "
         "ONE مقدرش ينزّله في {folder}. هينزّله لما الإنترنت يرجع وتبقى فيه مساحة كفاية، "
-        "أول ما صفحة تحتاج قراية من الصورة."
+        "أول ما ONE يقرا صفحة من الصورة."
     ),
 }

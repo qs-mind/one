@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic_ai.messages import ModelRequest
 
 from qsone import copy, usage
 from qsone.app import create_app
@@ -273,7 +274,11 @@ async def test_the_lessons_brief_with_a_function_model(data_dir, fake_sleep, fak
         await engine.start()
         brief = await closing.propose_lessons(rec, engine)
         await engine.result(brief)
-        assert closing.INSTRUCTION in str(lead.seen[0])
+        assert any(
+            closing.INSTRUCTION in (message.instructions or "")
+            for message in lead.seen[0]
+            if isinstance(message, ModelRequest)
+        )
         lessons = closing.checklist(rec, engine.engineer_records())["lessons"]
         assert [(x["text"], x["carried"]) for x in lessons] == [(LESSON["text"], False)]
     finally:
