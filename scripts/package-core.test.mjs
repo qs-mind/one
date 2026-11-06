@@ -174,3 +174,13 @@ test("the smoke test starts the core without any virtual environment", () => {
   });
   expect(env).toEqual({ PATH: "/usr/bin", HOME: "/home/me" });
 });
+
+test("the drawing executable ships beside the embedded runtime", async () => {
+  const { copyDrawings } = await import("./package-core.mjs");
+  const from = tmp();
+  const out = tmp();
+  put(from, ["qsone-drawings"]);
+  copyDrawings(from, out, "x86_64-unknown-linux-gnu");
+  expect(readFileSync(path.join(out, "qsone-drawings"), "utf8")).toBe("x");
+  expect(() => copyDrawings(from, out, "x86_64-pc-windows-msvc")).toThrow(/drawing reader/i);
+});

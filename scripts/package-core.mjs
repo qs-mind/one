@@ -198,6 +198,14 @@ export function sizeOf(dir) {
   return { bytes, files };
 }
 
+/** A separately built, unmodified-library drawing reader beside the packaged runtime. */
+export function copyDrawings(from, out, target) {
+  const name = `qsone-drawings${target.includes("windows") ? ".exe" : ""}`;
+  const source = path.join(from, name);
+  if (!existsSync(source)) throw new Error(`Build the drawing reader before packaging: ${source}`);
+  cpSync(source, path.join(out, name));
+}
+
 export async function packageCore({ target = hostTarget(), out = path.join(root, "build", "core") } = {}) {
   const pinned = runtime.targets[target];
   if (!pinned) throw new Error(`core/runtime.json has no target ${target}`);
@@ -212,6 +220,7 @@ export async function packageCore({ target = hostTarget(), out = path.join(root,
   ]);
   copyCore(path.join(root, "core", "qsone"), site);
   trim(out, target);
+  copyDrawings(path.join(root, "drawings", "target", "release"), out, target);
   refuseLicensedFonts(out);
   bytecodeOnly(python, lib);
   const { writeNotices } = await import("./notices.mjs"); // it imports this file

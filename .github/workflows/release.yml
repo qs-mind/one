@@ -111,6 +111,11 @@ jobs:
       - name: Rust from rust-toolchain.toml
         run: rustup toolchain install && rustc --version
 
+      - name: Build and test ONE's drawing reader
+        run: |
+          cargo test --manifest-path drawings/Cargo.toml --locked -j 4
+          cargo build --manifest-path drawings/Cargo.toml --locked --release -j 4
+
       # cryptography builds its Rust part against a static OpenSSL wherever no wheel fits the Intel Mac.
       - name: Static OpenSSL on the Intel Mac
         if: matrix.target == 'x86_64-apple-darwin'

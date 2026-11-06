@@ -706,6 +706,8 @@ export const texts = {
     en: "This page is scanned: it has no text ONE could read.",
     ar: "الصفحة دي متصوّرة سكانر: مفيهاش نص ONE يقدر يقراه.",
   },
+  drawingAt: { en: "Sheet {sheet}, handle {handle}", ar: "لوحة {sheet}، معرّف {handle}" },
+  drawingNoPreview: { en: "A drawing preview is not available yet. The text ONE read is shown below.", ar: "معاينة الرسم لسه مش متاحة. النص اللي ONE قراه ظاهر تحت." },
   fileNoText: { en: "ONE read no text from this file.", ar: "ONE مقراش أي نص من الملف ده." },
   // Plan 7 Task 6 (the shell: top bar, floating chat, command bar, palette, General chat)
   searchKeys: { en: "Search {keys}", ar: "بحث {keys}" },

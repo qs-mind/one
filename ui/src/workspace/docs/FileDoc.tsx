@@ -21,9 +21,10 @@ export const LARGE = 1400;
 const RESIZE_SETTLE_MS = 150;
 
 function where(locator: FilePiece["locator"]): string | undefined {
-  const { page, sheet, row, line } = locator;
+  const { page, sheet, row, line, handle } = locator;
   if (page !== undefined) return fill(t("page"), { page });
   if (sheet !== undefined && row !== undefined) return fill(t("sheetRow"), { sheet: String(sheet).trim(), row }); // «مقايسة » had a space
+  if (sheet !== undefined && handle !== undefined) return fill(t("drawingAt"), { sheet: String(sheet), handle: String(handle) });
   if (row !== undefined) return fill(t("row"), { row });
   if (line !== undefined) return fill(t("line"), { line });
   return undefined;
@@ -344,6 +345,14 @@ export function FileDoc({ projectId, sources, fileId, opened, notice }: {
   useLanguage();
   const [comparing, setComparing] = useState(false);
   const state = useFilePage(sources, fileId, opened);
+  const [drawing, setDrawing] = useState(false);
+  useEffect(() => {
+    let live = true;
+    sources.files().then((files) => {
+      if (live) setDrawing(/\.(dwg|dxf)$/i.test(files.find((f) => f.id === fileId)?.name ?? ""));
+    }, () => {});
+    return () => { live = false; };
+  }, [sources, fileId]);
   // undefined while asked; null for no sheet (a PDF, a text file, or one the sheet reader cannot open)
   const [sheet, setSheet] = useState<FileSheet | null | undefined>(undefined);
   useEffect(() => {
@@ -383,6 +392,7 @@ export function FileDoc({ projectId, sources, fileId, opened, notice }: {
     return <SheetFile projectId={projectId} sources={sources} fileId={fileId} first={sheet} opened={opened} notice={notice} />;
   return (
     <div ref={root} dir={dir()} className="h-full overflow-auto bg-paper text-ink">
+      {drawing && <p role="status" className="px-5 py-3 text-slate">{t("drawingNoPreview")}</p>}
       {projectId && (state.pages ?? 0) > 0 && <button type="button" className="px-5 py-2 text-copper" onClick={() => setComparing(true)}>{t("compareOpen")}</button>}
       {sheet === null && <FilePages sources={sources} fileId={fileId} state={state} width={width} notice={notice} opened={opened} projectId={projectId} />}
     </div>

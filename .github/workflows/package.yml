@@ -18,6 +18,7 @@ on:
       - "core/pyproject.toml"
       - "package-lock.json"
       - "desktop/**"
+      - "drawings/**"
       - ".github/workflows/**"
   pull_request:
     paths:
@@ -29,6 +30,7 @@ on:
       - "core/pyproject.toml"
       - "package-lock.json"
       - "desktop/**"
+      - "drawings/**"
       - ".github/workflows/**"
   workflow_dispatch:
 
@@ -69,6 +71,11 @@ jobs:
       # The notices list the shell's Rust crates with `cargo metadata`; rustup reads rust-toolchain.toml.
       - name: Rust from rust-toolchain.toml
         run: rustup toolchain install && rustc --version
+
+      - name: Build and test ONE's drawing reader
+        run: |
+          cargo test --manifest-path drawings/Cargo.toml --locked -j 4
+          cargo build --manifest-path drawings/Cargo.toml --locked --release -j 4
 
       - run: npm ci --ignore-scripts
 

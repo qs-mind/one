@@ -86,8 +86,11 @@ def test_dxf_text_by_layer_with_arabic_codepage():
     assert data.startswith(b"  0\r\nSECTION")
     x = extract("مسقط - عينة.dxf", data)
     assert x.kind == "dxf" and x.status == "read"
-    assert Piece({"layer": "A-TEXT"}, "A-TEXT | غرفة نوم | مطبخ") in x.pieces
-    assert any(p.locator == {"layer": "A-DOOR"} and "D90 ×2" in p.text for p in x.pieces)
+    assert [p.text for p in x.pieces] == ["غرفة نوم", "مطبخ"]
+    assert all(p.locator["sheet"] == "Model" and p.locator["handle"] for p in x.pieces)
+    from qsone.records.drawings import read_sheets
+
+    assert read_sheets("sample.dxf", data)[0].counts["D90"] == 2
 
 
 def test_dxf_mtext_codes_and_repeats_in_utf8():
@@ -103,9 +106,14 @@ def test_dxf_mtext_codes_and_repeats_in_utf8():
         }
     )
     x = extract("مسقط - عينة.dxf", data)
-    assert x.pieces == [
-        Piece({"layer": "A-ROOM"}, "A-ROOM | غرفة نوم ⌀12 | 1/2 م | حمام ×2 | ⌀16 @ 200")
+    assert [" ".join(p.text.split()) for p in x.pieces] == [
+        "غرفة نوم Ø12",
+        "1/2 م",
+        "حمام",
+        "حمام",
+        "Ø16 @ 200",
     ]
+    assert len({p.locator["handle"] for p in x.pieces}) == 5
 
 
 def test_dxf_without_text_is_read_with_no_pieces():
@@ -160,11 +168,21 @@ def test_ifc_magic_and_damage():
     assert (x.kind, x.status) == ("ifc", "read")  # a broken escape is decoded leniently
 
 
-def test_binary_dxf_and_dwg_are_stored_with_a_plain_note():
+def test_damaged_binary_dxf_and_dwg_have_a_plain_note():
     x = extract("مسقط - عينة.dxf", b"AutoCAD Binary DXF\r\n\x1a\x00" + b"\x00" * 20)
-    assert (x.kind, x.status, x.note, x.pieces) == ("dxf", "stored", "FILE_DWG_NOT_YET", [])
+    assert (x.kind, x.status, x.note, x.pieces) == (
+        "dxf",
+        "partly_read",
+        "FILE_DRAWINGS_REPAIRED",
+        [],
+    )
     x = extract("مسقط - عينة.dwg", b"AC1032" + b"\x00" * 20)
-    assert (x.kind, x.status, x.note, x.pieces) == ("dwg", "stored", "FILE_DWG_NOT_YET", [])
+    assert (x.kind, x.status, x.note, x.pieces) == (
+        "dwg",
+        "partly_read",
+        "FILE_DRAWINGS_REPAIRED",
+        [],
+    )
 
 
 def test_old_word_is_stored_with_a_plain_note(monkeypatch):
