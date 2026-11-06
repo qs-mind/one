@@ -56,15 +56,16 @@ class Meaning:
         root: Path,
         *,
         spec: ModelSpec = EMBEDDER,
-        client: Callable[[], httpx.Client] = fetch.default_client,
+        client: Callable[[], httpx.Client] | None = None,
         loader: Callable[[ModelSpec, Path], object] | None = None,
         available: Callable[[], bool] | None = None,
         ram: int | None = None,
-        sleep: Callable[[float], None] = time.sleep,
+        sleep: Callable[[float], object] | None = None,
     ):
         self.root = Path(root)
         self._projects, self._specs = projects, (spec,)
-        self._client, self._sleep = client, sleep
+        self._client = client or fetch.default_client
+        self._sleep = sleep  # None: the wait between retries ends when quitting
         self._loader = loader or _onnx_loader
         self._available = available or _has_runtime
         self._host = ModelHost(
@@ -84,7 +85,8 @@ class Meaning:
     # The model's state
 
     def start(self) -> None:
-        """Works out the state, goes on with a download a project asked for, starts the worker."""
+        """Works out the state, goes on with a download a project asked for, starts the worker.
+        With neither, the worker first looks for a project with text on this computer."""
         if not self._available():
             self._set("unavailable", copy.MEANING_NOT_ON_THIS_COMPUTER)
         elif fetch.installed(self._specs, self.root):
@@ -238,6 +240,10 @@ class Meaning:
             return self._quit.is_set() or self._state != "ready"
 
     def _work(self) -> None:
+        with self._lock:
+            off = self._state == "off"
+        if off and self._any_text():
+            self._want()
         while not self._quit.is_set():
             self._wake.clear()
             self._host.unload_idle()
@@ -246,6 +252,26 @@ class Meaning:
                     break
                 self._look(pid, rec)
             self._wake.wait(WAKE_SECONDS)
+
+    def _any_text(self) -> bool:
+        """Has any project here text? Each file is opened on its own and closed again; one that
+        will not open is passed over."""
+        for project in self._projects.list():
+            if self._quit.is_set():
+                return False
+            if "error" in project:
+                continue
+            try:
+                rec = self._projects.open_file(project["id"])
+            except Exception as error:
+                log.warning("project %s: not looked at (%s)", project["id"], type(error).__name__)
+                continue
+            try:
+                if search.vector_counts(rec, self._embedder)[1]:
+                    return True
+            finally:
+                rec.close()
+        return False
 
     def _look(self, pid: str, rec) -> None:
         """Vectors of another model go at once; text asks for the model; then indexing."""

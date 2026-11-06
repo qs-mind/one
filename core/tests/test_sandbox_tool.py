@@ -20,7 +20,7 @@ import pytest
 from qsone import copy
 from qsone.engine.agents import checker_spec
 from qsone.engine.tools import REGISTRY, Denied, ModelRetry, call
-from qsone.meaning.download import DownloadError
+from qsone.meaning.download import DownloadError, NoSpace
 from qsone.records import files
 from qsone.sandbox import check, runtime
 from qsone.sandbox.runner import RunResult, SandboxRunner
@@ -385,13 +385,13 @@ async def test_ready_installs_and_a_damaged_runtime_is_downloaded_again(tmp_path
 
 def test_download_failures_use_the_sandboxs_own_texts(tmp_path, monkeypatch):
     for theirs, ours in (
-        (copy.MEANING_DOWNLOAD_FAILED, copy.SANDBOX_DOWNLOAD_FAILED),
-        (copy.MEANING_NO_SPACE, copy.SANDBOX_NO_SPACE),
-        (copy.MEANING_FILE_DAMAGED, copy.MEANING_FILE_DAMAGED),  # already plain for any file
+        (DownloadError(copy.MEANING_DOWNLOAD_FAILED), copy.SANDBOX_DOWNLOAD_FAILED),
+        (NoSpace(335_000_000), copy.SANDBOX_NO_SPACE),
+        (DownloadError(copy.MEANING_FILE_DAMAGED), copy.MEANING_FILE_DAMAGED),  # plain for any file
     ):
 
         def fail(*args, theirs=theirs, **kwargs):
-            raise DownloadError(theirs)
+            raise theirs
 
         monkeypatch.setattr(runtime.fetch, "download", fail)
         with pytest.raises(DownloadError) as failed:

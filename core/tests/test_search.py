@@ -1,6 +1,6 @@
 """Search: exact mode for codes and numbers, words for Arabic spellings, meaning through the
-Embedder interface (test doubles only, no model), RRF fusion, the Reranker interface (One ships
-none, the interface stays) and dropping the vectors of an old model."""
+Embedder interface (test doubles only, no model), RRF fusion and dropping the vectors of an old
+model."""
 
 import pytest
 
@@ -15,7 +15,7 @@ from qsone.records.search import (
     search,
     vector_counts,
 )
-from tests.doubles import ConceptEmbedder, PreferReranker
+from tests.doubles import ConceptEmbedder
 from tests.samples import sample_pdf, sample_xlsx
 
 
@@ -99,12 +99,6 @@ def test_words_and_meaning_together(boq):
     r = search(boq, "waterproofing", also=["عزل الرطوبة"], embedder=emb)
     assert r.hits[0].locator == {"sheet": "BOQ", "row": 3}
     assert r.hits[0].found_by == ("words", "meaning")
-
-
-def test_reranker_reorders_the_top(boq):
-    assert search(boq, "خرسانة").hits[0].locator != {"sheet": "BOQ", "row": 2}
-    r = search(boq, "خرسانة", reranker=PreferReranker("عادية"))
-    assert r.hits[0].locator == {"sheet": "BOQ", "row": 2} and r.hits[0].score == 1.0
 
 
 def test_k_limits_the_hits(boq):

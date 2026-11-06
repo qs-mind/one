@@ -282,3 +282,32 @@ def test_the_bench_checks_a_claude_key_itself(data_dir, monkeypatch):
 
 async def _no_wait(_seconds: float) -> None:
     return None
+
+
+def test_the_bench_gets_search_by_meaning_ready_from_the_fake_hub(data_dir):
+    """The guard keeps Hugging Face out; the bench's model comes from the fake hub, so its
+    screens never show «البحث بالمعنى مش جاهز»."""
+    import time
+
+    from fastapi.testclient import TestClient
+
+    from tests.bench import __main__ as bench_main
+    from tests.samples import sample_xlsx
+
+    app = create_app(
+        SECRET, data_dir=data_dir, meaning=lambda r: bench_main.bench_meaning(r, data_dir)
+    )
+    with TestClient(app) as client:
+        pid = client.post("/projects", json={"name": "مدرسة - عينة"}, headers=AUTH).json()["id"]
+        rows = [["03/02", "خرسانة مسلحة للأسقف - عينة", "م3", 120]]
+        r = client.post(
+            f"/projects/{pid}/files",
+            params={"name": "جدول - عينة.xlsx"},
+            content=sample_xlsx({"BOQ": rows}),
+            headers=AUTH,
+        )
+        assert r.status_code == 201
+        end = time.monotonic() + 5
+        while client.get("/meaning", headers=AUTH).json()["model"]["state"] != "ready":
+            assert time.monotonic() < end, client.get("/meaning", headers=AUTH).json()
+            time.sleep(0.02)

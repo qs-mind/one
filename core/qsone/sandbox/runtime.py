@@ -81,10 +81,7 @@ FILES = (
 
 
 # The search models' download words, said for the Sandbox's Python instead.
-_OURS = (
-    (copy.MEANING_DOWNLOAD_FAILED, copy.SANDBOX_DOWNLOAD_FAILED),
-    (copy.MEANING_NO_SPACE, copy.SANDBOX_NO_SPACE),
-)
+_OURS = ((copy.MEANING_DOWNLOAD_FAILED, copy.SANDBOX_DOWNLOAD_FAILED),)
 
 
 @dataclass(frozen=True)
@@ -160,6 +157,8 @@ def install(
     spec = _spec(files)
     try:
         fetch.download([spec], base, client=client, stop=stop, on_progress=on_progress)
+    except fetch.NoSpace as e:
+        raise fetch.DownloadError(copy.SANDBOX_NO_SPACE) from e
     except fetch.DownloadError as e:
         text = next((ours for theirs, ours in _OURS if e.text == theirs), e.text)
         raise fetch.DownloadError(text) from e

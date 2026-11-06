@@ -112,6 +112,21 @@ def _refuse_internet(family, address) -> None:
 
 
 @pytest.fixture(autouse=True)
+def refused_hub(monkeypatch):
+    """Every test: the search model's default download answers 403 at once, so an app made
+    without a fake hub never tries the real one, nor waits out its retries. A test that wants a
+    download passes its own client (tests/hub.py)."""
+    import httpx
+
+    from qsone.meaning import download
+
+    def refused() -> httpx.Client:
+        return httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(403)))
+
+    monkeypatch.setattr(download, "default_client", refused)
+
+
+@pytest.fixture(autouse=True)
 def no_internet(monkeypatch):
     """Every test: a connection to anything but this computer is refused, and so is a name
     lookup. Loopback and AF_UNIX work. Covers plain sockets and asyncio's own connect (which

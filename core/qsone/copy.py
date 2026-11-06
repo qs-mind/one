@@ -206,11 +206,11 @@ MEANING_FILE_DAMAGED = {
 
 MEANING_NO_SPACE = {
     "en": (
-        "There is not enough free space: the search model needs about 140 MB. "
+        "There is not enough free space: the search model needs about {size} free. "
         "Free some space; it tries again at the next start."
     ),
     "ar": (
-        "مفيش مساحة فاضية كفاية: نموذج البحث محتاج حوالي 140 ميجا. "
+        "مفيش مساحة فاضية كفاية: نموذج البحث محتاج حوالي {size} فاضيين. "
         "فضّي شوية مساحة، وهيحاول تاني أول ما تفتح البرنامج."
     ),
 }

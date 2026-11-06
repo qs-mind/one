@@ -1,7 +1,8 @@
 """The search model, pinned to an exact Hugging Face commit with each file's size and SHA-256.
 
-multilingual-e5-small, int8 ONNX (founder's decision, 5 Nov 2026): 118 MB instead of the 1.17 GB
-of BGE-M3 and its reranker. Only `tokenizer.json` and the int8 `.onnx` are fetched.
+multilingual-e5-small, int8 ONNX (founder's decision, 5 Nov 2026): 135 MB with its tokenizer,
+instead of the 1.17 GB of BGE-M3 and its reranker. Only `tokenizer.json` and the int8 `.onnx`
+are fetched.
 """
 
 from dataclasses import dataclass

@@ -1,8 +1,7 @@
 """Search in one project. Exact mode for codes and numbers; otherwise words and meaning lists,
-fused by reciprocal rank fusion (RRF) and, with a reranker, reordered at the top.
+fused by reciprocal rank fusion (RRF); no reranker (5 Nov 2026).
 
-The embedding model stays behind the `Embedder` interface (meaning/onnx.py: multilingual-e5-small);
-One ships no reranker (5 Nov 2026), but `search` still takes one behind `Reranker`.
+The embedding model stays behind the `Embedder` interface (meaning/onnx.py: multilingual-e5-small).
 `arabic.normalise` runs exactly once on any text, on the index side and on the query side (its
 light stemmer is not idempotent)."""
 
@@ -10,14 +9,13 @@ import json
 import re
 import struct
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from qsone.records import arabic
 from qsone.records.project import Records
 
 LIST_SIZE = 50  # each words or meaning list
-RERANK_TOP = 30
 ACTOR = "One"  # index upkeep changes no project data, so it writes no audit rows
 
 
@@ -27,12 +25,6 @@ class Embedder(Protocol):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
     def embed_query(self, text: str) -> list[float]: ...
-
-
-class Reranker(Protocol):
-    name: str
-
-    def rerank(self, query: str, texts: list[str]) -> list[float]: ...  # higher is better
 
 
 Mode = Literal["auto", "exact", "meaning"]
@@ -45,7 +37,7 @@ class Hit:
     file_name: str
     locator: dict
     text: str
-    score: float  # exact: -bm25; hybrid: RRF, or the reranker's score when it ran
+    score: float  # exact: -bm25; hybrid: RRF
     found_by: tuple[str, ...]  # "words", "meaning"
 
 
@@ -121,6 +113,8 @@ def drop_stale_vectors(rec: Records, embedder: Embedder) -> bool:
     with rec.write(ACTOR, upkeep=True) as conn:
         conn.execute("DROP TABLE IF EXISTS chunk_vectors")
         conn.execute("DELETE FROM meta WHERE key IN ('embed_model', 'embed_dims')")
+    # Project files keep auto_vacuum off (0), so there is no incremental vacuum to run: the freed
+    # pages stay in the file and the new, smaller vectors fill them.
     return True
 
 
@@ -238,7 +232,6 @@ def search(
     k: int = 10,
     include_old: bool = False,
     embedder: Embedder | None = None,
-    reranker: Reranker | None = None,
 ) -> Result:
     """`also` holds the same question in other words (the agent writes the other language)."""
     texts = [query, *also]
@@ -279,16 +272,7 @@ def search(
             for i in ids:
                 if kind not in found_by.get(i, ()):
                     found_by[i] = (*found_by.get(i, ()), kind)
-        fused = rrf([ids for _, ids in lists])[: max(k, RERANK_TOP) if reranker else k]
+        fused = rrf([ids for _, ids in lists])[:k]
         hits = _hits(conn, fused, found_by)
 
-    if reranker is not None and hits:
-        top, rest = hits[:RERANK_TOP], hits[RERANK_TOP:]
-        hits = _reorder(top, reranker.rerank(query, [h.text for h in top])) + rest
     return Result(hybrid, hits[:k])
-
-
-def _reorder(hits: list[Hit], scores: Sequence[float]) -> list[Hit]:
-    """Best score first; the sort is stable, so ties keep the order they came in."""
-    order = sorted(range(len(hits)), key=lambda i: -scores[i])
-    return [replace(hits[i], score=float(scores[i])) for i in order]

@@ -95,6 +95,29 @@ describe("MeaningStatus", () => {
     expect(screen.getByText(preparing("0%"))).toBeInTheDocument();
   });
 
+  it("after a file comes in with the model ready, keeps looking until the project's preparing shows", async () => {
+    vi.useFakeTimers();
+    let now = status({ state: "ready", done_bytes: total }, { state: "ready", done: 5, total: 5 });
+    const fetch = core(() => now);
+    const { rerender } = render(<MeaningStatus projectId={project} files={1} />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    rerender(<MeaningStatus projectId={project} files={2} />); // the core has not looked at it yet
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    now = status({ state: "ready", done_bytes: total }, { state: "indexing", done: 5, total: 45 });
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText(preparing("11%"))).toBeInTheDocument();
+
+    now = status({ state: "ready", done_bytes: total }, { state: "ready", done: 45, total: 45 });
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    const polls = gets(fetch);
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(gets(fetch)).toBe(polls); // done: no more waiting
+  });
+
   it("gives up waiting after a few seconds when a file starts nothing (no text in it)", async () => {
     vi.useFakeTimers();
     const fetch = core(() => status({ state: "off" }));

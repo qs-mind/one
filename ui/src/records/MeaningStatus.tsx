@@ -43,16 +43,21 @@ export function MeaningStatus({ projectId, files = 0 }: { projectId: string; fil
     let live = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let last: Status | undefined;
-    let waits = 0; // polls spent waiting for the core to start on a new file (the core looks every 5 s)
+    let waits = 0; // polls spent waiting for the core to start on a new file
+    let moved = false; // the line moved since the files changed: its end is known, no need to wait
     async function poll() {
       const response = await api("/meaning").catch(() => undefined);
       const body = response?.ok ? ((await response.json().catch(() => undefined)) as Status | undefined) : undefined;
       if (!live) return;
       if (body) setStatus((last = body));
       // a missed answer keeps the last line; polling goes on while that line still moves, and for a few seconds
-      // while the core has not yet started on a new file (one with no text never starts it)
-      const waiting = files > 0 && last?.model.state === "off" && waits++ < 10;
-      if (last && (moving(last, projectId) || waiting)) timer = setTimeout(() => void poll(), 1000);
+      // after a new file while the core has not yet started on it: the download when off, the project's
+      // preparing when ready (a file with no text starts neither)
+      const now = last !== undefined && moving(last, projectId);
+      moved ||= now;
+      const state = last?.model.state;
+      const waiting = files > 0 && !moved && (state === "off" || state === "ready") && waits++ < 10;
+      if (last && (now || waiting)) timer = setTimeout(() => void poll(), 1000);
     }
     void poll();
     return () => {

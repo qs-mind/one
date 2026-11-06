@@ -224,16 +224,37 @@ def test_words_work_while_it_downloads(app_with, hub):
         wait_for(lambda: indexed(client, pid, total=len(BOQ_ROWS)))
 
 
-def test_an_older_project_with_text_starts_it_when_opened(app_with, hub):
+def test_an_older_project_with_text_starts_it_at_startup(app_with, hub, spec, models):
     with TestClient(app_with(available=lambda: False)) as client:  # made where it cannot run
         pid = new_project(client, BOQ_ROWS)
     assert hub.requests == [] and settings.load().get(SETTING) is None
 
-    with TestClient(app_with()) as client:
-        time.sleep(0.2)
-        assert model_state(client) == "off" and hub.requests == []  # not opened yet
+    with TestClient(app_with()) as client:  # no project opened: the start looks for itself
+        wait_for(lambda: model_state(client) == "ready")
+        assert download.installed([spec], models) and settings.load()[SETTING] == "on"
+        assert project_state(client, pid) is None  # nothing was opened for it
         assert client.post(f"/projects/{pid}/open", headers=AUTH).status_code == 200
         wait_for(lambda: indexed(client, pid, total=len(BOQ_ROWS)))
+
+
+def test_projects_without_text_download_nothing_at_startup(app_with, hub):
+    with TestClient(app_with(available=lambda: False)) as client:
+        new_project(client)  # no file
+        client.post("/projects", json={"name": "مستشفى - عينة"}, headers=AUTH)
+    with TestClient(app_with()) as client:
+        time.sleep(0.3)
+        assert model_state(client) == "off" and hub.requests == []
+        assert client.app.state.projects.opened() == []  # looked at, then closed again
+
+
+def test_an_app_without_a_fake_hub_fails_at_once_and_quits_at_once(data_dir):
+    """The core's own default client (refused in every test by conftest): the first file asks,
+    the 403 fails it without retries, and nothing waits when the app stops."""
+    started = time.monotonic()
+    with TestClient(create_app(SECRET, data_dir=data_dir)) as client:
+        new_project(client, BOQ_ROWS)
+        wait_for(lambda: model_state(client) == "failed")
+    assert time.monotonic() - started < 3
 
 
 def test_exact_mode(ready_client):
