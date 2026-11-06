@@ -101,7 +101,19 @@ export type ProjectStatus = {
 export type SelectionItem = { kind: FrameKind | "agent"; id: string; title: string; anchor?: Anchor; label?: string };
 
 /** A text piece One read from a file, with where it is (sheet, row, page). */
-export type FilePiece = { locator: Record<string, string | number>; text: string };
+// PDF points, origin top-left; page is one-based.
+export type SourceLocator = {
+  [key: string]: string | number | [number, number, number, number] | undefined;
+  page?: string | number;
+  sheet?: string | number;
+  row?: string | number;
+  column?: string | number;
+  line?: string | number;
+  paragraph?: string | number;
+  dated_how?: string | number;
+  box?: [number, number, number, number];
+};
+export type FilePiece = { locator: SourceLocator; text: string };
 
 /** Everything the screen reads and writes for one project. */
 export interface ProjectSources {

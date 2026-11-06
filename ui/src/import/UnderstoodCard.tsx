@@ -1,3 +1,4 @@
+import type { SourceLocator } from "../project/types";
 // The "I understood this" card, in the project chat once the Lead QS has read a tender folder (a data-understood
 // part, which carries only the project; the card reads GET /projects/{id}/facts). Each fact shows its source ("file,
 // page 3"); the engineer changes any of them (saved on Enter or on leaving the field, by the engineer, with today's
@@ -14,7 +15,7 @@ import { FileName } from "../ui/FileName";
 import { SaveNote, useSaving } from "../ui/live";
 
 type Source =
-  | { kind: "file"; file_id: string; file_name: string | null; locator: Record<string, string | number> | null }
+  | { kind: "file"; file_id: string; file_name: string | null; locator: SourceLocator | null }
   | { kind: "engineer"; date: string }
   | { kind: "count"; trace_id: string }
   | { kind: string };

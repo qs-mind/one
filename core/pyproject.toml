@@ -28,6 +28,7 @@ dependencies = [
   "sqlcipher3-wheels",
   "sqlite-vec",
   "pypdfium2",
+  "pdfplumber",  # MIT; PDF BOQ tables; brings pdfminer.six (MIT)
   "openpyxl",
   "xlrd",
   "platformdirs",

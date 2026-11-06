@@ -1,3 +1,4 @@
+import type { SourceLocator } from "../project/types";
 // A number's source opened from its card: the file opens as the document at its page, and once it shows, the quoted
 // place in it is marked with the source mark (sources/mark.ts): a sheet row or line of the file's text. The card
 // closes as the file opens, so the workspace marks it (Workspace.tsx) and says once when it cannot.
@@ -10,13 +11,13 @@ type Wanted = { key: string; opened: Opened | null; keys: string[]; figures: str
 let wanted: Wanted | null = null;
 
 /** Opens the file of a source as the document, at its page; its place is marked once it shows. */
-export function openSourceFile(fileId: string, locator: Record<string, string | number> | null | undefined, figures: string[]) {
+export function openSourceFile(fileId: string, locator: SourceLocator | null | undefined, figures: string[]) {
   wanted = { key: `file:${fileId}`, opened: null, keys: sourceKeys({ fileId, locator }), figures };
   workspaceApi.open(`file:${fileId}`, anchorOf(locator));
 }
 
 /** Where in the file to open: a PDF's page, or a spreadsheet's cell (its sheet, row `r<row>` and column letters). */
-function anchorOf(locator: Record<string, string | number> | null | undefined): Anchor {
+function anchorOf(locator: SourceLocator | null | undefined): Anchor {
   if (typeof locator?.page === "number") return { page: locator.page };
   const row = locator?.row ?? locator?.line; // a CSV's row is its line
   if (row === undefined) return {};

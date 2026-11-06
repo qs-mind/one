@@ -1,3 +1,4 @@
+import type { SourceLocator } from "../project/types";
 // Search and commands (Ctrl/Cmd+K): the project's documents by title (Enter opens one as the document), the shell's
 // commands and the projects, and a search of Project Records (a hit opens its file as the document, at its page).
 // Opened from the top bar's search field, it grows from the field in place (scaled and clipped from its rect, 220 ms)
@@ -16,7 +17,7 @@ import { workspaceApi } from "../workspace/api";
 import { titleOf, type Documents } from "../workspace/documents";
 import { openSourceFile } from "../workspace/reveal";
 
-type Hit = { file_id: string; file_name: string; locator: Record<string, string | number>; text: string };
+type Hit = { file_id: string; file_name: string; locator: SourceLocator; text: string };
 
 const SEARCH_DELAY = 250;
 

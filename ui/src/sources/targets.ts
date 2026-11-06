@@ -1,3 +1,4 @@
+import type { SourceLocator } from "../project/types";
 // Where a number's source shows on screen. An element that shows a source carries `data-source-at` with one or more
 // keys (space-separated):
 //   number:<number id>                 a ledger number as a sheet cell or a document reference shows it
@@ -13,13 +14,13 @@ export type SourcePlace = {
   numberId?: string | null;
   sourceId?: string | null;
   fileId?: string | null;
-  locator?: Record<string, string | number> | null;
+  locator?: SourceLocator | null;
 };
 
 const PLACES = ["page", "sheet", "row", "line"] as const;
 
 /** A file's key, with the place in it when the locator names one: `file:f1#sheet=BOQ&row=41`. */
-export function fileKey(fileId: string, locator?: Record<string, string | number> | null): string {
+export function fileKey(fileId: string, locator?: SourceLocator | null): string {
   const at = PLACES.filter((k) => locator?.[k] !== undefined && locator[k] !== "").map(
     (k) => `${k}=${encodeURIComponent(String(locator![k]))}`,
   );

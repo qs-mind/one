@@ -345,11 +345,11 @@ def test_preview_shows_numbers_as_excel_does(rec):
     assert boq.exact(0.1 + 0.2, None) == (None, "decimals")  # the import never rounds it
 
 
-async def test_only_excel_files_are_imported(ctx):
+async def test_pdf_without_tables_is_reported(ctx):
     f = add_file(
         ctx.rec, "مواصفات - عينة.pdf", sample_pdf([["spec - sample"]]), actor="engineer"
     ).id
-    with pytest.raises(ModelRetry, match="not an Excel workbook"):
+    with pytest.raises(ModelRetry, match="No tables were found"):
         await call("boq_preview", {"file_id": f}, ctx)
     with pytest.raises(ModelRetry, match="no file with this id"):
         await run_import(ctx, "0" * 32)
