@@ -1,5 +1,7 @@
 """Thin route adapters shared by argparse and YAML walks."""
 
+import os
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -67,18 +69,109 @@ class Commands:
 
     def files_add(self, project, paths):
         result = []
-        for path in paths:
-            path = Path(path)
-            with path.open("rb") as source:
-                result.append(
-                    self.client.request(
-                        "POST",
-                        f"/projects/{project}/files",
-                        params={"name": path.name},
-                        content=source,
+        expanded = []
+        for given in paths:
+            given = Path(given)
+            if given.is_dir():
+                for directory, dirs, files in os.walk(given, followlinks=False):
+                    dirs[:] = sorted(
+                        d
+                        for d in dirs
+                        if not d.startswith(".")
+                        and d != "__MACOSX"
+                        and not (Path(directory) / d).is_symlink()
                     )
+                    for name in sorted(files):
+                        path = Path(directory) / name
+                        if (
+                            name.startswith((".", "~$"))
+                            or name.casefold() in ("thumbs.db", "desktop.ini")
+                            or path.is_symlink()
+                        ):
+                            continue
+                        expanded.append((path, path.parent.relative_to(given.parent).as_posix()))
+            else:
+                expanded.append((given, ""))
+        for path, folder in expanded:
+            try:
+                with path.open("rb") as source:
+                    result.append(
+                        self.client.request(
+                            "POST",
+                            f"/projects/{project}/files",
+                            params={"name": path.name, **({"folder": folder} if folder else {})},
+                            content=source,
+                        )
+                    )
+            except (CliError, OSError) as error:
+                result.append(
+                    {
+                        "name": path.name,
+                        "folder": folder,
+                        "status": "failed",
+                        "error": error.text if isinstance(error, CliError) else TEXT["error"],
+                    }
                 )
         return {"uploads": result}
+
+    def map(self, project, *, group=None, file=None, cursor=None, wait=None):
+        route = f"/projects/{project}/map"
+        if file and wait is None:
+            return self.client.get(route + f"/files/{file}")
+        deadline = time.monotonic() + max(0, wait or 0)
+        while True:
+            result = self.client.get(route, parent=group, cursor=cursor)
+            for entry in result.get("files", []):
+                if entry.get("kind") in ("dwg", "dxf"):
+                    entry["sheets"] = self.client.get(route + f"/files/{entry['file_id']}").get(
+                        "sheets", []
+                    )
+            if wait is None:
+                return result
+            # Read all pages for readiness, even when displaying a filtered page.
+            scan = result if group is None and cursor is None else self.client.get(route)
+            states = []
+            while True:
+                states.extend(scan.get("files", []))
+                if not scan.get("next_cursor"):
+                    break
+                scan = self.client.get(route, cursor=scan["next_cursor"])
+            messages = self.client.get(f"/chat/{project}/messages").get("messages", [])
+            cards = {}
+            for message in messages:
+                for part in message.get("parts", []):
+                    if part.get("type") == "data-card":
+                        card = part["data"] | {"id": part["id"], "chat": project}
+                        cards[card["id"]] = cards.get(card["id"], {}) | card
+            pending = [
+                card
+                for card in cards.values()
+                if card.get("kind") == "cost" and card.get("status") == "pending"
+            ]
+            if pending:
+                self.saved["cards"].update({card["id"]: card for card in pending})
+                session.save(self.path, self.saved)
+                return result | {"cards": pending, "state": "waiting_engineer"}
+            status = result.get("status", {})
+            settled = not (status.get("waiting", 0) or status.get("reading", 0)) and all(
+                f.get("ai_state") in ("done", "local", "declined", "no_ai", "failed")
+                or f.get("local_state") == "failed"
+                for f in states
+            )
+            if settled or time.monotonic() >= deadline:
+                if file:
+                    result = self.client.get(route + f"/files/{file}")
+                return result | {"state": "done" if settled else "timeout"}
+            time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+
+    def map_entries(self, project, name):
+        route = f"/projects/{project}/map/{name}"
+        result = self.client.get(route)
+        while result.get("next_cursor"):
+            page = self.client.get(route, cursor=result["next_cursor"])
+            result[name].extend(page[name])
+            result["next_cursor"] = page.get("next_cursor")
+        return result
 
     def files_report(self, project):
         files = self.client.get(f"/projects/{project}/files")["files"]
@@ -200,6 +293,15 @@ class Commands:
             if action == "list":
                 return c.get("/projects")
             return c.post(base + "/open")
+        if cmd == "map":
+            return self.map(p, group=args.group, file=args.file, cursor=args.cursor, wait=args.wait)
+        if cmd in ("facts", "links"):
+            return self.map_entries(p, cmd)
+        if cmd == "fact":
+            return c.post(
+                base + f"/map/facts/{args.fact}",
+                {"confirm": True} if action == "confirm" else {"value": args.value},
+            )
         if cmd == "files":
             if action == "add":
                 return self.files_add(p, args.paths)
