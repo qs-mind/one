@@ -1,7 +1,7 @@
 // The conversation with the Lead QS, as a list: the engineer's messages (with the canvas selection they were sent
 // with) and each Brief's reply with its Progress Line, Coordination Room, cards, costs, Review codes and Deliverable
 // cards. The shell owns the chat itself (ui/src/shell/useChats.ts) and its composer, the command bar.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SelectionItem } from "../project/types";
 import { type Fix, fixOf } from "../core";
 import { DeliverableCard } from "../deliverables/DeliverableCard";
@@ -26,6 +26,7 @@ import { BidiText, baseDirection } from "./bidi";
 import { Reply } from "./Reply";
 import { takeSentFrom } from "./sent";
 import { useScrollEdges } from "../ui/useScrollEdges";
+import { DocumentsContext } from "../workspace/documents";
 
 // The core sends a model error as an {en, ar} pair in the error text, with the `fix` the chat can offer (a refused
 // key: Open AI settings); any other failure gets the plain line.
@@ -237,6 +238,9 @@ export function ChatLog({
   const reduced = useReducedMotion();
   const busy = working(chat);
   const lastReply = messages.findLastIndex((message) => message.role === "assistant");
+  // a project with no file yet: the chat asks for the tender files, in one line (no fixed suggestions: ONE is AI-driven)
+  const documents = useContext(DocumentsContext);
+  const noFilesYet = !!projectId && documents?.files.length === 0;
   const sent = useRef<string | undefined>(undefined); // the newest message of the engineer's already in place
 
   const toEnd = () => {
@@ -312,7 +316,7 @@ export function ChatLog({
         className={`scroll-fade relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${dense ? "p-3" : "px-5 py-4"} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink`}
       >
         <ol className={`flex flex-col ${dense ? "gap-3" : "gap-6"}`}>
-          {messages.length === 0 && <li className="text-slate">{t("empty")}</li>}
+          {messages.length === 0 && <li className="text-slate">{t(noFilesYet ? "emptyProject" : "empty")}</li>}
           {messages.map((message, index) =>
             message.role === "user" ? (
               <li key={message.id} data-own={message.id} className="max-w-[85%] self-end rounded-2xl bg-stone px-4 py-3">

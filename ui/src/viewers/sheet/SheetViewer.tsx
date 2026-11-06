@@ -113,14 +113,19 @@ export function SheetViewer(props: SheetViewerProps) {
     return () => observer.disconnect();
   }, [full]);
 
-  // Row heights and one-line widths in the real font once it has loaded.
-  const measure = useMemo(makeMeasure, []);
+  // Row heights and one-line widths in the real font once it has loaded. A face can come after `ready` (Zain's bold
+  // only loads when the bold header first shows), so each font that lands measures again, with nothing kept from
+  // before it (a header measured in the fallback was cut to «الوحـ…»).
   const [fontsLoaded, setFontsLoaded] = useState(0);
+  const measure = useMemo(() => (void fontsLoaded, makeMeasure()), [fontsLoaded]);
   useEffect(() => {
     let live = true;
-    void document.fonts?.ready.then(() => live && setFontsLoaded((n) => n + 1));
+    const landed = () => live && setFontsLoaded((n) => n + 1);
+    void document.fonts?.ready.then(landed);
+    document.fonts?.addEventListener?.("loadingdone", landed);
     return () => {
       live = false;
+      document.fonts?.removeEventListener?.("loadingdone", landed);
     };
   }, []);
 

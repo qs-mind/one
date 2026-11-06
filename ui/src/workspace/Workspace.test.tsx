@@ -305,7 +305,7 @@ describe("dropping on the open document", () => {
       },
     });
     render(<App sourcesFor={() => fakeSources({ workspace: { key: "files:all", anchor: null } })} />);
-    const area = await screen.findByText(texts.dropHere.ar);
+    const area = await screen.findByText(texts.emptyFilesTitle.ar); // an empty project: the one drop area
     fireEvent.drop(area, { dataTransfer: { types: ["Files"], files: [new File(["a"], "أ - عينة.csv")], items: [] } });
     expect(await screen.findByText(/أ - عينة/)).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -484,5 +484,87 @@ describe("a sample client BOQ", () => {
     render(<App sourcesFor={() => sources} />);
     await screen.findByText("03/02");
     expect(document.querySelector("[data-sample-label]")).toBeNull();
+  });
+});
+
+describe("an empty project", () => {
+  const info = (name: string) => ({ id: `id-${name}`, name, status: "read", note: null, replaces: null });
+  const region = () => screen.getAllByRole("region", { name: texts.projectFiles.ar }).at(-1)!; // Project files, in the document
+
+  it("opens on Project files with one drop area: its heading, what ONE does, Choose files and the folder; nothing else", async () => {
+    setCurrentProject(P1);
+    const fetch = core();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    const heading = await screen.findByRole("heading", { name: texts.emptyFilesTitle.ar });
+    expect(workspaceApi.current()?.key).toBe("files:all");
+    const area = heading.closest<HTMLElement>("[data-empty-drop]")!;
+    expect(area).toHaveTextContent(texts.emptyFilesWhat.ar);
+    expect(within(area).getByRole("button", { name: texts.chooseFiles.ar })).toBeInTheDocument();
+    expect(within(area).getByRole("button", { name: texts.orTenderFolder.ar })).toBeInTheDocument();
+    // no search over nothing, no search-by-meaning line, no "no files yet"
+    expect(within(region()).queryByRole("searchbox")).toBeNull();
+    expect(within(region()).queryByRole("status")).toBeNull();
+    expect(screen.queryByText(texts.noFiles.ar)).toBeNull();
+    expect(screen.queryByText(texts.dropHere.ar)).toBeNull();
+    expect(fetch.mock.calls.some(([url]) => String(url) === "/api/meaning")).toBe(false);
+    // the chat says where to start, in one line
+    expect(await screen.findByText(texts.emptyProject.ar)).toBeInTheDocument();
+    expect(screen.queryByText(texts.empty.ar)).toBeNull();
+  });
+
+  it("Choose files opens the file picker, and the folder link the folder chooser", async () => {
+    setCurrentProject(P1);
+    core();
+    const user = userEvent.setup();
+    const clicked: Element[] = [];
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (this: HTMLInputElement) {
+      clicked.push(this);
+    });
+    render(<App sourcesFor={() => fakeSources({})} />);
+    await user.click(await screen.findByRole("button", { name: texts.chooseFiles.ar }));
+    expect(clicked.at(-1)).toHaveAttribute("type", "file");
+    expect(clicked.at(-1)).toHaveAttribute("multiple");
+    expect(clicked.at(-1)!.hasAttribute("data-folder-chooser")).toBe(false);
+    await user.click(screen.getByRole("button", { name: texts.orTenderFolder.ar }));
+    expect(clicked.at(-1)!.hasAttribute("data-folder-chooser")).toBe(true);
+  });
+
+  it("gives way to the list, the search and the usual chat line once the first file lands", async () => {
+    setCurrentProject(P1);
+    const name = "مقايسة - عينة.xlsx";
+    core({ routes: { [`POST /api/projects/p1/files?name=${encodeURIComponent(name)}`]: () => Response.json(info(name), { status: 201 }) } });
+    const sources = fakeSources({});
+    render(<App sourcesFor={() => sources} />);
+    await screen.findByRole("heading", { name: texts.emptyFilesTitle.ar });
+    const input = region().querySelector<HTMLInputElement>('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [new File(["a"], name)] } });
+    expect(await within(region()).findByText(/مقايسة - عينة/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: texts.emptyFilesTitle.ar })).toBeNull();
+    expect(within(region()).getByRole("searchbox", { name: texts.search.ar })).toBeInTheDocument();
+    act(() => sources.emit({ type: "file", file: info(name) as never })); // the core's live event for it
+    expect(await screen.findByText(texts.empty.ar)).toBeInTheDocument();
+  });
+
+  it("a file that came another way (a tender folder) shows in the list too", async () => {
+    setCurrentProject(P1);
+    core();
+    const sources = fakeSources({});
+    render(<App sourcesFor={() => sources} />);
+    await screen.findByRole("heading", { name: texts.emptyFilesTitle.ar });
+    act(() => sources.emit({ type: "file", file: info("مواصفات - عينة.pdf") as never }));
+    expect(await within(region()).findByText(/مواصفات - عينة/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: texts.emptyFilesTitle.ar })).toBeNull();
+  });
+
+  it("speaks English too", async () => {
+    setLanguage("en");
+    setCurrentProject(P1);
+    core();
+    render(<App sourcesFor={() => fakeSources({})} />);
+    expect(await screen.findByRole("heading", { name: texts.emptyFilesTitle.en })).toBeInTheDocument();
+    expect(screen.getByText(texts.emptyFilesWhat.en)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.chooseFiles.en })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: texts.orTenderFolder.en })).toBeInTheDocument();
+    expect(await screen.findByText(texts.emptyProject.en)).toBeInTheDocument();
   });
 });
