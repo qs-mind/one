@@ -25,6 +25,8 @@ class KeyPage(BaseModel):
     model_config = ConfigDict(extra="forbid")
     label: Text
     page: int | None = Field(None, ge=1)
+    slide: int | None = Field(None, ge=1)
+    paragraph: int | None = Field(None, ge=1)
     sheet: str | None = Field(None, max_length=200)
     row: int | None = Field(None, ge=1)
     why: Text
@@ -77,6 +79,8 @@ INSTRUCTIONS = (
     "English/Egyptian Arabic title, a bilingual group path {en,ar}, "
     "and key-page labels and reasons. "
     "Use only locators present in the digest; never invent pages or worksheets. "
+    "Files with pages=null still need an output: use slide or paragraph positions for "
+    "presentations/Word and sheet+row for spreadsheets. Preserve each file_id exactly. "
     "Do not calculate quantities or extract tender facts. Return every supplied file once."
 )
 
@@ -111,6 +115,8 @@ def digest(rec, file_id):
         "file_id": file_id,
         "name": _file_name(rec, file_id),
         "pages": row["pages"],
+        "kind": row["kind"],
+        "positions": [json.loads(loc) for _, loc in chunks],
         "headings": structure.get("headings", [])[:30],
         "sections": structure.get("sections", [])[:20],
         "numbered_clauses": structure.get("numbered_clauses", [])[:20],
@@ -159,6 +165,17 @@ def valid_pages(result, source):
                 key.row is None or key.row > sheets[key.sheet].get("last_row", 0)
             ):
                 continue
+        elif key.slide is not None or key.paragraph is not None:
+            position = {
+                k: v
+                for k, v in key.model_dump(exclude_none=True).items()
+                if k in ("slide", "paragraph")
+            }
+            if not any(
+                all(loc.get(k) == v for k, v in position.items())
+                for loc in source.get("positions", [])
+            ):
+                continue
         else:
             continue
         valid.append(key.model_dump(exclude_none=True))
@@ -174,8 +191,16 @@ def batches(digests):
         yield digests[start : start + 4]
 
 
-async def run(rec, models, *, file_ids=None, request=None, passes=None):
+async def run(rec, models, *, file_ids=None, request=None, passes=None, vision_request=None):
     """Map ready files once. Unknown prices require approval too; a refusal sends no text."""
+    vision_card = None
+    if request is None:
+        vision_card = oneshot.map_picture_model(models)
+        if vision_card is not None:
+
+            async def vision_request(images, schema, instructions):
+                return await oneshot.map_pictures(models, images, schema, instructions)
+
     request = request or (
         lambda prompt, schema, instructions: oneshot.map_text(models, prompt, schema, instructions)
     )
@@ -252,6 +277,17 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None):
         )
         fact_cost = cards.cost(card, input_tokens=fact_tokens, output_tokens=10000)
         estimate = None if estimate is None or fact_cost is None else estimate + 4 * fact_cost
+        if vision_request is not None:
+            from qsone.records.mapping import picture
+
+            vision_cost = cards.cost(
+                vision_card or card,
+                input_tokens=picture.MAX_FACTS * picture.IMAGE_TOKENS + 2000,
+                output_tokens=picture.MAX_FACTS * 100,
+            )
+            estimate = (
+                None if estimate is None or vision_cost is None else estimate + 4 * vision_cost
+            )
         for batch in batches(digests):
             link_tokens = request_size.estimate(json.dumps(batch, ensure_ascii=False)) + 2000
             link_cost = cards.cost(card, input_tokens=link_tokens, output_tokens=4000)
@@ -291,6 +327,7 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None):
     resumed_ids = {item["file_id"] for item in resumed}
     _attempt(rec, resumed_ids)
     queue = list(batches([d for d in digests if d["file_id"] not in resumed_ids]))
+    retried_missing = set()
     for batch in queue:
         _attempt(rec, [source["file_id"] for source in batch])
         try:
@@ -338,8 +375,12 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None):
                 }
             )
         missing = set(allowed) - seen
-        if missing:
-            _failed(rec, missing)
+        for fid in missing:
+            if fid in retried_missing:
+                _failed(rec, [fid])
+            else:
+                retried_missing.add(fid)
+                queue.append([allowed[fid]])
     # Initial drops use all new titles; replacement drops send only changed titles.
     titles = _at_stage(rec, mapped, "groups")
     for start in range(0, len(titles), 100):
@@ -386,7 +427,11 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None):
 
             async def extract_facts():
                 await facts.run_approved(
-                    rec, read=passes["read"], request=request, file_ids=fact_ids
+                    rec,
+                    read=passes["read"],
+                    request=request,
+                    file_ids=fact_ids,
+                    vision_request=vision_request,
                 )
 
             if await _project_pass(rec, "facts", fact_ids, extract_facts):
@@ -625,7 +670,7 @@ def local_key_pages(rec, fid):
                         **{
                             k: v
                             for k, v in loc.items()
-                            if k in ("page", "sheet", "row", "line", "paragraph")
+                            if k in ("page", "sheet", "row", "line", "paragraph", "slide")
                         },
                         "label": copy.MAP_LOCAL_KEY_PAGE,
                         "why": copy.MAP_LOCAL_KEY_REASON,
@@ -635,7 +680,9 @@ def local_key_pages(rec, fid):
             )
     result, seen = [], set()
     for _, row in sorted(ranked, key=lambda pair: -pair[0]):
-        key = tuple((k, row[k]) for k in ("page", "sheet", "row", "line", "paragraph") if k in row)
+        key = tuple(
+            (k, row[k]) for k in ("page", "sheet", "row", "line", "paragraph", "slide") if k in row
+        )
         if key not in seen:
             result.append(row)
             seen.add(key)

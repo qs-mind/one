@@ -3002,3 +3002,8 @@ MAP_PASS_FAILED = {
     "en": "{stage} could not finish after one retry: {reason}",
     "ar": "{stage} ما خلصتش بعد إعادة المحاولة مرة: {reason}",
 }
+
+MAP_PICTURE_NUMBER = {
+    "en": "The PDF's text says {text}; the page shows {picture} — check the page.",
+    "ar": "نص الـPDF بيقول {text}؛ الصفحة بتعرض {picture} — راجع الصفحة.",
+}

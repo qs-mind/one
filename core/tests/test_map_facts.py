@@ -498,3 +498,412 @@ async def test_approved_grounding_accepts_range_format_and_longer_fact_name(rec)
         )
 
     assert len(await facts.run_approved(rec, read=read, request=request, file_ids=set(texts))) == 2
+
+
+@pytest.mark.parametrize(
+    "words,number",
+    [
+        ("تسعين", "90"),
+        ("تسعون", "90"),
+        ("ستين", "60"),
+        ("ثلاثين", "30"),
+        ("مائة", "100"),
+        ("مئة", "100"),
+        ("ثلاثمائة وستين", "360"),
+        ("ninety", "90"),
+    ],
+)
+def test_number_words(words, number):
+    assert facts.grounded(words, {"value": number, "evidence": words})
+    assert not facts.grounded(words, {"value": "110", "evidence": words})
+
+
+def test_title_label_is_optional(rec):
+    text = "كراسةالشروطوالمواصفات\nفتح العروض 16/04/1448"
+    f = files.add_file(rec, "sample.txt", text.encode(), actor="engineer")
+    p = dict(
+        file_id=f.id,
+        locator={},
+        name={"en": "Opening", "ar": "فتح العروض"},
+        value="16/04/1448",
+        source_label="كراسة الشروط والمواصفات",
+        evidence="فتح العروض 16/04/1448",
+    )
+    assert len(facts.accept(rec, [p])) == 1
+    assert store.entries(rec, "facts")["facts"][0]["source_label"] == "فتح العروض"
+
+
+def test_picture_comparison():
+    from qsone.records import ocr
+    from qsone.records.mapping.picture import compare
+
+    page = ocr.Page([ocr.Word("٩٠", [0, 0, 10, 10], 95)], False)
+    result = compare("01 days", page)
+    assert result["value"] == "01 days"
+    assert result["text_value"] == "01 days"
+    assert set(result["warning"]) == {"en", "ar"}
+    assert compare("90 days", ocr.Page([ocr.Word("٠٩", [], 95)], False)) is None
+    assert compare("01 days", ocr.Page([ocr.Word("90", [], 20)], True)) is None
+    assert compare("01 يوم", ocr.Page([ocr.Word("٠", [], 77)], False)) is None
+    assert compare("01 يوم", ocr.Page([ocr.Word("90", [], 77)], False)) is None
+    assert compare("01 يوم", ocr.Page([ocr.Word("٠", [], 95)], False)) is None
+
+
+@pytest.mark.anyio
+async def test_reviewer_five_rows_keep_conflict(rec):
+    from tests.test_project_map import drain
+
+    book = files.add_file(
+        rec, "sample-book.pdf", sample_pdf([["Sample page"] for _ in range(20)]), actor="engineer"
+    )
+    cond = files.add_file(
+        rec,
+        "sample-conditions.pdf",
+        sample_pdf([["Sample condition"] for _ in range(3)]),
+        actor="engineer",
+    )
+    rows = [
+        (
+            book.id,
+            7,
+            "Opening",
+            "فتح العروض",
+            "16/04/1448",
+            "كراسة الشروط والمواصفات",
+            "فتح العروض 16/04/1448",
+        ),
+        (
+            book.id,
+            20,
+            "Bid security",
+            "الضمان الابتدائي",
+            "1%",
+            "كراسة الشروط والمواصفات",
+            "الضمان الابتدائي بنسبة 1 بالمائة من القيمة الإجمالية للعرض",
+        ),
+        (
+            cond.id,
+            2,
+            "Bid security",
+            "الضمان الابتدائي",
+            "1% - 2%",
+            "المملكة العربية السعودية وزارة",
+            "يقدم مع العرض ضمان ابتدائي بقيمة تتراوح من )2%( إلى )1%( من",
+        ),
+        (
+            book.id,
+            20,
+            "Security validity",
+            "سريان الضمان الابتدائي",
+            "90 days",
+            "",
+            "ساري المفعول مدة لا تقل عن)90(تسعين يوماً من التاريخ المحدد",
+        ),
+        (
+            cond.id,
+            3,
+            "Offer validity",
+            "مدة سريان العروض",
+            "90 days",
+            "",
+            "تكون مدة سريان العروض في المنافسات العامة تسعين يوماً من الت",
+        ),
+    ]
+    drain(rec)
+    texts = {}
+    for fid, page, *_, evidence in rows:
+        texts[(fid, page)] = texts.get((fid, page), "كراسةالشروطوالمواصفات\n") + "\n" + evidence
+    with rec.write("one") as c:
+        for (fid, page), text in texts.items():
+            c.execute(
+                "UPDATE chunks SET text=? WHERE file_id=? AND json_extract(locator,'$.page')=?",
+                (text, fid, page),
+            )
+
+    async def read(fid, loc):
+        return texts.get((fid, loc["page"]), "Sample")
+
+    async def request(*args):
+        return facts.Result(
+            facts=[
+                facts.Fact(
+                    file_id=fid,
+                    locator={"page": page},
+                    name={"en": en, "ar": ar},
+                    value=value,
+                    source_label=label,
+                    evidence=ev,
+                    state="found",
+                )
+                for fid, page, en, ar, value, label, ev in rows
+            ]
+        )
+
+    assert (
+        len(await facts.run_approved(rec, read=read, request=request, file_ids={book.id, cond.id}))
+        == 5
+    )
+    saved = store.entries(rec, "facts")["facts"]
+    security = [r for r in saved if r["name"]["en"] == "Bid security"]
+    assert len(security) == 2 and all(r["state"] == "conflict" for r in security)
+
+
+def test_picture_result_persisted(rec, monkeypatch):
+    from qsone.records.mapping import picture
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Validity 01 days"]]), actor="engineer")
+    from qsone.records import ocr
+
+    monkeypatch.setattr(
+        picture,
+        "check",
+        lambda *args: picture.compare(args[-1], ocr.Page([ocr.Word("٩٠", [], 95)], False)),
+    )
+    p = dict(
+        file_id=f.id,
+        locator={"page": 1},
+        name={"en": "Validity", "ar": "السريان"},
+        value="01 days",
+        evidence="Validity 01 days",
+    )
+    assert facts.accept(rec, [p])
+    row = store.entries(rec, "facts")["facts"][0]
+    assert row["value"] == "01 days"
+    assert row["picture_check"]["text_value"] == "01 days"
+    assert row["evidence"] == p["evidence"]
+    assert row["confirmed_at"] is None
+    assert facts.accept(rec, [p]) == []
+
+
+def test_picture_renders_evidence_region_with_stub_ocr(rec, monkeypatch, tmp_path):
+    from qsone.records import ocr
+    from qsone.records.mapping import picture
+
+    f = files.add_file(
+        rec, "sample.pdf", sample_pdf([["Validity 01 days", "Unrelated 500"]]), actor="engineer"
+    )
+    for language in ("ara", "eng"):
+        (tmp_path / f"{language}.traineddata").write_bytes(b"sample")
+    monkeypatch.setattr(ocr, "find_tesseract", lambda: "sample-tesseract")
+    monkeypatch.setattr(ocr, "model_folder", lambda: tmp_path)
+    monkeypatch.setattr(ocr, "system_folders", lambda _: [])
+    images = []
+
+    def read(png, **kwargs):
+        width, height = ocr.png_size(png)
+        assert width > 0 and height > 0
+        assert kwargs["points"] == (width / 3, height / 3)
+        images.append(png)
+        return ocr.Page([ocr.Word("٩٠", [], 95)], False)
+
+    monkeypatch.setattr(ocr, "read_image", read)
+    result = picture.check(rec, f.id, {"page": 1}, "Validity 01 days", "01 days")
+    assert images and result["value"] == "01 days"
+    assert picture.check(rec, f.id, {"page": 1}, "Missing 01", "01") is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("reading, warned", [("٩٠", True), ("01", False)])
+async def test_approved_batched_vision_keeps_text_value(rec, monkeypatch, reading, warned):
+    from qsone.records.mapping import picture
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Validity 01 days"]]), actor="engineer")
+
+    async def read(*args):
+        return "Validity 01 days"
+
+    async def request(*args):
+        return facts.Result(
+            facts=[
+                facts.Fact(
+                    file_id=f.id,
+                    locator={"page": 1},
+                    name={"en": "Validity", "ar": "السريان"},
+                    value="01 days",
+                    evidence="Validity 01 days",
+                    state="found",
+                )
+            ]
+        )
+
+    calls = []
+
+    async def vision(images, schema, instructions):
+        calls.append(images)
+        assert len(images) == 1 and images[0]["png"].startswith(b"\x89PNG")
+        assert "exactly" in instructions and "Arabic-Indic" in instructions
+        return schema.model_validate({"readings": [{"id": images[0]["id"], "numbers": reading}]})
+
+    monkeypatch.setattr(
+        picture, "check", lambda *args: pytest.fail("OCR must not judge before vision")
+    )
+    ids = await facts.run_approved(
+        rec, read=read, request=request, file_ids={f.id}, vision_request=vision
+    )
+    assert len(calls) == 1 and len(ids) == 1
+    row = store.entries(rec, "facts")["facts"][0]
+    assert row["value"] == "01 days"
+    assert bool(row["picture_check"] and row["picture_check"].get("warning")) == warned
+    assert row["picture_check"]["text_value"] == "01 days"
+    assert row["picture_check"]["picture_text"] == reading
+    assert row["confirmed_at"] is None
+    assert facts.gate(rec, {"fact_ids": ids})
+    facts.update(rec, ids[0], confirm=True)
+    assert facts.gate(rec, {"fact_ids": ids}) == []
+
+
+@pytest.mark.anyio
+async def test_costed_quick_vision_request(general, fake_clock, data_dir):
+    from pydantic_ai.messages import BinaryContent, ModelResponse, ToolCallPart
+    from pydantic_ai.models.function import FunctionModel
+    from pydantic_ai.usage import RequestUsage
+
+    from qsone.engine import oneshot
+    from qsone.engine.costs import Spending
+    from qsone.engine.oneshot import Models
+    from qsone.engine.store import CostBook
+    from qsone.records.mapping import picture
+    from tests.engine_fakes import HAIKU, FakeHost
+    from tests.test_engine_runner import FakeLink
+
+    async def answer(messages, info):
+        assert any(
+            isinstance(part, BinaryContent)
+            for message in messages
+            for p in message.parts
+            for part in (p.content if isinstance(getattr(p, "content", None), list) else [])
+        )
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    info.output_tools[0].name, {"readings": [{"id": "sample", "numbers": "90"}]}
+                )
+            ],
+            usage=RequestUsage(input_tokens=100, output_tokens=50),
+        )
+
+    link = FakeLink(
+        "anthropic", "Sample AI", "anthropic", models={HAIKU.choice.model: FunctionModel(answer)}
+    )
+    models = Models(
+        sheet=(HAIKU,),
+        roles={"quick": HAIKU.choice},
+        connectors={link.id: link},
+        spending=Spending(CostBook(general), clock=fake_clock),
+        host=FakeHost(brief_id="sample"),
+        brief_id="sample",
+        project_id="sample-project",
+        run_id="vision-run",
+        work=data_dir / "work",
+    )
+
+    async def request(images, schema, instructions):
+        return await oneshot.map_pictures(models, images, schema, instructions)
+
+    f = files.add_file(general, "sample.pdf", sample_pdf([["Validity 01 days"]]), actor="engineer")
+    ids = facts.accept(
+        general,
+        [
+            dict(
+                file_id=f.id,
+                locator={"page": 1},
+                name={"en": "Validity", "ar": "السريان"},
+                value="01 days",
+                evidence="Validity 01 days",
+            )
+        ],
+        picture_fallback=False,
+    )
+
+    # Return the actual fact id from the scripted provider.
+    async def answer_with_id(messages, info):
+        response = await answer(messages, info)
+        response.parts[0].args["readings"][0]["id"] = ids[0]
+        return response
+
+    link.models[HAIKU.choice.model] = FunctionModel(answer_with_id)
+    await picture.verify(general, ids, request=request)
+    with general.read() as c:
+        assert c.execute(
+            "SELECT role,input_tokens,output_tokens FROM ai_costs WHERE run_id='vision-run'"
+        ).fetchone() == ("quick", 100, 50)
+
+
+@pytest.mark.anyio
+async def test_vision_retry_checks_already_persisted_facts(rec):
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Validity 01 days"]]), actor="engineer")
+
+    async def read(*args):
+        return "Validity 01 days"
+
+    async def request(*args):
+        return facts.Result(
+            facts=[
+                facts.Fact(
+                    file_id=f.id,
+                    locator={"page": 1},
+                    name={"en": "Validity", "ar": "السريان"},
+                    value="01 days",
+                    evidence="Validity 01 days",
+                    state="found",
+                )
+            ]
+        )
+
+    calls = []
+
+    async def vision(images, schema, instructions):
+        calls.append(images)
+        if len(calls) == 1:
+            raise ValueError("Sample interrupted request")
+        return schema.model_validate({"readings": [{"id": images[0]["id"], "numbers": "90"}]})
+
+    with pytest.raises(ValueError, match="interrupted"):
+        await facts.run_approved(
+            rec, read=read, request=request, file_ids={f.id}, vision_request=vision
+        )
+    await facts.run_approved(
+        rec, read=read, request=request, file_ids={f.id}, vision_request=vision
+    )
+    assert len(calls) == 2
+    row = store.entries(rec, "facts")["facts"][0]
+    assert row["value"] == "01 days" and row["picture_check"]["warning"]
+
+
+@pytest.mark.anyio
+async def test_numeric_pdf_facts_share_one_vision_batch(rec):
+    from qsone.records.mapping import picture
+
+    f = files.add_file(
+        rec,
+        "sample.pdf",
+        sample_pdf([["Validity 01 days"], ["Validity 02 days"]]),
+        actor="engineer",
+    )
+    ids = facts.accept(
+        rec,
+        [
+            dict(
+                file_id=f.id,
+                locator={"page": page},
+                name={"en": "Validity", "ar": "السريان"},
+                value=value,
+                evidence=f"Validity {value}",
+            )
+            for page, value in [(1, "01 days"), (2, "02 days")]
+        ],
+        picture_fallback=False,
+    )
+    calls = []
+
+    async def vision(images, schema, instructions):
+        calls.append(images)
+        return schema.model_validate(
+            {"readings": [{"id": image["id"], "numbers": "٩٠"} for image in images]}
+        )
+
+    await picture.verify(rec, ids, request=vision)
+    assert len(calls) == 1 and len(calls[0]) == 2
+    saved = store.entries(rec, "facts")["facts"]
+    assert {r["value"] for r in saved} == {"01 days", "02 days"}
+    assert all(r["picture_check"]["warning"] for r in saved)

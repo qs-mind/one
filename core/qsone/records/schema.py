@@ -489,4 +489,7 @@ MIGRATIONS: list[str] = [
     "ALTER TABLE map_facts ADD COLUMN source_label TEXT;"
     "ALTER TABLE map_files ADD COLUMN group_labels TEXT "
     "CHECK(group_labels IS NULL OR json_valid(group_labels));",
+    "ALTER TABLE map_facts ADD COLUMN evidence TEXT;"
+    "ALTER TABLE map_facts ADD COLUMN picture_check TEXT "
+    "CHECK(picture_check IS NULL OR json_valid(picture_check));",
 ]

@@ -436,3 +436,59 @@ def map_model(models: Models):
             return card
     found = _subscription(models, ("quick", "specialist", "lead"))
     return None if found is None else found[0]
+
+
+def map_picture_model(models: Models):
+    """Use the quick role only when its connected model supports images."""
+    if models is None or not hasattr(models, "card"):
+        return None
+    card = models.card(roles.available(models.sheet, models.roles).get("quick"))
+    if (
+        card is not None
+        and card.images
+        and (_model_link(models, card) or card.choice.connector == claude_code.ID)
+    ):
+        return card
+    return None
+
+
+async def map_pictures(models: Models, images, output_type, instructions: str):
+    """One structured, cost-counted vision request inside the approved map pass."""
+    card = map_picture_model(models)
+    if card is None or not SEND_PAGE_IMAGES:
+        return None
+    if card.choice.connector == claude_code.ID:
+        content = []
+        for image in images:
+            content.extend(
+                [
+                    {"type": "text", "text": image["id"]},
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": base64.b64encode(image["png"]).decode(),
+                        },
+                    },
+                ]
+            )
+        text = await _on_subscription(
+            models,
+            card,
+            "quick",
+            content,
+            instructions=instructions
+            + "\nReturn JSON matching: "
+            + json.dumps(output_type.model_json_schema()),
+            tools=(),
+            failed=copy.MAP_FAILED,
+        )
+        return output_type.model_validate_json(text)
+    content = []
+    for image in images:
+        content.extend([image["id"], BinaryImage(image["png"], media_type="image/png")])
+    agent = Agent(
+        _costed(models, card, "quick"), instructions=instructions, output_type=output_type
+    )
+    return (await _once(models, card, "quick", agent, content)).output

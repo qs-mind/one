@@ -887,3 +887,111 @@ async def test_drop_estimate_reserves_validation_retry(rec, monkeypatch, enrichm
     )
     assert len(asked) == 1
     assert expected in asked[0].detail["en"]
+
+
+@pytest.mark.anyio
+async def test_missing_batch_file_retried_alone(rec, monkeypatch):
+    from qsone.records.extract import Extracted, Piece
+    from tests.samples import sample_docx, sample_xls
+
+    original_extract = files.extract
+
+    def extract(name, data):
+        if name.endswith(".pptx"):
+            return Extracted(
+                "pptx", "read", None, [Piece({"slide": 1}, "Sample presentation")], None
+            )
+        if name.endswith(".docx"):
+            return Extracted(
+                "docx", "read", None, [Piece({"paragraph": 1}, "Sample document")], None
+            )
+        return original_extract(name, data)
+
+    monkeypatch.setattr(files, "extract", extract)
+    fs = [
+        files.add_file(rec, "sample.pptx", b"Sample presentation fixture", actor="engineer"),
+        files.add_file(
+            rec, "sample.docx", sample_docx([("p", "Sample document")]), actor="engineer"
+        ),
+        files.add_file(
+            rec,
+            "sample.xls",
+            sample_xls({f"Sample {i}": [["Sample", i]] for i in range(19)}),
+            actor="engineer",
+        ),
+    ]
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(cards, "cost", lambda *a, **k: Decimal("0.001"))
+    batches_seen = []
+
+    async def request(prompt, schema, instructions):
+        if schema is ai.Groups:
+            return ai.Groups(groups=[])
+        batch = json.loads(prompt)
+        batches_seen.append([d["file_id"] for d in batch])
+        chosen = batch[:-1] if len(batch) > 1 else batch
+        return ai.Batch(
+            files=[
+                ai.FileMap(file_id=d["file_id"], kind="contract", group="Tender") for d in chosen
+            ]
+        )
+
+    await ai.run(rec, SimpleNamespace(), request=request)
+    assert len(batches_seen) == 2
+    assert batches_seen[1] == [batches_seen[0][-1]]
+    assert all(store.detail(rec, f.id)["ai_state"] == "done" for f in fs)
+
+
+def test_nonpage_locators():
+    text = {"en": "Sample", "ar": "عينة"}
+    for key in ("slide", "paragraph"):
+        result = ai.FileMap(
+            file_id="sample",
+            kind="contract",
+            group=text,
+            key_pages=[{"label": text, "why": text, key: 2}],
+        )
+        source = {
+            "pages": None,
+            "sheets": [],
+            "drawing_sheets": [],
+            "positions": [{key: 2}],
+            "key_page_candidates": [],
+        }
+        assert ai.valid_pages(result, source)[0][key] == 2
+
+
+@pytest.mark.anyio
+async def test_vision_is_in_drop_estimate_before_any_image_leaves(rec, monkeypatch):
+    from qsone.records.mapping import picture
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Validity 01 days"]]), actor="engineer")
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    priced = []
+
+    def price(card, *, input_tokens, output_tokens):
+        priced.append((input_tokens, output_tokens))
+        return Decimal("1")
+
+    monkeypatch.setattr(cards, "cost", price)
+    asked = []
+
+    async def ask(card):
+        asked.append(card)
+        return "no"
+
+    async def forbidden(*args):
+        pytest.fail("Declined drop must not send text or images")
+
+    await ai.run(
+        rec,
+        SimpleNamespace(host=SimpleNamespace(ask=ask)),
+        request=forbidden,
+        vision_request=forbidden,
+        passes={"read": forbidden},
+    )
+    assert (picture.MAX_FACTS * picture.IMAGE_TOKENS + 2000, picture.MAX_FACTS * 100) in priced
+    assert len(asked) == 1
+    assert store.detail(rec, f.id)["ai_state"] == "declined"
