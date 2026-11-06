@@ -255,6 +255,10 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
     except ModelRetry as e:
         _refused(ctx, name, copy.words_for(e.message))
         raise
+    read_repeat = getattr(ctx.host, "read_repeat", None)
+    if name in {"files_read", "read_chunk"} and read_repeat is not None:
+        if read_repeat(name, parsed.model_dump(mode="json")):
+            return copy.READ_ALREADY["en"]
     key = _write_key(tool, parsed) if tool.writes else None
     if key is not None:
         earlier = ctx.store.known_write(ctx.brief_id, key)
@@ -277,6 +281,8 @@ async def call(name: str, args: dict, ctx: ToolContext) -> str:
         raise
     if out.startswith("not done:"):
         _refused(ctx, name, copy.words_for(out.split("\n", 1)[0]))
+    if name in {"files_read", "read_chunk"} and re.search(r"\.{3,}|_{3,}", out):
+        out += "\n" + copy.READ_TEMPLATE_BLANK["en"]
     page, note = _paged(tool, parsed, out)
     if tool.untrusted:
         page = data_text.as_data(page, source=tool.name, fence=ctx.fence)

@@ -111,3 +111,97 @@ def test_walk_fact_states_sources_and_links():
     assert walk.check("map_fact_states", ["found"])
     assert walk.check("map_links_min", 1)
     assert not walk.check("map_fact_states", ["blank"])
+
+
+@pytest.mark.anyio
+async def test_local_evidence_is_available_without_ai_and_drawings_are_paged(rec):
+    from qsone.tools.project_map import MapArgs, read_map
+
+    f = files.add_file(rec, "electrical sample.pdf", sample_pdf([["sample"]]), actor="engineer")
+    with rec.write("one") as c:
+        c.execute("UPDATE files SET folder='Tender/Electrical' WHERE id=?", (f.id,))
+        store.write(
+            c,
+            rec,
+            "map_files",
+            {
+                "file_id": f.id,
+                "read_how": "text",
+                "structure": {"headings": [{"text": "Electrical schedules", "page": 1}]},
+            },
+        )
+        store.write(
+            c,
+            rec,
+            "map_tables",
+            {
+                "file_id": f.id,
+                "locator": {"page": 1},
+                "header": ["Item", "Quantity"],
+                "looks_like_boq": 1,
+                "row_count": 2,
+                "column_guess": {},
+            },
+        )
+        for i in range(3):
+            store.write(
+                c,
+                rec,
+                "map_sheets",
+                {
+                    "file_id": f.id,
+                    "sheet": str(i),
+                    "number": f"E-{i}",
+                    "title": "Main single line diagram" if i == 0 else "Electrical lighting",
+                    "revision": "A",
+                    "scale": "1:100",
+                    "discipline": "electrical",
+                    "counts": {"MCCB": 7, "LIGHT": 2, "SOCKET": 1},
+                    "source": {"page": 1},
+                    "state": "local",
+                },
+            )
+    ctx = SimpleNamespace(rec=rec)
+    for mode in ("overview", "file", "find"):
+        result = json.loads(
+            await read_map(ctx, MapArgs(mode=mode, file_id=f.id, label="E-0", limit=2))
+        )
+        row = result if mode == "file" else result["files"][0]
+        assert row["name"] == "electrical sample.pdf"
+        assert row["folder"] == "Tender/Electrical"
+        assert row["kind"] == "pdf" and row["pages"] == 1 and row["read_how"] == "text"
+        assert row["headings"][0]["text"] == "Electrical schedules"
+        assert row["boq_tables"][0]["locator"] == {"page": 1}
+        assert len(row["sheets"]) == 2 and row["sheets_next_page"] == 2
+        assert row["sheets"][0]["number"] == "E-0"
+        assert row["sheets"][0]["counts"]["MCCB"] == 7
+        assert row["sheets"][0]["file_id"] == f.id
+        assert row["sheets"][0]["counts_next_page"] == 2
+    second = json.loads(await read_map(ctx, MapArgs(mode="file", file_id=f.id, page=2, limit=2)))
+    assert [s["number"] for s in second["sheets"]] == ["E-2"]
+    for query in ("electrical sample", "Electrical schedules", "E-0", "Main single line"):
+        found = json.loads(await read_map(ctx, MapArgs(mode="find", label=query)))
+        assert found["files"][0]["file_id"] == f.id
+
+    blocks = json.loads(
+        await read_map(ctx, MapArgs(mode="file", file_id=f.id, counts_page=2, limit=2))
+    )
+    assert blocks["sheets"][0]["counts"] == {"SOCKET": 1}
+    assert blocks["sheets"][0]["counts_next_page"] is None
+
+
+@pytest.mark.anyio
+async def test_tool_call_keeps_its_own_sheet_pagination(rec):
+    from qsone.engine.tools import call
+    from tests.fakes_tools import tool_ctx
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["sample"]]), actor="engineer")
+    with rec.write("one") as c:
+        for i in range(3):
+            store.write(
+                c, rec, "map_sheets", {"file_id": f.id, "sheet": str(i), "number": f"E-{i}"}
+            )
+    answer = await call(
+        "project_map", {"mode": "file", "file_id": f.id, "page": 2, "limit": 2}, tool_ctx(rec)
+    )
+    assert '"number": "E-2"' in answer

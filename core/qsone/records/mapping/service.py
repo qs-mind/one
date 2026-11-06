@@ -80,20 +80,13 @@ class Mapping:
                                 r[0]
                                 for r in c.execute(
                                     "SELECT file_id FROM map_files WHERE valid_until IS NULL "
-                                    "AND local_state='done' AND coalesce(ai_state,'') NOT IN "
+                                    "AND local_state='done' AND ai_attempts<2 "
+                                    "AND coalesce(ai_state,'') NOT IN "
                                     "('done','local','declined') "
                                     "ORDER BY file_id"
                                 )
                             ]
-                        key = (pid, tuple(pending))
-                        previous = self._submitted.get(key)
-                        if previous is not None and previous.done():
-                            try:
-                                accepted = previous.result()
-                            except Exception:
-                                accepted = False
-                            if not accepted:
-                                self._submitted.pop(key, None)
+                        key = pid
                         if pending and key not in self._submitted:
                             approved = self.passes(rec).get("approved")
                             self._submitted[key] = (

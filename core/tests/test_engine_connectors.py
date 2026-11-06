@@ -728,3 +728,105 @@ async def test_a_404_model_is_not_checked_again():
     assert await connectors.check("standard:stub/gone-sample", among=[link]) is not None
     assert await connectors.check("standard:stub/gone-sample", among=[link]) is not None
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "base_url,provider",
+    [
+        ("https://generativelanguage.googleapis.com/v1beta/openai", "google"),
+        ("https://us-central1-aiplatform.googleapis.com/v1/openapi", "google-vertex"),
+        ("https://sample-proxy.example/openai", "google"),
+    ],
+)
+def test_google_wire_schemas_drop_array_bounds_but_validation_keeps_them(base_url, provider):
+    from pydantic import ValidationError
+    from pydantic_ai.models import ModelRequestParameters
+    from pydantic_ai.tools import ToolDefinition
+
+    from qsone.engine import tools
+    from qsone.records.mapping import ai, facts, links
+
+    link = StandardLink("google", "Google", base_url, provider)
+    schemas = [ai.Batch, ai.Groups, facts.Result, links.Result]
+    schemas += [tool.args for tool in tools.REGISTRY.values()]
+    definitions = [
+        ToolDefinition(name=f"schema_{i}", parameters_json_schema=s.model_json_schema())
+        for i, s in enumerate(schemas)
+    ]
+    model = link.model("sample-gemini")
+    sent = model.customize_request_parameters(
+        ModelRequestParameters(function_tools=definitions, output_tools=definitions)
+    )
+    for definition in sent.function_tools + sent.output_tools:
+        encoded = json.dumps(definition.parameters_json_schema)
+        assert "maxItems" not in encoded and "minItems" not in encoded
+    valid = {
+        "file_id": "sample",
+        "kind": "contract",
+        "title": {"en": "Sample", "ar": "عينة"},
+        "group": "Tender",
+    }
+    assert len(ai.Batch.model_validate({"files": [valid] * 4}).files) == 4
+    with pytest.raises(ValidationError) as invalid:
+        ai.Batch.model_validate({"files": [valid] * 5})
+    assert invalid.value.errors()[0]["type"] == "too_long"
+    assert ai.Batch.model_json_schema()["properties"]["files"]["maxItems"] == 4
+
+
+async def test_google_request_sends_compatible_tool_and_output_schemas():
+    from pydantic_ai.messages import ModelRequest, UserPromptPart
+    from pydantic_ai.models import ModelRequestParameters
+    from pydantic_ai.output import OutputObjectDefinition
+    from pydantic_ai.tools import ToolDefinition
+
+    from qsone.records.mapping.ai import Batch
+
+    seen = []
+
+    def handle(request):
+        body = json.loads(request.content)
+        seen.append(body)
+        assert "maxItems" not in json.dumps(body)
+        assert "minItems" not in json.dumps(body)
+        return httpx2.Response(
+            200,
+            json={
+                "id": "sample",
+                "object": "chat.completion",
+                "created": 0,
+                "model": "sample",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {"role": "assistant", "content": '{"files":[]}'},
+                    }
+                ],
+            },
+        )
+
+    async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as http:
+        link = StandardLink(
+            "google",
+            "Google",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "google",
+            http_client=http,
+        )
+        schema = Batch.model_json_schema()
+        tool = ToolDefinition(name="map_batch", parameters_json_schema=schema)
+        model = link.model("sample")
+        await model.request(
+            [ModelRequest(parts=[UserPromptPart("synthetic sample")])],
+            None,
+            ModelRequestParameters(function_tools=[tool], output_tools=[tool]),
+        )
+        await model.request(
+            [ModelRequest(parts=[UserPromptPart("synthetic sample")])],
+            None,
+            ModelRequestParameters(
+                output_mode="native", output_object=OutputObjectDefinition(json_schema=schema)
+            ),
+        )
+    assert len(seen) == 2
+    assert schema["properties"]["files"]["maxItems"] == 4

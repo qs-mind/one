@@ -253,8 +253,9 @@ def _pending(rec):
     with rec.read() as c:
         return store.rows(
             c,
-            "SELECT * FROM map_files WHERE valid_until IS NULL "
-            "AND local_state IN ('waiting','reading') ORDER BY local_state,file_id LIMIT 1",
+            "SELECT m.* FROM map_files m JOIN files f ON f.id=m.file_id "
+            "WHERE m.valid_until IS NULL AND local_state IN ('waiting','reading') "
+            "ORDER BY local_state,f.rowid LIMIT 1",
         )
 
 
@@ -285,6 +286,9 @@ def step(
     info = files.file_info(rec, file_id)
     try:
         if row["local_state"] == "waiting":
+            if _duplicate(rec, file_id):
+                original.clear()
+                return True
             data = original(rec, file_id)
             structure, scanned, tables = _structure(rec, info, data)
             _update(
@@ -404,3 +408,53 @@ def step(
         original.clear()
         _update(rec, file_id, {"local_state": "failed", "note": copy.MAP_FAILED})
     return True
+
+
+def _duplicate(rec, file_id):
+    """Reuse the first locally mapped identical original, including bounded evidence rows."""
+    with rec.write(store.ACTOR) as c:
+        found = c.execute(
+            "SELECT m.file_id FROM map_files m JOIN files f ON f.id=m.file_id "
+            "WHERE f.sha256=(SELECT sha256 FROM files WHERE id=?) AND f.id<>? "
+            "AND f.rowid<(SELECT rowid FROM files WHERE id=?) "
+            "AND m.local_state='done' ORDER BY f.rowid LIMIT 1",
+            (file_id, file_id, file_id),
+        ).fetchone()
+        if not found:
+            return False
+        source = store.decoded(store.rows(c, "SELECT * FROM map_files WHERE file_id=?", found)[0])
+        fields = {
+            k: source[k]
+            for k in (
+                "structure",
+                "scanned_pages",
+                "ocr_done_pages",
+                "text_pages",
+                "read_how",
+                "ai_kind",
+                "ai_title",
+                "ai_group",
+                "key_pages",
+                "note",
+            )
+        }
+        store.write(
+            c,
+            rec,
+            "map_files",
+            fields
+            | {
+                "file_id": file_id,
+                "local_state": "done",
+                "ai_state": "local",
+                "mapped_at": rec.clock(),
+            },
+        )
+        for table in ("map_tables", "map_sheets"):
+            for row in store.rows(
+                c, f"SELECT * FROM {table} WHERE file_id=? AND valid_until IS NULL", found
+            ):
+                item = store.decoded(row)
+                item.pop("id")
+                store.write(c, rec, table, item | {"file_id": file_id})
+        return True

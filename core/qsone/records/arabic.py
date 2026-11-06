@@ -28,11 +28,11 @@ _PREFIXES = ("وال", "بال", "كال", "فال", "لل", "ال", "و", "ب",
 _SUFFIXES = ("ات", "ون", "ين", "ان", "يه", "ها", "ه", "ي")
 
 
-def display_text(s: str) -> str:
+def display_text(s: str, *, keep_blanks: bool = False) -> str:
     """Presentation forms joined, no kashida, tidy lines and spaces; digits as written."""
     s = _PRESENTATION_FORMS.sub(lambda m: unicodedata.normalize("NFKC", m[0]), s)
     s = _KASHIDA.sub("", s).replace("\r\n", "\n").replace("\r", "\n")
-    s = _SPACES.sub(" ", _DOT_LEADER.sub(" ", s))
+    s = _SPACES.sub(" ", s if keep_blanks else _DOT_LEADER.sub(" ", s))
     return _LINE_END_SPACES.sub("\n", s).strip()
 
 
