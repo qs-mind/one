@@ -595,6 +595,7 @@ TOOL_WORDS = {
     },
     "use_desk": {"en": "Calling on a Desk", "ar": "بيستعين بقسم"},
     "web_read": {"en": "Reading a web page", "ar": "بيقرا صفحة ويب"},
+    "open_tools": {"en": "Getting tools ready", "ar": "بيجهّز أدواته"},
     "web_search": {"en": "Searching the web", "ar": "بيدوّر على الويب"},
 }
 
