@@ -23,16 +23,30 @@ def digest(rec):
             "LEFT JOIN map_files m ON m.file_id=f.id "
             "WHERE a.valid_until IS NULL AND f.valid_until IS NULL ORDER BY a.id LIMIT 10",
         )
-        sheet_count = c.execute(
-            "SELECT count(*) FROM map_sheets s JOIN files f ON f.id=s.file_id "
-            "WHERE s.valid_until IS NULL "
+        sheet_count, drawing_count = c.execute(
+            "SELECT count(*),count(DISTINCT s.file_id) FROM map_sheets s "
+            "JOIN files f ON f.id=s.file_id WHERE s.valid_until IS NULL "
             "AND f.valid_until IS NULL"
-        ).fetchone()[0]
-    if sheet_count:
-        lines.append(
-            f"Drawing sheets: {sheet_count}; use project_map mode sheets/counts "
-            "(label filters block names)."
+        ).fetchone()
+        sheets = store.rows(
+            c,
+            "SELECT f.name,s.sheet,s.number,s.title FROM map_sheets s "
+            "JOIN files f ON f.id=s.file_id "
+            "WHERE s.valid_until IS NULL AND f.valid_until IS NULL ORDER BY f.id,s.id LIMIT 20",
         )
+        drawing_count = c.execute(
+            "SELECT count(*) FROM files f WHERE valid_until IS NULL AND "
+            "(kind IN ('dwg','dxf') OR EXISTS (SELECT 1 FROM map_sheets s "
+            "WHERE s.file_id=f.id AND s.valid_until IS NULL))"
+        ).fetchone()[0]
+    if drawing_count:
+        lines.append(f"Drawing files: {drawing_count}; drawing sheets: {sheet_count}")
+        for sheet in sheets:
+            lines.append(
+                f"{sheet['name'][:60]} | {sheet['sheet'][:40]} | "
+                f"{(sheet['number'] or 'unknown')[:40]} | {(sheet['title'] or 'unknown')[:100]}"
+            )
+        lines.append("block counts: project_map mode counts")
 
     candidates = []
     for row in pages:

@@ -217,7 +217,12 @@ def _chunk(rec: Records, chunk_id: int) -> str:
         "file": file_name,
         "locator": json.loads(locator),
     }
-    return f"{_json(head)}\n{text}"
+    from qsone.records import files
+    from qsone.records.mapping import drawing_evidence
+
+    evidence = drawing_evidence.chunks(rec, files.file_info(rec, file_id))
+    header = "\n".join(f"{_json(loc)} {line}" for loc, line in evidence)
+    return f"{_json(head)}\n{header}\n{text}"
 
 
 async def _read_chunk(ctx: ToolContext, args: ChunkArgs) -> str:

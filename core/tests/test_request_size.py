@@ -308,3 +308,50 @@ def test_first_lead_schemas_and_digest_leave_room_for_context(rec):
     sizes = request_size.parts(messages, params)
     assert "Key Tender Data" in prompt
     assert sizes["total"] < STEP_TARGET - 1_000
+
+
+async def test_scripted_lead_reads_drawing_map(registry, data_dir, fake_clock, fake_sleep):
+    from qsone.records.mapping import store
+
+    project = registry.create("Sample electrical project", "engineer")["id"]
+    rec = registry.get(project)
+    f = files.add_file(
+        rec,
+        "sample.dxf",
+        (Path(__file__).parent / "fixtures/drawings/title.dxf").read_bytes(),
+        actor="engineer",
+    )
+    with rec.write("one") as c:
+        for i in range(20):
+            store.write(
+                c,
+                rec,
+                "map_sheets",
+                {
+                    "file_id": f.id,
+                    "sheet": f"SLD{i}",
+                    "number": f"EL-{504 + i}",
+                    "title": "Sample main single line diagram",
+                    "counts": {"MCCB": 7},
+                },
+            )
+
+    def script(body):
+        assert "EL-504" in str(body) and "EL-523" in str(body)
+        if not any(m["role"] == "tool" for m in body["messages"]):
+            return "calls", [("files_read", {"file_id": f.id})]
+        result = _last_tool(body)
+        assert "EL-504" in result and "MCCB × 7" in result
+        assert result.index("EL-504") < result.index("MCCB × 7")
+        return "text", "The sample drawing evidence is available above."
+
+    provider = FakeProvider(script)
+    engine = await _engine(registry, data_dir, provider, fake_clock, fake_sleep)
+    try:
+        await _run(engine, project, "List the sample electrical sheets and MCCB blocks")
+        assert len(provider.bodies) == 2
+        sizes = [wire_parts(body)["total"] for body in provider.bodies]
+        assert max(sizes) < STEP_TARGET
+        assert sum(sizes) < BRIEF_TARGET
+    finally:
+        await engine.shutdown()
