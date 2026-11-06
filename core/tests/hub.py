@@ -6,7 +6,7 @@ import re
 
 import httpx
 
-from qsone.meaning.manifest import EMBEDDER, RERANKER, ModelFile, ModelSpec
+from qsone.meaning.manifest import EMBEDDER, ModelFile, ModelSpec
 
 PIECE = 16 * 1024  # the fake network hands the body over in pieces this size
 
@@ -18,24 +18,25 @@ def _bytes(seed: str, size: int) -> bytes:
     return (head + body)[:size]
 
 
-def _spec(id, kind, sizes, dims, ram_bytes) -> tuple[ModelSpec, dict[str, bytes]]:
-    paths = ("tokenizer.json", "onnx/model_int8.onnx")
+def _spec(id, sizes, dims, ram_bytes) -> tuple[ModelSpec, dict[str, bytes]]:
+    paths = ("tokenizer.json", "onnx/model_quantized.onnx")
     data = {p: _bytes(f"{id}/{p}", n) for p, n in zip(paths, sizes, strict=True)}
     files = tuple(ModelFile(p, len(b), hashlib.sha256(b).hexdigest()) for p, b in data.items())
     revision = hashlib.sha1(id.encode()).hexdigest()
-    spec = ModelSpec(id, kind, f"qsmind-sample/{id}", revision, files, "MIT", dims, ram_bytes)
+    spec = ModelSpec(id, f"qsmind-sample/{id}", revision, files, "MIT", dims, ram_bytes)
     return spec, data
 
 
 def _samples() -> tuple[tuple[ModelSpec, ModelSpec], dict[str, bytes]]:
-    embedder, e = _spec("sample-embedder", "embedder", (150_000, 300_000), 5, EMBEDDER.ram_bytes)
-    reranker, r = _spec("sample-reranker", "reranker", (120_000, 250_000), None, RERANKER.ram_bytes)
-    served = {s.url(f): d[f.path] for s, d in ((embedder, e), (reranker, r)) for f in s.files}
-    return (embedder, reranker), served
+    embedder, e = _spec("sample-embedder", (150_000, 300_000), 5, EMBEDDER.ram_bytes)
+    second, r = _spec("sample-second", (120_000, 250_000), 5, EMBEDDER.ram_bytes)
+    served = {s.url(f): d[f.path] for s, d in ((embedder, e), (second, r)) for f in s.files}
+    return (embedder, second), served
 
 
 def sample_specs() -> tuple[ModelSpec, ModelSpec]:
-    """Two tiny specs: an embedder with `dims=5` (`ConceptEmbedder.dims`) and a reranker."""
+    """Two tiny specs with `dims=5` (`ConceptEmbedder.dims`): the search service takes the first;
+    the downloader, as the Sandbox uses it, takes both."""
     return _samples()[0]
 
 

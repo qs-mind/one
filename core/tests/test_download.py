@@ -2,21 +2,27 @@
 matches. Everything goes through `FakeHub`; no test opens a socket."""
 
 import shutil
+import threading
+import time
 from threading import Event
 
 import pytest
 import truststore
 
 from qsone import copy
+from qsone.meaning import download as download_module
 from qsone.meaning.download import (
+    SPARE,
     DownloadError,
     DownloadStopped,
+    NoSpace,
     default_client,
     download,
     folder,
     installed,
     remaining,
 )
+from qsone.meaning.manifest import MODELS
 from tests.hub import FakeHub
 
 
@@ -135,9 +141,32 @@ def test_no_space_asks_nothing(tmp_path, hub, monkeypatch):
     usage = shutil.disk_usage(tmp_path)
     free = total(hub.specs) + 200_000_000 - 1
     monkeypatch.setattr(shutil, "disk_usage", lambda path: usage._replace(free=free))
-    with pytest.raises(DownloadError) as caught:
+    with pytest.raises(NoSpace) as caught:
         download(hub.specs, tmp_path, client=hub.client(), stop=Event())
-    assert caught.value.text == copy.MEANING_NO_SPACE and hub.requests == []
+    need = total(hub.specs) + 200_000_000  # what is still to come and the spare, worked out
+    assert caught.value.need == need and hub.requests == []
+    assert caught.value.text == copy.fill(copy.MEANING_NO_SPACE, size=f"{round(need / 1e6)} MB")
+    assert "201 MB" in caught.value.text["en"] and "201 MB" in caught.value.text["ar"]
+    # the real model: 135 MB to come and the 200 MB spare
+    assert round((sum(s.size for s in MODELS) + SPARE) / 1e6) == 335
+
+
+def test_a_try_that_moved_on_counts_the_retries_again(tmp_path, hub, monkeypatch):
+    monkeypatch.setattr(download_module, "MOVED_ON", 50_000)
+    hub.drop_after(60_000, times=8)  # far more drops than 3 retries, but each one moved on
+    slept = []
+    download(hub.specs, tmp_path, client=hub.client(), stop=Event(), sleep=slept.append)
+    assert installed(hub.specs, tmp_path) and len(slept) > 3 and max(slept) <= 4
+
+
+def test_the_wait_between_tries_ends_when_stopped(tmp_path, hub):
+    hub.drop_after(10, times=99)
+    stop = Event()
+    threading.Timer(0.2, stop.set).start()
+    started = time.monotonic()
+    with pytest.raises(DownloadStopped):
+        download(hub.specs, tmp_path, client=hub.client(), stop=stop)  # waits on `stop`, 2 s
+    assert time.monotonic() - started < 1.5
 
 
 def put_by_hand(hub, root) -> None:

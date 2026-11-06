@@ -1,107 +1,129 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setLanguage, texts } from "../i18n";
-import { formatBytes, MeaningStatus } from "./MeaningStatus";
+import { fill, setLanguage, texts } from "../i18n";
+import { MeaningStatus } from "./MeaningStatus";
 
 const project = "p1";
-const total = 1_173_349_509; // the two pinned search models, as the core's manifest says
+const total = 135_390_915; // the pinned search model, as the core's manifest says
 
 type Model = { state: string; done_bytes?: number; total_bytes?: number; reason?: { en: string; ar: string } | null };
 type Job = { state: string; done: number; total: number; reason?: { en: string; ar: string } | null };
 
 // GET /api/meaning as the core answers it.
-function status(model: Model, job?: Job, paused = false) {
+function status(model: Model, job?: Job) {
   return {
     model: { done_bytes: 0, total_bytes: total, reason: null, ...model },
-    indexing: { paused, projects: job ? { [project]: { reason: null, ...job } } : {} },
+    indexing: { projects: job ? { [project]: { reason: null, ...job } } : {} },
   };
 }
 
-// The core behind /api: `answer` gives the current GET /api/meaning body; every POST is recorded.
+// The core behind /api: `answer` gives the current GET /api/meaning body.
 function core(answer: () => object | undefined) {
-  const fetch = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
-    const url = String(input);
-    if (url === "/api/meaning" && (init.method ?? "GET") === "GET") {
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input) === "/api/meaning") {
       const body = answer();
       return body ? Response.json(body) : new Response("down", { status: 500 });
     }
-    if (url.startsWith("/api/meaning/") && init.method === "POST") return Response.json(answer(), { status: 202 });
     return new Response("not found", { status: 404 });
   });
   vi.stubGlobal("fetch", fetch);
   return fetch;
 }
 
-const gets = (fetch: ReturnType<typeof core>) =>
-  fetch.mock.calls.filter(([url, init]) => url === "/api/meaning" && (init?.method ?? "GET") === "GET").length;
-const posted = (fetch: ReturnType<typeof core>) =>
-  fetch.mock.calls.filter(([, init]) => init?.method === "POST").map(([url]) => String(url));
+const gets = (fetch: ReturnType<typeof core>) => fetch.mock.calls.length;
+const preparing = (percent: string, lang: "en" | "ar" = "ar") => fill(texts.meaningPreparing[lang], { percent });
 
 beforeEach(() => setLanguage("ar"));
 afterEach(() => vi.useRealTimers());
 
-describe("formatBytes", () => {
-  it("gives MB under a gigabyte and GB with one decimal above, the same in both languages", () => {
-    expect(formatBytes(420_000_000)).toBe("420 MB");
-    expect(formatBytes(total)).toBe("1.2 GB");
-    expect(formatBytes(0)).toBe("0 MB");
-  });
-});
-
 describe("MeaningStatus", () => {
-  it("offers the download with its real size and starts it", async () => {
-    let now = status({ state: "off" });
-    const fetch = core(() => now);
-    const user = userEvent.setup();
+  it("shows one quiet Slate line with the download's percent, and no button", async () => {
+    core(() => status({ state: "downloading", done_bytes: 57_000_000 }));
     render(<MeaningStatus projectId={project} />);
-
-    const line = await screen.findByText(texts.meaningOff.ar.replace("{size}", "1.2 GB"));
+    const line = await screen.findByText(preparing("42%"));
     expect(line).toHaveAttribute("role", "status");
-    now = status({ state: "downloading", done_bytes: 0 });
-    await user.click(screen.getByRole("button", { name: texts.meaningDownload.ar }));
-
-    expect(posted(fetch)).toEqual(["/api/meaning/download"]);
-    expect(await screen.findByRole("button", { name: texts.meaningStop.ar })).toBeInTheDocument();
-  });
-
-  it("shows download progress and stops it", async () => {
-    let now = status({ state: "downloading", done_bytes: 420_000_000 });
-    const fetch = core(() => now);
-    const user = userEvent.setup();
-    render(<MeaningStatus projectId={project} />);
-
-    expect(await screen.findByText("بننزّل نموذج البحث: 420 MB من 1.2 GB")).toHaveAttribute("role", "status");
-    now = status({ state: "stopped", done_bytes: 420_000_000 });
-    await user.click(screen.getByRole("button", { name: texts.meaningStop.ar }));
-
-    expect(posted(fetch)).toEqual(["/api/meaning/stop"]);
-    expect(await screen.findByText("التنزيل وقف عند 420 MB من 1.2 GB.")).toBeInTheDocument();
-    now = status({ state: "downloading", done_bytes: 420_000_000 });
-    await user.click(screen.getByRole("button", { name: texts.meaningResume.ar }));
-    expect(posted(fetch)).toEqual(["/api/meaning/stop", "/api/meaning/download"]);
-
+    expect(line).toHaveClass("text-slate");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
     setLanguage("en");
-    expect(await screen.findByRole("button", { name: texts.meaningStop.en })).toBeInTheDocument();
+    expect(await screen.findByText(preparing("42%", "en"))).toBeInTheDocument();
   });
 
-  it("polls while something moves and stops when ready", async () => {
+  it("keeps the same line while the files are checked, then for this project's preparing", async () => {
+    let now = status({ state: "checking", done_bytes: total });
+    core(() => now);
+    vi.useFakeTimers();
+    render(<MeaningStatus projectId={project} />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByText(preparing("100%"))).toBeInTheDocument();
+    now = status({ state: "ready", done_bytes: total }, { state: "indexing", done: 120, total: 400 });
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText(preparing("30%"))).toBeInTheDocument();
+  });
+
+  it("shows nothing once ready, and stops polling", async () => {
     vi.useFakeTimers();
     let now = status({ state: "downloading", done_bytes: 1 });
     const fetch = core(() => now);
     render(<MeaningStatus projectId={project} />);
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(gets(fetch)).toBe(1);
-
     await act(() => vi.advanceTimersByTimeAsync(3000));
     expect(gets(fetch)).toBe(4); // three polls in three seconds
 
     now = status({ state: "ready", done_bytes: total }, { state: "ready", done: 5, total: 5 });
     await act(() => vi.advanceTimersByTimeAsync(1000));
     expect(gets(fetch)).toBe(5);
-    expect(screen.getByText(texts.meaningReady.ar)).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(10_000));
     expect(gets(fetch)).toBe(5);
+  });
+
+  it("shows nothing before a project has a file, and looks again when one comes", async () => {
+    vi.useFakeTimers();
+    let now = status({ state: "off" });
+    const fetch = core(() => now);
+    const { rerender } = render(<MeaningStatus projectId={project} files={0} />);
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(gets(fetch)).toBe(1); // nothing moves: no polling
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    rerender(<MeaningStatus projectId={project} files={1} />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(gets(fetch)).toBe(2);
+    now = status({ state: "downloading", done_bytes: 0 }); // the core started on the file
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText(preparing("0%"))).toBeInTheDocument();
+  });
+
+  it("after a file comes in with the model ready, keeps looking until the project's preparing shows", async () => {
+    vi.useFakeTimers();
+    let now = status({ state: "ready", done_bytes: total }, { state: "ready", done: 5, total: 5 });
+    const fetch = core(() => now);
+    const { rerender } = render(<MeaningStatus projectId={project} files={1} />);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    rerender(<MeaningStatus projectId={project} files={2} />); // the core has not looked at it yet
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    now = status({ state: "ready", done_bytes: total }, { state: "indexing", done: 5, total: 45 });
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText(preparing("11%"))).toBeInTheDocument();
+
+    now = status({ state: "ready", done_bytes: total }, { state: "ready", done: 45, total: 45 });
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    const polls = gets(fetch);
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(gets(fetch)).toBe(polls); // done: no more waiting
+  });
+
+  it("gives up waiting after a few seconds when a file starts nothing (no text in it)", async () => {
+    vi.useFakeTimers();
+    const fetch = core(() => status({ state: "off" }));
+    render(<MeaningStatus projectId={project} files={1} />);
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+    expect(gets(fetch)).toBe(11);
   });
 
   it("stops polling when the panel closes", async () => {
@@ -115,95 +137,51 @@ describe("MeaningStatus", () => {
     expect(gets(fetch)).toBe(3);
   });
 
-  it("shows the core's reason and tries again after a failure", async () => {
-    const noInternet = { en: "The search model did not download. Try again.", ar: "نموذج البحث ما اتنزلش. جرّب تاني." };
-    let now = status({ state: "failed", done_bytes: 9, reason: noInternet });
-    const fetch = core(() => now);
-    const user = userEvent.setup();
+  it("says plainly when it is not ready after a failure, with no button and no retry here", async () => {
+    vi.useFakeTimers();
+    const why = { en: "The search model did not download.", ar: "نموذج البحث مانزلش." };
+    const fetch = core(() => status({ state: "failed", done_bytes: 9, reason: why }));
     render(<MeaningStatus projectId={project} />);
-
-    expect(await screen.findByText(noInternet.ar)).toHaveAttribute("role", "status");
-    now = status({ state: "downloading", done_bytes: 9 });
-    await user.click(screen.getByRole("button", { name: texts.meaningRetry.ar }));
-    expect(posted(fetch)).toEqual(["/api/meaning/download"]);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByText(texts.meaningNotReady.ar)).toHaveClass("text-slate");
+    expect(screen.queryByText(why.ar)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(gets(fetch)).toBe(1); // it tries again at the next start, by itself
   });
 
-  it("says plainly when this computer cannot run it, with no button", async () => {
+  it("says the same when this project's preparing failed", async () => {
+    core(() => status({ state: "ready", done_bytes: total }, { state: "failed", done: 3, total: 9 }));
+    render(<MeaningStatus projectId={project} />);
+    expect(await screen.findByText(texts.meaningNotReady.ar)).toBeInTheDocument();
+  });
+
+  it("shows nothing on a computer that cannot run it, or when the core does not answer", async () => {
     const cannot = { en: "Search by meaning cannot run on this computer.", ar: "البحث بالمعنى مش هينفع هنا." };
-    core(() => status({ state: "unavailable", reason: cannot }));
-    render(<MeaningStatus projectId={project} />);
-    expect(await screen.findByText(cannot.ar)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-  });
+    let fetch = core(() => status({ state: "unavailable", reason: cannot }));
+    const { unmount } = render(<MeaningStatus projectId={project} />);
+    await waitFor(() => expect(gets(fetch)).toBe(1));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    unmount();
 
-  it("says the files are being checked, with no button", async () => {
-    core(() => status({ state: "checking", done_bytes: total }));
-    render(<MeaningStatus projectId={project} />);
-    expect(await screen.findByText(texts.meaningChecking.ar)).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-  });
-
-  it("shows indexing N of M and pauses it", async () => {
-    let now = status({ state: "ready", done_bytes: total }, { state: "indexing", done: 120, total: 400 });
-    const fetch = core(() => now);
-    const user = userEvent.setup();
-    render(<MeaningStatus projectId={project} />);
-
-    expect(await screen.findByText("بنجهّز البحث بالمعنى: 120 من 400 جزء")).toBeInTheDocument();
-    now = status({ state: "ready", done_bytes: total }, { state: "indexing", done: 124, total: 400 }, true);
-    await user.click(screen.getByRole("button", { name: texts.meaningPause.ar }));
-
-    expect(posted(fetch)).toEqual(["/api/meaning/pause"]);
-    expect(await screen.findByText("واقف عند 124 من 400 جزء.")).toBeInTheDocument();
-    now = status({ state: "ready", done_bytes: total }, { state: "ready", done: 400, total: 400 });
-    await user.click(screen.getByRole("button", { name: texts.meaningResume.ar }));
-    expect(posted(fetch)).toEqual(["/api/meaning/pause", "/api/meaning/resume"]);
-    expect(await screen.findByText(texts.meaningReady.ar)).toHaveClass("text-slate");
-  });
-
-  it("a project whose preparing failed says why and tries again by resuming", async () => {
-    const stopped = { en: "Preparing search by meaning stopped on this project.", ar: "تجهيز البحث بالمعنى وقف." };
-    const fetch = core(() =>
-      status({ state: "ready", done_bytes: total }, { state: "failed", done: 3, total: 9, reason: stopped }),
-    );
-    const user = userEvent.setup();
-    render(<MeaningStatus projectId={project} />);
-    expect(await screen.findByText(stopped.ar)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: texts.meaningRetry.ar }));
-    expect(posted(fetch)).toEqual(["/api/meaning/resume"]);
-  });
-
-  it("shows nothing when the core does not answer", async () => {
-    const fetch = core(() => undefined);
+    fetch = core(() => undefined);
     render(<MeaningStatus projectId={project} />);
     await waitFor(() => expect(gets(fetch)).toBe(1));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("every new label exists in both languages, with the same blanks", () => {
-    for (const key of [
-      "meaningOff",
-      "meaningDownload",
-      "meaningDownloading",
-      "meaningStop",
-      "meaningStopped",
-      "meaningResume",
-      "meaningChecking",
-      "meaningRetry",
-      "meaningIndexing",
-      "meaningPause",
-      "meaningPaused",
-      "meaningReady",
-      "reordering",
-    ] as const) {
+  it("its two labels exist in both languages, with the same blanks, and say nothing of a download", () => {
+    for (const key of ["meaningPreparing", "meaningNotReady"] as const) {
       const { en, ar } = texts[key];
       expect(en.trim()).not.toBe("");
       expect(ar.trim()).not.toBe("");
       expect(en).not.toBe(ar);
       const blanks = (text: string) => (text.match(/\{\w+\}/g) ?? []).sort();
       expect(blanks(ar)).toEqual(blanks(en));
-      expect(en).not.toMatch(/\blocal\b/i); // the glossary bans it for on-device things
-      expect(ar).not.toContain("محلي");
+      expect(en).not.toMatch(/\blocal\b|Hugging Face|download/i);
+      expect(ar).not.toMatch(/محلي|Hugging Face|تنزيل/);
     }
+    for (const gone of ["meaningOff", "meaningDownload", "meaningStop", "meaningPause", "reordering"])
+      expect(gone in texts).toBe(false);
   });
 });

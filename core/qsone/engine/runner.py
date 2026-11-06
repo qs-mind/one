@@ -748,7 +748,6 @@ class _Brief:
             host=self,
             fence=new_fence(),
             embedder=meaning.embedder() if meaning is not None else None,
-            reranker=meaning.reranker() if meaning is not None else None,
             services=services,
             projects=self.engine.projects,
         )

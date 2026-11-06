@@ -35,18 +35,6 @@ class ConceptEmbedder:
         return self._embed(text)
 
 
-class PreferReranker:
-    """Scores 1.0 for texts that contain `word`, else 0.0."""
-
-    name = "test-prefer-1"
-
-    def __init__(self, word: str) -> None:
-        self.word = word
-
-    def rerank(self, query: str, texts: list[str]) -> list[float]:
-        return [1.0 if self.word in t else 0.0 for t in texts]
-
-
 class GateEmbedder(ConceptEmbedder):
     """Holds each batch of `embed_documents` until the test releases it, and counts batches."""
 

@@ -142,7 +142,6 @@ async def _search(ctx: ToolContext, args: SearchArgs) -> str:
             also=args.also,
             k=args.k,
             embedder=ctx.embedder,
-            reranker=ctx.reranker,
         )
         found.append((where, result))
     flat = [(where, h) for where, result in found for h in result.hits]

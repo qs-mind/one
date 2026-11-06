@@ -1,7 +1,7 @@
 """Downloads the search models into `<root>/<model id>/<revision>/`, file by file.
 
 A file arrives as `<file>.part` and resumes over HTTP ranges; it is renamed into place only after
-its SHA-256 matches. `verified.json` per model saves rehashing 1.1 GB at every start. Paths come
+its SHA-256 matches. `verified.json` per model saves rehashing every file at every start. Paths come
 only from the manifest, never from a server answer. Logs carry model ids and byte counts only."""
 
 import hashlib
@@ -11,7 +11,6 @@ import os
 import shutil
 import ssl
 import threading
-import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -23,8 +22,9 @@ from qsone.meaning.manifest import ModelFile, ModelSpec
 
 log = logging.getLogger("qsone.meaning.download")
 
-PIECE = 1 << 20  # progress and Stop are looked at every MiB
+PIECE = 1 << 20  # progress and stop are looked at every MiB
 SPARE = 200_000_000  # free space kept beyond the bytes still to come
+MOVED_ON = PIECE  # a try that brought this much more starts the count of retries again
 VERIFIED = "verified.json"
 
 
@@ -34,8 +34,16 @@ class DownloadError(Exception):
         self.text = text  # a copy.py pair
 
 
+class NoSpace(DownloadError):
+    """Not enough free space; `need` is the bytes still to come plus `SPARE`."""
+
+    def __init__(self, need: int) -> None:
+        super().__init__(copy.fill(copy.MEANING_NO_SPACE, size=f"{round(need / 1e6)} MB"))
+        self.need = need
+
+
 class DownloadStopped(Exception):
-    """The engineer pressed Stop; partial files are kept."""
+    """The stop event was set (the app is quitting); partial files are kept."""
 
 
 def folder(spec: ModelSpec, root: Path) -> Path:
@@ -151,15 +159,20 @@ class _Fetch:
                 os.fsync(out.fileno())
 
     def run(self, client, stop, progress, retries: int, sleep) -> None:
-        """Network errors are retried, each try resuming from the part; then the checksum."""
+        """Network errors are retried, each try resuming from the part; then the checksum. A try
+        that moved on by `MOVED_ON` bytes counts the retries from nought again. The wait between
+        tries ends at once when `stop` is set."""
         tries = 0
         while True:
             if stop.is_set():
                 raise DownloadStopped
+            before = max(self.have, 0)
             try:
                 self.once(client, stop, progress)
                 break
             except (httpx.TransportError, OSError) as error:
+                if self.have - before >= MOVED_ON:
+                    tries = 0
                 if tries >= retries:
                     log.warning(
                         "model %s: gave up at %d bytes (%s)",
@@ -169,7 +182,7 @@ class _Fetch:
                     )
                     raise DownloadError(copy.MEANING_DOWNLOAD_FAILED) from error
                 tries += 1
-                sleep(2**tries)
+                (sleep or stop.wait)(2**tries)
         self.finish()
 
     def finish(self) -> None:
@@ -194,16 +207,18 @@ def download(
     stop: threading.Event,
     on_progress: Callable[[int, int], None] = lambda done, total: None,
     retries: int = 3,
-    sleep: Callable[[float], None] = time.sleep,
+    sleep: Callable[[float], object] | None = None,
 ) -> None:
     """Fetches what is missing, in manifest order. `on_progress(done, total)` counts all files.
+    Between retries it waits on `stop` (or calls `sleep`, for tests).
 
-    Raises `DownloadError` (a copy.py pair in `.text`) or `DownloadStopped`."""
+    Raises `DownloadError` (a copy.py pair in `.text`; `NoSpace` for the disk) or
+    `DownloadStopped`."""
     root.mkdir(parents=True, exist_ok=True)
     total = sum(spec.size for spec in specs)
     left = remaining(specs, root)
     if shutil.disk_usage(root).free < left + SPARE:
-        raise DownloadError(copy.MEANING_NO_SPACE)
+        raise NoSpace(left + SPARE)
     done = 0  # bytes of the files already finished
     for spec in specs:
         verified = _verified(spec, root)

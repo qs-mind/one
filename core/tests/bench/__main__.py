@@ -97,6 +97,25 @@ def new_computer(app, data_dir: Path) -> None:
         return {"new": True}
 
 
+def bench_meaning(registry, data_dir: Path):
+    """Search by meaning as on a computer that has it: the guard keeps Hugging Face out, so the
+    model comes from the tests' fake hub (sample files) and embeds with the concept double. The
+    screens then show it getting ready and ready, never «…مش جاهز…»."""
+    from qsone.meaning.service import Meaning
+    from tests.doubles import ConceptEmbedder
+    from tests.hub import FakeHub
+
+    hub, embedder = FakeHub(), ConceptEmbedder()
+    return Meaning(
+        registry,
+        data_dir / "models",
+        spec=hub.specs[0],
+        client=hub.client,
+        loader=lambda spec, folder: embedder,
+        available=lambda: True,
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="tests.bench")
     parser.add_argument("--port", type=int, required=True)
@@ -137,6 +156,7 @@ def main(argv: list[str] | None = None) -> None:
     real_app = core.create_app
 
     def create_app(*a, **k):
+        k.setdefault("meaning", lambda registry: bench_meaning(registry, args.data_dir))
         app = real_app(*a, **k)
         new_computer(app, args.data_dir)
         forget_claude_key(app)

@@ -63,9 +63,8 @@ const posts = (fetch: ReturnType<typeof core>) =>
   fetch.mock.calls.filter(([url, init]) => String(url).startsWith(`${files}?`) && init?.method === "POST");
 
 const searchRoute = `GET /api/projects/${school.id}/search`;
-const rerankRoute = `POST /api/projects/${school.id}/rerank`;
 
-// One search result as the core sends it, with the chunk id the rerank route takes back.
+// One search result as the core sends it.
 function hit(n: number) {
   return {
     chunk_id: n,
@@ -76,12 +75,10 @@ function hit(n: number) {
     score: 1 / (n + 1),
   };
 }
-const thirty = Array.from({ length: 30 }, (_, n) => hit(n));
+const ten = Array.from({ length: 10 }, (_, n) => hit(n));
 
-const reranks = (fetch: ReturnType<typeof core>) =>
-  fetch.mock.calls.filter(
-    ([url, init]) => String(url) === `/api/projects/${school.id}/rerank` && init?.method === "POST",
-  );
+const searches = (fetch: ReturnType<typeof core>) =>
+  fetch.mock.calls.filter(([url]) => String(url).startsWith(`/api/projects/${school.id}/search?`));
 
 function panel() {
   return render(<RecordsPanel onClose={() => undefined} onPickProject={() => undefined} />);
@@ -233,7 +230,7 @@ describe("RecordsPanel", () => {
     expect(screen.getByText("03/02 | خرسانة")).toHaveAttribute("dir", "auto");
     expect(screen.getByText(named("مواصفات - عينة.pdf"))).toHaveAttribute("dir", "auto");
     const search = fetch.mock.calls.find(([url]) => String(url).includes("/search"))!;
-    expect(search[0]).toBe(`/api/projects/${school.id}/search?q=${encodeURIComponent("03/02")}&k=30`);
+    expect(search[0]).toBe(`/api/projects/${school.id}/search?q=${encodeURIComponent("03/02")}&k=10`);
 
     setLanguage("en");
     expect(await screen.findByText("Page 3")).toBeInTheDocument();
@@ -254,112 +251,39 @@ describe("RecordsPanel", () => {
     expect(screen.getByText(texts.noResults.ar)).toBeInTheDocument();
   });
 
-  it("shows the search model's state under the drop area", async () => {
+  it("shows one quiet line under the drop area while search by meaning gets ready, with no button", async () => {
     core({
       "GET /api/meaning": () =>
         Response.json({
-          model: { state: "off", done_bytes: 0, total_bytes: 1_173_349_509, reason: null },
-          indexing: { paused: false, projects: {} },
+          model: { state: "downloading", done_bytes: 57_000_000, total_bytes: 135_390_915, reason: null },
+          indexing: { projects: {} },
         }),
     });
     panel();
-    const line = await screen.findByText(texts.meaningOff.ar.replace("{size}", "1.2 GB"));
+    const line = await screen.findByText(fill(texts.meaningPreparing.ar, { percent: "42%" }));
+    expect(line).toHaveClass("text-slate");
     const drop = screen.getByText(texts.dropHere.ar);
     expect(drop.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("button", { name: texts.meaningDownload.ar })).toBeInTheDocument();
+    expect(screen.queryByText(/Hugging Face/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).not.toContain("تنزيل");
   });
 
-  it("shows hybrid results at once, then the reranked order", async () => {
-    let reranked!: (response: Response) => void;
+  it("asks the core for ten and shows them as they come, with nothing to reorder", async () => {
     const fetch = core({
-      [searchRoute]: () => Response.json({ mode: "hybrid", rerank: true, note: null, results: thirty }),
-      [rerankRoute]: () => new Promise<Response>((resolve) => (reranked = resolve)),
+      [searchRoute]: () => Response.json({ mode: "hybrid", note: null, results: ten }),
     });
     const user = userEvent.setup();
     panel();
     await user.type(screen.getByRole("searchbox", { name: texts.search.ar }), "عزل الرطوبة للأساسات{enter}");
 
     expect(await screen.findByText("بند 0 - عينة")).toBeInTheDocument();
-    expect(screen.getByText("بند 9 - عينة")).toBeInTheDocument();
-    expect(screen.queryByText("بند 10 - عينة")).not.toBeInTheDocument();
-    expect(await screen.findByText(texts.reordering.ar)).toHaveAttribute("role", "status");
-    const [, init] = reranks(fetch)[0]!;
-    expect(JSON.parse(String(init?.body))).toEqual({
-      q: "عزل الرطوبة للأساسات",
-      chunk_ids: thirty.map((h) => h.chunk_id),
-    });
-
-    reranked(Response.json({ results: [...thirty].reverse() }));
-    await waitFor(() => expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument());
     const items = within(screen.getByRole("list")).getAllByRole("listitem");
     expect(items).toHaveLength(10);
-    expect(items[0]).toHaveTextContent("بند 29 - عينة");
-    expect(screen.queryByText("بند 0 - عينة")).not.toBeInTheDocument();
-  });
-
-  it("keeps the first list when reranking fails", async () => {
-    const superseded = { en: "A newer search took its place.", ar: "بحث أحدث أخد مكانه." };
-    core({
-      [searchRoute]: () => Response.json({ mode: "hybrid", rerank: true, note: null, results: thirty }),
-      [rerankRoute]: () => Response.json({ error: superseded }, { status: 409 }),
-    });
-    const user = userEvent.setup();
-    panel();
-    await user.type(screen.getByRole("searchbox", { name: texts.search.ar }), "خرسانة{enter}");
-
-    await waitFor(() => expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument());
-    const items = within(screen.getByRole("list")).getAllByRole("listitem");
-    expect(items[0]).toHaveTextContent("بند 0 - عينة");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.queryByText(superseded.ar)).not.toBeInTheDocument();
-  });
-
-  it("a new search aborts the old reranking", async () => {
-    const fetch = core({
-      [searchRoute]: (url) =>
-        Response.json({
-          mode: "hybrid",
-          rerank: true,
-          note: null,
-          results: url.includes(encodeURIComponent("حديد")) ? [hit(100), hit(101)] : thirty,
-        }),
-      // the first rerank never answers on its own; it ends only when its request is aborted
-      [rerankRoute]: (_url, init) =>
-        reranks(fetch).length === 1
-          ? new Promise<Response>((_, reject) =>
-              init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))),
-            )
-          : Response.json({ results: [hit(101), hit(100)] }),
-    });
-    const user = userEvent.setup();
-    panel();
-    const box = screen.getByRole("searchbox", { name: texts.search.ar });
-    await user.type(box, "خرسانة{enter}");
-    await waitFor(() => expect(reranks(fetch)).toHaveLength(1));
-
-    await user.clear(box);
-    await user.type(box, "حديد{enter}");
-    await waitFor(() => expect(reranks(fetch)).toHaveLength(2));
-    expect(reranks(fetch)[0]![1]?.signal?.aborted).toBe(true);
-    await waitFor(() => expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument());
-    const items = within(screen.getByRole("list")).getAllByRole("listitem");
-    expect(items.map((item) => item.textContent)).toEqual([
-      expect.stringContaining("بند 101 - عينة"),
-      expect.stringContaining("بند 100 - عينة"),
-    ]);
-  });
-
-  it("exact results are not reranked", async () => {
-    const fetch = core({
-      [searchRoute]: () => Response.json({ mode: "exact", rerank: false, note: null, results: thirty }),
-    });
-    const user = userEvent.setup();
-    panel();
-    await user.type(screen.getByRole("searchbox", { name: texts.search.ar }), "03/02{enter}");
-
-    expect(await screen.findByText("بند 0 - عينة")).toBeInTheDocument();
-    expect(reranks(fetch)).toHaveLength(0);
-    expect(screen.queryByText(texts.reordering.ar)).not.toBeInTheDocument();
+    const [url] = searches(fetch)[0]!;
+    expect(String(url)).toBe(
+      `/api/projects/${school.id}/search?q=${encodeURIComponent("عزل الرطوبة للأساسات")}&k=10`,
+    );
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
   });
 
   it("asks to pick or create a project first when none is open", async () => {

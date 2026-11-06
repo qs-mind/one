@@ -64,7 +64,7 @@ def test_pins_are_exact():
         for f in spec.files:
             assert re.fullmatch(r"[0-9a-f]{64}", f.sha256) and f.size > 0
             assert f"/resolve/{spec.revision}/" in spec.url(f) and "/main/" not in spec.url(f)
-    assert sum(s.size for s in MODELS) == 1_173_349_509
+    assert sum(s.size for s in MODELS) == 135_390_915  # 5 Nov 2026: e5-small only
 
 
 def test_data_folder_follows_the_override(data_dir):
@@ -72,7 +72,7 @@ def test_data_folder_follows_the_override(data_dir):
 
 
 def test_windows_keeps_the_data_folder_local_never_roaming(monkeypatch, tmp_path):
-    # Settings, projects and the 1.2 GB of models must not sync with a roaming office profile.
+    # Settings, projects and the search model must not sync with a roaming office profile.
     monkeypatch.delenv("QSONE_DATA_DIR")
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
@@ -101,10 +101,8 @@ def test_every_new_text_has_both_languages():
         "MEANING_FILE_DAMAGED",
         "MEANING_NO_SPACE",
         "MEANING_NOT_ON_THIS_COMPUTER",
-        "MEANING_NOT_READY",
         "MEANING_MODEL_FAILED",
         "MEANING_INDEX_FAILED",
-        "SEARCH_SUPERSEDED",
         "SEARCH_WORDS_ONLY",
     ]:
         text = getattr(copy, name)

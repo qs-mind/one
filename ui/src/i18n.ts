@@ -369,28 +369,12 @@ export const texts = {
   sheetRow: { en: "Sheet {sheet}, row {row}", ar: "ورقة {sheet}، صف {row}" },
   row: { en: "Row {row}", ar: "صف {row}" },
   line: { en: "Line {line}", ar: "سطر {line}" },
-  meaningOff: {
-    en: "Search by meaning finds the same idea in other words, in Arabic and English. It needs a one-time download of {size} from Hugging Face; then it works without internet.",
-    ar: "البحث بالمعنى يجد الفكرة نفسها بكلمات أخرى، بالعربية والإنجليزية. يحتاج إلى تنزيل لمرة واحدة بحجم {size} من Hugging Face، ثم يعمل دون إنترنت.",
+  // Search by meaning gets ready by itself (5 Nov 2026): one quiet line, no button.
+  meaningPreparing: { en: "Getting search by meaning ready… {percent}", ar: "بيجهّز البحث بالمعنى… {percent}" },
+  meaningNotReady: {
+    en: "Search by meaning isn't ready; word search works.",
+    ar: "البحث بالمعنى مش جاهز، والبحث بالكلمات شغال.",
   },
-  meaningDownload: { en: "Download", ar: "تنزيل" },
-  meaningDownloading: {
-    en: "Downloading the search model: {done} of {total}",
-    ar: "بننزّل نموذج البحث: {done} من {total}",
-  },
-  meaningStop: { en: "Stop", ar: "وقّف" },
-  meaningStopped: { en: "The download stopped at {done} of {total}.", ar: "التنزيل وقف عند {done} من {total}." },
-  meaningResume: { en: "Resume", ar: "كمّل" },
-  meaningChecking: { en: "Checking the downloaded files…", ar: "بنفحص الملفات اللي نزلت…" },
-  meaningRetry: { en: "Try again", ar: "جرّب تاني" },
-  meaningIndexing: {
-    en: "Preparing search by meaning: {done} of {total} parts",
-    ar: "بنجهّز البحث بالمعنى: {done} من {total} جزء",
-  },
-  meaningPause: { en: "Pause", ar: "وقّف شوية" },
-  meaningPaused: { en: "Paused at {done} of {total} parts.", ar: "واقف عند {done} من {total} جزء." },
-  meaningReady: { en: "Search by meaning is on.", ar: "البحث بالمعنى شغّال." },
-  reordering: { en: "Reordering by meaning…", ar: "بنرتّب تاني حسب المعنى…" },
   // Plan 6 (Deliverables and review), one group per task: sheet* Task 8, doc* Task 9, the rest
   // Task 10. Arabic in plain Egyptian colloquial, as in core/qsone/copy.py, until the founder picks.
   sheetCollapse: { en: "Fold the section", ar: "اطوي الباب" },

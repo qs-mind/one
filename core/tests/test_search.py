@@ -1,21 +1,21 @@
 """Search: exact mode for codes and numbers, words for Arabic spellings, meaning through the
-Embedder interface (test doubles only, no model), RRF fusion and the Reranker interface."""
+Embedder interface (test doubles only, no model), RRF fusion and dropping the vectors of an old
+model."""
 
 import pytest
 
 from qsone.records.files import add_file
 from qsone.records.project import Records
 from qsone.records.search import (
-    Superseded,
+    drop_stale_vectors,
     ensure_index,
     index_vectors,
     looks_exact,
-    rerank_hits,
     rrf,
     search,
     vector_counts,
 )
-from tests.doubles import ConceptEmbedder, PreferReranker
+from tests.doubles import ConceptEmbedder
 from tests.samples import sample_pdf, sample_xlsx
 
 
@@ -99,12 +99,6 @@ def test_words_and_meaning_together(boq):
     r = search(boq, "waterproofing", also=["عزل الرطوبة"], embedder=emb)
     assert r.hits[0].locator == {"sheet": "BOQ", "row": 3}
     assert r.hits[0].found_by == ("words", "meaning")
-
-
-def test_reranker_reorders_the_top(boq):
-    assert search(boq, "خرسانة").hits[0].locator != {"sheet": "BOQ", "row": 2}
-    r = search(boq, "خرسانة", reranker=PreferReranker("عادية"))
-    assert r.hits[0].locator == {"sheet": "BOQ", "row": 2} and r.hits[0].score == 1.0
 
 
 def test_k_limits_the_hits(boq):
@@ -219,35 +213,19 @@ def test_counts_are_zero_for_another_model(boq):
     assert vector_counts(boq, FlatEmbedder()) == (0, 5)
 
 
-def test_rerank_hits_orders_the_given_chunks(boq):
-    ids = [h.chunk_id for h in search(boq, "خرسانة", k=30).hits]
-    hits = rerank_hits(boq, "خرسانة", ids, PreferReranker("عادية"))
-    assert hits[0].locator == {"sheet": "BOQ", "row": 2} and len(hits) == len(ids)
-    assert hits[0].score == 1.0 and all(h.found_by == () for h in hits)
-    assert [h.chunk_id for h in hits[1:]] == [
-        i for i in ids if i != hits[0].chunk_id
-    ]  # ties keep order
-
-
-def test_rerank_hits_drops_unknown_ids(boq):
-    ids = [h.chunk_id for h in search(boq, "خرسانة", k=30).hits]
-    reranker = PreferReranker("عادية")
-    assert rerank_hits(boq, "خرسانة", [999999, *ids], reranker) == rerank_hits(
-        boq, "خرسانة", ids, reranker
-    )
-    assert rerank_hits(boq, "خرسانة", [999999], reranker) == []
-
-
-def test_a_newer_rerank_stops_this_one(boq):
-    calls = []
-
-    class Counting(PreferReranker):
-        def rerank(self, q, texts):
-            calls.append(len(texts))
-            return super().rerank(q, texts)
-
-    with pytest.raises(Superseded):
-        rerank_hits(
-            boq, "خرسانة", list(range(1, 6)), Counting("x"), should_stop=lambda: len(calls) >= 1
+def test_vectors_of_another_model_are_dropped_and_made_again(boq):
+    old, new = FlatEmbedder(), ConceptEmbedder()
+    assert drop_stale_vectors(boq, new) is False  # no table yet: nothing to drop
+    index_vectors(boq, old)
+    assert drop_stale_vectors(boq, old) is False  # its own vectors stay
+    assert drop_stale_vectors(boq, new) is True
+    assert not any(k.startswith("embed_") for k in boq.meta())
+    with boq.read() as conn:
+        assert (
+            conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'chunk_vectors'").fetchone()
+            is None
         )
-    assert calls == [4]
+    assert search(boq, "عزل", embedder=new).hits[0].locator == {"sheet": "BOQ", "row": 3}  # words
+    assert vector_counts(boq, new) == (0, 5)
+    assert index_vectors(boq, new) == 5 and vector_counts(boq, new) == (5, 5)
+    assert boq.meta()["embed_dims"] == str(new.dims)

@@ -184,31 +184,35 @@ SEARCH_WORDS_ONLY = {
     "ar": "البحث بالكلمات بس لحد ما البحث بالمعنى يجهز.",
 }
 
-SEARCH_SUPERSEDED = {
-    "en": "A newer search took its place.",
-    "ar": "في بحث أحدث خد مكانه.",
-}
-
 # Search by meaning: the search model ("Search model" / «نموذج البحث» in the glossary).
 MEANING_DOWNLOAD_FAILED = {
     "en": (
         "The search model did not download (no internet, or the server did not answer). "
-        "What came so far is kept. Try again."
+        "What came so far is kept; it goes on at the next start."
     ),
-    "ar": "نموذج البحث مانزلش (مفيش نت، أو السيرفر مارَدّش). اللي نزل لحد دلوقتي محفوظ. جرّب تاني.",
+    "ar": (
+        "نموذج البحث مانزلش (مفيش نت، أو السيرفر مارَدّش). "
+        "اللي نزل لحد دلوقتي محفوظ، وهيكمّل أول ما تفتح البرنامج."
+    ),
 }
 
 MEANING_FILE_DAMAGED = {
-    "en": "A downloaded file did not match its check, so it was deleted. Try again.",
-    "ar": "ملف من اللي نزلوا ماطابقش الفحص بتاعه، فاتمسح. جرّب تاني.",
+    "en": (
+        "A downloaded file did not match its check, so it was deleted. "
+        "It comes again at the next start."
+    ),
+    "ar": "ملف من اللي نزلوا ماطابقش الفحص بتاعه، فاتمسح. هينزل تاني أول ما تفتح البرنامج.",
 }
 
 MEANING_NO_SPACE = {
     "en": (
-        "There is not enough free space: the search model needs about 1.2 GB. "
-        "Free some space, then try again."
+        "There is not enough free space: the search model needs about {size} free. "
+        "Free some space; it tries again at the next start."
     ),
-    "ar": "مفيش مساحة فاضية كفاية: نموذج البحث محتاج حوالي 1.2 جيجا. فضّي شوية مساحة وجرّب تاني.",
+    "ar": (
+        "مفيش مساحة فاضية كفاية: نموذج البحث محتاج حوالي {size} فاضيين. "
+        "فضّي شوية مساحة، وهيحاول تاني أول ما تفتح البرنامج."
+    ),
 }
 
 MEANING_NOT_ON_THIS_COMPUTER = {
@@ -216,19 +220,14 @@ MEANING_NOT_ON_THIS_COMPUTER = {
     "ar": "البحث بالمعنى مش هينفع يشتغل على الجهاز ده. البحث بالكلمات شغال عادي.",
 }
 
-MEANING_NOT_READY = {
-    "en": "Search by meaning is not ready yet.",
-    "ar": "البحث بالمعنى لسه مجهزش.",
-}
-
 MEANING_MODEL_FAILED = {
-    "en": "The search model would not start, so it will be downloaded again.",
-    "ar": "نموذج البحث ماشتغلش، فهيتنزّل تاني.",
+    "en": "The search model would not start, so it is checked and fetched again at the next start.",
+    "ar": "نموذج البحث ماشتغلش، فهيتفحص ويتنزّل تاني أول ما تفتح البرنامج.",
 }
 
 MEANING_INDEX_FAILED = {
-    "en": "Preparing search by meaning stopped on this project. Try again.",
-    "ar": "تجهيز البحث بالمعنى وقف في المشروع ده. جرّب تاني.",
+    "en": "Preparing search by meaning stopped on this project. It tries again at the next start.",
+    "ar": "تجهيز البحث بالمعنى وقف في المشروع ده. هيحاول تاني أول ما تفتح البرنامج.",
 }
 
 # Project Records: the Source Ledger.

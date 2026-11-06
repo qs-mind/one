@@ -3,7 +3,7 @@
 // (agent instructions, templates, typst files, open-licence fonts), trimmed and bytecode only, plus the third-party
 // notices. Tauri ships build/core/ as the resource folder core/ (desktop/tauri.release.conf.json), and the shell starts
 // core/bin/python3 (core\python.exe on Windows) with -I -m qsone. The Sandbox's CPython for WASI is not packaged: the
-// core downloads it on first use into <data>/sandbox, as it does the search models.
+// core downloads it on first use into <data>/sandbox, as it does the search model.
 //
 //   node scripts/package-core.mjs [--target <triple>]     (default: this machine's)
 import { spawnSync } from "node:child_process";

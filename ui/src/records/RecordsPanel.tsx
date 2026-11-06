@@ -11,18 +11,15 @@ import { FileName } from "../ui/FileName";
 import { workspaceApi } from "../workspace/api";
 
 type Hit = {
-  chunk_id?: number;
   file_id: string;
   file_name: string;
   locator: Record<string, string | number>;
   text: string;
 };
-type Found =
-  | { state: "found"; note: Text | null; results: Hit[]; reordering: boolean }
-  | { state: "failed"; line: Text };
+type Found = { state: "found"; note: Text | null; results: Hit[] } | { state: "failed"; line: Text };
 
-// Search asks the core for its top 30 and shows 10 at once; the reranker then reorders those 30 by meaning.
-const ASKED = 30;
+// Search shows the core's top 10: words and meaning fused (no reranker since 5 Nov 2026). The box sends the
+// query as typed; the core has no translation of its own, so the other language is found by meaning only.
 const SHOWN = 10;
 
 const statusText: Record<FileInfo["status"], Text> = {
@@ -173,7 +170,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [found, setFound] = useState<Found>();
-  const turn = useRef<AbortController>(undefined); // the latest search; a newer one aborts its reordering
+  const turn = useRef<AbortController>(undefined); // the latest search; a newer one, or leaving, drops its answer
   const id = project?.id;
 
   useEffect(() => {
@@ -221,7 +218,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
     const mine = new AbortController();
     turn.current = mine;
     setSearching(true);
-    const response = await api(`/projects/${id}/search?q=${encodeURIComponent(q)}&k=${ASKED}`).catch(
+    const response = await api(`/projects/${id}/search?q=${encodeURIComponent(q)}&k=${SHOWN}`).catch(
       () => undefined,
     );
     setSearching(false);
@@ -230,30 +227,8 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
       setFound({ state: "failed", line: await coreLine(response, texts.searchFailed) });
       return;
     }
-    const body = (await response.json()) as { note: Text | null; results: Hit[]; rerank?: boolean };
-    const chunkIds = body.results.flatMap((hit) => (hit.chunk_id === undefined ? [] : [hit.chunk_id]));
-    const reordering = body.rerank === true && chunkIds.length > 1;
-    setFound({ state: "found", note: body.note, results: body.results.slice(0, SHOWN), reordering });
-    if (reordering) await rerank(id, q, chunkIds, mine.signal);
-  }
-
-  // The second step. On any failure, a 409 included, the first list stays and no error is shown.
-  async function rerank(projectId: string, q: string, chunkIds: number[], signal: AbortSignal) {
-    const response = await api(`/projects/${projectId}/rerank`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ q, chunk_ids: chunkIds }),
-      signal,
-    }).catch(() => undefined);
-    const body = response?.ok
-      ? ((await response.json().catch(() => undefined)) as { results: Hit[] } | undefined)
-      : undefined;
-    if (signal.aborted) return;
-    setFound((now) =>
-      now?.state === "found"
-        ? { ...now, results: body ? body.results.slice(0, SHOWN) : now.results, reordering: false }
-        : now,
-    );
+    const body = (await response.json()) as { note: Text | null; results: Hit[] };
+    setFound({ state: "found", note: body.note, results: body.results.slice(0, SHOWN) });
   }
 
   return (
@@ -324,7 +299,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
               )}
             </div>
 
-            <MeaningStatus projectId={project.id} />
+            <MeaningStatus projectId={project.id} files={files?.length ?? 0} />
 
             {problems.length > 0 && (
               <div role="alert" className="flex flex-col gap-1 text-copper">
@@ -411,11 +386,6 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
             {found?.state === "found" && (
               <div className="flex flex-col gap-2">
                 {found.note && <p className="text-slate">{pick(found.note)}</p>}
-                {found.reordering && (
-                  <p role="status" className="text-slate">
-                    {t("reordering")}
-                  </p>
-                )}
                 {found.results.length === 0 && <p>{t("noResults")}</p>}
                 <ol className="flex flex-col gap-2">
                   {found.results.map((hit, index) => (
