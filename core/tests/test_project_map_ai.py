@@ -247,6 +247,7 @@ def test_replaced_fact_is_reextracted_unconfirmed(rec):
             dict(
                 name={"en": "Retention", "ar": "المحتجز"},
                 value="10%",
+                evidence="Retention 10%",
                 file_id=unchanged.id,
                 locator={"line": 1},
             )
@@ -265,6 +266,7 @@ def test_replaced_fact_is_reextracted_unconfirmed(rec):
             dict(
                 name={"en": "Sample security", "ar": "تأمين العينة"},
                 value="350000",
+                evidence="Sample security is still 350000 USD",
                 file_id=new.id,
                 locator={"page": 1},
             )
@@ -857,3 +859,31 @@ async def test_model_slice_yields_only_to_matching_active_model(monkeypatch):
         models, SimpleNamespace(choice=SimpleNamespace(model="foreground-model"))
     )
     assert slept == [0.05]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("enrichment,expected", [(False, "0.80"), (True, "2.40")])
+async def test_drop_estimate_reserves_validation_retry(rec, monkeypatch, enrichment, expected):
+    files.add_file(rec, "sample.txt", b"Sample contract data", actor="engineer")
+    drain(rec)
+    asked = []
+
+    async def ask(card):
+        asked.append(card)
+        return "no"
+
+    async def request(*args):
+        pytest.fail("approval declined")
+
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    # Two passes at $0.20 each: one request each is below $0.50, reserving
+    # one validation retry each must trigger approval at $0.80.
+    monkeypatch.setattr(cards, "cost", lambda *a, **kw: Decimal("0.20"))
+    assert not await ai.run(
+        rec,
+        SimpleNamespace(host=SimpleNamespace(ask=ask)),
+        request=request,
+        passes={} if enrichment else None,
+    )
+    assert len(asked) == 1
+    assert expected in asked[0].detail["en"]

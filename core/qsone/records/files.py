@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from qsone import copy
 from qsone.records import audit, hidden, search
 from qsone.records.arabic import NORMALISER_VERSION, display_text
-from qsone.records.extract import Piece, chunk, extract
+from qsone.records.extract import EXTRACTOR_VERSION, Piece, chunk, extract
 from qsone.records.hidden import Flag
 from qsone.records.project import Records, RecordsError
 
@@ -171,6 +171,8 @@ def add_file(
             after=row,
         )
         map_store.enqueue(conn, rec, file_id, extracted.kind, extracted.pages, actor=actor)
+        if extracted.kind == "pdf":
+            _extraction_meta(rec, conn, file_id, extracted)
         indexed = []
         for seq, piece in enumerate(chunks):
             cur = conn.execute(
@@ -244,6 +246,86 @@ def read_pages(conn, file_id: str) -> set[int]:
         (file_id,),
     )
     return {int(page) for (page,) in rows}
+
+
+def _extraction_meta(rec, conn, file_id, extracted):
+    rec.set_meta(conn, "extractor:" + file_id, str(EXTRACTOR_VERSION))
+    rec.set_meta(conn, "pdf_sources:" + file_id, json.dumps(extracted.page_sources))
+
+
+def reread_pdf(rec):
+    """One old PDF per background slice, using only its encrypted in-database original.
+
+    Replaces derived native text and its indexes; OCR words and source page locators
+    survive. Version and text commit atomically, so restart cannot skip an old file.
+    """
+    from qsone.records.mapping import store
+
+    with rec.read() as c:
+        pending = c.execute(
+            "SELECT f.id,f.name FROM files f LEFT JOIN meta m ON m.key='extractor:'||f.id "
+            "WHERE f.kind='pdf' AND f.valid_until IS NULL AND coalesce(m.value,'')<>? "
+            "ORDER BY f.id LIMIT 1",
+            (str(EXTRACTOR_VERSION),),
+        ).fetchone()
+    if pending is None:
+        return False
+    file_id, name = pending
+    result = extract(name, read_original(rec, file_id))
+    with rec.write(store.ACTOR) as c:
+        if c.execute("SELECT valid_until FROM files WHERE id=?", (file_id,)).fetchone()[0]:
+            return True
+        old = c.execute(
+            "SELECT id FROM chunks WHERE file_id=? AND json_extract(locator,'$.read_by') IS NULL",
+            (file_id,),
+        ).fetchall()
+        vectors = c.execute("SELECT 1 FROM sqlite_master WHERE name='chunk_vectors'").fetchone()
+        for (chunk_id,) in old:
+            c.execute("DELETE FROM chunks_fts WHERE rowid=?", (chunk_id,))
+            if vectors:
+                c.execute("DELETE FROM chunk_vectors WHERE chunk_id=?", (chunk_id,))
+            c.execute("DELETE FROM chunks WHERE id=?", (chunk_id,))
+        seq = c.execute(
+            "SELECT coalesce(max(seq),-1)+1 FROM chunks WHERE file_id=?", (file_id,)
+        ).fetchone()[0]
+        indexed = []
+        for piece in chunk(result.pieces):
+            cur = c.execute(
+                "INSERT INTO chunks(file_id,seq,locator,text) VALUES (?,?,?,?)",
+                (file_id, seq, json.dumps(piece.locator), piece.text),
+            )
+            indexed.append((cur.lastrowid, piece.text))
+            seq += 1
+        search.index_words(c, indexed)
+        _extraction_meta(rec, c, file_id, result)
+        # Retire facts grounded in the old reading, then remap only this file.
+        store.expire(c, rec, file_id, rec.clock())
+        store.write(
+            c,
+            rec,
+            "map_files",
+            dict(
+                file_id=file_id,
+                valid_until=None,
+                local_state="waiting",
+                ai_state=None,
+                ai_attempts=0,
+                structure={},
+                key_pages=[],
+                note=None,
+            ),
+        )
+        audit.record(
+            c,
+            at=rec.clock(),
+            actor=store.ACTOR,
+            action="reread",
+            table="files",
+            row_id=file_id,
+            before=None,
+            after={"extractor_version": EXTRACTOR_VERSION, "page_sources": result.page_sources},
+        )
+    return True
 
 
 def add_ocr_pages(

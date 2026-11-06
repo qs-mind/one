@@ -9,6 +9,7 @@ import ctypes
 import datetime as dt
 import io
 import re
+import unicodedata
 import zipfile
 from dataclasses import dataclass, field
 from typing import Literal
@@ -21,6 +22,8 @@ import xlrd
 from qsone.records import hidden, office
 from qsone.records.arabic import display_number, display_text
 from qsone.records.hidden import Flag
+
+EXTRACTOR_VERSION = 2
 
 Status = Literal["read", "partly_read", "stored", "unreadable"]
 
@@ -39,6 +42,7 @@ class Extracted:
     pieces: list[Piece]
     note: str | None  # name of a copy.py text, e.g. "FILE_SCANNED_PAGES"
     flags: list[Flag] = field(default_factory=list)  # hidden text and orders to an AI
+    page_sources: dict[int, str] = field(default_factory=dict)
 
 
 _KINDS = {
@@ -177,7 +181,11 @@ def extract(name: str, data: bytes) -> Extracted:
     else:
         x = _text(kind, data)
     ai = hidden.ai_instruction_flags(x.pieces)
-    return Extracted(x.kind, x.status, x.pages, x.pieces, x.note, x.flags + ai) if ai else x
+    return (
+        Extracted(x.kind, x.status, x.pages, x.pieces, x.note, x.flags + ai, x.page_sources)
+        if ai
+        else x
+    )
 
 
 def _drawing(name: str, data: bytes) -> Extracted:
@@ -340,15 +348,77 @@ def _left_to_right(tp, first: int, last: int) -> bool:
     return boxes[0] < boxes[1]
 
 
+def arabic_quality(text: str) -> float:
+    """Directional evidence per Arabic word; higher means more likely logical order.
+
+    This is a source selector, never an instruction to reverse arbitrary text.
+    """
+    text = unicodedata.normalize("NFKC", text)
+    words = re.findall(r"[ء-ي]+", text)
+    if not words:
+        return 0.0
+    good = sum(w.startswith(("ال", "وال", "بال")) for w in words)
+    bad = sum(
+        w.endswith("لا")
+        or w.startswith(("ة", "ى"))
+        or w in {"ىلع", "سفانتملا", "يئادتبالا", "ةيكنبلا"}
+        for w in words
+    )
+    flipped = len(re.findall(r"\)[^()\n]+\(|\][^\[\]\n]+\[", text))
+    return (good - 2 * bad - flipped) / len(words)
+
+
+def _inspector_text(data: bytes, index: int) -> str:
+    import pdf_inspector
+
+    result = pdf_inspector.extract_pages_markdown_bytes(data, [index])
+    return "\n".join(p.markdown for p in result.pages if p.page == index)
+
+
+def _pypdf_text(data: bytes, index: int) -> str:
+    from pypdf import PdfReader
+
+    return PdfReader(io.BytesIO(data)).pages[index].extract_text() or ""
+
+
+def _plain_markdown(text: str) -> str:
+    text = re.sub(r"(?m)^\s*#{1,6}\s+", "", text)
+    text = re.sub(r"(?m)^\s*[-*+]\s+", "", text)
+    text = re.sub(r"!?\[([^]\n]*)\]\([^\n)]*\)", r"\1", text)
+    text = re.sub(r"(?m)^\s*\|?\s*:?-{3,}.*$", "", text)
+    return text.replace("**", "").replace("`", "").replace("|", " ")
+
+
+def select_pdf_text(data: bytes, index: int, text: str) -> tuple[str, str]:
+    text = unicodedata.normalize("NFKC", text)
+    score = arabic_quality(text)
+    if score >= 0:
+        return text, "pdfium"
+    # Prefer inspector's logical reading order. pypdf is a last resort because
+    # its line order can be scrambled. Never write decrypted bytes to a path.
+    for source, reader in (("pdf-inspector", _inspector_text), ("pypdf", _pypdf_text)):
+        try:
+            candidate = unicodedata.normalize("NFKC", reader(data, index))
+            if source == "pdf-inspector":
+                candidate = _plain_markdown(candidate)
+            if re.search(r"[ء-ي]", candidate) and arabic_quality(candidate) > score:
+                return candidate, source
+        except Exception:
+            continue  # a damaged alternative must not discard pdfium's text
+    return text, "pdfium"
+
+
 def _pdf(data: bytes) -> Extracted:
     pieces, flags, pdf = [], [], None
+    sources = {}
     try:
         pdf = pdfium.PdfDocument(data)
         pages = len(pdf)
         for i in range(pages):
             page = pdf[i]
             textpage = page.get_textpage()
-            text = display_text(_page_text(textpage), keep_blanks=True)
+            selected, sources[i + 1] = select_pdf_text(data, i, _page_text(textpage))
+            text = display_text(selected, keep_blanks=True)
             flags += hidden.pdf_page_flags(page, textpage, i + 1)
             textpage.close()
             page.close()
@@ -360,9 +430,9 @@ def _pdf(data: bytes) -> Extracted:
         if pdf is not None:
             pdf.close()
     if len(pieces) == pages:
-        return Extracted("pdf", "read", pages, pieces, None, flags)
+        return Extracted("pdf", "read", pages, pieces, None, flags, sources)
     status = "partly_read" if pieces else "unreadable"
-    return Extracted("pdf", status, pages, pieces, "FILE_SCANNED_PAGES", flags)
+    return Extracted("pdf", status, pages, pieces, "FILE_SCANNED_PAGES", flags, sources)
 
 
 def _xlsx(data: bytes) -> tuple[list[tuple[str, list]], list[Flag]]:

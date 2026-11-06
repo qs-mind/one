@@ -223,7 +223,8 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None):
     # Include schema, instructions, outputs and the title-tree pass before any request.
     estimate = Decimal(0)
     priced_batches = list(batches(digests))
-    # Reserve validation isolation up front, within the same drop-level approval.
+    # Reserve one model validation retry for every shot, including isolated files.
+    # Enrichment also has two project-pass attempts, so it reserves four requests.
     priced_batches += [[source] for batch in priced_batches if len(batch) > 1 for source in batch]
     for batch in priced_batches:
         tokens = request_size.estimate(
@@ -232,9 +233,9 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None):
             + json.dumps(Batch.model_json_schema())
         )
         cost = cards.cost(card, input_tokens=tokens, output_tokens=1000 * len(batch))
-        estimate = None if estimate is None or cost is None else estimate + cost
+        estimate = None if estimate is None or cost is None else estimate + 2 * cost
     tree_cost = cards.cost(card, input_tokens=len(digests) * 1500, output_tokens=len(digests) * 700)
-    estimate = None if estimate is None or tree_cost is None else estimate + tree_cost
+    estimate = None if estimate is None or tree_cost is None else estimate + 2 * tree_cost
     if passes is not None:
         # Reserve the bounded fact pages before key-page AI runs; these may differ
         # from the local candidates. The same card covers all subsequent requests.
@@ -250,11 +251,11 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None):
             json.dumps(facts.Result.model_json_schema()) + facts.GUIDE
         )
         fact_cost = cards.cost(card, input_tokens=fact_tokens, output_tokens=10000)
-        estimate = None if estimate is None or fact_cost is None else estimate + 2 * fact_cost
+        estimate = None if estimate is None or fact_cost is None else estimate + 4 * fact_cost
         for batch in batches(digests):
             link_tokens = request_size.estimate(json.dumps(batch, ensure_ascii=False)) + 2000
             link_cost = cards.cost(card, input_tokens=link_tokens, output_tokens=4000)
-            estimate = None if estimate is None or link_cost is None else estimate + 2 * link_cost
+            estimate = None if estimate is None or link_cost is None else estimate + 4 * link_cost
     if estimate is None or estimate > settings.map_auto_usd():
         cost_text = "?" if estimate is None else format(estimate.quantize(Decimal(".01")), "f")
         approval = Card(

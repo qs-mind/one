@@ -26,6 +26,7 @@ from uuid import uuid4
 
 from pydantic_ai import Agent, BinaryImage, WebSearchTool
 from pydantic_ai.capabilities.native_tool import NativeTool
+from pydantic_ai.exceptions import UnexpectedModelBehavior, UsageLimitExceeded
 from pydantic_ai.messages import NativeToolReturnPart
 from pydantic_ai.usage import UsageLimits
 
@@ -161,11 +162,13 @@ def _costed(models: Models, card: ModelCard, role: Role) -> CostedModel:
 
 
 async def _once(models: Models, card: ModelCard, role: Role, agent: Agent, prompt) -> Any:
-    """One request through `CostedModel`; a provider's error becomes its plain words."""
+    """One shot with one validation retry; every response is costed separately."""
     for attempt in range(2):
         try:
             with agent.override(model=_costed(models, card, role)):
-                return await agent.run(prompt, usage_limits=UsageLimits(request_limit=1))
+                return await agent.run(prompt, usage_limits=UsageLimits(request_limit=2))
+        except (UnexpectedModelBehavior, UsageLimitExceeded):
+            raise OneShotFailed(copy.MAP_AI_INVALID_OUTPUT) from None
         except connectors.PROVIDER_ERRORS as error:
             provider = models.link(card).name
             if connectors.model_unavailable(error):
