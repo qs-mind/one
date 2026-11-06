@@ -48,7 +48,7 @@ _EGYPTIAN = re.compile(
 def reply_line(text: str) -> str:
     """The line that tells the Lead which language and register to answer the engineer's
     message in: the language most of it is written in (a few words of the other do not change
-    it), and Egyptian Arabic when the engineer writes Egyptian."""
+    it), with ONE's consistent Egyptian Arabic voice for Arabic replies."""
     if brief_language(text) == "en":
         return (
             "The engineer wrote in English: reply in English, even if the message has a few "
@@ -59,7 +59,10 @@ def reply_line(text: str) -> str:
             "The engineer wrote in Egyptian Arabic: reply in plain Egyptian Arabic, as they "
             "write, not formal Arabic."
         )
-    return "The engineer wrote in Arabic: reply in Arabic."
+    return (
+        "The engineer wrote in Arabic: reply in Arabic. "
+        "Use one consistent Egyptian Arabic voice throughout, including summaries and refusals."
+    )
 
 
 @dataclass(frozen=True)

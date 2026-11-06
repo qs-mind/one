@@ -820,15 +820,15 @@ _NUMBER_EXAMPLE = {
     "source_id": "<source id>",
 }
 
-_NUMBER_DOC = f"""Record a sourced number on an item. Computed numbers use calculate.
-- item: the item's id or code. name: quantity, rate, amount, price, or another word.
-- value: exact text as the source has it, one decimal point, no thousands separators.
-- unit: needed for a quantity and a rate (m3 for EGP per m3). currency: three letters, needed \
-for a rate and an amount.
-- source_id: from add_source. dated: YYYY-MM-DD, by default the source's.
-- where: engineer for an Engineer Records item and source.
-BOQ rates require an engineer-named item code/row; otherwise use prices_propose or a resource.
-Returns number_id; the same call again records nothing.
+_NUMBER_DOC = f"""Record a sourced number; computed numbers use calculate.
+- item: id/code. name: quantity, rate, amount, price, or another word.
+- value: exact source text, decimal point, no thousands separators.
+- unit: required for quantities/rates (m3 for EGP/m3). currency: three letters for rates/amounts.
+- source_id: from add_source. dated: YYYY-MM-DD; defaults to source date.
+- where: engineer for Engineer Records.
+BOQ rates require an engineer-named item (code/BOQ row/card answer), any pricing request, \
+or the engineer's own priced copy. Otherwise use prices_propose or a resource.
+Returns number_id; repeating records nothing.
 Example:
 {_json(_NUMBER_EXAMPLE)}"""
 
@@ -935,128 +935,46 @@ def _same_measure(a: str, b: str) -> bool:
     return kind(da) == kind(db)
 
 
-def _pricing_scope(conn, item: dict, message: str) -> bool:
-    """The engineer's requested scope, independently of the source's claimed item."""
-    text = re.sub(r"[\u064b-\u065f]", "", arabic.clean(message).casefold())
-    action = (
-        r"\b(?:price|pricing|rate)\s+(?:(?:the|all|this|these)\s+)*"
-        r"(?:boq|bill of quantities|section|division|items)\b"
-        r"|(?:سعر|تسعير)\s+(?:(?:كل|جميع|هذه)\s+)*"
-        r"(?:المقايسة|المقايسه|البنود|بنود|القسم|قسم|الباب|باب)"
-    )
-    if not re.search(action, text):
-        return False
-    code = arabic.clean(item.get("code") or "").casefold()
-    section = re.search(r"(?:section|division|القسم|قسم|الباب|باب)\s+([\w./-]+)", text)
-    if section:
-        asked = section[1]
-        if code.startswith(tuple(asked + sep for sep in (".", "-", "/"))):
-            return True
-        fields = item["fields"]
-        if str(fields.get("section", "")).casefold() == asked:
-            return True
-        if fields.get("file_id") and isinstance(fields.get("row"), int):
-            headings = conn.execute(
-                "SELECT code, fields FROM items WHERE kind = 'boq_heading'"
-                " AND json_extract(fields, '$.file_id') = ?"
-                " AND json_extract(fields, '$.sheet') = ?"
-                " AND json_extract(fields, '$.row') < ?"
-                " ORDER BY json_extract(fields, '$.row') DESC",
-                (fields["file_id"], fields.get("sheet"), fields["row"]),
-            ).fetchall()
-            for heading_code, raw in headings:
-                heading = json.loads(raw)
-                if heading.get("line_kind"):
-                    continue
-                title = arabic.clean(heading.get("description", "")).casefold()
-                return (
-                    heading_code == asked
-                    or title == asked
-                    or bool(
-                        re.search(
-                            r"(?:section|division|القسم|قسم|الباب|باب)\s+"
-                            + re.escape(asked)
-                            + r"(?![\w./-])",
-                            title,
-                        )
-                    )
-                )
-        return False
-    # A list must not accidentally expand to every item in the BOQ.
-    listed = re.search(r"(?:items|البنود|بنود)\s*[:：]?\s*([0-9][\w./,، &و-]*)", text)
-    if listed:
-        return code in re.findall(r"[0-9]+(?:[./-][0-9]+)*", listed[1])
+def _pricing_requested(message: str) -> bool:
+    """Recognise pricing intent without interpreting its object or limiting BOQ scope."""
+    text = re.sub(r"[\u064b-\u065f\u0670]", "", arabic.clean(message).casefold())
+    text = text.translate(str.maketrans("أإآٱ", "اااا"))
     return bool(
-        re.search(r"\bboq\b|bill of quantities|المقايسة|المقايسه|البنود|بنود|\bitems\b", text)
+        re.search(
+            r"(?<!\w)(?:سعر|تسعير|اتسعر|يتسعر|تتسعر)(?!\w)"
+            r"|\b(?:price|rate|cost)\s+(?=[a-z])|\bpricing\b",
+            text,
+        )
     )
 
 
-def _matching_price_source(
-    target: Records, item: dict, source_id: str | None, message: str
-) -> tuple[bool, bool]:
-    """Read the actual row, never a model's description of what the source contains.
-
-    Second result: the engineer explicitly identified this file as their priced copy.
-    """
+def _engineers_priced_copy(target: Records, source_id: str | None, message: str) -> bool:
+    """Whether the engineer identified this source file as their own priced BOQ copy."""
     if not source_id:
-        return False, False
+        return False
     with target.read() as conn:
         source = conn.execute(
             "SELECT file_id, locator FROM sources WHERE id = ?", (source_id,)
         ).fetchone()
     if not source or not source[0]:
-        return False, False
+        return False
     file_id, raw = source
     loc = json.loads(raw)
     if not isinstance(loc.get("row"), int) or not isinstance(loc.get("sheet"), str):
-        return False, False
+        return False
     try:
         book = boq.workbook(target, file_id)
         _, sheet = boq.read(book, loc["sheet"])
     except RecordsError:
-        return False, False
-    cells = sheet.cells.get(loc["row"], {})
+        return False
     _, columns = boq.guess(sheet, boq.PREVIEW_ROWS)
-    code_cell = cells.get(boq.column(columns.get("code", "A")))
-    code = arabic.clean(item.get("code") or "").casefold()
-    same_code = bool(
-        code and code_cell and arabic.clean(boq._text(code_cell.value)).casefold() == code
-    )
-    description = arabic.normalise(item["fields"].get("description", ""))
-    words = set(description.split())
-
-    def close(value) -> bool:
-        if not isinstance(value, str) or len(words) < 2:
-            return False
-        other = set(arabic.normalise(value).split())
-
-        # Strength/class/dimensions must not disappear in a fuzzy description match.
-        def digits(tokens):
-            return {w for w in tokens if any(c.isdigit() for c in w)}
-
-        return (
-            digits(words) == digits(other)
-            and len(words & other) / max(len(words), len(other)) >= 0.85
-        )
-
-    same_description = any(close(c.value) for c in cells.values())
-    own = item["fields"]
-    own_rate = (
-        file_id == own.get("file_id")
-        and loc["row"] == own.get("row")
-        and boq.match_sheet([sheet.name], own.get("sheet", "")) is not None
-        and columns.get("rate") is not None
-        and loc.get("column") == columns["rate"]
-    )
     said = re.sub(r"[\u064b-\u065f]", "", arabic.clean(message).casefold())
-    priced_copy = (
-        same_code
-        and "rate" in columns
+    return (
+        "rate" in columns
         and "quantity" in columns
         and book.name.casefold() in said
         and bool(re.search(r"my priced (?:copy|boq)|نسختي المسعر[ةه]|نسختي اللي سعرتها", said))
     )
-    return same_code or same_description or own_rate, priced_copy
 
 
 def _price_item_named(
@@ -1104,10 +1022,7 @@ def _price_item_named(
     message = ctx.store.brief(ctx.brief_id)["text"]
     if names_item(message):
         return
-    matches, priced_copy = _matching_price_source(target, item, source_id, message)
-    with target.read() as conn:
-        in_scope = _pricing_scope(conn, item, message)
-    if priced_copy or (in_scope and matches):
+    if _pricing_requested(message) or _engineers_priced_copy(target, source_id, message):
         return
     with ctx.store.rec.read() as conn:
         answers = conn.execute(
@@ -1139,7 +1054,7 @@ def _price_item_named(
                 return
     raise RecordsError(
         copy.fill(
-            copy.BOQ_PRICE_SOURCE_MISMATCH if in_scope else copy.BOQ_PRICE_ITEM_REQUIRED,
+            copy.BOQ_PRICE_ITEM_REQUIRED,
             item=item.get("code") or str(row or ref),
         ),
         status=422,

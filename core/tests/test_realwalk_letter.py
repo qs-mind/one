@@ -31,14 +31,44 @@ def problems(rec, text: str) -> list[str]:
         return truth.letter_problems(c, text, day=DAY, has_total=True)
 
 
-def test_a_priced_letter_gives_the_vat_and_the_total_with_it(rec):
+@pytest.fixture
+def priced_letter(rec):
+    """Sample ledger amounts: the letter tests check VAT and bid fields against known totals."""
+    with rec.write("engineer") as c:
+        at = rec.clock()
+        item = ledger.write_item(c, at=at, actor="engineer", kind="total", code="BOQ")
+        source = ledger.write_source(
+            c, at=at, actor="engineer", kind="boq", title="Priced BOQ - sample"
+        )
+        for name, value in (
+            ("total", "1426948.50"),
+            ("vat", "199772.79"),
+            ("with_vat", "1626721.29"),
+        ):
+            ledger.write_number(
+                c,
+                at=at,
+                actor="engineer",
+                item_id=item,
+                name=name,
+                value=value,
+                source_id=source,
+                dated="2026-11-01",
+                currency="EGP",
+            )
+    return rec
+
+
+def test_a_priced_letter_gives_the_vat_and_the_total_with_it(priced_letter):
+    rec = priced_letter
     add_file(rec, "05 إيميل العميل - عينة.txt", EMAIL, actor="engineer")
     wrong = problems(rec, f"القاهرة في 5 نوفمبر 2026\n{TOTAL}\n{FIELDS}")
     assert any("VAT amount" in w and "with VAT" in w for w in wrong)
     assert problems(rec, f"القاهرة في 5 نوفمبر 2026\n{TOTAL}\n{VAT}\n{FIELDS}") == []
 
 
-def test_a_priced_letter_has_the_bid_fields_for_the_engineer(rec):
+def test_a_priced_letter_has_the_bid_fields_for_the_engineer(priced_letter):
+    rec = priced_letter
     add_file(rec, "05 إيميل العميل - عينة.txt", EMAIL, actor="engineer")
     [wrong] = problems(rec, f"القاهرة في 5 نوفمبر 2026\n{TOTAL}\n{VAT}")
     assert "bidder" in wrong and "tender number" in wrong and "signature" in wrong
@@ -86,3 +116,10 @@ async def test_a_typed_total_that_is_a_ledger_number_goes_in_as_that_number(ctx)
         *({"type": "p", "children": [{"text": line}]} for line in FIELDS.split("\n")),
     ]
     assert json.loads(await call("deliverable_create", letter | {"blocks": blocks}, ctx))["id"]
+
+
+def test_a_priced_letter_still_refuses_amounts_missing_from_the_ledger(rec):
+    add_file(rec, "05 إيميل العميل - عينة.txt", EMAIL, actor="engineer")
+    wrong = problems(rec, f"القاهرة في 5 نوفمبر 2026\n{TOTAL}\n{VAT}\n{FIELDS}")
+    assert len(wrong) == 3
+    assert all("not in the project records" in problem for problem in wrong)
