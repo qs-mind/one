@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from qsone import activity, copy
 from qsone.calc.currencies import CURRENCIES
@@ -36,6 +36,7 @@ from qsone.tools.cite import SourceRef
 
 CELL_CHARS = 60  # of each cell in a preview
 MAX_SKIPPED = 40  # rows left out, named one by one in a result
+SENT = "sent"  # a question card's one option (qsone.tools.engineer)
 KEEP = "keep"  # the rows card's options (the screen's words: "Keep the ticked rows")
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 _LETTERS = re.compile(r"^[A-Z]{1,3}$")
@@ -140,12 +141,6 @@ class ImportArgs(_Args):
             raise ValueError(copy.BOQ_NEEDS_CURRENCY["en"])
         return None if value is None else value.upper()
 
-    @model_validator(mode="after")
-    def _priced(self) -> "ImportArgs":
-        if {"rate", "amount"} & set(self.columns) and self.currency is None:
-            raise ValueError(copy.BOQ_NEEDS_CURRENCY["en"])
-        return self
-
 
 # boq_preview ------------------------------------------------------------------------------------
 
@@ -197,7 +192,8 @@ async def _preview(ctx: ToolContext, args: PreviewArgs) -> str:
     nxt["columns"] = p["columns_guess"] or {"description": "B", "unit": "C", "quantity": "D"}
     notes = [
         "Map columns by letter; rows below the header row are read to the end (rows limits "
-        "them). Rates and amounts need currency.",
+        "them). Rates and amounts need a currency: give it when the file states it; left out, "
+        "ONE reads it from the headings or asks the engineer.",
         f"Next: boq_import {_json(nxt)}",
     ]
     if p["sheet_hidden"]:
@@ -239,8 +235,8 @@ each row below the header becomes an item, a heading, or a row left out and why.
 quantity, rate and amount keeps its cell as its source.
 - columns: letters for description, unit and quantity (needed), and code, rate, amount, \
 description_2 (another description column).
-- currency: needed with rate or amount. dated: the BOQ's date, if written. rows: "5-200" \
-for part. hidden_rows: skip (default), or include once the engineer agrees.
+- currency: if stated; else ONE asks. dated: the BOQ's date, if written. \
+rows: "5-200" for part. hidden_rows: skip (default), or include once the engineer agrees.
 The engineer sets the columns on a card first. Returns import_id and counts: quote them.
 Example:
 {_json(_IMPORT_EXAMPLE)}"""
@@ -308,6 +304,53 @@ def _card(ctx: ToolContext, p: boq.Plan) -> Card:
             ],
         },
     )
+
+
+# The currency a rate or amount column's heading names: «الفئة (جنيه)», "Rate (SAR)".
+_CURRENCY_WORDS = (
+    ("EGP", re.compile(r"جنيه|ج\.م|\bEGP\b|\bL\.?E\b", re.I)),
+    ("SAR", re.compile(r"ريال|ر\.س|\bSAR\b|\bS\.?R\b", re.I)),
+    ("AED", re.compile(r"درهم|\bAED\b", re.I)),
+    ("USD", re.compile(r"دولار|\bUSD\b|US\$", re.I)),
+)
+CURRENCY_QUESTION = "currency"
+CURRENCY_OPTIONS = ("EGP", "SAR", "AED", "USD")
+
+
+def _stated_currency(p: boq.Plan, columns: dict[str, str]) -> str | None:
+    """The one currency the headings of the rate and amount columns name, or None."""
+    headers = " ".join(
+        p.sheet_columns.get(columns[f], {}).get("header", "") for f in ("rate", "amount")
+        if f in columns
+    )  # fmt: skip
+    found = {code for code, words in _CURRENCY_WORDS if words.search(headers)}
+    return found.pop() if len(found) == 1 else None
+
+
+async def _ask_currency(ctx: ToolContext) -> str | None:
+    """Asks the engineer the currency of the BOQ's rates and amounts, which the file does not
+    state (a question card, never a silent refusal). None when the answer is no currency."""
+    lang = _language(ctx)
+    card = Card(
+        id=uuid4().hex,
+        kind="question",
+        title=copy.fill(copy.QUESTION_TITLE, agent=ctx.agent.name),
+        detail=copy.QUESTION_DETAIL,
+        options=(SENT,),
+        payload={
+            "questions": [
+                {
+                    "id": CURRENCY_QUESTION,
+                    "text": copy.BOQ_ASK_CURRENCY[lang],
+                    "options": list(CURRENCY_OPTIONS),
+                    "free_text": True,
+                }
+            ]
+        },
+    )
+    answer = read_answer(card, await keep.ask(ctx, card))
+    said = str(answer["answers"].get(CURRENCY_QUESTION, "")).strip().upper()
+    return said if said in CURRENCIES else None
 
 
 def _columns_set(p: boq.Plan, answer: dict) -> dict[str, str] | dict:
@@ -463,7 +506,10 @@ async def _import(ctx: ToolContext, args: ImportArgs) -> str:
         text = copy.fill(copy.BOQ_REQUIRED_UNTICKED, fields=fields)
         return cite.not_done(text, instead=again)
     if {"rate", "amount"} & set(columns) and args.currency is None:
-        return cite.not_done(copy.BOQ_NEEDS_CURRENCY, instead="boq_import again with currency")
+        currency = _stated_currency(p, columns) or await _ask_currency(ctx)
+        if currency is None:
+            return cite.not_done(copy.BOQ_NEEDS_CURRENCY, instead="boq_import again with currency")
+        args = args.model_copy(update={"currency": currency})
     if columns != p.columns:
         p = await asyncio.to_thread(_plan, rec, args, columns)
     out = await asyncio.to_thread(_write, ctx, rec, args, p)

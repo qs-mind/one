@@ -22,7 +22,7 @@ from qsone.clientfile import fill
 from qsone.deliverables import changes, comments, compare, ops, store
 from qsone.deliverables import review as checks
 from qsone.deliverables.api import current_view
-from qsone.engine import truth
+from qsone.engine import numbers_guard, truth
 from qsone.engine.tools import MAX_RESULT, REGISTRY, ModelRetry, ToolContext, register_functions
 from qsone.engine.types import Data, DeliverableDraft
 from qsone.records.project import Records, RecordsError
@@ -136,8 +136,38 @@ def truthful(rec: Records, tool: str, content, kind: str, said: str = "") -> Non
         text = "\n".join(_texts(content))
         with rec.read() as c:
             wrong += truth.letter_problems(c, text, day=day, has_total=_has_ref(content), said=said)
+            wrong += _typed_numbers(c, text)
     if wrong:
         raise ModelRetry(f"{tool}: " + " ".join(wrong) + " Nothing was saved.")
+
+
+def _typed_numbers(conn, text: str) -> list[str]:
+    """Each number typed in a Document that is a current Source Ledger number: it goes in as
+    that number, with its source (the letter's total showed as a number with no source, 6 Nov
+    2026). Small numbers (a count of days, a percent) are left to the term checks."""
+    typed = {v: w for w, v in numbers_guard._counted(text) if len(v.replace(".", "")) >= 4}
+    if not typed:
+        return []
+    rows = conn.execute(
+        "SELECT n.id, n.value, n.name, i.code FROM numbers n JOIN items i ON i.id = n.item_id"
+        " WHERE n.valid_until IS NULL"
+    ).fetchall()
+    found: dict[str, list[tuple[str, str, str | None]]] = {}
+    for n_id, value, name, code in rows:
+        for v in numbers_guard.known_values([str(value)]):
+            if v in typed:
+                found.setdefault(v, []).append((n_id, name, code))
+    out = []
+    for v, numbers in found.items():
+        n_id, name, code = numbers[0]
+        also = f" (or one of {len(numbers) - 1} more with that value)" if len(numbers) > 1 else ""
+        out.append(
+            f"The number {typed[v]} is typed, but it is the Source Ledger's {name} of "
+            f"{code or 'an item'} ({n_id}){also}: put it in as "
+            f'{{"type": "num", "number": "{n_id}", "children": [{{"text": ""}}]}}, so it shows '
+            "its source."
+        )
+    return out
 
 
 def _page(v: dict, offset: int, limit: int) -> dict:

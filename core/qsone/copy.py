@@ -566,6 +566,7 @@ TOOL_WORDS = {
     "find_items": {"en": "Looking up items", "ar": "بيدوّر على بنود"},
     "hand_to_project": {"en": "Passing the work to a project", "ar": "بيحوّل الشغل لمشروع"},
     "ledger_numbers": {"en": "Reading the project's numbers", "ar": "بيقرا أرقام المشروع"},
+    "rank_items": {"en": "Sorting the project's items", "ar": "بيرتّب بنود المشروع"},
     "make_deliverable": {"en": "Making a Deliverable", "ar": "بيعمل مُخرج"},
     "note_lesson": {"en": "Noting a lesson learned", "ar": "بيسجّل درس مستفاد"},
     "offer_new_project": {"en": "Suggesting a new project", "ar": "بيقترح مشروع جديد"},
@@ -620,6 +621,10 @@ TOOL_FIND_ITEMS = {
     "ar": "بيدوّر على بنود في سجل المصادر",
 }
 
+TOOL_RANK_ITEMS = {
+    "en": "Finding the top {top} items by {name}",
+    "ar": "بيطلّع أعلى {top} بنود في {name}",
+}
 TOOL_LEDGER_NUMBERS = {
     "en": "Reading the numbers of item {item}",
     "ar": "بيقرا أرقام البند {item}",
@@ -686,6 +691,10 @@ NO_SOURCE = {
 
 # The team (Plan 4, Task 7). {name} and {desk} are {en, ar} pairs; {title} is a Deliverable's.
 BUDGET_TITLE = {"en": "Brief Budget", "ar": "ميزانية التكليف"}
+BUDGET_SPENT = {
+    "en": "This Brief has spent {spent} USD so far and is about to pass {line} USD. Go on?",
+    "ar": "التكليف ده صرف لحد دلوقتي {spent} دولار، وقرّب يعدّي {line} دولار. نكمّل؟",
+}
 
 BUDGET_UNKNOWN = {
     "en": (
@@ -827,6 +836,29 @@ DESK_TEMPORARY = {"en": "Temporary Desk", "ar": "قسم مؤقت"}
 
 CONTINUE_AFTER_RESTART = "ONE restarted. Continue from your last step."  # the model reads it
 
+STEP_LIMIT_NOW = (  # the model reads it: the last request after ONE's step limit
+    "ONE's step limit for one request is reached, so the work stops now. Without calling any "
+    "tool, reply with what you found so far, with its sources, and what is left."
+)
+STEP_LIMIT_REACHED = {
+    "en": "ONE stopped this request at its limit of {n} steps. What the Lead QS found so far is "
+    "above; ask for less at a time (one section, or the top items) to go on.",
+    "ar": "ONE وقّف الطلب ده عند حدّه: {n} خطوة. اللي كبير مهندسي الكميات لقاه لحد دلوقتي "
+    "فوق؛ اطلب حاجة أصغر في المرة (قسم واحد، أو أعلى البنود) عشان نكمّل.",
+}
+# ONE's own refusals, repeated until the model gave up: never the provider's fault (6 Nov 2026).
+TOOL_GAVE_UP = {
+    "en": "The work stopped: ONE refused the same step {n} times, so it was not done. Why: {why} "
+    "The work so far is saved; tell the Lead QS how to go on.",
+    "ar": "الشغل وقف: ONE رفض نفس الخطوة {n} مرات، فماتعملتش. السبب: {why} الشغل اللي اتعمل "
+    "لحد دلوقتي محفوظ؛ قول لكبير مهندسي الكميات يكمّل إزاي.",
+}
+REPLY_GAVE_UP = {
+    "en": "The work stopped: ONE sent the Lead QS's answer back to be fixed several times, and it "
+    "could not fix it. The work so far is saved; ask again in fewer words.",
+    "ar": "الشغل وقف: ONE رجّع رد كبير مهندسي الكميات يتصلّح كذا مرة، وماعرفش يصلّحه. الشغل "
+    "اللي اتعمل لحد دلوقتي محفوظ؛ اطلب تاني بكلام أقل.",
+}
 REPORT_NOW = (  # the model reads it: the last request after the engineer chose "stop with a report"
     "The Spending Cap stops the work now. Without calling any tool, reply with a short report: "
     "what is done, with its sources, and what is left."
@@ -926,6 +958,24 @@ def fill(text: dict[str, str], /, **values) -> dict[str, str]:
     for lang, s in text.items():
         mine = {k: v[lang] if isinstance(v, dict) else v for k, v in values.items()}
         found[lang] = _one_stop(s, mine).format(**mine)
+    return found
+
+
+def words_for(said: str) -> dict[str, str] | None:
+    """The {en, ar} text whose English words `said` holds (a refusal the model was given in
+    English), the longest that fits; None when no text of this module, without blanks, is in it."""
+    found = None
+    for value in globals().values():
+        if (
+            isinstance(value, dict)
+            and isinstance(value.get("en"), str)
+            and isinstance(value.get("ar"), str)
+            and "{" not in value["en"]
+            and len(value["en"]) >= 20
+            and value["en"] in said
+            and (found is None or len(value["en"]) > len(found["en"]))
+        ):
+            found = value
     return found
 
 
@@ -1908,6 +1958,10 @@ BOQ_NO_ROWS = {
     "ar": "مالقيناش صفوف مقايسة تحت صف العناوين بالأعمدة دي. راجع صف العناوين والأعمدة بـ "
     "boq_preview.",
 }
+BOQ_ASK_CURRENCY = {
+    "en": "The BOQ's rates and amounts don't say their currency. Which currency are they in?",
+    "ar": "الفئات والإجماليات في المقايسة مش مكتوب عملتها. هي بأنهي عملة؟",
+}
 BOQ_NEEDS_CURRENCY = {
     "en": "Rates and amounts need their currency: three letters, e.g. EGP, SAR, AED.",
     "ar": "الفئات والإجماليات محتاجة عملتها: تلات حروف، زي EGP أو SAR أو AED.",
@@ -1971,6 +2025,13 @@ SOURCE_NOT_EVIDENCE = {
         "المصدر لازم يشاور على دليل حقيقي: ملف وصفحته أو صفه، أو صفحة ويب ONE قراها، "
         "أو سعر من QS Mind، أو رد المهندس."
     ),
+}
+CLIENT_ITEMS_IMPORTED = {
+    "en": "The client's BOQ items come only from the engineer's import or an accepted change. "
+    "Record a breakdown's parts as resource items, and a condition or a contract's data as its "
+    "own kind; a new row in a Deliverable is proposed there as a change.",
+    "ar": "بنود مقايسة العميل بتيجي من استيراد المهندس أو تعديل اتقبل بس. سجّل مكونات التحليل "
+    "كموارد، والشروط وبيانات العقد كنوع لوحدها؛ والصف الجديد في مستند بيتقترح هناك كتعديل.",
 }
 NUMBER_NEEDS_CALC = {
     "en": (
@@ -2463,6 +2524,43 @@ TRUTH_CARD_NOT_SAVED = {
     "en": "The «I understood this» card was not saved: {why}",
     "ar": "كارت «فهمت كده» ماتحفظش: {why}",
 }
+# A reply that says a step was done after ONE refused it (the real walk, 6 Nov 2026).
+TRUTH_REFUSED = {
+    "en": "The reply says this was done, but ONE refused it, so it was not done: {why}",
+    "ar": "الرد بيقول إن ده اتعمل، بس ONE رفضه فماتعملش: {why}",
+}
+TRUTH_NOT_DONE = {
+    "en": "The reply says {what} was done; ONE's records show it was not done in this Brief.",
+    "ar": "الرد بيقول إن {what} اتعمل، وسجلات ONE بتقول إنه ماتعملش في التكليف ده.",
+}
+CLAIM_IMPORT = {"en": "the BOQ import", "ar": "استيراد المقايسة"}
+CLAIM_ADD = {"en": "an addition to the records or a Deliverable", "ar": "الإضافة للسجلات أو للمخرج"}
+CLAIM_PRICED = {"en": "the pricing", "ar": "التسعير"}
+REFUSED_STEP = {
+    "en": "the step «{step}» could not be done as it was sent.",
+    "ar": "خطوة «{step}» ماكانش ينفع تتعمل بالشكل اللي اتبعتت بيه.",
+}
+TRUTH_EMPTY_DELIVERABLE = {
+    "en": "The reply speaks of priced items, but the Deliverable this Brief made has no items.",
+    "ar": "الرد بيتكلم عن بنود متسعّرة، بس المخرج اللي اتعمل في التكليف ده مافيهوش أي بند.",
+}
+TRUTH_MISCITED = {
+    "en": "The reply says {value} is at {place}; that place has {have}.",
+    "ar": "الرد بيقول إن {value} موجود في {place}؛ والمكان ده فيه {have}.",
+}
+TRUTH_NO_PLACE = {
+    "en": "The reply cites {place}, which no project file has.",
+    "ar": "الرد بيستشهد بـ{place}، ومفيش ملف في المشروع فيه المكان ده.",
+}
+TRUTH_PER_DAY = {
+    "en": "The reply gives {value} without its unit: {place} has it per day.",
+    "ar": "الرد بيقول {value} من غير وحدته: {place} كاتبه عن كل يوم.",
+}
+TRUTH_OTHER_ROW = {
+    "en": "The reply prices item {code} from {place}, which is another item's row.",
+    "ar": "الرد بيسعّر البند {code} من {place}، والصف ده بتاع بند تاني.",
+}
+NO_NUMBERS = {"en": "no numbers", "ar": "مفيش أرقام"}
 
 # ---------------------------------------------------------------------------------------------
 # What the screen can add to a text: the action that fixes it, for the place it shows in.

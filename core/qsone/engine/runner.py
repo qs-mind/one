@@ -51,6 +51,7 @@ from pydantic_ai.exceptions import (
     ModelServerError,
     ModelUnavailableError,
     UnexpectedModelBehavior,
+    UsageLimitExceeded,
 )
 from pydantic_ai.messages import (
     ModelMessagesTypeAdapter,
@@ -67,6 +68,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.settings import ModelSettings
+from pydantic_ai.usage import UsageLimits
 
 from qsone import activity, copy, usage, view
 from qsone.deliverables import tools as outputs
@@ -128,6 +130,11 @@ log = logging.getLogger("qsone.engine.runner")
 GENERAL = "general"  # the General chat's id; it lives in the Engineer Records file
 WORK = "claude-work"  # <data>/claude-work/<run id>/: one Claude Code run's folder
 TOOL_RETRIES = 3  # how often a model may fix one tool call, or its final answer
+STEP_LIMIT = 50  # model requests in one pass of the Lead; then it reports what it has
+REPORT_LIMIT = 3  # model requests of that report, or of a report at a Spending Cap
+# ONE's own refusals, given up on by the model: never a provider's error (6 Nov 2026)
+_TOOL_GAVE_UP = re.compile(r"^Tool '([A-Za-z0-9_]+)' exceeded max retries count of (\d+)")
+_REPLY_GAVE_UP = re.compile(r"^Exceeded maximum (?:output )?retries")
 BUSY_WAIT = 5  # seconds before the one more try at a busy provider
 OFFLINE_WAITS = (5, 15, 30, 60)  # then every 60 s while the app runs
 REVIEW_AS_JSON = (  # the model reads it: a check on Claude Code answers in text
@@ -152,6 +159,10 @@ SPECIALIST_RULES = (
     "- A rate says what it includes: supply, or supply and installation. A supply-only quote "
     "never covers labour; an installed item's rate adds labour from its own source, with "
     "calculate. A rate is per the item's own unit.\n"
+    "- When the files have a build-up (rate analysis) or a materials price sheet, read them "
+    "first (search_records with the item's words, then read_chunk): an item's unit rate = "
+    "materials + labour + waste, as its build-up row has them, never one material alone. A "
+    "material is missing only when no sheet has it.\n"
     "- A value you do not have is missing: say so; never leave a blank for it."
 )
 _RECORD_ID = re.compile(r"\b[0-9a-f]{32}\b")  # an item, file or number id in a tool's words
@@ -188,6 +199,27 @@ def _refused(history: bytes, tool: str) -> str | None:
                 )
                 if retried and p.tool_name == tool:
                     found = p.content if isinstance(p.content, str) else json.dumps(p.content)
+    return found
+
+
+NOT_DONE = "not done:"  # a tool's result when the world refused it (qsone.tools.cite.not_done)
+
+
+def outcomes(history: bytes | None) -> list[tuple[str, bool, str]]:
+    """(tool, went through, its text) for each tool call answered in a run's history, oldest
+    first: a retry, a failure and a "not done" result did not go through."""
+    found = []
+    for m in _load(history):
+        if not isinstance(m, ModelRequest):
+            continue
+        for p in m.parts:
+            if isinstance(p, ToolReturnPart):
+                text = p.content if isinstance(p.content, str) else json.dumps(p.content)
+                ok = p.outcome == "success" and not text.startswith(NOT_DONE)
+                found.append((p.tool_name, ok, text))
+            elif isinstance(p, RetryPromptPart) and p.tool_name:
+                text = p.content if isinstance(p.content, str) else json.dumps(p.content)
+                found.append((p.tool_name, False, text))
     return found
 
 
@@ -512,9 +544,12 @@ class _Brief:
         self.lead_run_id: str | None = None
         self.lead_ctx: ToolContext | None = None
         self.truth_retried = False  # the reply went back once to be fixed (engine.truth)
+        self.step_limited = False  # the Lead reached STEP_LIMIT and reported what it had
+        self.budget_approved = False  # the engineer said yes to the Brief Budget of its plan
         self.said = 0  # the reply's length so far, in the screen's units (UTF-16)
         self.answer_from = 0  # where the Lead's latest response began in it
         self.redo_cleared = False  # a reply sent back left the screen with no words
+        self.refusals: dict[str, Text] = {}  # each tool's last refusal, in the engineer's words
         self._news = asyncio.Event()
         saved = brief.get("worklog")
         self.worklog = (
@@ -683,6 +718,14 @@ class _Brief:
 
     def post(self, message: TeamMessage) -> None:
         self.emit(message)  # send_message stored it already
+
+    def note_refusal(self, tool: str, text: Text | None) -> None:
+        """A tool call refused, with its words when ONE has them in both languages: the flag
+        beside a reply that says it was done gives the engineer this reason (`_did`)."""
+        if text is not None:
+            self.refusals[tool] = text
+        else:
+            self.refusals.pop(tool, None)
 
     async def run_specialist(self, spec: AgentSpec, task: str, kit: dict) -> str:
         run_id = team.specialist_run(self.store, self.brief_id, spec.id)
@@ -899,6 +942,9 @@ class _Brief:
             except (CapReached, CallRefused, _Fail, asyncio.CancelledError):
                 raise
             except Exception as error:  # noqa: BLE001 - sorted below; anything else is re-raised
+                gave_up = self._gave_up(run_id, error)
+                if gave_up is not None:
+                    raise _Fail(gave_up) from None
                 kind = _error_kind(error)
                 if kind is None:
                     raise
@@ -923,6 +969,22 @@ class _Brief:
                     continue
                 retried = False
                 await self._move(run_id, spec, choice, avoid, provider)
+
+    def _gave_up(self, run_id: str, error: BaseException) -> Text | None:
+        """The plain words for a run that stopped on ONE's own refusals (a tool call refused
+        until the model gave up, or an answer sent back too often); None for any other error.
+        The provider is never named for these: they are ONE's."""
+        if not isinstance(error, UnexpectedModelBehavior):
+            return None
+        tool = _TOOL_GAVE_UP.match(error.message)
+        if tool is not None:
+            name, n = tool[1], tool[2]
+            said = _refused(self.store.run(run_id)["history"], name) or ""
+            why = self._refusal(name, said)
+            return copy.fill(copy.TOOL_GAVE_UP, n=str(int(n) + 1), why=why)
+        if _REPLY_GAVE_UP.match(error.message):
+            return copy.REPLY_GAVE_UP
+        return None
 
     async def _move(
         self,
@@ -1017,13 +1079,37 @@ class _Brief:
                 pending = pending_deferred(own)
                 if pending:
                     await self._run_deferred(self.lead_run_id, pending)
-            out = await self._attempts(
-                self.lead_run_id, spec, lambda c: self._lead_pass(c, report=report)
-            )
+            try:
+                out = await self._attempts(
+                    self.lead_run_id, spec, lambda c: self._lead_pass(c, report=report)
+                )
+            except UsageLimitExceeded:
+                if report:  # a report that keeps calling tools ends with what was said
+                    return None
+                return await self._step_limit()
             if out is not _DEFERRED:
                 return out
             if report:
                 return None
+
+    async def _step_limit(self) -> Any:
+        """The Lead reached ONE's step limit for one request: the engineer hears why, and the
+        Lead says, without another tool, what it got so far (the top 5 of SGH took 50 steps of
+        one item each and ended "problem inside ONE", 6 Nov 2026)."""
+        log.info("brief %s at the step limit", self.brief_id)
+        notice = copy.fill(copy.STEP_LIMIT_REACHED, n=str(STEP_LIMIT))
+        self.emit(Data(self.brief_id, "notice", f"{self.brief_id}-step-limit", {"text": notice}))
+        self.worklog.truth = (self.worklog.truth or {}) | {"step_limit": notice}
+        self.step_limited = True
+        try:
+            out = await self._attempts(
+                self.lead_run_id,
+                self.lead_ctx.agent,
+                lambda c: self._lead_pass(c, report=True, prompt=copy.STEP_LIMIT_NOW),
+            )
+        except UsageLimitExceeded:
+            out = None
+        return out if isinstance(out, str) and out.strip() else ""
 
     async def _run_deferred(self, run_id: str, calls: list[ToolCallPart]) -> None:
         """Runs the deferred calls that have no stored result, at the same time, storing each
@@ -1056,7 +1142,9 @@ class _Brief:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._agent(run_id, state="working")
 
-    async def _lead_pass(self, choice: ModelChoice, *, report: bool = False) -> Any:
+    async def _lead_pass(
+        self, choice: ModelChoice, *, report: bool = False, prompt: str | None = None
+    ) -> Any:
         run_id = self.lead_run_id
         assert run_id is not None and self.lead_ctx is not None
         spec = self.lead_ctx.agent
@@ -1077,7 +1165,7 @@ class _Brief:
                 else:  # only when reporting at a cap: the work was not done
                     calls[c.tool_call_id] = ToolFailed("Stopped by the Spending Cap.")
             results = DeferredToolResults(calls=calls)
-        prompt = copy.REPORT_NOW if report else (None if own else self.text)
+        prompt = (prompt or copy.REPORT_NOW) if report else (None if own else self.text)
         earlier = self._earlier()
         effort = self.lead_effort(choice)
         # the Lead is sent the tool groups its Brief opened (tool_groups)
@@ -1099,6 +1187,7 @@ class _Brief:
             instructions=self._instructions(choice),
             retries=TOOL_RETRIES,
             model_settings=None if effort is None else ModelSettings(thinking=effort),
+            usage_limits=UsageLimits(request_limit=REPORT_LIMIT if report else STEP_LIMIT),
         ) as run:
             self.lead_run = run
             try:
@@ -1359,9 +1448,15 @@ class _Brief:
                 did.specialists += (spec.name["en"], spec.name["ar"])
             if not run["history"]:
                 continue
+            for name, ok, said in outcomes(run["history"]):
+                if ok:
+                    did.done.add(name)
+                    did.refused.pop(name, None)
+                else:
+                    did.refused[name] = self._refusal(name, said)
             for name, text in agents.tool_returns(run["history"]):
                 tool = REGISTRY.get(name)
-                if tool is None:
+                if tool is None or text.startswith(NOT_DONE):
                     continue
                 if tool.writes and (name not in team.TEAM_TOOLS or name == "make_deliverable"):
                     did.writes += 1
@@ -1379,17 +1474,79 @@ class _Brief:
             if not did.understood:
                 refused = _refused(run["history"], understand.TOOL)
                 did.understood_refused = refused or did.understood_refused
+        if self.place.rec is not None and "deliverable_create" in did.done:
+            did.item_rows = self._item_rows()
         return did
+
+    def _refusal(self, tool: str, said: str) -> Text:
+        """Why a call of `tool` was refused, in the engineer's words: as the tool said it, or the
+        words of ONE's own text in the refusal, or a plain line naming the step."""
+        found = self.refusals.get(tool) or copy.words_for(said)
+        if found is not None:
+            return {lang: words.rstrip() for lang, words in found.items()}
+        step = copy.tool_step(tool)
+        step = step if "{" not in step["en"] else copy.TOOL_STEP
+        return copy.fill(copy.REFUSED_STEP, step=step)
+
+    def _item_rows(self) -> int | None:
+        """The item rows in the Sheets this Brief made, and the numbers it set or added on items
+        through suggested changes; None when it made no Sheet."""
+        made: list[str] = []
+        changes: list[str] = []
+        for run in self.store.runs(self.brief_id):
+            if not run["history"]:
+                continue
+            for name, text in agents.tool_returns(run["history"]):
+                try:
+                    out = json.loads(text)
+                except ValueError:
+                    continue
+                if not isinstance(out, dict):
+                    continue
+                if name == "deliverable_create" and isinstance(out.get("id"), str):
+                    made.append(out["id"])
+                elif name == "deliverable_propose" and isinstance(out.get("change_ids"), list):
+                    changes += [c for c in out["change_ids"] if isinstance(c, str)]
+        try:
+            with self.place.rec.read() as c:
+                made = [
+                    d
+                    for d in made
+                    if c.execute(
+                        "SELECT 1 FROM deliverables WHERE id = ? AND kind = 'sheet'", (d,)
+                    ).fetchone()
+                ]
+                if not made:
+                    return None
+                rows = 0
+                for d in made:
+                    (n,) = c.execute(
+                        "SELECT count(*) FROM parts WHERE deliverable_id = ? AND kind = 'item'"
+                        " AND valid_until IS NULL AND removed = 0",
+                        (d,),
+                    ).fetchone()
+                    rows += n
+                for change in changes:
+                    row = c.execute("SELECT op FROM changes WHERE id = ?", (change,)).fetchone()
+                    op = json.loads(row[0]).get("op") if row else None
+                    rows += op in ("set_number", "add_item_row")
+        except Exception:  # noqa: BLE001 - an older file: the check is left out, never the reply
+            return 1
+        return rows
 
     def _reply_problems(self, output: str) -> list[truth.Problem]:
         rec = self.place.rec
-        return truth.reply_problems(
+        found = truth.reply_problems(
             output,
             cov=truth.coverage(rec) if rec is not None else None,
             did=self._did(),
             engineer_text=self.text,
             understand_brief=self.instruction == understand.INSTRUCTION,
         )
+        if rec is not None:  # each number at the row or page the reply cites for it
+            with rec.read() as c:
+                found += truth.miscited(c, output)
+        return found
 
     async def _truthful(self, output: Any) -> Any:
         """The Lead's answer against ONE's records, before the engineer relies on it. Once per
@@ -1428,17 +1585,21 @@ class _Brief:
             self.emit(Data(self.brief_id, "facts", self.brief_id, found))
         if no_search:
             self.emit(_no_search_notice(self.brief_id))
-        self.worklog.truth = {"facts": found, "no_search": no_search}
+        self.worklog.truth = (self.worklog.truth or {}) | {"facts": found, "no_search": no_search}
 
     async def _finish(self, output: Any) -> None:
         if isinstance(output, str):
+            clean = truth.clean_reply(output, shown=self._did().shown)
+            if clean != output:  # JSON or ids that stayed after the retry: never on the screen
+                self.emit(Data(self.brief_id, "redo", self.brief_id, {"from": 0, "to": self.said}))
+                self.emit(TextDelta(self.brief_id, clean))
+                self.worklog.truth = (self.worklog.truth or {}) | {"reply": clean}
+                output = clean
             results = self.results()
-            marked = numbers_guard.unsourced(output, numbers_guard.known_values(results))
-            if marked and self.place.rec is not None:  # a size in an item's own words is no price
-                found = await asyncio.to_thread(_descriptions, self.place.rec)
-                marked = numbers_guard.described(output, marked, found)
+            marked = await asyncio.to_thread(_marked, self.place.rec, output, results)
             if marked:
                 self.emit(Unsourced(self.brief_id, tuple(marked)))
+            self.worklog.truth = (self.worklog.truth or {}) | {"unsourced": marked}
             named = numbers_guard.sourced(output, results)
             if named:  # decision 16.3: each opens into its ledger number's source card
                 self.emit(Data(self.brief_id, "sourced", self.brief_id, {"numbers": named}))
@@ -1988,6 +2149,21 @@ def _chat_activity(brief: _Brief, state: str) -> dict:
     }
 
 
+def _marked(rec: Records | None, reply: str, results: list[str]) -> list[str]:
+    """The numbers of a reply with no source: none of the Brief's tools gave them, no item's
+    own words have them (a size, «طوب 25 سم»), and no place the reply cites has them (a number
+    read from a cited page carries that source: the bid security on page 26, 6 Nov 2026)."""
+    marked = numbers_guard.unsourced(reply, numbers_guard.known_values(results))
+    if marked and rec is not None:
+        marked = numbers_guard.described(reply, marked, _descriptions(rec))
+    if marked and rec is not None:
+        with rec.read() as c:
+            cited = truth.cited_values(c, reply)
+        if cited:
+            marked = [m for m in marked if numbers_guard.known_values([m]) - cited]
+    return marked
+
+
 def _tool_results(runs: list[dict]) -> list[str]:
     """What the tools gave in these runs, the numbers guard's sources (the team's own words do
     not count)."""
@@ -2024,6 +2200,9 @@ def _stored_events(
     lead = next((r for r in runs if r["parent_id"] is None and r["spec"].role == "lead"), None)
     reply = lead_text(_load(lead["history"])) if lead is not None else ""
     said_at = _first_said(lead["history"]) if reply and lead is not None else None
+    cleaned = json.loads(brief["worklog"]).get("truth") if brief["worklog"] else None
+    if isinstance(cleaned, dict) and isinstance(cleaned.get("reply"), str):
+        reply = cleaned["reply"]  # the reply as the core cleaned it then (no JSON, no ids)
     with store.rec.read() as c:
         approvals = c.execute(
             "SELECT card, status, choice, asked_at, settled_at FROM approvals"
@@ -2072,9 +2251,13 @@ def _stored_events(
             round=round_,
         )
         events.append(Reviewed(brief_id, deliverable_id, review))
+    said = json.loads(brief["worklog"]).get("truth") if brief["worklog"] else None
+    said = said if isinstance(said, dict) else {}
     if reply and brief["status"] == "done":
         results = _tool_results(runs)
-        marked = numbers_guard.unsourced(reply, numbers_guard.known_values(results))
+        marked = said.get("unsourced")  # as the core marked them then
+        if marked is None:
+            marked = numbers_guard.unsourced(reply, numbers_guard.known_values(results))
         if marked:
             events.append(Unsourced(brief_id, tuple(marked)))
         named = numbers_guard.sourced(reply, results)
@@ -2089,5 +2272,8 @@ def _stored_events(
             events.append(Data(brief_id, "facts", brief_id, said["facts"]))
         if said.get("no_search"):
             events.append(_no_search_notice(brief_id))
+        if said.get("step_limit"):
+            limit = {"text": said["step_limit"]}
+            events.append(Data(brief_id, "notice", f"{brief_id}-step-limit", limit))
     events.append(Status(brief_id, brief["status"], brief["step"]))
     return events

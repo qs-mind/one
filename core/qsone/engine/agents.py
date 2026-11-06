@@ -149,6 +149,8 @@ def _summary(tool_name: str, content, args: dict | None = None) -> str:
     """A stub for a tool result: its ids and values, and, for a tool that only reads, the call
     that reads it again."""
     text = _text(content)
+    if text.startswith("not done:"):  # a refusal stays one (engine.truth reads it: done or not)
+        return text.split("\n", 1)[0][:300]
     ids = ids_in(text, 20)
     values = list(dict.fromkeys(_VALUE.findall(text)))[:20]
     tool = REGISTRY.get(tool_name)
