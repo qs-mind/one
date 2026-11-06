@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from qsone import activity, copy, settings
 from qsone.backup import keys as backup_keys
 from qsone.meaning.service import Meaning, ModelFailed
-from qsone.records import audit, files, report, search, unzip, vault
+from qsone.records import audit, files, office, report, search, unzip, vault
 from qsone.records.project import FILE_NAME, Records, RecordsError
 
 if TYPE_CHECKING:
@@ -416,6 +416,20 @@ def router(
         if flags is None:
             raise RecordsError(copy.FILE_NOT_FOUND, status=404)
         return {"flags": flags}
+
+    @r.post("/projects/{project_id}/files/{file_id}/pdf")
+    def print_file_pdf(project_id: str, file_id: str) -> Response:
+        """Local in-memory pack source; does not export a deliverable or grant Sign-off."""
+        rec = projects.get(project_id)
+        info = files.file_info(rec, file_id)
+        if info is None:
+            raise RecordsError(copy.FILE_NOT_FOUND, status=404)
+        if office.find_soffice() is None:
+            raise RecordsError(copy.FILE_LIBREOFFICE_MISSING, status=503)
+        pdf = office.to_pdf(files.read_original(rec, file_id), info.name)
+        if pdf is None:
+            raise RecordsError(copy.FILE_OFFICE_CONVERSION_FAILED, status=422)
+        return Response(pdf, media_type="application/pdf")
 
     @r.post("/projects/{project_id}/files")
     async def add_file(

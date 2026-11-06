@@ -167,9 +167,10 @@ def test_binary_dxf_and_dwg_are_stored_with_a_plain_note():
     assert (x.kind, x.status, x.note, x.pieces) == ("dwg", "stored", "FILE_DWG_NOT_YET", [])
 
 
-def test_old_word_is_stored_with_a_plain_note():
+def test_old_word_is_stored_with_a_plain_note(monkeypatch):
+    monkeypatch.setattr("qsone.records.office.find_soffice", lambda: None)
     x = extract("مواصفات - عينة.doc", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 20)
-    assert (x.kind, x.status, x.note, x.pieces) == ("doc", "stored", "FILE_OLD_WORD", [])
+    assert (x.kind, x.status, x.note, x.pieces) == ("doc", "stored", "FILE_LIBREOFFICE_MISSING", [])
 
 
 def test_image_is_stored_and_read_later():

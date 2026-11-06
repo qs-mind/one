@@ -1856,6 +1856,18 @@ FILE_PAGES_OUT_OF_RANGE = {
     "en": "Those pages are not in the file. It has {pages}.",
     "ar": "الصفحات دي مش في الملف. الملف فيه {pages}.",
 }
+FILE_LIBREOFFICE_MISSING = {
+    "en": "Kept. LibreOffice opens this file, but is not installed. Download it from "
+    "https://www.libreoffice.org/download/download-libreoffice/.",
+    "ar": "اتحفظ. LibreOffice بيفتح الملف ده، بس مش متثبت. نزّله من "
+    "https://www.libreoffice.org/download/download-libreoffice/.",
+}
+FILE_OFFICE_CONVERSION_FAILED = {
+    "en": "Kept. LibreOffice could not convert this file or took too long. "
+    "Open it in LibreOffice and export a PDF or XLSX copy, then drop that copy.",
+    "ar": "اتحفظ. LibreOffice مقدرش يحوّل الملف ده أو أخد وقت طويل. "
+    "افتحه في LibreOffice وصدّر نسخة PDF أو XLSX، وبعدين ارمي النسخة دي.",
+}
 FILE_OLD_WORD = {
     "en": (
         "Kept. ONE reads Word files saved as .docx: open this one in Word, save it as .docx, "

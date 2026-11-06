@@ -64,7 +64,12 @@ def _what(rec: Records, f: dict) -> dict:
     """One file: its label and, for a BOQ, its sheets."""
     entry = {"id": f["id"], "name": f["name"], "kind": f["kind"], "status": f["status"]}
     entry["note"] = f["note"]
-    if f["status"] in ("unreadable",) or f["note"] in ("FILE_LOCKED", "FILE_SHEETS_EMPTY"):
+    if f["status"] == "unreadable" or f["note"] in (
+        "FILE_LOCKED",
+        "FILE_SHEETS_EMPTY",
+        "FILE_LIBREOFFICE_MISSING",
+        "FILE_OFFICE_CONVERSION_FAILED",
+    ):
         entry["label"] = None
         return entry
     if f["kind"] in boq.KINDS:
@@ -155,7 +160,10 @@ def _lines(entries: list[dict], missing: list[str]) -> list[dict]:
         lines.append(copy.fill(copy.REPORT_FILE, name=name, label=label))
         for s in e.get("sheets", [])[:10]:
             lines.append(_sheet_line(s))
-        if e["note"] == "FILE_SCANNED_PAGES" or e["status"] == "stored":
+        if (
+            e["note"] in ("FILE_SCANNED_PAGES", "FILE_LIBREOFFICE_MISSING")
+            or e["status"] == "stored"
+        ):
             lines.append(getattr(copy, e["note"] or "FILE_NOT_READ_YET"))
     if missing:
         what = [copy.REPORT_LABELS[m] for m in missing]
