@@ -15,3 +15,5 @@ export function openView(id: string, view: ViewData) {
 export function viewOf(id: string): ViewData | undefined {
   return views.get(id);
 }
+
+export const projectMapKey = "view:project-map" as const;

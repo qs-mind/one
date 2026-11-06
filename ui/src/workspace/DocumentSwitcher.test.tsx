@@ -49,12 +49,13 @@ describe("DocumentSwitcher", () => {
     show();
     await userEvent.click(screen.getByRole("button", { name: /المقايسة المسعّرة/ }));
     const names = screen.getAllByRole("menuitem").map((i) => i.textContent ?? "");
-    expect(names).toHaveLength(4);
+    expect(names).toHaveLength(5);
     expect(names[0]).toContain("المقايسة المسعّرة");
     expect(names[1]).toContain("الكميات القديمة");
     expect(names[2]).toContain(texts.docClientBoq.ar);
     expect(names[2]).toContain("عميل.xlsx");
-    expect(names[3]).toContain(texts.projectFiles.ar);
+    expect(names[3]).toContain(texts.projectMap.ar);
+    expect(names[4]).toContain(texts.projectFiles.ar);
   });
 
   it("picking a client BOQ opens clientboq:<id>", async () => {
@@ -89,14 +90,14 @@ describe("DocumentSwitcher", () => {
     show();
     await userEvent.click(screen.getByRole("button", { name: /المقايسة المسعّرة/ }));
     const items = screen.getAllByRole("menuitem");
-    expect(items[3]!.textContent).toContain(texts.projectFiles.ar);
+    expect(items[4]!.textContent).toContain(texts.projectFiles.ar);
     act(() => screen.getByRole("menu").focus());
     await userEvent.keyboard("{ArrowUp}");
-    expect(document.activeElement).toBe(items[3]);
+    expect(document.activeElement).toBe(items[4]);
     await userEvent.keyboard("{Home}");
     expect(document.activeElement).toBe(items[0]);
     await userEvent.keyboard("{End}");
-    expect(document.activeElement).toBe(items[3]);
+    expect(document.activeElement).toBe(items[4]);
   });
 
   it("the trigger says it opens a menu", () => {
@@ -148,4 +149,14 @@ it("names the sample top-items view opened as a document", () => {
   show({ opened: workspaceApi.current()! });
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(view.title);
   expect(screen.getByText(texts.sampleNumbers.ar)).toBeInTheDocument();
+});
+
+
+it("opens Project Map through the document switcher and names its open view", async () => {
+  const {rerender} = show();
+  await userEvent.click(screen.getByRole("button", {name:/المقايسة المسعّرة/}));
+  await userEvent.click(screen.getByRole("menuitem", {name:texts.projectMap.ar}));
+  expect(workspaceApi.current()?.key).toBe("view:project-map");
+  rerender(<DocumentSwitcher deliverables={[]} clientBoqs={[]} files={[]} opened={{key:"view:project-map",anchor:null}} working={new Set()} />);
+  expect(screen.getByRole("heading", {level:1})).toHaveTextContent(texts.projectMap.ar);
 });
