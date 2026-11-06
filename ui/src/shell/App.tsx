@@ -56,8 +56,25 @@ const WAITING_SYNC_MS = 1500;
 const WAITING_FRAMES = 30;
 const BRIEF_REREAD_MS = 2000; // after a screen starts a Brief, the chat checks it did not miss the Brief's end
 
+/** Files dragged over or dropped where nothing takes them (the chat, the top bar, the gutters) are refused here, so
+ * the window never opens a dropped file in ONE's place (dragDropEnabled is off: the webview's drop is the page's). */
+function useNoFileOpening() {
+  useEffect(() => {
+    const refuse = (event: globalThis.DragEvent) => {
+      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    };
+    window.addEventListener("dragover", refuse);
+    window.addEventListener("drop", refuse);
+    return () => {
+      window.removeEventListener("dragover", refuse);
+      window.removeEventListener("drop", refuse);
+    };
+  }, []);
+}
+
 export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: string) => ProjectSources }) {
   useLanguage();
+  useNoFileOpening();
   const project = useProject();
   const narrow = useNarrow();
   const small = useSmall();
@@ -354,13 +371,7 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
               // dense (5 Nov): the room is the data's: 8 px under the top bar and above the window's foot, 12 px at
               // the sides and between the document and the chat
               // below 640 px the document loses its side gutters: the phone's width is all the data's
-              <main
-                className={`relative flex min-h-0 flex-1 gap-3 py-2 ${small ? "px-0" : "px-3"}`}
-                // files dropped beside the document (the chat, the gutters) are taken by nothing: the window must
-                // not open them in its place (dragDropEnabled is off, so the webview's own drop is the page's)
-                onDragOver={(event) => event.dataTransfer.types.includes("Files") && event.preventDefault()}
-                onDrop={(event) => event.dataTransfer.types.includes("Files") && event.preventDefault()}
-              >
+              <main className={`relative flex min-h-0 flex-1 gap-3 py-2 ${small ? "px-0" : "px-3"}`}>
                 {documents ? (
                   <Workspace projectId={project.id} sources={sources} documents={documents} />
                 ) : (

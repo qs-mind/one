@@ -74,19 +74,22 @@ function useSourceMark(opened: Opened): boolean {
 const carriesFiles = (event: DragEvent) => event.dataTransfer?.types?.includes("Files") ?? false;
 
 /** Files or a folder dropped anywhere on the document: a folder (a tender's) goes into the project with its folders,
- * files go to Project Records (Project files opens to show them come). The window never opens what was dropped. */
+ * files go to Project Records (Project files opens to show them come). Taken on the way down (capture), before a
+ * viewer under the pointer (a letter's editor) can take the drop as its own; Project files takes its own drops. */
 function dropHandlers(projectId: string, opened: Opened) {
+  const ours = (event: DragEvent) => carriesFiles(event) && opened.key !== "files:all";
   return {
-    onDragOver(event: DragEvent) {
-      if (carriesFiles(event)) event.preventDefault();
+    onDragOverCapture(event: DragEvent) {
+      if (ours(event)) event.preventDefault();
     },
-    onDrop(event: DragEvent) {
-      if (event.defaultPrevented || !carriesFiles(event)) return; // Project files took it itself
+    onDropCapture(event: DragEvent) {
+      if (!ours(event)) return;
       event.preventDefault();
+      event.stopPropagation(); // the editor never inserts it
       if (holdsFolder(event.dataTransfer.items)) return void importInto(projectId, event.dataTransfer);
       const files = Array.from(event.dataTransfer.files);
       if (!files.length) return;
-      if (opened.key !== "files:all") workspaceApi.open("files:all"); // Back returns to the document
+      workspaceApi.open("files:all"); // Back returns to the document
       addToRecords(files);
     },
   };

@@ -1,7 +1,8 @@
 // Back from a source file comes back to the number's place (final review, finding 8): a number's card opens its file
-// at the page, and Back returns to the same row of the sheet, the same paragraph of the letter. Real viewers, with the
-// shell's mocked core; the project's lists are fake sources.
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+// at the page, and Back returns to the same row of the sheet, the same paragraph of the letter. Files dropped on a
+// letter's text go to Project files, never into the editor. Real viewers, with the shell's mocked core; the project's
+// lists are fake sources.
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { columns, D, DOC, entry, letter, sheet, viewRoutes } from "../deliverables/fixtures";
@@ -89,5 +90,41 @@ describe("Back from a number's source file", () => {
     await userEvent.setup().click(value);
     await openThePageAndBack();
     expect(workspaceApi.current()).toMatchObject({ key: `deliverable:${DOC}`, anchor: { row: "b2" } });
+  });
+});
+
+describe("files dropped on a letter's text", () => {
+  const NAME = "عرض سعر حديد - عينة.pdf";
+
+  it("go to Project files, not into the editor; Back returns to the letter", async () => {
+    const posted: string[] = [];
+    open(`deliverable:${DOC}`, {
+      ...viewRoutes(letter()),
+      [`POST /api/projects/p1/files?name=${encodeURIComponent(NAME)}`]: () => {
+        posted.push(NAME);
+        return Response.json({ id: "f9", name: NAME, status: "read", note: null, replaces: null }, { status: 201 });
+      },
+    });
+    const text = await screen.findByText("الأسعار سارية حالياً لمدة ٣٠ يوماً");
+    const block = text.closest("[data-block-id]")!;
+    expect(block.closest("[contenteditable='true']")).not.toBeNull(); // the letter's editor is under the pointer
+    const transfer = { types: ["Files"], files: [new File(["%PDF"], NAME)], items: [] };
+    expect(fireEvent.dragOver(block, { dataTransfer: transfer })).toBe(false);
+    expect(fireEvent.drop(block, { dataTransfer: transfer })).toBe(false);
+    await waitFor(() => expect(workspaceApi.current()?.key).toBe("files:all"));
+    await waitFor(() => expect(posted).toEqual([NAME]));
+    expect(screen.queryByText("الأسعار سارية حالياً لمدة ٣٠ يوماً")).toBeNull(); // Project files shows, the letter is unchanged
+    act(() => void workspaceApi.back());
+    expect(workspaceApi.current()?.key).toBe(`deliverable:${DOC}`);
+  });
+
+  it("dropped on the top bar, the window does not open them", async () => {
+    open(`deliverable:${DOC}`, viewRoutes(letter()));
+    await screen.findByText("الأسعار سارية حالياً لمدة ٣٠ يوماً");
+    const bar = document.querySelector('[data-region="topbar"]')!;
+    const transfer = { types: ["Files"], files: [new File(["x"], NAME)], items: [] };
+    expect(fireEvent.dragOver(bar, { dataTransfer: transfer })).toBe(false);
+    expect(fireEvent.drop(bar, { dataTransfer: transfer })).toBe(false);
+    expect(workspaceApi.current()?.key).toBe(`deliverable:${DOC}`); // nothing else happened
   });
 });
