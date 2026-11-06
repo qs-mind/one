@@ -57,9 +57,12 @@ export function whenSent(): Promise<void> {
   return Promise.all(sending).then(() => undefined);
 }
 
-/** Closes the project in the core once `sent` is done. */
+/** Closes the project in the core once `sent` is done, unless the engineer is back in it by then (left and
+ * reopened before the save was answered): a close then would shut the project now open. */
 export function closeAfter(projectId: string, sent: Promise<void>) {
-  void sent.then(() => api(`/projects/${projectId}/close`, { method: "POST" })).catch(() => undefined);
+  void sent
+    .then(() => (current?.id === projectId ? undefined : api(`/projects/${projectId}/close`, { method: "POST" })))
+    .catch(() => undefined);
 }
 
 /** Makes `next` current and closes the one before it in the core, so one project stays open at a time; what the one

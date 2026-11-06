@@ -390,6 +390,23 @@ describe("the project keeps its open document", () => {
     await waitFor(() => expect(order).toEqual(["save deliverable:dB", "saved deliverable:dB", "close p1"]));
   });
 
+  it("left and reopened before the save is answered, the project is not closed under the engineer", async () => {
+    const order: string[] = [];
+    const { sources, answer } = ordered(order);
+    setCurrentProject(P1);
+    const fetch = core({ routes: closing(order, "p1") });
+    render(<App sourcesFor={(id) => (id === "p1" ? sources : fakeSources({}))} />);
+    await screen.findByTestId("viewer-dA");
+    act(() => workspaceApi.open("deliverable:dB"));
+    act(() => switchProject(P2));
+    await waitFor(() => expect(order).toEqual(["save deliverable:dB"]));
+    act(() => switchProject(P1)); // back in it before the core answered
+    answer();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(order).not.toContain("close p1");
+    expect(fetch.mock.calls.filter(([url]) => String(url) === "/api/projects/p1/close")).toEqual([]);
+  });
+
   it("a row selected in the open document is saved, as an opening is", async () => {
     setCurrentProject(P1);
     core();
