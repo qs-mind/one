@@ -1,7 +1,7 @@
 // The workspace's contracts: what the core says about the
 // project's files, Deliverables, Desks and agents. `sources.ts` is the only file that knows the routes behind them.
 import type { Ref } from "react";
-import type { DeliverableInfo, SheetView } from "../deliverables/types";
+import type { DeliverableInfo, SheetView, PdfBox, FileRegion, Thread } from "../deliverables/types";
 import type { Language, Text } from "../i18n";
 
 export type { DeliverableInfo }; // Plan 6 declares it (plus pending, total, sample): never redeclared
@@ -11,7 +11,7 @@ export type FrameKind = "files" | "file" | "deliverable" | "desk" | "team" | "cl
 export type FrameKey = `${FrameKind}:${string}`;
 
 /** A place inside a frame: a sheet row and column, a document block (`row`) and text range, a PDF page. */
-export type Anchor = { row?: string; column?: string; page?: number; text?: [number, number]; point?: [number, number]; sheet?: string };
+export type Anchor = { box?: PdfBox; value?: string; row?: string; column?: string; page?: number; text?: [number, number]; point?: [number, number]; sheet?: string };
 export type DocKind = "files" | "file" | "deliverable" | "clientboq" | "view";
 /** "files:all", "file:<id>", "deliverable:<id>", "clientboq:<id>", "view:<chat part id>" (workspace/views.ts). */
 export type DocKey = `${DocKind}:${string}`;
@@ -101,7 +101,7 @@ export type ProjectStatus = {
 export type SelectionItem = { kind: FrameKind | "agent"; id: string; title: string; anchor?: Anchor; label?: string };
 
 /** A text piece One read from a file, with where it is (sheet, row, page). */
-// PDF points, origin top-left; page is one-based.
+// PDF points, origin top-left; page is one-based. Shared with PDF import and OCR.
 export type SourceLocator = {
   [key: string]: string | number | [number, number, number, number] | undefined;
   page?: string | number;
@@ -129,6 +129,9 @@ export interface ProjectSources {
   pageImage(fileId: string, page: number, width: number): Promise<string>;
   /** The number of pages; 0 when the file is not a PDF. */
   pages(fileId: string): Promise<number>;
+  pageBoxes?(fileId: string, page: number, value?: string): Promise<{width: number; height: number; boxes: PdfBox[]}>;
+  fileComments?(fileId: string): Promise<Thread[]>;
+  addFileComment?(fileId: string, anchor: FileRegion, body: string): Promise<Thread>;
   fileText(fileId: string, page?: number): Promise<FilePiece[]>;
   /** The client BOQ imported from the file, as a read-only Sheet view. */
   clientBoq(fileId: string): Promise<SheetView>;

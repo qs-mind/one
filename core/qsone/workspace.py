@@ -18,9 +18,11 @@ from starlette.concurrency import run_in_threadpool
 
 from qsone import copy
 from qsone.clientfile import imported
+from qsone.deliverables import comments
 from qsone.deliverables import store as deliverables
+from qsone.deliverables.api import _thread
 from qsone.projects import Projects
-from qsone.records import files, render, sheetview
+from qsone.records import files, regions, render, sheetview
 from qsone.records.project import Records, RecordsError
 
 MAX_PIECES = 1000  # text pieces in one answer
@@ -273,6 +275,40 @@ def router(projects: Projects, waiting=lambda project_id: 0) -> APIRouter:
     ):
         found = await run(lambda: page_image(project(project_id), file_id, page, width))
         return found if isinstance(found, Response) else Response(found, media_type="image/png")
+
+    @r.get("/projects/{project_id}/files/{file_id}/pages/{page}/boxes")
+    async def get_boxes(
+        project_id: str, file_id: str, page: int, value: Annotated[str, Query(max_length=128)] = ""
+    ):
+        return await run(lambda: regions.page_boxes(project(project_id), file_id, page, value))
+
+    @r.get("/projects/{project_id}/files/{file_id}/comments")
+    async def get_file_comments(project_id: str, file_id: str):
+        def read():
+            rec = project(project_id)
+            _file_row(rec, file_id)
+            return {"comments": comments.file_comments(rec, file_id)}
+
+        return await run(read)
+
+    @r.post("/projects/{project_id}/files/{file_id}/comments")
+    async def add_file_comment(project_id: str, file_id: str, request: Request):
+        try:
+            body = await request.json()
+        except ValueError:
+            return _refusal(_bad("body"))
+
+        def add():
+            rec = project(project_id)
+            anchor = body.get("anchor") if isinstance(body, dict) else None
+            if not isinstance(anchor, dict) or anchor.get("file_id") != file_id:
+                raise _bad("anchor.file_id")
+            made = comments.add(
+                rec, None, kind="review", anchor=anchor, body=body.get("body"), actor="engineer"
+            )
+            return JSONResponse(_thread(rec, made), status_code=201)
+
+        return await run(add)
 
     @r.get("/projects/{project_id}/files/{file_id}/text")
     async def get_text(

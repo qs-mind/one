@@ -2685,6 +2685,16 @@ def error(text: dict[str, str]) -> dict:
     return {"error": text} if fix is None else {"error": text, "fix": fix}
 
 
+# PDF page-region comments (Wave 1 E).
+FILE_REGION_PLACE = {
+    "en": "file {file}, page {page}, box {box}",
+    "ar": "الملف {file}، صفحة {page}، المنطقة {box}",
+}
+FILE_REGION_FIX = {
+    "en": "Review the comment on file {file}, page {page}, box {box}: {body}",
+    "ar": "راجع التعليق على الملف {file}، صفحة {page}، المنطقة {box}: {body}",
+}
+
 # Tender packs (wave 1 A).
 PACK_INVALID = {
     "en": "This pack step is invalid. Choose pages that exist and paired text.",

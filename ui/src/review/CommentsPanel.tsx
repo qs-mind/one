@@ -1,6 +1,7 @@
 // The comments on one Deliverable: One's notes (an agent's remarks, never blocking) and Review comments (the
 // engineer's and the Checking QS's, which may be Code C: must fix before Sign-off), each with a text label, its
 // replies and its status. "Fix it" sends the core's own message to the Lead QS through the chat.
+import { workspaceApi } from "../workspace/api";
 import { useState } from "react";
 import type { Anchor } from "../project/types";
 import { deliverablesApi } from "../deliverables/api";
@@ -25,6 +26,7 @@ export type CommentsPanelProps = {
 
 /** The viewer's anchor for a comment's place now. */
 export function toAnchor(a: CommentAnchor): Anchor | null {
+  if ("kind" in a && a.kind === "file_region") return { page: a.page, box: a.box };
   switch (a.type) {
     case "cell":
       return { row: a.row, column: a.column };
@@ -52,9 +54,9 @@ function Badge({ thread }: { thread: Thread }) {
   );
 }
 
-function ThreadItem(props: {
+export function ThreadItem(props: {
   projectId: string;
-  view: View;
+  view: View | null;
   thread: Thread;
   onChanged: () => void;
   onSend?: (text: string) => void;
@@ -102,7 +104,11 @@ function ThreadItem(props: {
         type="button"
         disabled={!anchor}
         className="self-start text-start text-sm text-slate underline decoration-slate/40 hover:text-copper disabled:no-underline"
-        onClick={() => anchor && onLocate?.(anchor)}
+        onClick={() => {
+          const at = thread.anchor_now ?? thread.anchor;
+          if ("kind" in at && at.kind === "file_region") workspaceApi.open(`file:${at.file_id}`, {page: at.page, box: at.box});
+          else if (anchor) onLocate?.(anchor);
+        }}
       >
         <bdi dir="auto">{fill(t("reviewCommentOn"), { place: anchorPlace(view, thread.anchor_now ?? thread.anchor) })}</bdi>
       </button>

@@ -5,6 +5,10 @@ export type Language = "ar" | "en";
 export type Text = { en: string; ar: string };
 
 export const texts = {
+  regionSelect: { en: "Comment on a region", ar: "علّق على منطقة" },
+  regionDrag: { en: "Drag a box on the page, then write your comment.", ar: "اسحب مربع على الصفحة، وبعدها اكتب تعليقك." },
+  regionUnavailable: { en: "ONE could not locate regions on this page.", ar: "ONE مقدرش يحدد المناطق في الصفحة دي." },
+  regionValueMissing: { en: "ONE could not find this number in the page’s text.", ar: "ONE ملقاش الرقم ده في نص الصفحة." },
   deliverablePack: { en: "Tender pack", ar: "حزمة المناقصة" },
   packBuild: { en: "Build pack", ar: "كوّن حزمة المناقصة" },
   packBuilding: { en: "Building pack…", ar: "بنكوّن حزمة المناقصة…" },

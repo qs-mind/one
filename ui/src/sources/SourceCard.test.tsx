@@ -241,7 +241,7 @@ describe("a number opens in place into its source card", () => {
     const line = within(card).getByText("أسمنت بورتلاندي 3,450 ج.م. للطن - عينة");
     expect(line).toHaveClass("bg-copper/9", "ring-copper/25");
     await user.click(within(card).getByRole("button", { name: texts.sourceOpenPage.ar }));
-    expect(open).toHaveBeenCalledWith("file:f1", { page: 1 });
+    expect(open).toHaveBeenCalledWith("file:f1", { page: 1, value: "39850.50" });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
