@@ -649,6 +649,7 @@ def reply_problems(
         found.append(
             Problem(
                 "english",
+                "Replace the answer silently; no apology or mention of language/retry. "
                 "Write the Arabic reply without English words in brackets (not «مستند "
                 "(Deliverable)», just «مستند»), in the engineer's own dialect.",
             )

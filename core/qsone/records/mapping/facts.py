@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict
 from qsone import copy
 from qsone.records import arabic
 from qsone.records.mapping import links, store
+from qsone.records.mapping.roles import file_role
 from qsone.records.project import RecordsError
 
 GUIDE = (
@@ -22,7 +23,7 @@ GUIDE = (
 )
 TERMS = re.compile(
     r"contract data|bid data|validity|security|retention|advance|payment|currency|"
-    r"date|opening|award|commencement|deadline|contract form|price adjustment|"
+    r"date|duration|opening|award|commencement|deadline|contract form|price adjustment|"
     r"damages|defects|insurance|programme|submission|"
     r"بيانات العقد|ضمان|محتجز|دفعة|غرام|تأمين|برنامج|فتح العروض|تقديم|سريان|صلاحية|"
     r"مدة|احتجاز|دفع|عملة|العملة|الأسعار|تأخير|عيوب|صيانة|تأمينات|جدول زمني|"
@@ -50,6 +51,19 @@ class Fact(BaseModel):
 
 class Result(BaseModel):
     facts: list[Fact]
+
+
+def guide_score(text):
+    words = arabic.clean(text)
+    dates = len(re.findall(r"\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}|\d+\s*[%٪]", words))
+    priority = bool(
+        re.search(
+            r"bid (?:validity|security)|ضمان.{0,15}ابتدائي|سريان.{0,15}عرو?ض|سريان العرض",
+            words,
+            re.I,
+        )
+    )
+    return len(TERMS.findall(words)) + dates * 3 + priority * 12
 
 
 def clean(text):
@@ -192,21 +206,38 @@ def update(rec, fact_id, *, confirm=None, value=None, actor="engineer"):
 
 def candidates(rec, *, limit=15, file_ids=None):
     result, seen, pools = [], set(), []
+    project_scores = {}
     with rec.read() as c:
         rows = [
             store.decoded(r)
             for r in store.rows(
-                c, "SELECT * FROM map_files WHERE valid_until IS NULL ORDER BY file_id"
+                c,
+                "SELECT m.*,f.folder,f.kind FROM map_files m JOIN files f ON f.id=m.file_id "
+                "WHERE m.valid_until IS NULL AND f.valid_until IS NULL ORDER BY m.file_id",
             )
         ]
         for row in rows:
+            if row["kind"] in ("dwg", "dxf") or file_role(row["folder"], row["ai_kind"])[
+                "en"
+            ].startswith("Our"):
+                continue
             pool = []
             if file_ids is not None and row["file_id"] not in file_ids:
                 continue
+            source_chunks = links.chunks(c, row["file_id"])
+            scores = {}
             locators = [
-                {k: p[k] for k in ("page", "sheet", "row") if k in p} for p in row["key_pages"]
+                loc
+                for loc, text in sorted(
+                    source_chunks,
+                    key=lambda pair: -guide_score(pair[1]),
+                )
+                if TERMS.search(arabic.clean(text))
             ]
-            locators += [loc for loc, text in links.chunks(c, row["file_id"]) if TERMS.search(text)]
+            locators += [
+                {k: p[k] for k in ("page", "sheet", "row", "line", "paragraph") if k in p}
+                for p in row["key_pages"]
+            ]
             for loc in locators:
                 loc = {
                     k: v
@@ -214,18 +245,42 @@ def candidates(rec, *, limit=15, file_ids=None):
                     if k in ("page", "sheet", "row", "paragraph", "line")
                 }
                 key = (row["file_id"], tuple(sorted(loc.items())))
-                if key not in seen and links.at(c, row["file_id"], loc):
+                if key in seen:
+                    continue
+                text = " ".join(
+                    text
+                    for position, text in source_chunks
+                    if all(position.get(k) == v for k, v in loc.items())
+                )
+                if text:
                     pool.append({"file_id": row["file_id"], "locator": loc})
+                    scores[tuple(sorted(loc.items()))] = guide_score(text)
+                    project_scores[key] = guide_score(text)
                     seen.add(key)
             if pool:
-                pools.append(pool)
-    # Share the bounded page budget across files, rather than exhausting it in one PDF.
-    while pools and len(result) < limit:
-        for pool in pools:
-            result.append(pool.pop(0))
-            if len(result) == limit:
-                break
-        pools = [pool for pool in pools if pool]
+                pool.sort(key=lambda p: -scores[tuple(sorted(p["locator"].items()))])
+                pools.append((scores[tuple(sorted(pool[0]["locator"].items()))], pool))
+        pools = [pool for _, pool in sorted(pools, key=lambda pair: -pair[0])]
+    # Rank strong signals across the project; reserve diversity by taking at most
+    # three pages from each file before filling any remaining budget.
+    scored = []
+    for pool in pools:
+        for p in pool:
+            key = (p["file_id"], tuple(sorted(p["locator"].items())))
+            scored.append((project_scores[key], p))
+    ordered = [p for _, p in sorted(scored, key=lambda pair: -pair[0])]
+    counts, deferred = {}, []
+    for p in ordered:
+        fid = p["file_id"]
+        if counts.get(fid, 0) >= 3:
+            deferred.append(p)
+            continue
+        result.append(p)
+        counts[fid] = counts.get(fid, 0) + 1
+        if len(result) == limit:
+            return result
+    result.extend(deferred[: limit - len(result)])
+
     return result
 
 
@@ -414,6 +469,10 @@ async def structured(models, query, schema):
     return schema.model_validate_json(text)
 
 
+class NoTenderFacts(ValueError):
+    """The facts pass returned no usable evidence; the mapping owner records failure."""
+
+
 PAGE_CHARS = 12000
 
 
@@ -442,7 +501,12 @@ async def run_approved(rec, *, read, request, file_ids):
                 )
             if p["source_label"]:
                 valid.append(p)
-    return accept(rec, valid)
+    if not valid:
+        raise NoTenderFacts("NoTenderFacts: no grounded tender facts returned")
+    accepted = accept(rec, valid)
+    if not accepted and not store.entries(rec, "facts")["facts"]:
+        raise NoTenderFacts("NoTenderFacts: all proposals rejected by grounding validation")
+    return accepted
 
 
 def mapping_passes(brief):

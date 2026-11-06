@@ -610,7 +610,21 @@ async def test_links_retry_keeps_successful_groups_facts_and_link_batches(rec, m
         if schema is ai.Groups:
             return ai.Groups(groups=[])
         if schema is facts.Result:
-            return facts.Result(facts=[])
+            pages = json.loads(prompt.split("\n", 1)[1])
+            return facts.Result(
+                facts=[
+                    facts.Fact(
+                        name={"en": "Retention", "ar": "المحتجز"},
+                        value="10%",
+                        source_label="Retention",
+                        file_id=p["file_id"],
+                        locator=p["locator"],
+                        state="found",
+                        evidence="Retention 10%",
+                    )
+                    for p in pages
+                ]
+            )
         batch = json.loads(prompt.split("\n", 1)[1])
         link_inputs.append([d["file_id"] for d in batch])
         if calls[links.Result] == 2:
@@ -622,7 +636,7 @@ async def test_links_retry_keeps_successful_groups_facts_and_link_batches(rec, m
     await ai.run(rec, SimpleNamespace(), request=request, passes={"read": read})
     assert calls == {ai.Batch: 3, ai.Groups: 1, facts.Result: 1, links.Result: 4}
     assert reads == first_reads
-    assert link_inputs[3] == link_inputs[1]
+    assert link_inputs[2] == link_inputs[1]
     assert all(row["ai_state"] == "done" for row in store.list_map(rec)["files"])
 
 
@@ -663,7 +677,21 @@ async def test_links_never_receive_failed_classification(rec, monkeypatch):
         if schema is ai.Groups:
             return ai.Groups(groups=[])
         if schema is facts.Result:
-            return facts.Result(facts=[])
+            pages = json.loads(prompt.split("\n", 1)[1])
+            return facts.Result(
+                facts=[
+                    facts.Fact(
+                        name={"en": "Retention", "ar": "المحتجز"},
+                        value="10%",
+                        source_label="Retention",
+                        file_id=p["file_id"],
+                        locator=p["locator"],
+                        state="found",
+                        evidence="Retention 10%",
+                    )
+                    for p in pages
+                ]
+            )
         link_ids.update(d["file_id"] for d in json.loads(prompt.split("\n", 1)[1]))
         return links.Result(links=[])
 
