@@ -995,3 +995,38 @@ async def test_vision_is_in_drop_estimate_before_any_image_leaves(rec, monkeypat
     assert (picture.MAX_FACTS * picture.IMAGE_TOKENS + 2000, picture.MAX_FACTS * 100) in priced
     assert len(asked) == 1
     assert store.detail(rec, f.id)["ai_state"] == "declined"
+
+
+async def test_estimate_covers_mandatory_pages_beyond_soft_limit(rec, monkeypatch):
+    from qsone.engine import request_size
+    from qsone.records.mapping import facts
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Sample"]] * 18), actor="engineer")
+    drain(rec)
+    monkeypatch.setattr(oneshot, "map_model", lambda _: object())
+    monkeypatch.setattr(facts, "candidates", lambda _: [{}] * 18)
+    tokens = []
+
+    def cost(card, *, input_tokens, output_tokens):
+        if output_tokens == 10000:
+            tokens.append(input_tokens)
+        return Decimal("0.001")
+
+    monkeypatch.setattr(cards, "cost", cost)
+
+    async def request(prompt, schema, instructions):
+        if schema is ai.Groups:
+            return ai.Groups(groups=[])
+        return ai.Batch(files=[])
+
+    await ai.run(rec, SimpleNamespace(), request=request, passes={"read": None}, file_ids=[f.id])
+    assert tokens[0] >= 18 * request_size.estimate("م" * facts.PAGE_CHARS)
+
+
+def test_pass_summary_keeps_running_link_batch_visible(rec):
+    store.pass_status(rec, "links", {"sample-a"}, state="failed", attempts=2)
+    store.pass_status(rec, "links", {"sample-b"}, state="running", attempts=1)
+    with rec.read() as c:
+        status = store._pass_summary(c)["links"]
+    assert status["state"] == "running"
+    assert status["failed_batches"] == 1

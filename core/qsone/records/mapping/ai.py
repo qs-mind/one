@@ -269,7 +269,7 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None, vision_r
                 "SELECT coalesce(sum(max(1,coalesce(pages,1))),0) FROM map_files "
                 "WHERE valid_until IS NULL"
             ).fetchone()[0]
-        page_count = min(15, available)
+        page_count = min(available, max(15, len(facts.candidates(rec))))
         # Reserve Unicode text at the normal estimator's bytes/token rate.
         fact_tokens = page_count * request_size.estimate("م" * facts.PAGE_CHARS)
         fact_tokens += request_size.estimate(

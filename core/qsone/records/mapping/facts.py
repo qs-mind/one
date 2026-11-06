@@ -4,6 +4,7 @@
 called implicitly; the caller owns approval and cost accounting with the map pass.
 """
 
+import asyncio
 import re
 import unicodedata
 import uuid
@@ -161,18 +162,26 @@ def shown(row):
     return row
 
 
-def accept(rec, proposals, *, picture_fallback=True):
-    ids = []
-    with rec.write(store.ACTOR) as c:
+def accept(rec, proposals, *, picture_fallback=True, rejected=None):
+    ids, prepared = [], []
+    rejected = rejected if rejected is not None else {}
+
+    def reject(reason):
+        rejected[reason] = rejected.get(reason, 0) + 1
+
+    with rec.read() as c:
         for p in proposals:
             if not isinstance(p, dict):
+                reject("other")
                 continue
             name, value = p.get("name"), p.get("value")
             if not isinstance(name, dict) or not all(
                 isinstance(name.get(k), str) and name[k].strip() for k in ("en", "ar")
             ):
+                reject("other")
                 continue
             if not isinstance(value, str):
+                reject("other")
                 continue
             supplied = p.get("locator")
             locator = (
@@ -182,14 +191,17 @@ def accept(rec, proposals, *, picture_fallback=True):
             )
             pieces = links.at(c, p.get("file_id"), locator)
             if not pieces or not isinstance(p.get("evidence"), str):
+                reject("other")
                 continue
             text = "\n".join(t for _, t in pieces)
             source_label = usable_label(c, p, text)
             # Known semantic substitutions remain invalid regardless of label recovery.
             ar_name = grounding_text(name["ar"])
             if "فتحالعروض" in grounding_text(text) and "تقديم" in ar_name and "فتح" not in ar_name:
+                reject("other")
                 continue
             if "تأخير" in name["ar"] and "المحتويالمحلي" in grounding_text(text):
+                reject("other")
                 continue
             blank = p.get("state") == "blank"
             evidence = p.get("evidence", "")
@@ -201,8 +213,10 @@ def accept(rec, proposals, *, picture_fallback=True):
                     or not re.search(r"_{2,}|\.{3,}|…|\[\s*\]", evidence)
                     or not re.search(r"_{2,}|\.{3,}|…|\[\s*\]", text)
                 ):
+                    reject("other")
                     continue
             elif not grounded(text, p):
+                reject("not_grounded" if not evidence_matches(text, evidence) else "number_missing")
                 continue
             # Prefer the reader's box; an invented AI rectangle is never persisted.
             box = next(
@@ -227,17 +241,11 @@ def accept(rec, proposals, *, picture_fallback=True):
                 )
                 for r in old
             ):
+                reject("duplicate")
                 continue
-            from qsone.records.mapping import picture
-
-            picture_check = (
-                picture.check(rec, p["file_id"], locator, evidence, value)
-                if picture_fallback
-                else None
-            )
             row = dict(
                 evidence=evidence,
-                picture_check=picture_check,
+                picture_check=None,
                 id=uuid.uuid4().hex,
                 name=name,
                 value=value,
@@ -247,6 +255,41 @@ def accept(rec, proposals, *, picture_fallback=True):
                 source_label=source_label or None,
                 state="blank" if blank else "found",
             )
+            prepared.append(row)
+    from qsone.records.mapping import picture
+
+    for row in prepared:
+        if picture_fallback:
+            row["picture_check"] = picture.check(
+                rec, row["file_id"], row["locator"], row["evidence"], row["value"]
+            )
+    with rec.write(store.ACTOR) as c:
+        for row in prepared:
+            if not c.execute(
+                "SELECT 1 FROM files WHERE id=? AND valid_until IS NULL", (row["file_id"],)
+            ).fetchone():
+                reject("other")
+                continue
+            # Recheck duplicates after the unlocked picture work, including this batch.
+            old = [
+                store.decoded(r)
+                for r in store.rows(
+                    c,
+                    "SELECT * FROM map_facts WHERE file_id=? AND valid_until IS NULL",
+                    (row["file_id"],),
+                )
+            ]
+            if any(
+                r["name"] == row["name"]
+                and r["locator"] == row["locator"]
+                and (
+                    r["value"] == row["value"]
+                    or (r.get("picture_check") or {}).get("text_value") == row["value"]
+                )
+                for r in old
+            ):
+                reject("duplicate")
+                continue
             store.write(c, rec, "map_facts", row)
             ids.append(row["id"])
         _conflicts(c, rec)
@@ -298,12 +341,14 @@ def update(rec, fact_id, *, confirm=None, value=None, actor="engineer"):
 def candidates(rec, *, limit=15, file_ids=None):
     result, seen, pools = [], set(), []
     project_scores = {}
+    reserved = []
     with rec.read() as c:
         rows = [
             store.decoded(r)
             for r in store.rows(
                 c,
-                "SELECT m.*,f.folder,f.kind FROM map_files m JOIN files f ON f.id=m.file_id "
+                "SELECT m.*,f.folder,f.kind,f.pages FROM map_files m "
+                "JOIN files f ON f.id=m.file_id "
                 "WHERE m.valid_until IS NULL AND f.valid_until IS NULL ORDER BY m.file_id",
             )
         ]
@@ -317,7 +362,28 @@ def candidates(rec, *, limit=15, file_ids=None):
                 continue
             source_chunks = links.chunks(c, row["file_id"])
             scores = {}
-            locators = [
+            priority = set()
+            page_text = {}
+            for loc, text in source_chunks:
+                position = tuple(
+                    sorted(
+                        (k, v)
+                        for k, v in loc.items()
+                        if k in ("page", "sheet", "row", "line", "paragraph")
+                    )
+                )
+                page_text[position] = page_text.get(position, "") + " " + text
+            for position, text in page_text.items():
+                words = arabic.clean(text)
+                if len(re.findall(r"\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}", words)) >= 2 or re.search(
+                    r"فتح العروض|الترسية|بدء الأعمال|ضمان ابتدائي|سريان", words
+                ):
+                    priority.add(position)
+            locators = [dict(loc) for loc in sorted(priority)]
+            if row["pages"] is not None and row["pages"] <= 10 and page_text:
+                locators.append(dict(max(page_text, key=lambda loc: guide_score(page_text[loc]))))
+            mandatory = {tuple(sorted(loc.items())) for loc in locators}
+            locators += [
                 loc
                 for loc, text in sorted(
                     source_chunks,
@@ -344,7 +410,10 @@ def candidates(rec, *, limit=15, file_ids=None):
                     if all(position.get(k) == v for k, v in loc.items())
                 )
                 if text:
-                    pool.append({"file_id": row["file_id"], "locator": loc})
+                    candidate = {"file_id": row["file_id"], "locator": loc}
+                    pool.append(candidate)
+                    if tuple(sorted(loc.items())) in mandatory:
+                        reserved.append(candidate)
                     scores[tuple(sorted(loc.items()))] = guide_score(text)
                     project_scores[key] = guide_score(text)
                     seen.add(key)
@@ -360,8 +429,16 @@ def candidates(rec, *, limit=15, file_ids=None):
             key = (p["file_id"], tuple(sorted(p["locator"].items())))
             scored.append((project_scores[key], p))
     ordered = [p for _, p in sorted(scored, key=lambda pair: -pair[0])]
+    # Mandatory source coverage may exceed the soft project budget.
+    result.extend(reserved)
     counts, deferred = {}, []
+    for p in reserved:
+        counts[p["file_id"]] = counts.get(p["file_id"], 0) + 1
     for p in ordered:
+        if p in reserved:
+            continue
+        if len(result) >= limit:
+            break
         fid = p["file_id"]
         if counts.get(fid, 0) >= 3:
             deferred.append(p)
@@ -370,7 +447,7 @@ def candidates(rec, *, limit=15, file_ids=None):
         counts[fid] = counts.get(fid, 0) + 1
         if len(result) == limit:
             return result
-    result.extend(deferred[: limit - len(result)])
+    result.extend(deferred[: max(0, limit - len(result))])
 
     return result
 
@@ -569,13 +646,25 @@ PAGE_CHARS = 12000
 async def run_approved(rec, *, read, request, file_ids, vision_request=None):
     """Only called by ai.run after the single drop approval; all reads are recorded."""
     pages = []
+    rejected = {"not_grounded": 0, "number_missing": 0, "duplicate": 0, "other": 0}
+    counts = {"candidate_pages": 0, "proposed": 0, "accepted": 0, "rejected": rejected}
+
+    def report():
+        import json
+
+        with rec.write(store.ACTOR) as c:
+            rec.set_meta(c, "project_map_fact_counts", json.dumps(counts))
+
     # A changed file may point to tender terms in any existing project document.
     for p in candidates(rec):
         pages.append(p | {"text": (await read(p["file_id"], p["locator"]))[:PAGE_CHARS]})
+    counts["candidate_pages"] = len(pages)
+    report()
     if not pages:
         return []
     result = await request(prompt(pages), Result, "Extract sourced tender facts only.")
     allowed = {(p["file_id"], repr(sorted(p["locator"].items()))): p["text"] for p in pages}
+    counts["proposed"] = len(result.facts)
     valid = []
     for fact in result.facts:
         p = fact.model_dump()
@@ -588,9 +677,21 @@ async def run_approved(rec, *, read, request, file_ids, vision_request=None):
                     (label for label in p["name"].values() if contains(text, label)), ""
                 )
             valid.append(p)
+        else:
+            reason = (
+                "not_grounded"
+                if text is None or not evidence_matches(text, p["evidence"])
+                else "number_missing"
+            )
+            rejected[reason] += 1
+    report()
     if not valid:
         raise NoTenderFacts("NoTenderFacts: no grounded tender facts returned")
-    accepted = accept(rec, valid, picture_fallback=vision_request is None)
+    accepted = await asyncio.to_thread(
+        accept, rec, valid, picture_fallback=vision_request is None, rejected=rejected
+    )
+    counts["accepted"] = len(accepted)
+    report()
     if vision_request is not None:
         from qsone.records.mapping import picture
 

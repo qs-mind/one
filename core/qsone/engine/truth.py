@@ -1264,7 +1264,7 @@ _BID_FIELDS = (
 
 
 def read_passages(returns: list[tuple[str, str]]) -> list[tuple[str, dict, str]]:
-    """Only text actually returned by full read tools, not search hits or files in storage.
+    """Only text actually returned by reads or exact search hits, never files in storage.
 
     Parse the read tools' own locator lines. A continuation contributes only its returned
     lines; neither a requested page range nor a source footer proves the text was returned.
@@ -1272,6 +1272,29 @@ def read_passages(returns: list[tuple[str, str]]) -> list[tuple[str, dict, str]]
     found = []
     decoder = json.JSONDecoder()
     for name, result in returns:
+        if name == "search_records":
+            try:
+                payload = result.strip()
+                if payload.startswith("<<data "):
+                    payload = payload.split("\n", 1)[1].rsplit("\n<</data ", 1)[0]
+                data = json.loads(payload)
+            except (ValueError, IndexError):
+                continue
+            for hit in data.get("hits", []) if isinstance(data, dict) else []:
+                if (
+                    isinstance(hit, dict)
+                    and isinstance(hit.get("locator"), dict)
+                    and isinstance(hit.get("text"), str)
+                    and hit.get("file_id")
+                ):
+                    found.append(
+                        (
+                            hit["file_id"],
+                            hit["locator"] | {"_file_name": hit.get("file")},
+                            hit["text"],
+                        )
+                    )
+            continue
         if name not in {"files_read", "read_chunk"}:
             continue
         file, locator, lines, file_name = None, None, [], None

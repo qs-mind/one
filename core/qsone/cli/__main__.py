@@ -203,9 +203,16 @@ def human_result(result):
                 uploads.extend({"status": "failed"} for _ in upload.get("skipped", []))
             else:
                 uploads.append(upload)
+        failures = [
+            {"name": u.get("name"), "error": u["error"]}
+            for u in uploads
+            if u.get("status") == "failed" and u.get("error")
+        ]
         states = [u.get("status") for u in uploads]
         return {
+            **({"failures": failures} if failures else {}),
             "count": len(uploads),
+            "added": sum(s in ("read", "partly_read", "stored") for s in states),
             "read": states.count("read"),
             "partly_read": states.count("partly_read"),
             "failed": sum(

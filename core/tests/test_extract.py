@@ -166,7 +166,12 @@ def test_reversed_arabic_quality_and_page_selection(rec, monkeypatch):
     good = "على المتنافس تقديم الضمان الابتدائي بنسبة 1 بالمائة (11) البنكية"
     assert reader.arabic_quality(good) > reader.arabic_quality(bad)
     monkeypatch.setattr(reader, "_page_text", lambda _: bad)
-    monkeypatch.setattr(reader, "_inspector_text", lambda *_: "# " + good)
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "pdf_inspector.extract_pages_markdown_bytes",
+        lambda *_: SimpleNamespace(pages=[SimpleNamespace(page=0, markdown="# " + good)]),
+    )
     result = reader.extract("sample.pdf", sample_pdf([["Sample"]]))
     assert result.pieces == [Piece({"page": 1}, good)]
     assert result.page_sources == {1: "pdf-inspector"}
@@ -255,3 +260,25 @@ def test_pdf_markdown_preserves_visible_blank_placeholders():
     from qsone.records.extract import _plain_markdown
 
     assert "____" in _plain_markdown("# الدفعة المقدمة\n| الدفعة | ____ |\n")
+
+
+def test_inspector_parses_multi_page_pdf_once(monkeypatch):
+    from types import SimpleNamespace
+
+    import pdf_inspector
+
+    from qsone.records import extract as reader
+
+    calls = []
+    monkeypatch.setattr(reader, "_page_text", lambda _: "ىلع سفانتملا")
+
+    def inspect(data, indices=None):
+        calls.append(indices)
+        return SimpleNamespace(
+            pages=[SimpleNamespace(page=i, markdown="على المتنافس") for i in range(4)]
+        )
+
+    monkeypatch.setattr(pdf_inspector, "extract_pages_markdown_bytes", inspect)
+    result = reader.extract("sample.pdf", sample_pdf([["Sample"]] * 4))
+    assert len(result.pieces) == 4
+    assert len(calls) == 1

@@ -1,6 +1,14 @@
 """CLI-only copy. Core replies keep their own bilingual copy."""
 
 TEXT = {
+    "upload_timeout": {
+        "en": "Upload timed out after 60 s.",
+        "ar": "وقت رفع الملف خلص بعد ٦٠ ثانية.",
+    },
+    "upload_http_error": {
+        "en": "ONE could not upload this file because the core connection failed.",
+        "ar": "ONE مقدرش يرفع الملف ده عشان الاتصال بالخدمة فشل.",
+    },
     "stop_timeout": {
         "en": "The owned core is still shutting down. Session retained; try stop again.",
         "ar": "ONE لسه بيقفل. بيانات الجلسة موجودة؛ جرّب stop تاني.",

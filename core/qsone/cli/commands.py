@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
+import httpx
+
 from qsone.cli import session
 from qsone.cli.follow import follow
 from qsone.cli.texts import TEXT, CliError
@@ -103,16 +105,28 @@ class Commands:
                             content=source,
                         )
                     )
-            except (CliError, OSError) as error:
+            except (CliError, OSError, httpx.HTTPError) as error:
                 result.append(
                     {
                         "name": path.name,
                         "folder": folder,
                         "status": "failed",
-                        "error": error.text if isinstance(error, CliError) else TEXT["error"],
+                        "error": (
+                            error.text
+                            if isinstance(error, CliError)
+                            else TEXT["upload_timeout"]
+                            if isinstance(error, httpx.TimeoutException)
+                            else TEXT["upload_http_error"]
+                            if isinstance(error, httpx.HTTPError)
+                            else TEXT["error"]
+                        ),
                     }
                 )
-        return {"uploads": result}
+        return {
+            "uploads": result,
+            "added": sum(r.get("status") != "failed" for r in result),
+            "failed": sum(r.get("status") == "failed" for r in result),
+        }
 
     def map(self, project, *, group=None, file=None, cursor=None, wait=None):
         route = f"/projects/{project}/map"
@@ -160,6 +174,9 @@ class Commands:
                 )
                 or f.get("local_state") == "failed"
                 for f in states
+            )
+            settled = settled and not any(
+                p.get("state") in ("running", "retrying") for p in status.get("passes", {}).values()
             )
             if settled or time.monotonic() >= deadline:
                 if file:

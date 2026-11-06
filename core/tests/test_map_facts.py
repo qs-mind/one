@@ -907,3 +907,123 @@ async def test_numeric_pdf_facts_share_one_vision_batch(rec):
     saved = store.entries(rec, "facts")["facts"]
     assert {r["value"] for r in saved} == {"01 days", "02 days"}
     assert all(r["picture_check"]["warning"] for r in saved)
+
+
+def test_picture_check_releases_write_lock(rec, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from qsone.records.mapping import picture
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Retention 10%"]]), actor="engineer")
+
+    def check(*args):
+        def write():
+            with rec.write("engineer") as c:
+                rec.set_meta(c, "concurrent_sample", "ok")
+
+        with ThreadPoolExecutor() as pool:
+            pool.submit(write).result(timeout=2)
+        return None
+
+    monkeypatch.setattr(picture, "check", check)
+    assert facts.accept(rec, [proposal(f.id)])
+
+
+def test_candidate_reservations(rec):
+    pages = [["Retention security payment validity 10% 20% 30%"]] * 4
+    pages += [["فتح العروض 16/04/1448 الترسية 29/06/1448 بدء الأعمال 07/07/1448"]]
+    f = files.add_file(rec, "sample.pdf", sample_pdf(pages), actor="engineer")
+    g = files.add_file(rec, "short.pdf", sample_pdf([["Sample cover"]]), actor="engineer")
+    chosen = facts.candidates(rec, limit=3)
+    assert {"file_id": f.id, "locator": {"page": 5}} in chosen
+    assert {"file_id": g.id, "locator": {"page": 1}} in chosen
+
+
+async def test_fact_pass_reports_private_text_free_counts(rec):
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Retention 10%"]]), actor="engineer")
+    good = dict(proposal(f.id), state="found", source_label="Retention")
+    missing = dict(good, value="99%")
+    ungrounded = dict(good, evidence="Invented condition 10%")
+
+    async def read(fid, loc):
+        return "Retention 10%"
+
+    async def request(*args):
+        return facts.Result(facts=[good, good, missing, ungrounded])
+
+    await facts.run_approved(rec, read=read, request=request, file_ids={f.id})
+    with rec.read() as c:
+        stats = store._pass_summary(c)["facts"]["counts"]
+    assert stats == {
+        "candidate_pages": 1,
+        "proposed": 4,
+        "accepted": 1,
+        "rejected": {"not_grounded": 1, "number_missing": 1, "duplicate": 1, "other": 0},
+    }
+
+
+async def test_approved_picture_work_does_not_block_event_loop(rec, monkeypatch):
+    import threading
+
+    from qsone.records.mapping import picture
+
+    main_thread = threading.get_ident()
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Retention 10%"]]), actor="engineer")
+
+    def check(*args):
+        assert threading.get_ident() != main_thread
+
+    monkeypatch.setattr(picture, "check", check)
+
+    async def read(fid, loc):
+        return "Retention 10%"
+
+    async def request(*args):
+        return facts.Result(facts=[dict(proposal(f.id), state="found")])
+
+    assert await facts.run_approved(rec, read=read, request=request, file_ids={f.id})
+
+
+def test_key_data_and_short_bid_conditions_keep_conflicting_sources(rec):
+    book = files.add_file(
+        rec,
+        "sample-book.pdf",
+        sample_pdf([["Retention security payment validity 10% 20% 30%"]] * 28),
+        actor="engineer",
+    )
+    bid = files.add_file(
+        rec,
+        "sample-conditions.pdf",
+        sample_pdf([["Sample cover"], ["Sample terms"]]),
+        actor="engineer",
+    )
+    dates = "فتح العروض 16/04/1448 / الترسية 29/06/1448 / بدء الأعمال 07/07/1448"
+    security = "ضمان ابتدائي بقيمة تتراوح من (2%) إلى (1%)"
+    with rec.write("engineer") as c:
+        for fid, page, text in [
+            (book.id, 7, dates),
+            (book.id, 20, "ضمان ابتدائي 1%"),
+            (bid.id, 2, security),
+        ]:
+            c.execute(
+                "UPDATE chunks SET text=? WHERE file_id=? AND json_extract(locator,'$.page')=?",
+                (text, fid, page),
+            )
+    chosen = facts.candidates(rec, limit=3)
+    assert all(
+        {"file_id": fid, "locator": {"page": page}} in chosen
+        for fid, page in [(book.id, 7), (book.id, 20), (bid.id, 2)]
+    )
+    name = {"en": "Bid security", "ar": "ضمان ابتدائي"}
+    accepted = facts.accept(
+        rec,
+        [
+            dict(
+                proposal(book.id, "1%", evidence="ضمان ابتدائي 1%"), locator={"page": 20}, name=name
+            ),
+            dict(proposal(bid.id, "1%–2%", evidence=security), locator={"page": 2}, name=name),
+        ],
+        picture_fallback=False,
+    )
+    assert len(accepted) == 2
+    assert all(r["state"] == "conflict" for r in store.entries(rec, "facts")["facts"])

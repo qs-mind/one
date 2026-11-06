@@ -151,7 +151,7 @@ def test_human_summary_and_fact_states():
     result = human_result(
         {"uploads": [{"status": "read"}, {"status": "partly_read"}, {"status": "failed"}]}
     )
-    assert result == {"count": 3, "read": 1, "partly_read": 1, "failed": 1}
+    assert result == {"count": 3, "added": 2, "read": 1, "partly_read": 1, "failed": 1}
     for state, en, ar in [
         ("found", "read by ONE, not checked", "قراه ONE، لسه متراجعش"),
         ("blank", "Blank", "فاضي"),
@@ -272,7 +272,7 @@ def test_zip_summary_counts_members():
             ]
         }
     )
-    assert result == {"count": 3, "read": 1, "partly_read": 1, "failed": 1}
+    assert result == {"count": 3, "added": 2, "read": 1, "partly_read": 1, "failed": 1}
 
 
 def test_stop_live_wrong_launcher_is_not_signalled(adapter, monkeypatch):
@@ -324,3 +324,11 @@ def test_map_wait_checks_later_pages(adapter):
     )
     result = commands.run(parser().parse_args(["map", "p", "--wait", "0"]))
     assert result["state"] == "timeout"
+
+
+def test_human_upload_summary_keeps_file_failure_reason():
+    from qsone.cli.__main__ import human_result
+
+    error = {"en": "Upload timed out after 60 s.", "ar": "وقت رفع الملف خلص بعد ٦٠ ثانية."}
+    result = human_result({"uploads": [{"name": "sample.pdf", "status": "failed", "error": error}]})
+    assert result["failures"] == [{"name": "sample.pdf", "error": error}]
