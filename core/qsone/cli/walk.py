@@ -502,37 +502,33 @@ class Walk:
             return self.commands.files_add(self.project, paths)
         if "map" in step:
             wanted = step["map"] or {}
-            deadline = time.monotonic() + min(600, max(1, int(wanted.get("wait_seconds", 60))))
-            while True:
-                started = time.monotonic()
-                found = self.c.get(f"/projects/{self.project}/map", limit=20)
-                elapsed = time.monotonic() - started
-                messages = self.c.get(f"/chat/{self.project}/messages")["messages"]
-                cards = [
-                    p.get("data", {})
-                    for m in messages
-                    for p in m.get("parts", [])
-                    if p.get("type") == "data-card"
-                ]
-                mapped = found.get("files") and all(
-                    f.get("ai_title") and f.get("ai_state") in ("done", "local")
-                    for f in found["files"]
-                )
-                has_card = any(
-                    c.get("kind") == "cost" and c.get("title") == copy.MAP_AI_LABEL for c in cards
-                )
-                if (
-                    has_card if wanted.get("cost_card") else mapped
-                ) or time.monotonic() >= deadline:
-                    self.observed = {
-                        "map": found,
-                        "map_seconds": elapsed,
-                        "map_cards": cards,
-                        "map_facts": self.c.get(f"/projects/{self.project}/map/facts")["facts"],
-                        "map_links": self.c.get(f"/projects/{self.project}/map/links")["links"],
-                    }
-                    return self.observed
-                time.sleep(0.1)
+            wait = min(600, max(1, int(wanted.get("wait_seconds", 60))))
+            settled = self.commands.map(self.project, wait=wait)
+            if settled["state"] == "timeout":
+                raise CliError("walk")
+            started = time.monotonic()
+            found = self.c.get(f"/projects/{self.project}/map", limit=20)
+            elapsed = time.monotonic() - started
+            messages = self.c.get(f"/chat/{self.project}/messages")["messages"]
+            cards = [
+                p.get("data", {})
+                for m in messages
+                for p in m.get("parts", [])
+                if p.get("type") == "data-card"
+            ]
+            has_card = any(
+                c.get("kind") == "cost" and c.get("title") == copy.MAP_AI_LABEL for c in cards
+            )
+            if not wanted.get("cost_card") or has_card:
+                self.observed = {
+                    "map": found,
+                    "map_seconds": elapsed,
+                    "map_cards": cards,
+                    "map_facts": self.c.get(f"/projects/{self.project}/map/facts")["facts"],
+                    "map_links": self.c.get(f"/projects/{self.project}/map/links")["links"],
+                }
+                return self.observed
+            raise CliError("walk")
         if "review" in step:
             if step["review"] != "close_fixed":
                 raise CliError("walk")

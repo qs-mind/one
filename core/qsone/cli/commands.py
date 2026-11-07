@@ -198,6 +198,15 @@ class Commands:
             settled = settled and not any(
                 p.get("state") in ("running", "retrying") for p in status.get("passes", {}).values()
             )
+            # File classification finishes before enrichment is registered. The
+            # checkpoint closes that gap (and the gap between facts and links).
+            passes = status.get("passes", {})
+            settled = settled and all(
+                f.get("ai_state") != "done"
+                or f.get("ai_stage") not in ("facts", "links")
+                or passes.get(f["ai_stage"], {}).get("state") == "failed"
+                for f in states
+            )
             if settled or time.monotonic() >= deadline:
                 if file:
                     result = self.client.get(route + f"/files/{file}")
