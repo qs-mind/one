@@ -255,10 +255,10 @@ async def test_read_and_search_citations_keep_good_answer(make_engine, project, 
     from tests.samples import sample_pdf
 
     pages = [["Sample cover"]] * 20
-    pages[6] = ["Opening 16/04/1448"]
+    pages[6] = ["Opening 03/02/1450"]
     pages[19] = ["Security 2%"]
     file = add_file(registry.get(project), "sample.pdf", sample_pdf(pages), actor="t")
-    answer = "Opening 16/04/1448, page 7.\nSecurity 2%, page 20."
+    answer = "Opening 03/02/1450, page 7.\nSecurity 2%, page 20."
     lead = scripted(
         call("files_read", {"file_id": file.id, "pages": "7"}),
         call("search_records", {"query": "Security"}),
@@ -280,9 +280,9 @@ async def test_unseen_citation_retries_and_marks_only_bad_sentence(make_engine, 
     from tests.samples import sample_pdf
 
     file = add_file(
-        registry.get(project), "sample.pdf", sample_pdf([["Opening 16/04/1448"]]), actor="t"
+        registry.get(project), "sample.pdf", sample_pdf([["Opening 03/02/1450"]]), actor="t"
     )
-    good = "Opening 16/04/1448, page 1."
+    good = "Opening 03/02/1450, page 1."
     bad = "Security 2%, page 50."
     lead = scripted(
         call("files_read", {"file_id": file.id, "pages": "1"}),

@@ -595,7 +595,7 @@ def prompt(pages):
         + ". Return facts with name {en,ar}, value, file_id, locator "
         "(page or sheet+row), state found or blank, short verbatim evidence, and source_label. "
         "source_label is optional: words immediately before/around the value, "
-        "e.g. فتح العروض → 16/04/1448, never a document title, letterhead or file name. "
+        "e.g. فتح العروض → 03/02/1450, never a document title, letterhead or file name. "
         "Copy the label into the name in "
         "that language; translate it faithfully in the other language. فتح العروض is opening "
         "of offers, never submission. A local-content compliance penalty is not delay damages. "

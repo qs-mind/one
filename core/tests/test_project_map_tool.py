@@ -157,7 +157,7 @@ async def test_local_evidence_is_available_without_ai_and_drawings_are_paged(rec
                     "revision": "A",
                     "scale": "1:100",
                     "discipline": "electrical",
-                    "counts": {"MCCB": 7, "LIGHT": 2, "SOCKET": 1},
+                    "counts": {"BREAKER": 7, "LIGHT": 2, "SOCKET": 1},
                     "source": {"page": 1},
                     "state": "local",
                 },
@@ -175,7 +175,7 @@ async def test_local_evidence_is_available_without_ai_and_drawings_are_paged(rec
         assert row["boq_tables"][0]["locator"] == {"page": 1}
         assert len(row["sheets"]) == 2 and row["sheets_next_page"] == 2
         assert row["sheets"][0]["number"] == "E-0"
-        assert row["sheets"][0]["counts"]["MCCB"] == 7
+        assert row["sheets"][0]["counts"]["BREAKER"] == 7
         assert row["sheets"][0]["file_id"] == f.id
         assert row["sheets"][0]["counts_next_page"] == 2
     second = json.loads(await read_map(ctx, MapArgs(mode="file", file_id=f.id, page=2, limit=2)))

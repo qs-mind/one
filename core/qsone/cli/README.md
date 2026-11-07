@@ -317,11 +317,10 @@ separately from an identity mismatch. An already exited process with the recorde
 birth identity needs no signal, including the stat/cmdline zombie teardown race;
 changed birth identities and live command-line mismatches remain refused.
 
-Targeted checks (from this worktree root; use the shared absolute interpreter,
-never create `core/.venv` in a worktree):
+Targeted checks (from the repo root; never create `core/.venv` in a worktree):
 
 ```sh
-/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m pytest core/tests/test_cli*.py
-/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m ruff check core
-/home/kareem/Work/qs-mind/one/core/.venv/bin/python -m ruff format core
+core/.venv/bin/python -m pytest core/tests/test_cli*.py
+core/.venv/bin/python -m ruff check core
+core/.venv/bin/python -m ruff format core
 ```

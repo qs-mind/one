@@ -79,22 +79,22 @@ async def test_drawing_read_tools_surface_local_map(rec):
             "map_sheets",
             {
                 "file_id": f.id,
-                "sheet": "SLD1",
-                "number": "EL-504",
+                "sheet": "SampleLayout1",
+                "number": "E-201",
                 "title": "Sample main single line diagram",
                 "revision": "A",
                 "scale": "NTS",
-                "counts": {"MCCB": 339},
+                "counts": {"BREAKER": 214},
             },
         )
         chunk = c.execute("SELECT id FROM chunks WHERE file_id=? LIMIT 1", (f.id,)).fetchone()[0]
     ctx = tool_ctx(rec)
     for name, args in (("files_read", {"file_id": f.id}), ("read_chunk", {"chunk_id": chunk})):
         answer = await call(name, args, ctx)
-        assert "EL-504" in answer and "Sample main single line diagram" in answer
-        assert "MCCB × 339" in answer and "SLD1" in answer and "sample.dwg" in answer
+        assert "E-201" in answer and "Sample main single line diagram" in answer
+        assert "BREAKER × 214" in answer and "SampleLayout1" in answer and "sample.dwg" in answer
     assert "1 sheets" in await call("files_list", {}, ctx)
-    assert "EL-504" in digest(rec) and "Sample main single line diagram" in digest(rec)
+    assert "E-201" in digest(rec) and "Sample main single line diagram" in digest(rec)
 
 
 def test_drawing_header_pages_before_original_text(rec):
@@ -116,10 +116,10 @@ def test_drawing_header_pages_before_original_text(rec):
                 "map_sheets",
                 {
                     "file_id": f.id,
-                    "sheet": f"SLD{i}",
-                    "number": f"EL-{504 + i}",
+                    "sheet": f"SampleLayout{i}",
+                    "number": f"E-{201 + i}",
                     "title": "Sample diagram",
-                    "counts": {"MCCB": i + 1},
+                    "counts": {"BREAKER": i + 1},
                 },
             )
     args = ReadArgs(file_id=f.id)
@@ -133,7 +133,7 @@ def test_drawing_header_pages_before_original_text(rec):
         gathered.append(_render(rec, f, args, sel, []))
         assert len(gathered) < 100
     joined = "\n".join(gathered)
-    assert "EL-543" in joined and "MCCB × 820" in joined
+    assert "E-240" in joined and "BREAKER × 820" in joined
     with rec.read() as c:
         text = c.execute(
             "SELECT text FROM chunks WHERE file_id=? ORDER BY seq LIMIT 1", (f.id,)

@@ -178,7 +178,7 @@ async def _ask(ctx: ToolContext, args: AskArgs) -> str:
 
     def tokens(text: str) -> set[str]:
         words = normalise(text).split()
-        # Fold regular English plurals, including block acronyms (MCCBs).
+        # Fold regular English plurals, including block labels (BREAKERS).
         return {
             word[:-1] if word.isascii() and word.endswith("s") and not word.endswith("ss") else word
             for word in words

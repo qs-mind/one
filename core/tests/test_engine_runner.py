@@ -1132,7 +1132,7 @@ async def test_tender_absence_gets_one_silent_search_nudge(make_engine, project,
     )
     with rec.write("engineer") as c:
         c.execute(
-            "UPDATE chunks SET text='فتح العروض 16/04/1448' WHERE file_id=? "
+            "UPDATE chunks SET text='فتح العروض 03/02/1450' WHERE file_id=? "
             "AND json_extract(locator,'$.page')=7",
             (f.id,),
         )
@@ -1161,12 +1161,12 @@ async def test_tender_absence_gets_one_silent_search_nudge(make_engine, project,
         said("The opening offers date was not found in the tender documents."),
         nudged,
         call("files_read", {"file_id": f.id, "pages": "7"}),
-        said("Opening offers: 16/04/1448 (Tender sample.pdf, p7)."),
+        said("Opening offers: 03/02/1450 (Tender sample.pdf, p7)."),
     )
     engine = await started(make_engine(links(lead=lead)))
     brief = await engine.start_brief(project, "Date for opening offers per the tender documents?")
     await asyncio.wait_for(finish(engine, brief), 10)
-    assert "16/04/1448" in str(await engine.result(brief))
+    assert "03/02/1450" in str(await engine.result(brief))
     assert lead.calls == 4
 
 

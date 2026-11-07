@@ -14,7 +14,7 @@ from tests.fakes_tools import tool_ctx
     "text",
     [
         "What is the submission deadline and project duration?",
-        "اعرض اللوحات الكهربائية وعد قواطع MCCB",
+        "اعرض اللوحات الكهربائية وعد قواطع BREAKER",
     ],
 )
 async def test_brief_echo_refused(rec, text):
@@ -95,8 +95,8 @@ def test_map_digest(rec):
     "brief,question",
     [
         (
-            "List the electrical sheets and count MCCB.",
-            "LIST the electrical sheets, and count mccb?",
+            "List the electrical sheets and count BREAKER.",
+            "LIST the electrical sheets, and count breaker?",
         ),
         ("ما هو موعد التسليم ومدة المشروع؟", "ما هو موعد التسليم، ومدة المشروع"),
         (
@@ -301,8 +301,8 @@ async def test_requested_pricing_can_ask_for_engineers_own_rate(rec):
         (
             "List every drawing sheet in this project: sheet number and title, "
             "from all the DWG files. "
-            "And how many MCCB are in the main single line diagram?",
-            "How many MCCBs are in the MAIN POWER SINGLE LINE DIAGRAM.dwg?",
+            "And how many BREAKER are in the sample power diagram?",
+            "How many BREAKERs are in the SAMPLE POWER DIAGRAM.dwg?",
             True,
         ),
         (
@@ -310,9 +310,13 @@ async def test_requested_pricing_can_ask_for_engineers_own_rate(rec):
             "Which of the two BOQ versions should I price?",
             False,
         ),
-        ("Count MCCB in the SLD.", "Please upload the SLD", False),
-        ("Approve the SLD and count MCCB.", "Do you approve the SLD?", False),
-        ("عدد قواطع MCCB في المخطط الرئيسي", "كام عدد قواطع MCCB في المخطط الرئيسي.dwg؟", True),
+        ("Count BREAKER in the SLD.", "Please upload the SLD", False),
+        ("Approve the SLD and count BREAKER.", "Do you approve the SLD?", False),
+        (
+            "عدد قواطع BREAKER في المخطط الرئيسي",
+            "كام عدد قواطع BREAKER في المخطط الرئيسي.dwg؟",
+            True,
+        ),
         ("List sheet number title", "List sheet number title revision date", True),
         ("List sheet number", "List sheet number revision date", True),
         ("List sheet", "List sheet number revision date", False),
@@ -346,7 +350,7 @@ async def test_factual_echo_with_options_is_not_a_choice(rec):
     with rec.write("engineer") as c:
         c.execute(
             "UPDATE briefs SET text=? WHERE id=?",
-            ("How many MCCB are in the main diagram?", ctx.brief_id),
+            ("How many BREAKER are in the main diagram?", ctx.brief_id),
         )
     with pytest.raises(ModelRetry, match="engineer's own question"):
         await call(
@@ -355,7 +359,7 @@ async def test_factual_echo_with_options_is_not_a_choice(rec):
                 "questions": [
                     {
                         "id": "q1",
-                        "text": "How many MCCB are in the main diagram?",
+                        "text": "How many BREAKER are in the main diagram?",
                         "options": ["Sample count A", "Sample count B"],
                     }
                 ]

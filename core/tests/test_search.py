@@ -388,7 +388,7 @@ def test_repeated_lines_are_index_only_and_footer_chunks_are_absent(rec):
         for page in range(1, 7):
             footer = f"https://tenders.example/Print?TenderId=123 {page}/6"
             body = (
-                "فتح العروض 16/04/1448" if page == 4 else f"sample unique section {chr(64 + page)}"
+                "فتح العروض 03/02/1450" if page == 4 else f"sample unique section {chr(64 + page)}"
             )
             for text in (f"كراسة الشروط 9/3/26 صفحة {page}\n{body}", footer):
                 i = c.execute(

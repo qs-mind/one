@@ -301,10 +301,10 @@ def test_first_lead_schemas_and_digest_leave_room_for_context(rec):
                     id=f"sample-{n}",
                     file_id=f.id,
                     name={"en": f"Tender date {n}", "ar": f"تاريخ المناقصة {n}"},
-                    value="16/04/1448",
+                    value="03/02/1450",
                     locator={"page": 7},
                     state="found",
-                    evidence="Sample date 16/04/1448",
+                    evidence="Sample date 03/02/1450",
                 ),
             )
     spec = agents.lead_spec()
@@ -345,26 +345,26 @@ async def test_scripted_lead_reads_drawing_map(registry, data_dir, fake_clock, f
                 "map_sheets",
                 {
                     "file_id": f.id,
-                    "sheet": f"SLD{i}",
-                    "number": f"EL-{504 + i}",
+                    "sheet": f"SampleLayout{i}",
+                    "number": f"E-{201 + i}",
                     "title": "Sample main single line diagram",
-                    "counts": {"MCCB": 7},
+                    "counts": {"BREAKER": 7},
                 },
             )
 
     def script(body):
-        assert "EL-504" in str(body) and "EL-523" in str(body)
+        assert "E-201" in str(body) and "E-220" in str(body)
         if not any(m["role"] == "tool" for m in body["messages"]):
             return "calls", [("files_read", {"file_id": f.id})]
         result = _last_tool(body)
-        assert "EL-504" in result and "MCCB × 7" in result
-        assert result.index("EL-504") < result.index("MCCB × 7")
+        assert "E-201" in result and "BREAKER × 7" in result
+        assert result.index("E-201") < result.index("BREAKER × 7")
         return "text", "The sample drawing evidence is available above."
 
     provider = FakeProvider(script)
     engine = await _engine(registry, data_dir, provider, fake_clock, fake_sleep)
     try:
-        await _run(engine, project, "List the sample electrical sheets and MCCB blocks")
+        await _run(engine, project, "List the sample electrical sheets and BREAKER blocks")
         assert len(provider.bodies) == 2
         sizes = [wire_parts(body)["total"] for body in provider.bodies]
         assert max(sizes) < STEP_TARGET

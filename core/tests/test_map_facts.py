@@ -238,7 +238,7 @@ def test_arabic_guide_search_in_addition_to_key_pages(rec):
     f = files.add_file(
         rec,
         "sample-ar.txt",
-        "فتح العروض 16/04/1448\nسريان العرض 90 يوم\nالضمان الابتدائي 1%–2%".encode(),
+        "فتح العروض 03/02/1450\nسريان العرض 90 يوم\nالضمان الابتدائي 1%–2%".encode(),
         actor="engineer",
     )
     while worker.step(rec):
@@ -249,10 +249,10 @@ def test_arabic_guide_search_in_addition_to_key_pages(rec):
 
 
 def test_opening_label_cannot_be_submission(rec):
-    f = files.add_file(rec, "sample-ar.txt", "فتح العروض 16/04/1448".encode(), actor="engineer")
+    f = files.add_file(rec, "sample-ar.txt", "فتح العروض 03/02/1450".encode(), actor="engineer")
     wrong = dict(
         name={"en": "Submission Date", "ar": "ميعاد التقديم"},
-        value="16/04/1448",
+        value="03/02/1450",
         file_id=f.id,
         locator={},
         source_label="فتح العروض",
@@ -282,7 +282,7 @@ def test_source_label_is_kept_and_local_content_penalty_not_delay(rec):
     f = files.add_file(
         rec,
         "sample-label.txt",
-        "فتح العروض 16/04/1448\nغرامة مخالفة المحتوى المحلي 10%".encode(),
+        "فتح العروض 03/02/1450\nغرامة مخالفة المحتوى المحلي 10%".encode(),
         actor="engineer",
     )
     base = dict(file_id=f.id, locator={})
@@ -293,8 +293,8 @@ def test_source_label_is_kept_and_local_content_penalty_not_delay(rec):
                 base,
                 name={"en": "Opening of offers", "ar": "فتح العروض"},
                 source_label="فتح العروض",
-                value="16/04/1448",
-                evidence="فتح العروض 16/04/1448",
+                value="03/02/1450",
+                evidence="فتح العروض 03/02/1450",
             )
         ],
     )
@@ -337,7 +337,7 @@ async def test_synthetic_arabic_tender_pages_security_validity_and_blank(rec):
     )
     drain(rec)
     text = {
-        1: "فتح العروض 16/04/1448",
+        1: "فتح العروض 03/02/1450",
         2: "المادة 8 (ج) الضمان الابتدائي 1%–2% من قيمة العرض صالح 90 يوم من فتح العروض",
         3: "مدة سريان العرض 90 يوم\nالدفعة المقدمة ____",
     }
@@ -375,10 +375,10 @@ async def test_synthetic_arabic_tender_pages_security_validity_and_blank(rec):
 
         return facts.Result(
             facts=[
-                fact("فتح العروض", "Submission Date", "16/04/1448", 1).model_copy(
+                fact("فتح العروض", "Submission Date", "03/02/1450", 1).model_copy(
                     update={"name": facts.Label(en="Submission Date", ar="ميعاد التقديم")}
                 ),
-                fact("فتح العروض", "Opening of offers", "16/04/1448", 1),
+                fact("فتح العروض", "Opening of offers", "03/02/1450", 1),
                 fact("الضمان الابتدائي", "Bid security", "1%–2%", 2),
                 fact("الضمان الابتدائي", "Bid security validity", "90 يوم", 2),
                 fact("مدة سريان العرض", "Offer validity", "90 يوم", 3),
@@ -454,7 +454,7 @@ def test_evidence_grounding_arabic_variants_numbers_and_conflicts(rec):
     assert all(r["state"] == "conflict" and r["conflict_with"] for r in saved)
     assert {r["file_id"] for r in saved} == {a.id, b.id}
     assert not facts.accept(rec, [item(a.id, "10%", first), item(a.id, "2%", first)])
-    assert facts.evidence_matches("تَاريخ فَتح العروض ١٦ / ٠٤ / ١٤٤٨", "تاريخ فتح العروض 16/04/1448")
+    assert facts.evidence_matches("تَاريخ فَتح العروض ٠٣ / ٠٢ / ١٤٥٠", "تاريخ فتح العروض 03/02/1450")
     assert facts.evidence_matches("الضمان الإبتدائي للأميرسلطان", "الضمان الابتدائي للأمير سلطان")
     assert facts.evidence_matches(first, "على المتنافس تقديم الضمان الابتدائى بنسة 1 بالمائة")
     assert not facts.evidence_matches(first, "الدفعة المقدمة عشرون بالمائة")
@@ -466,7 +466,7 @@ def test_evidence_grounding_arabic_variants_numbers_and_conflicts(rec):
 async def test_approved_grounding_accepts_range_format_and_longer_fact_name(rec):
     from tests.test_project_map import drain
 
-    opening = "فتح العروض 16/04/1448"
+    opening = "فتح العروض 03/02/1450"
     security = "الضمان الابتدائي (2%) إلى (1%)"
     first = files.add_file(rec, "sample-opening.txt", opening.encode(), actor="engineer")
     second = files.add_file(rec, "sample-security.txt", security.encode(), actor="engineer")
@@ -481,7 +481,7 @@ async def test_approved_grounding_accepts_range_format_and_longer_fact_name(rec)
             facts=[
                 facts.Fact(
                     name={"en": "Date of opening offers", "ar": "تاريخ فتح العروض"},
-                    value="16/04/1448",
+                    value="03/02/1450",
                     file_id=first.id,
                     locator={"line": 1},
                     state="found",
@@ -522,15 +522,15 @@ def test_number_words(words, number):
 
 
 def test_title_label_is_optional(rec):
-    text = "كراسةالشروطوالمواصفات\nفتح العروض 16/04/1448"
+    text = "كراسةالشروطوالمواصفات\nفتح العروض 03/02/1450"
     f = files.add_file(rec, "sample.txt", text.encode(), actor="engineer")
     p = dict(
         file_id=f.id,
         locator={},
         name={"en": "Opening", "ar": "فتح العروض"},
-        value="16/04/1448",
+        value="03/02/1450",
         source_label="كراسة الشروط والمواصفات",
-        evidence="فتح العروض 16/04/1448",
+        evidence="فتح العروض 03/02/1450",
     )
     assert len(facts.accept(rec, [p])) == 1
     assert store.entries(rec, "facts")["facts"][0]["source_label"] == "فتح العروض"
@@ -571,9 +571,9 @@ async def test_reviewer_five_rows_keep_conflict(rec):
             7,
             "Opening",
             "فتح العروض",
-            "16/04/1448",
+            "03/02/1450",
             "كراسة الشروط والمواصفات",
-            "فتح العروض 16/04/1448",
+            "فتح العروض 03/02/1450",
         ),
         (
             book.id,
@@ -934,7 +934,7 @@ def test_picture_check_releases_write_lock(rec, monkeypatch):
 
 def test_candidate_reservations(rec):
     pages = [["Retention security payment validity 10% 20% 30%"]] * 4
-    pages += [["فتح العروض 16/04/1448 الترسية 29/06/1448 بدء الأعمال 07/07/1448"]]
+    pages += [["فتح العروض 03/02/1450 الترسية 18/04/1450 بدء الأعمال 25/04/1450"]]
     f = files.add_file(rec, "sample.pdf", sample_pdf(pages), actor="engineer")
     g = files.add_file(rec, "short.pdf", sample_pdf([["Sample cover"]]), actor="engineer")
     chosen = facts.candidates(rec, limit=3)
@@ -1000,7 +1000,7 @@ def test_key_data_and_short_bid_conditions_keep_conflicting_sources(rec):
         sample_pdf([["Sample cover"], ["Sample terms"]]),
         actor="engineer",
     )
-    dates = "فتح العروض 16/04/1448 / الترسية 29/06/1448 / بدء الأعمال 07/07/1448"
+    dates = "فتح العروض 03/02/1450 / الترسية 18/04/1450 / بدء الأعمال 25/04/1450"
     security = "ضمان ابتدائي بقيمة تتراوح من (2%) إلى (1%)"
     with rec.write("engineer") as c:
         for fid, page, text in [
