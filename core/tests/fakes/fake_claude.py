@@ -204,6 +204,36 @@ def out(obj: dict) -> None:
         sys.stdout.flush()
 
 
+def _lock_file(f) -> None:
+    """An exclusive lock the system drops if this process dies."""
+    if os.name == "nt":
+        import msvcrt
+
+        f.seek(0)
+        while True:
+            try:
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                return
+            except OSError:
+                time.sleep(0.005)
+    else:
+        import fcntl
+
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+
+
+def _unlock_file(f) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        f.seek(0)
+        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
 def claim_run_number(log: Path) -> int:
     """The lowest run number no other run has: each is claimed by creating `<log>.run<n>`
     exclusively, which is atomic on every system, so runs started at once never share one."""
@@ -223,8 +253,15 @@ class Log:
 
     def write(self, record: dict) -> None:
         if self.path:
-            with _log_lock, self.path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            # Runs started at once share the log. _log_lock covers this process's threads; the
+            # file lock covers other processes (Windows appends from two processes can collide).
+            with _log_lock, open(f"{self.path}.lock", "a+b") as lock:
+                _lock_file(lock)
+                try:
+                    with self.path.open("a", encoding="utf-8") as f:
+                        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                finally:
+                    _unlock_file(lock)
 
     def start(self, argv: list[str], files: dict[str, str]) -> None:
         run = {
