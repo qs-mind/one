@@ -766,7 +766,7 @@ def run(commands, file, *, max_usd=None, report=None, scripted_only=False):
         raise CliError("scripted")
 
     try:
-        document = yaml.safe_load(Path(file).read_text())
+        document = yaml.safe_load(Path(file).read_text(encoding="utf-8"))
     except yaml.YAMLError:
         raise CliError("walk") from None
     if not isinstance(document, dict):
@@ -832,8 +832,8 @@ def write_report(result, report, lang):
         from qsone.cli.__main__ import plain
 
         path = Path(report)
-        path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
-        path.with_suffix(".txt").write_text(plain(result, lang) + "\n")
+        path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        path.with_suffix(".txt").write_text(plain(result, lang) + "\n", encoding="utf-8")
 
 
 def run_all(commands, directory, *, max_usd=None, report=None, scripted_only=False):
@@ -844,7 +844,10 @@ def run_all(commands, directory, *, max_usd=None, report=None, scripted_only=Fal
     files = sorted({*Path(directory).glob("*.yaml"), *Path(directory).glob("*.yml")})
     if not files:
         raise CliError("walk")
-    limits = [Decimal(str(yaml.safe_load(path.read_text()).get("max_usd", 3))) for path in files]
+    limits = [
+        Decimal(str(yaml.safe_load(path.read_text(encoding="utf-8")).get("max_usd", 3)))
+        for path in files
+    ]
     if any(not limit.is_finite() or limit < 0 for limit in limits):
         raise CliError("walk")
     maximum = min(sum(limits), Decimal(str(max_usd))) if max_usd is not None else sum(limits)
@@ -857,7 +860,11 @@ def run_all(commands, directory, *, max_usd=None, report=None, scripted_only=Fal
             if budget.hit:
                 result["status"] = "CAP"
                 result["walks"].append(
-                    {"name": path.stem, "status": "NOT_RUN", "reason": TEXT["cap"]}
+                    {
+                        "name": path.stem,
+                        "status": "NOT_RUN",
+                        "reason": TEXT["cap"],
+                    }
                 )
                 continue
             try:

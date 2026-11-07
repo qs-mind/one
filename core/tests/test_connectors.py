@@ -323,7 +323,7 @@ async def test_stdio_server_stops_with_the_core(rec, general, tmp_path):
     await install(hub, tmp_path, read=True)
     ctx = ctx_for(rec, hub, general)
     await call("connector_call", {"connector": NAME, "tool": "read_inbox"}, ctx)
-    pid = int((tmp_path / f"{NAME}.pid").read_text())
+    pid = int((tmp_path / f"{NAME}.pid").read_text(encoding="utf-8"))
     assert alive(pid)
     await hub.close()
     deadline = time.monotonic() + 10
@@ -336,7 +336,7 @@ async def test_a_server_that_died_is_down_once_then_started_again(rec, general, 
     await install(hub, tmp_path, read=True)
     ctx = ctx_for(rec, hub, general, answers={"online": "yes"})
     await call("connector_call", {"connector": NAME, "tool": "read_inbox"}, ctx)
-    os.kill(int((tmp_path / f"{NAME}.pid").read_text()), signal.SIGTERM)
+    os.kill(int((tmp_path / f"{NAME}.pid").read_text(encoding="utf-8")), signal.SIGTERM)
     time.sleep(0.5)
     out = await call("connector_call", {"connector": NAME, "tool": "read_inbox"}, ctx)
     if "not done:" not in out:  # the kill may land after the call; the next one is down then

@@ -233,7 +233,7 @@ async def test_a_qa_brief_stays_under_the_targets(registry, data_dir, fake_clock
             print(f"\n== {kind} files, Brief: {text}", *sent, sep="\n")
             if os.environ.get("DUMP_BODY"):
                 Path(os.environ["DUMP_BODY"]).write_text(
-                    json.dumps(provider.bodies[-1], ensure_ascii=False, indent=1)
+                    json.dumps(provider.bodies[-1], ensure_ascii=False, indent=1), encoding="utf-8"
                 )
             assert "Key Tender Data" in json.dumps(provider.bodies[start], ensure_ascii=False)
             assert len(sent) == 4  # list, search, read, answer: the script ran to its end

@@ -1,6 +1,7 @@
 """Projects in the core API: create, list, open, close, files and search, over the bearer secret."""
 
 import logging
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -156,14 +157,27 @@ def test_lifespan_closes_every_project(data_dir):
     assert not rec.is_open
 
 
-def test_nothing_readable_in_the_data_folder(client, project, data_dir):
+@pytest.mark.parametrize(
+    "phase",
+    [
+        pytest.param(
+            "open",
+            marks=pytest.mark.skipif(
+                os.name == "nt",
+                reason="Windows denies raw reads of SQLite's open WAL shared memory",
+            ),
+        ),
+        "closed",
+    ],
+)
+def test_nothing_readable_in_the_data_folder(client, project, data_dir, phase):
     data = sample_xlsx({"BOQ": [["03/02", "خرسانة مسلحة للأسقف", "م3", 120]]})
     upload(client, project, BOQ, data)
-    for phase in ("open", "closed"):
-        blob = b"".join(p.read_bytes() for p in data_dir.rglob("*") if p.is_file())
-        for word in ["مدرسة - عينة", "خرسانة مسلحة", "03/02", BOQ]:
-            assert word.encode() not in blob, (phase, word)
+    if phase == "closed":
         client.post(f"/projects/{project}/close", headers=AUTH)
+    blob = b"".join(p.read_bytes() for p in data_dir.rglob("*") if p.is_file())
+    for word in ["مدرسة - عينة", "خرسانة مسلحة", "03/02", BOQ]:
+        assert word.encode() not in blob, (phase, word)
     assert [p.name for p in (data_dir / "projects").iterdir()] == [project]
 
 

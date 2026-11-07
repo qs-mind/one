@@ -172,7 +172,7 @@ def test_cli_switch_selects_lead_after_connection_check(tmp_path):
             calls.append((route, kwargs.get("json")))
 
     source = tmp_path / "sample-token.txt"
-    source.write_text("scripted test token")
+    source.write_text("scripted test token", encoding="utf-8")
     Commands(Client(), {}, tmp_path / "session").setup_ai("google", "sample-new", source)
     assert calls[-1] == ("/settings/model", {"id": "sample-new", "connector": "standard:sample"})
     assert calls[-2][0] == "/settings/ai/check"

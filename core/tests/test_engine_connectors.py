@@ -844,9 +844,9 @@ def test_explicit_choice_clears_only_its_refusal(role):
 def test_retirement_is_persisted_for_exact_connector_and_model(data_dir):
     choice = ModelChoice("standard:sample-a", "sample-cheapest")
     connectors.note_refused(choice)
-    assert json.loads((data_dir / "settings.json").read_text())["ai"]["refused_models"] == [
-        "standard:sample-a/sample-cheapest"
-    ]
+    assert json.loads((data_dir / "settings.json").read_text(encoding="utf-8"))["ai"][
+        "refused_models"
+    ] == ["standard:sample-a/sample-cheapest"]
     assert connectors.refused(choice)
     assert not connectors.refused(ModelChoice("standard:sample-b", choice.model))
     assert not connectors.refused(ModelChoice(choice.connector, "sample-next"))

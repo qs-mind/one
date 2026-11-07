@@ -144,7 +144,9 @@ async def test_arabic_voice_instruction_is_explicit(make_engine, project):
     engine = await started(make_engine(links(lead=lead)))
     await finish(engine, await engine.start_brief(project, "قارن العروض"))
     assert "Egyptian Arabic" in str(lead.seen[0])
-    instructions = (Path(__file__).parents[1] / "qsone/engine/instructions/lead_qs.txt").read_text()
+    instructions = (Path(__file__).parents[1] / "qsone/engine/instructions/lead_qs.txt").read_text(
+        encoding="utf-8"
+    )
     assert "[يملأه المهندس:" in instructions
     assert "project name" in instructions and "client" in instructions
 
@@ -187,7 +189,9 @@ def test_contract_values_without_read_are_flagged():
 
 
 def test_voice_and_letter_instructions():
-    instructions = (Path(__file__).parents[1] / "qsone/engine/instructions/lead_qs.txt").read_text()
+    instructions = (Path(__file__).parents[1] / "qsone/engine/instructions/lead_qs.txt").read_text(
+        encoding="utf-8"
+    )
     assert "Egyptian Arabic" in reply_line("قارن العروض")
     assert "Egyptian Arabic" not in reply_line("Compare the quotes")
     assert "[يملأه المهندس:" in instructions

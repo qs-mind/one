@@ -109,7 +109,7 @@ async def test_long_sheet_names_page_without_dispatcher_cut(rec):
 def test_synthetic_dxf_schedule_title_field():
     from pathlib import Path
 
-    source = (Path(__file__).parent / "fixtures/drawings/title.dxf").read_text()
+    source = (Path(__file__).parent / "fixtures/drawings/title.dxf").read_text(encoding="utf-8")
     # Both attributes belong to the synthetic title block; the top label is a view.
     start = source.index("0\nATTRIB\n5\n29\n")
     end = source.index("0\nATTRIB\n5\n2a\n", start)

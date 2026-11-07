@@ -377,7 +377,7 @@ async def test_ready_installs_and_a_damaged_runtime_is_downloaded_again(tmp_path
     await runner.ready()
     assert installs == [1]
     (tmp_path / "rt" / "lib").mkdir(parents=True)
-    (tmp_path / "rt" / runtime.STAMP).write_text("{}")
+    (tmp_path / "rt" / runtime.STAMP).write_text("{}", encoding="utf-8")
     r = await runner.run("one_io.result(1)", {}, {})  # no python.wasm
     assert r.error == "runtime: FileNotFoundError"
     assert not (tmp_path / "rt" / runtime.STAMP).exists()  # so the next ready() installs it

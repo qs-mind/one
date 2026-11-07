@@ -86,7 +86,7 @@ def test_scripted_only_file_is_skipped_in_real_mode(tmp_path):
     from qsone.cli.walk import run
 
     file = tmp_path / "sample.yaml"
-    file.write_text("name: sample\nscripted:\n- project: Sample\n")
+    file.write_text("name: sample\nscripted:\n- project: Sample\n", encoding="utf-8")
     commands = SimpleNamespace(client=None, saved={"mode": "real"}, lang="en")
     assert run(commands, file)["status"] == "SKIPPED"
 

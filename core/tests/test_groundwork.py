@@ -31,14 +31,19 @@ def client(data_dir):
 def test_one_version_everywhere():
     v = qsone.__version__
     assert v == "0.1.0"
-    assert json.loads((ROOT / "package.json").read_text())["version"] == v
-    lock = json.loads((ROOT / "package-lock.json").read_text())
+    assert json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"] == v
+    lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
     assert lock["version"] == v and lock["packages"][""]["version"] == v
-    assert json.loads((ROOT / "desktop/tauri.conf.json").read_text())["version"] == v
-    assert tomllib.loads((CORE / "pyproject.toml").read_text())["project"]["version"] == v
-    cargo = (ROOT / "desktop/Cargo.toml").read_text()
+    assert (
+        json.loads((ROOT / "desktop/tauri.conf.json").read_text(encoding="utf-8"))["version"] == v
+    )
+    assert (
+        tomllib.loads((CORE / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+        == v
+    )
+    cargo = (ROOT / "desktop/Cargo.toml").read_text(encoding="utf-8")
     assert re.search(r'^version = "([^"]+)"', cargo, re.M)[1] == v
-    cargo_lock = (ROOT / "desktop/Cargo.lock").read_text()
+    cargo_lock = (ROOT / "desktop/Cargo.lock").read_text(encoding="utf-8")
     assert f'name = "qs-mind-one"\nversion = "{v}"' in cargo_lock
 
 
@@ -62,13 +67,13 @@ def test_native_libraries_load(client):
 
 def test_locks_have_hashes_and_the_runtime_has_no_dev_tools():
     for name in ("requirements.lock", "runtime.lock"):
-        text = (CORE / name).read_text()
+        text = (CORE / name).read_text(encoding="utf-8")
         pins = re.findall(r"^([a-z0-9][a-z0-9._-]*)==", text, re.M | re.I)
         assert pins, name
         # every pinned package carries its hashes
         blocks = re.split(r"^(?=[a-z0-9][a-z0-9._-]*==)", text, flags=re.M | re.I)[1:]
         assert all("--hash=sha256:" in block for block in blocks), name
-    runtime = (CORE / "runtime.lock").read_text()
+    runtime = (CORE / "runtime.lock").read_text(encoding="utf-8")
     for dev in ("pytest==", "ruff==", "xlwt=="):
         assert dev not in runtime
     for direct in ("pyjwt==", "cryptography==", "httpx==", "truststore=="):
@@ -76,7 +81,9 @@ def test_locks_have_hashes_and_the_runtime_has_no_dev_tools():
 
 
 def test_direct_dependencies_are_named():
-    deps = tomllib.loads((CORE / "pyproject.toml").read_text())["project"]["dependencies"]
+    deps = tomllib.loads((CORE / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+        "dependencies"
+    ]
     names = {re.split(r"[\s\[<>=;!~]", d, maxsplit=1)[0].lower() for d in deps}
     assert {"pyjwt", "cryptography", "httpx", "truststore"} <= names
 

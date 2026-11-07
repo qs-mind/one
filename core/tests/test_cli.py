@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import httpx
@@ -17,7 +18,8 @@ def cli(session, *args, ok=0, timeout=90):
         [sys.executable, "-m", "qsone.cli", "--session", str(session), "--json", *map(str, args)],
         cwd=CORE,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        env=os.environ | {"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
         timeout=timeout,
     )
     assert result.returncode == ok, result.stdout + result.stderr
@@ -35,12 +37,13 @@ def running(tmp_path):
 
 def test_isolation(running, tmp_path):
     session, started = running
-    saved = json.loads(session.read_text())
+    saved = json.loads(session.read_text(encoding="utf-8"))
     assert started["mode"] == "scripted"
     assert saved["port"] not in (1440, 1442)
-    assert Path(saved["data_dir"]).is_relative_to(Path("/tmp"))
-    assert session.stat().st_mode & 0o777 == 0o600
-    assert session.parent.stat().st_mode & 0o777 == 0o700
+    assert Path(saved["data_dir"]).is_relative_to(Path(tempfile.gettempdir()).resolve())
+    if os.name != "nt":
+        assert session.stat().st_mode & 0o777 == 0o600
+        assert session.parent.stat().st_mode & 0o777 == 0o700
     for port in (1440, 1442):
         cli(tmp_path / "bad.json", "start", "--port", port, ok=1)
         cli(tmp_path / "bad.json", "attach", "--port", port, "--secret-file", "/missing", ok=1)
@@ -49,7 +52,7 @@ def test_isolation(running, tmp_path):
     for folder in (default_data_dir(), default_data_dir() / "nested"):
         cli(tmp_path / "bad.json", "start", "--data-dir", folder, ok=1)
     secret = tmp_path / "secret.txt"
-    secret.write_text(saved["secret"])
+    secret.write_text(saved["secret"], encoding="utf-8")
     attached = tmp_path / "attached" / "session.json"
     cli(attached, "attach", "--port", saved["port"], "--secret-file", secret)
     cli(attached, "stop")
@@ -67,7 +70,7 @@ def test_key_not_exposed(running, tmp_path, provider):
     session, started = running
     key = "sample-bench-ok-private-marker"
     file = tmp_path / "provider.txt"
-    file.write_text(key)
+    file.write_text(key, encoding="utf-8")
     for json_flag in ([], ["--json"]):
         result = subprocess.run(
             [
@@ -88,17 +91,21 @@ def test_key_not_exposed(running, tmp_path, provider):
             ],
             cwd=CORE,
             capture_output=True,
-            text=True,
+            encoding="utf-8",
+            env=os.environ | {"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
             timeout=30,
         )
         assert result.returncode == (0 if provider == "anthropic" else 1)
         assert key not in result.stdout + result.stderr
-    saved = json.loads(session.read_text())
+    saved = json.loads(session.read_text(encoding="utf-8"))
     for path in (
         session,
         Path(started["data_dir"]) / "core.log",
-        Path(f"/proc/{saved['pid']}/cmdline"),
-        Path(f"/proc/{saved['pid']}/environ"),
+        *(
+            [Path(f"/proc/{saved['pid']}/cmdline"), Path(f"/proc/{saved['pid']}/environ")]
+            if sys.platform == "linux"
+            else []
+        ),
     ):
         assert key.encode() not in path.read_bytes()
 
@@ -109,8 +116,11 @@ def test_question_and_boq(running):
     p = cli(session, "project", "new", "Sample CLI project")["id"]
     assert cli(session, "project", "list")["projects"]
     cli(session, "project", "open", p)
-    samples = list(Path(started["samples"]).glob("*.xlsx"))
-    cli(session, "files", "add", p, samples[0])
+    from tests.bench.samples import BOQ_NAME
+
+    # The folder also holds a two-item estimate: directory order is not a BOQ selector.
+    sample = Path(started["samples"]) / BOQ_NAME
+    cli(session, "files", "add", p, sample)
     assert cli(session, "files", "list", p)["files"]
     cli(session, "files", "report", p)
     question = cli(session, "ask", p, "bench:question What do you need?")
@@ -136,9 +146,11 @@ def test_walk(running, tmp_path):
     report = tmp_path / "report.json"
     result = cli(session, "walk", CORE / "tests/walks/bench.yaml", "--report", report)
     assert result["status"] == "PASS"
-    assert json.loads(report.read_text()) == result
+    assert json.loads(report.read_text(encoding="utf-8")) == result
     failing = tmp_path / "fail.yaml"
-    failing.write_text("name: failure\nscripted:\n  - check: {reply_contains: impossible}\n")
+    failing.write_text(
+        "name: failure\nscripted:\n  - check: {reply_contains: impossible}\n", encoding="utf-8"
+    )
     assert cli(session, "walk", failing, ok=1)["status"] == "FAIL"
     cap = cli(session, "walk", CORE / "tests/walks/bench.yaml", "--max-usd", "0.001", ok=1)
     assert cap["status"] == "CAP"
@@ -150,25 +162,26 @@ def test_missing_walk(running, tmp_path, name):
     import yaml
 
     session, _ = running
-    walk = yaml.safe_load((CORE / f"tests/walks/{name}.yaml").read_text())
+    walk = yaml.safe_load((CORE / f"tests/walks/{name}.yaml").read_text(encoding="utf-8"))
     walk["needs"] = [str(tmp_path / "missing.xlsx")]
     path = tmp_path / "missing.yaml"
-    path.write_text(yaml.safe_dump(walk))
+    path.write_text(yaml.safe_dump(walk), encoding="utf-8")
     assert cli(session, "walk", path)["status"] == "SKIPPED"
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux /proc birth identity")
 def test_stop_refuses_changed_identity(running):
     session, _ = running
-    original = session.read_text()
+    original = session.read_text(encoding="utf-8")
     saved = json.loads(original)
     saved["birth"] = "different-process"
-    session.write_text(json.dumps(saved))
+    session.write_text(json.dumps(saved), encoding="utf-8")
     try:
         assert "error" in cli(session, "stop", ok=1)
         assert session.exists()
         os.kill(saved["pid"], 0)
     finally:
-        session.write_text(original)
+        session.write_text(original, encoding="utf-8")
 
 
 def test_follow_idle_and_busy_controls(running):
@@ -186,7 +199,8 @@ def test_follow_idle_and_busy_controls(running):
 def test_walk_explicit_card_step(running, tmp_path):
     session, _ = running
     file = tmp_path / "cards.yaml"
-    file.write_text("""name: separate cards
+    file.write_text(
+        """name: separate cards
 scripted:
   - project: Sample separate cards
   - ask: 'bench:question What do you need?'
@@ -195,7 +209,9 @@ scripted:
       choice: sent
       answers: {q1: Ready-mix, q2: Sample note}
   - check: {reply_contains: 'bench reply'}
-""")
+""",
+        encoding="utf-8",
+    )
     assert cli(session, "walk", file)["status"] == "PASS"
 
 
@@ -203,7 +219,7 @@ def test_real_launcher_is_not_bench():
     from qsone.cli.session import command
 
     argv = command("real", 12345, "/tmp/sample", "/tmp/sample/samples")
-    assert argv[1].endswith("/scripts/realapp/realcore.py")
+    assert Path(argv[1]).parts[-3:] == ("scripts", "realapp", "realcore.py")
     assert "tests.bench" not in argv
     assert argv[-2:] == ["--data-dir", "/tmp/sample"]
 
@@ -321,7 +337,7 @@ def test_files_search_deliverables_and_numbers(running, tmp_path):
         "missing"
     ]
     assert "error" in cli(session, "changes", "reject", p, sheet["id"], "--ids", "missing", ok=1)
-    saved = json.loads(session.read_text())
+    saved = json.loads(session.read_text(encoding="utf-8"))
     row = next(r for r in view["rows"] if "rate" in r["cells"])
     route = f"/projects/{p}/deliverables/{sheet['id']}/changes"
     with httpx.Client(
@@ -358,8 +374,8 @@ def test_native_model_selection(running, tmp_path):
 
     session, _ = running
     key = tmp_path / "native.txt"
-    key.write_text("sample-bench-ok-value")
-    c = Client(json.loads(session.read_text()))
+    key.write_text("sample-bench-ok-value", encoding="utf-8")
+    c = Client(json.loads(session.read_text(encoding="utf-8")))
     try:
         # Reuse the connector: old role assignments must not upgrade the new lead.
         for model in ("sample-model", "claude-haiku-5-5"):
@@ -659,15 +675,15 @@ def test_walk_all_order_cap_and_scripted_only(tmp_path):
     commands = SimpleNamespace(client=Book(), saved={"mode": "scripted"}, guard=None, lang="en")
     for name in ("b", "a"):
         (tmp_path / f"{name}.yaml").write_text(
-            "max_usd: 0.1\nscripted:\n- check: {reply_not_contains: impossible}\n"
+            "max_usd: 0.1\nscripted:\n- check: {reply_not_contains: impossible}\n", encoding="utf-8"
         )
     report = tmp_path / "report.json"
     result = run_all(commands, tmp_path, report=report, scripted_only=True)
     assert result["status"] == "PASS"
     assert [r["name"] for r in result["walks"]] == ["a", "b"]
     assert result["max_usd"] == "0.2"
-    assert json.loads(report.read_text()) == result
-    assert report.with_suffix(".txt").read_text()
+    assert json.loads(report.read_text(encoding="utf-8")) == result
+    assert report.with_suffix(".txt").read_text(encoding="utf-8")
     result = run_all(commands, tmp_path, max_usd=0)
     assert result["status"] == "CAP"
     assert all(r["status"] == "NOT_RUN" for r in result["walks"])
@@ -802,7 +818,10 @@ def test_walk_catalogue_has_bounded_real_and_sample_parts():
         "conditions",
         "scanned",
     ]
-    documents = [yaml.safe_load((CORE / f"tests/walks/{name}.yaml").read_text()) for name in names]
+    documents = [
+        yaml.safe_load((CORE / f"tests/walks/{name}.yaml").read_text(encoding="utf-8"))
+        for name in names
+    ]
     assert sum(Decimal(str(d["max_usd"])) for d in documents) <= Decimal("1.4")
     for d in documents:
         assert d["real"] and d["scripted"]
@@ -1045,10 +1064,11 @@ def test_walk_failure_does_not_poison_later_walks(tmp_path, stop_on_fail):
                     {"check": {"changes_count": 0}},
                 ],
             }
-        )
+        ),
+        encoding="utf-8",
     )
     (tmp_path / "b.yaml").write_text(
-        "max_usd: 0.6\nscripted:\n- check: {reply_not_contains: impossible}\n"
+        "max_usd: 0.6\nscripted:\n- check: {reply_not_contains: impossible}\n", encoding="utf-8"
     )
     result = run_all(commands, tmp_path)
     assert result["status"] == "FAIL"
@@ -1177,7 +1197,8 @@ def test_failed_check_preserves_evidence_for_independent_checks(tmp_path):
     file = tmp_path / "walk.yaml"
     file.write_text(
         "scripted:\n- command: [search,p,sample]\n"
-        "- check: {export_ok: true}\n- check: {pack_pages: 2}\n"
+        "- check: {export_ok: true}\n- check: {pack_pages: 2}\n",
+        encoding="utf-8",
     )
     result = run(commands, file)
     assert [s["status"] for s in result["steps"]] == ["PASS", "FAIL", "PASS"]
@@ -1196,7 +1217,8 @@ def test_invalid_walk_command_is_only_a_failed_step(tmp_path):
     file = tmp_path / "walk.yaml"
     file.write_text(
         "scripted:\n- command: [invalid-command]\n"
-        "- check: {reply_contains: impossible}\n- check: {reply_not_contains: impossible}\n"
+        "- check: {reply_contains: impossible}\n- check: {reply_not_contains: impossible}\n",
+        encoding="utf-8",
     )
     result = run(commands, file)
     assert [s["status"] for s in result["steps"]] == ["FAIL", "FAIL", "FAIL"]
@@ -1237,7 +1259,7 @@ def test_failure_context_crosses_capability_branches(tmp_path, monkeypatch, nest
         ]
     ) + [{"command": ["search", "p", "recover"]}, {"check": {"pack_pages": 2}}]
     file = tmp_path / "nested.yaml"
-    file.write_text(yaml.safe_dump({"scripted": steps}))
+    file.write_text(yaml.safe_dump({"scripted": steps}), encoding="utf-8")
     result = module.run(commands, file)
     assert result["status"] == "FAIL"
     assert calls == (["fail"] if nested_stop else ["fail", "recover"])
@@ -1284,7 +1306,7 @@ def test_upload_http_failure_continues(tmp_path):
             return {"status": "read"}
 
     for name in ("a.txt", "b.txt"):
-        (tmp_path / name).write_text("Sample")
+        (tmp_path / name).write_text("Sample", encoding="utf-8")
     result = Commands(Core(), {}, None).files_add("p", [tmp_path])
     assert [r["status"] for r in result["uploads"]] == ["failed", "read"]
     assert result["added"] == 1 and result["failed"] == 1
