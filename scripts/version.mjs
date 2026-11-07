@@ -19,8 +19,12 @@ const toJson = (value) => JSON.stringify(value, null, 2) + "\n";
 /** A line `<prefix>"<version>"` in a text file: the first one, or the first one after `after`. */
 function line(prefix, after) {
   const find = (text) => {
-    const start = after ? text.indexOf(after) : 0;
-    if (start < 0) return undefined;
+    // `after` may span lines: match "\n" there as "\r\n" too (a Windows checkout).
+    const at = after
+      ? new RegExp(after.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replaceAll("\n", "\r?\n")).exec(text)
+      : { index: 0 };
+    if (!at) return undefined;
+    const start = at.index;
     const pattern = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"([^"]*)"`, "m");
     const found = pattern.exec(text.slice(start));
     return found && { at: start + found.index, length: found[0].length, version: found[1] };
