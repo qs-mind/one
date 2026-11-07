@@ -118,7 +118,7 @@ def test_reader_env_and_timeout(monkeypatch, tmp_path):
     import subprocess
 
     executable = tmp_path / "reader"
-    executable.write_text("fixture")
+    executable.write_text("fixture", encoding="utf-8")
     executable.chmod(0o755)
     monkeypatch.setenv("QSONE_DRAWINGS", str(executable))
     assert drawings.find_binary() == executable
@@ -230,7 +230,11 @@ def test_keyboard_font_decoding_is_style_scoped():
     assert decode_text({**row, "font_file": "arial.ttf"})["text"] == "Hgfdf"
     assert decode_text({**row, "font_file": "simplex.shx"})["text"] == "Hgfdf"
     inline = decode_text(
-        {"text": "x", "raw_text": r"{\Farabic.shx;Hgfdf} {\FArial;ABC}", "font_file": "arial.ttf"}
+        {
+            "text": "x",
+            "raw_text": r"{\Farabic.shx;Hgfdf} {\FArial;ABC}",
+            "font_file": "arial.ttf",
+        }
     )
     assert inline["text"] == "البيب ABC"
     assert inline["raw_text"].startswith("{")

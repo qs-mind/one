@@ -179,7 +179,7 @@ def sample_chunks(count: int) -> list[str]:
 def _rss() -> int | None:
     """Resident memory now, Linux only."""
     try:
-        pages = int(Path("/proc/self/statm").read_text().split()[1])
+        pages = int(Path("/proc/self/statm").read_text(encoding="utf-8").split()[1])
     except OSError:
         return None
     return pages * os.sysconf("SC_PAGE_SIZE")

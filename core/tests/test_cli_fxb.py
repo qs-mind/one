@@ -55,8 +55,8 @@ def test_directory_preserves_folders(adapter, tmp_path):
     for folder in ["01 المستلم", "02 الفني/النسخة العربية Rev000", ".hidden"]:
         directory = root / folder
         directory.mkdir(parents=True)
-        (directory / "sample.txt").write_text("sample " + folder)
-    (root / "Thumbs.db").write_text("system")
+        (directory / "sample.txt").write_text("sample " + folder, encoding="utf-8")
+    (root / "Thumbs.db").write_text("system", encoding="utf-8")
     commands.files_add("p", [root])
     assert len(seen) == 2
     assert {r.url.params["folder"] for r in seen} == {
@@ -102,7 +102,7 @@ def test_stop_already_exited_zombie(adapter, monkeypatch):
     original = Path.read_text
 
     def read(path, *a, **kw):
-        if str(path) == "/proc/987654/stat":
+        if path == Path("/proc/987654/stat"):
             return "987654 (python) Z " + " ".join(["0"] * 18 + ["123"])
         return original(path, *a, **kw)
 
@@ -142,7 +142,7 @@ def test_map_wait_waits_for_ai_and_caches_cost_card(adapter):
     result = commands.run(parser().parse_args(["map", "p", "--wait", "1"]))
     assert result["state"] == "waiting_engineer"
     assert result["cards"][0]["id"] == "cost1"
-    assert json.loads(commands.path.read_text())["cards"]["cost1"]["chat"] == "p"
+    assert json.loads(commands.path.read_text(encoding="utf-8"))["cards"]["cost1"]["chat"] == "p"
 
 
 def test_human_summary_and_fact_states():
@@ -199,7 +199,7 @@ def test_stop_retains_session_on_slow_shutdown(adapter, monkeypatch, finishes):
             "987654 (python) "
             + ("Z " if finishes and elapsed[0] >= 12 else "S ")
             + " ".join(["0"] * 18 + ["123"])
-            if str(path) == "/proc/987654/stat"
+            if path == Path("/proc/987654/stat")
             else original(path, *a, **kw)
         ),
     )
@@ -248,7 +248,7 @@ def test_stop_refuses_reused_pid_even_if_zombie(adapter, monkeypatch):
         "read_text",
         lambda path, *a, **kw: (
             "987654 (python) Z " + " ".join(["0"] * 18 + ["new"])
-            if str(path) == "/proc/987654/stat"
+            if path == Path("/proc/987654/stat")
             else original(path, *a, **kw)
         ),
     )
@@ -298,7 +298,7 @@ def test_stop_live_wrong_launcher_is_not_signalled(adapter, monkeypatch):
         "read_text",
         lambda path, *a, **kw: (
             "987654 (python) S " + " ".join(["0"] * 18 + ["123"])
-            if str(path) == "/proc/987654/stat"
+            if path == Path("/proc/987654/stat")
             else original(path, *a, **kw)
         ),
     )

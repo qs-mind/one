@@ -455,7 +455,7 @@ def test_vectors_of_the_old_model_are_dropped_on_open_and_made_again(
     registry.close_all()
     for old in RETIRED:
         (models / old / "rev").mkdir(parents=True)
-        (models / old / "rev" / "verified.json").write_text("{}")
+        (models / old / "rev" / "verified.json").write_text("{}", encoding="utf-8")
 
     gate = threading.Event()
     seen, held = held_client(hub, hold_at=1, gate=gate)

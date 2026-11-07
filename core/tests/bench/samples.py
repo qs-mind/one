@@ -187,7 +187,8 @@ def write_cli_samples(folder: Path) -> None:
     (folder / "sample-scan.pdf").write_bytes(sample_pdf([[]]))
     (folder / "sample-market.csv").write_text(
         "Month,Material,Price,Unit\n2026-09,Sample rebar,3200,EGP/t\n"
-        "2026-08,Sample cement,1500,EGP/t\n"
+        "2026-08,Sample cement,1500,EGP/t\n",
+        encoding="utf-8",
     )
     doc = Document()
     doc.add_paragraph("Sample booklet: offers must be submitted electronically.")

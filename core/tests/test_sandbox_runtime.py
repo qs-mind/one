@@ -400,9 +400,9 @@ def attempt(name, f):
     except Exception as e:
         seen[name] = type(e).__name__
 attempt("list root", lambda: seen.setdefault("root", os.listdir("/")))
-attempt("passwd", lambda: open("/etc/passwd").read())
-attempt("write lib", lambda: open("/lib/x", "w").write("x"))
-attempt("write tmp", lambda: open("/tmp/x", "w").write("x"))
+attempt("passwd", lambda: open("/etc/passwd", encoding="utf-8").read())
+attempt("write lib", lambda: open("/lib/x", "w", encoding="utf-8").write("x"))
+attempt("write tmp", lambda: open("/tmp/x", "w", encoding="utf-8").write("x"))
 attempt("mkdir", lambda: os.mkdir("/lib/d"))
 seen["lib"] = os.listdir("/lib")
 one_io.result(seen)

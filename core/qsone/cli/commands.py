@@ -29,7 +29,7 @@ class Commands:
     def setup_ai(self, provider, model, key_file):
         self.consent()
         # The only place the AI key is read. It is sent only in an HTTP body.
-        key = Path(key_file).read_text().strip()
+        key = Path(key_file).read_text(encoding="utf-8").strip()
         if not key:
             raise CliError()
         if provider == "anthropic":
@@ -313,7 +313,10 @@ class Commands:
                         bookmarks(node)
                     else:
                         result["bookmarks"].append(
-                            {"title": node.title, "page": pdf.get_destination_page_number(node) + 1}
+                            {
+                                "title": node.title,
+                                "page": pdf.get_destination_page_number(node) + 1,
+                            }
                         )
 
             bookmarks(pdf.outline)

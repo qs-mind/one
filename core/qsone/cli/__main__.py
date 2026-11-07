@@ -242,6 +242,9 @@ def human_result(result):
 
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     args = parser().parse_args(global_flags(list(sys.argv[1:] if argv is None else argv)))
     path = session.session_path(args.session)
     client = None

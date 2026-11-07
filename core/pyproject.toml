@@ -70,4 +70,6 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+preview = true
+explicit-preview-rules = true
+select = ["E", "F", "I", "UP", "B", "PLW1514"]

@@ -9,7 +9,7 @@ from threading import Barrier
 def test_pdfium_calls_are_guarded():
     violations = []
     for path in (Path(__file__).parents[1] / "qsone").rglob("*.py"):
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
 
         def visit(node, guarded=False, path=path):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):

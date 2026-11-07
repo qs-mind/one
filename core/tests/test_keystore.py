@@ -174,7 +174,12 @@ def test_the_core_chooses_before_the_app_is_built(no_key_store, tmp_path, monkey
     monkeypatch.setattr(entry.uvicorn, "Server", FakeServer)
     entry.main(["--port", "0", "--data-dir", str(tmp_path / "elsewhere")])
     assert seen == {"store": "file"}
-    assert json.loads((tmp_path / "elsewhere" / "settings.json").read_text())["key_store"] == "file"
+    assert (
+        json.loads((tmp_path / "elsewhere" / "settings.json").read_text(encoding="utf-8"))[
+            "key_store"
+        ]
+        == "file"
+    )
 
 
 def test_a_key_store_that_appears_later_gets_every_key(no_key_store, data_dir):

@@ -33,7 +33,9 @@ def session_path(value=None):
     return Path(
         value
         or os.environ.get("QSONE_CLI_SESSION")
-        or Path(tempfile.gettempdir()) / f"qsone-cli-{os.getuid()}" / "session.json"
+        or Path(tempfile.gettempdir())
+        / f"qsone-cli-{getattr(os, 'getuid', lambda: 'user')()}"
+        / "session.json"
     )
 
 
@@ -51,7 +53,11 @@ def data_ok(path):
 
 def private_parent(path):
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if path.parent.is_symlink() or path.parent.stat().st_mode & 0o077:
+    if (
+        path.parent.is_symlink()
+        or path.parent.is_junction()
+        or (sys.platform != "win32" and path.parent.stat().st_mode & 0o077)
+    ):
         raise CliError("session")
 
 
@@ -59,7 +65,7 @@ def save(path, value):
     private_parent(path)
     fd, temporary = tempfile.mkstemp(prefix=".session-", dir=path.parent)
     try:
-        with os.fdopen(fd, "w") as out:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
             json.dump(value, out, ensure_ascii=False)
         os.replace(temporary, path)
     finally:
@@ -70,7 +76,7 @@ def load(path):
     if path.is_symlink():
         raise CliError("session")
     try:
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         raise CliError("missing") from None
     port_ok(value["port"])
@@ -82,7 +88,7 @@ def load(path):
 def process_identity(pid):
     """Linux birth time prevents PID reuse; cmdline separately proves the exact launcher/data."""
     try:
-        stat = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
         return stat[19]
     except (OSError, IndexError):
         return None
@@ -147,6 +153,8 @@ def start(path, *, port=0, data_dir=None, mode="scripted"):
         )
     }
     env.update(
+        PYTHONIOENCODING="utf-8",
+        PYTHONUTF8="1",
         QSONE_SECRET=secret,
         PYTHONPATH=str(CORE),
         PYTHON_KEYRING_BACKEND="keyring.backends.fail.Keyring",
@@ -208,7 +216,7 @@ def attach(path, *, port, secret_file):
     port_ok(port)
     if path.exists():
         raise CliError("session")
-    secret = Path(secret_file).read_text().strip()
+    secret = Path(secret_file).read_text(encoding="utf-8").strip()
     with httpx.Client(trust_env=False) as client:
         response = client.get(
             f"http://127.0.0.1:{port}/health", headers={"Authorization": f"Bearer {secret}"}
@@ -229,7 +237,7 @@ def stop(path):
         if identity is not None:
             # A process can exit between reading stat and cmdline. Zombies keep their
             # birth identity but have no command line and must never be signalled.
-            stat = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+            stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
             if stat[19] != value.get("birth"):
                 raise CliError("identity")
             if stat[0] == "Z":
@@ -239,7 +247,12 @@ def stop(path):
             actual = Path(f"/proc/{pid}/cmdline").read_bytes().decode().rstrip("\0").split("\0")
             if identity != value.get("birth") or actual != expected:
                 try:
-                    ended = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+                    ended = (
+                        Path(f"/proc/{pid}/stat")
+                        .read_text(encoding="utf-8")
+                        .rsplit(")", 1)[1]
+                        .split()
+                    )
                 except FileNotFoundError:
                     ended = None
                 if ended is None or (ended[19] == value.get("birth") and ended[0] == "Z"):
@@ -253,7 +266,12 @@ def stop(path):
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
                 try:
-                    stat = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+                    stat = (
+                        Path(f"/proc/{pid}/stat")
+                        .read_text(encoding="utf-8")
+                        .rsplit(")", 1)[1]
+                        .split()
+                    )
                 except FileNotFoundError:
                     break
                 if stat[0] == "Z":

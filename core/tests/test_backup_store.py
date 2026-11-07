@@ -93,7 +93,7 @@ def test_prune_keeps_ten_newest_and_one_a_day(tmp_path):
     made += [now - timedelta(minutes=10 * i) for i in range(1, 6)]
     for at in made:
         (tmp_path / f"{at.strftime('%Y-%m-%dT%H%M%SZ')}.db").write_bytes(b"")
-    (tmp_path / "key.json").write_text("{}")
+    (tmp_path / "key.json").write_text("{}", encoding="utf-8")
     removed = store.prune(tmp_path, now)
     kept = sorted(p.name for p in tmp_path.glob("*.db"))
     # newest 10 = today's 6 + days 1-4; dailies = days 0-29: 10 + 25 = 35 kept, days 30-34 go
@@ -363,5 +363,5 @@ def test_last_group_must_match(machine):
         machine.backups.confirm("backup-key", "ZZZZZ" if not code.endswith("ZZZZZ") else "00000")
     assert e.value.text == copy.RECOVERY_LAST_GROUP_WRONG
     assert machine.backups.status()["backup_key"]["code_saved"] is False
-    assert code not in (machine.data_dir / "settings.json").read_text()
+    assert code not in (machine.data_dir / "settings.json").read_text(encoding="utf-8")
     assert code.replace("-", "") not in blob(machine.data_dir).decode("latin-1")
