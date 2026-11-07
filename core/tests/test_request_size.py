@@ -26,7 +26,7 @@ from tests.samples import sample_boq_xlsx, sample_pdf
 
 pytestmark = pytest.mark.anyio
 
-STEP_TARGET = 12_000
+STEP_TARGET = 13_000  # 7 Nov: the last two steps' reads stay whole (retest 10)
 BRIEF_TARGET = 60_000
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 
@@ -369,5 +369,39 @@ async def test_scripted_lead_reads_drawing_map(registry, data_dir, fake_clock, f
         sizes = [wire_parts(body)["total"] for body in provider.bodies]
         assert max(sizes) < STEP_TARGET
         assert sum(sizes) < BRIEF_TARGET
+    finally:
+        await engine.shutdown()
+
+
+async def test_four_parallel_reads_keep_each_pages_key_lines(
+    registry, data_dir, fake_clock, fake_sleep
+):
+    project = registry.create("Sample parallel reads", "engineer")["id"]
+    rec = registry.get(project)
+    f = files.add_file(
+        rec,
+        "sample.pdf",
+        sample_pdf(
+            [[f"Bid validity {n} days"] + ["Sample prose " * 20] * 35 for n in range(91, 95)]
+        ),
+        actor="engineer",
+    )
+
+    def script(body):
+        if not any(m["role"] == "tool" for m in body["messages"]):
+            return "calls", [
+                ("files_read", {"file_id": f.id, "pages": str(n)}) for n in range(1, 5)
+            ]
+        results = "\n".join(str(m["content"]) for m in body["messages"] if m["role"] == "tool")
+        for n in range(91, 95):
+            assert f"Bid validity {n} days" in results
+        assert "[earlier files_read" not in results
+        return "text", "The sample pages are readable."
+
+    provider = FakeProvider(script)
+    engine = await _engine(registry, data_dir, provider, fake_clock, fake_sleep)
+    try:
+        await _run(engine, project, "Read the four sample pages")
+        assert len(provider.bodies) == 2
     finally:
         await engine.shutdown()

@@ -1030,3 +1030,77 @@ def test_key_data_and_short_bid_conditions_keep_conflicting_sources(rec):
     )
     assert len(accepted) == 2
     assert all(r["state"] == "conflict" for r in store.entries(rec, "facts")["facts"])
+
+
+def test_scripted_missing_locator_uses_only_sent_pages(rec):
+    from tests.test_project_map import drain
+
+    f = files.add_file(
+        rec, "sample.pdf", sample_pdf([["Cover"], ["Bid validity 90 days"]]), actor="engineer"
+    )
+    drain(rec)
+    assert facts.run(
+        rec,
+        read=lambda fid, loc: "Bid validity 90 days",
+        propose=lambda pages: [
+            dict(proposal(f.id, "90 days", evidence="Bid validity 90 days"), locator={})
+        ],
+    )
+    assert store.entries(rec, "facts")["facts"][0]["locator"] == {"page": 2}
+
+
+def test_locator_recovery_prefers_key_lines_and_does_not_search_unsent_pages():
+    p = proposal("missing", "90 days", evidence="Bid validity 90 days")
+    p["locator"] = {}
+    pages = [
+        {
+            "file_id": "first",
+            "locator": {"page": 1},
+            "text": "The Bid validity 90 days is stated here. " + "Sample prose. " * 20,
+        },
+        {"file_id": "key", "locator": {"page": 7}, "text": "Bid validity 90 days"},
+    ]
+    recovered, ambiguous = facts.recover_locator(p, pages)
+    assert ambiguous and recovered["file_id"] == "key"
+    assert recovered["locator"] == {"page": 7}
+    assert facts.recover_locator(p, [pages[0]])[0]["file_id"] == "first"
+    assert facts.recover_locator(p, [dict(pages[0], text="Bid validity 30 days")])[0] == p
+
+
+def test_fact_schema_requires_file_and_locator_but_not_a_page():
+    """A sheet fact has sheet+row and no page; recover_locator fills a missing one."""
+    schema = facts.Fact.model_json_schema()
+    assert {"file_id", "locator"} <= set(schema["required"])
+    assert "required" not in schema["properties"]["locator"]
+
+
+async def test_approved_scripted_reply_with_empty_locator(rec):
+    from tests.test_project_map import drain
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Bid validity 90 days"]]), actor="engineer")
+    drain(rec)
+
+    async def read(fid, loc):
+        return "Bid validity 90 days"
+
+    async def request(prompt, schema, instructions):
+        return schema(
+            facts=[
+                dict(
+                    proposal(f.id, "90 days", evidence="Bid validity 90 days"),
+                    locator={},
+                    state="found",
+                )
+            ]
+        )
+
+    assert await facts.run_approved(rec, read=read, request=request, file_ids=[f.id])
+    assert store.entries(rec, "facts")["facts"][0]["locator"] == {"page": 1}
+
+
+def test_legacy_scripted_proposal_can_omit_locator_and_file():
+    p = proposal("sample", "90 days", evidence="Bid validity 90 days", state="found")
+    del p["locator"]
+    del p["file_id"]
+    parsed = facts.Fact.model_validate(p)
+    assert parsed.locator == {} and parsed.file_id == ""

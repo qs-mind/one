@@ -2930,6 +2930,10 @@ MAP_AI_COST = {
     "en": "Mapping {count} files costs about US${cost}.",
     "ar": "تخطيط {count} ملف هيتكلف حوالي {cost} دولار.",
 }
+MAP_AI_PRICE_UNKNOWN = {
+    "en": "ONE has no price for {model} yet, so it cannot estimate this. Map them anyway?",
+    "ar": "ONE لسه معندوش سعر لـ {model}، فمش هيقدر يقدّر التكلفة. نعمل الخريطة برضه؟",
+}
 MAP_AI_RUN = {"en": "Map them", "ar": "خطّطهم"}
 
 MAP_AI_FAILED_REASON = {

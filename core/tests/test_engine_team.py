@@ -391,6 +391,8 @@ def test_trim_history_keeps_ids_and_errors():
         ModelRequest(parts=[ToolReturnPart("ledger_numbers", big, tool_call_id="t1"), failed]),
         ModelResponse(parts=[TextPart("ok")]),
         ModelRequest(parts=[ToolReturnPart("find_items", big, tool_call_id="t3")]),
+        ModelResponse(parts=[TextPart("continue")]),
+        ModelRequest(parts=[ToolReturnPart("find_items", "small", tool_call_id="t4")]),
     ]
     assert trim_history(messages, limit_tokens=500_000) is messages  # under the limit: as it is
     out = trim_history(messages)  # two big results: over RESULTS_TOKENS
@@ -449,3 +451,42 @@ async def test_tender_search_excludes_company_working_files(ctx, rec):
         )
     )
     assert [hit["file_id"] for hit in exact["hits"]] == [tender.id]
+
+
+def test_read_stub_keeps_key_lines_and_reread():
+    from qsone.engine.agents import _summary
+
+    text = 'Key lines {"page": 7}:\nBid validity 90 days\n' + "Long prose. " * 2000
+    stub = _summary("files_read", text, {"file_id": "sample", "pages": "7"})
+    assert 'Key lines {"page": 7}' in stub
+    assert "Bid validity 90 days" in stub
+    assert "you read this" in stub
+    assert "call files_read" in stub and "before quoting other text" in stub
+
+
+def test_chunk_stub_extracts_key_lines_with_locator():
+    from qsone.engine.agents import _summary
+
+    stub = _summary(
+        "read_chunk",
+        '{"file_id": "sample", "locator": {"page": 7}}\nBid validity 90 days',
+        {"chunk_id": 12},
+    )
+    assert "Bid validity 90 days" in stub and '"page": 7' in stub
+    assert 'call read_chunk {"chunk_id": 12}' in stub
+
+
+def test_trim_protects_both_recent_steps_even_when_results_are_separate():
+    big = "Sample prose " * 4000
+    messages = [ModelRequest(parts=[UserPromptPart("Sample read")])]
+    for step in range(2):
+        messages.append(
+            ModelResponse(
+                parts=[ToolCallPart("files_read", {}, tool_call_id=f"{step}-{n}") for n in range(4)]
+            )
+        )
+        messages.extend(
+            ModelRequest(parts=[ToolReturnPart("files_read", big, tool_call_id=f"{step}-{n}")])
+            for n in range(4)
+        )
+    assert trim_history(messages, limit_tokens=1) == messages

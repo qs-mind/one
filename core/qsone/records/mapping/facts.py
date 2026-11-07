@@ -11,7 +11,7 @@ import uuid
 from difflib import SequenceMatcher
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from qsone import copy
 from qsone.records import arabic
@@ -50,6 +50,15 @@ class Fact(BaseModel):
     state: Literal["found", "blank"]
     evidence: str
     source_label: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_missing_locator(cls, value):
+        # A reply without file_id or locator still reaches recover_locator, which looks
+        # for the value in the pages this request sent.
+        if isinstance(value, dict):
+            return {"file_id": "", "locator": {}, **value}
+        return value
 
 
 class Result(BaseModel):
@@ -462,6 +471,23 @@ def candidates(rec, *, limit=30, file_ids=None):
     return result
 
 
+def recover_locator(proposal, pages):
+    """Recover only from this request's read pages, in candidate priority order."""
+    from qsone.records.key_lines import key_lines
+
+    p = dict(proposal)
+    loc = p.get("locator") or {}
+    if not pages:
+        return p, False
+    if p.get("file_id") and loc and ("page" in loc or "page" not in pages[0]["locator"]):
+        return p, False
+    matches = [page for page in pages if grounded(page["text"], p)]
+    matches.sort(key=lambda page: not grounded("\n".join(key_lines(page["text"])), p))
+    if matches:
+        p.update(file_id=matches[0]["file_id"], locator=matches[0]["locator"])
+    return p, len(matches) > 1
+
+
 def run(rec, *, read, propose):
     """Read 5–15 candidate pages when available through the caller's recorded read path.
 
@@ -475,6 +501,8 @@ def run(rec, *, read, propose):
     allowed = {(p["file_id"], repr(sorted(p["locator"].items()))) for p in pages}
     valid, refused = [], []
     for p in proposals if isinstance(proposals, list) else []:
+        if isinstance(p, dict):
+            p, _ = recover_locator(p, pages)
         if (
             isinstance(p, dict)
             and isinstance(p.get("locator"), dict)
@@ -593,7 +621,9 @@ def prompt(pages):
         "Extract the facts this tender needs; this is a guide, not a fixed template: "
         + GUIDE
         + ". Return facts with name {en,ar}, value, file_id, locator "
-        "(page or sheet+row), state found or blank, short verbatim evidence, and source_label. "
+        "(page is required for PDF pages; sheet+row for sheets). file_id and page must be copied "
+        "from the supplied source, never omitted or empty. Include state found or blank, "
+        "short verbatim evidence, and source_label. "
         "source_label is optional: words immediately before/around the value, "
         "e.g. فتح العروض → 03/02/1450, never a document title, letterhead or file name. "
         "Copy the label into the name in "
@@ -683,7 +713,9 @@ async def run_approved(rec, *, read, request, file_ids, vision_request=None):
     counts["proposed"] = len(result.facts)
     valid, rejected_proposals = [], []
     for fact in result.facts:
-        p = fact.model_dump()
+        p, ambiguous = recover_locator(fact.model_dump(), pages)
+        if ambiguous:
+            counts["locator_priority_selections"] = counts.get("locator_priority_selections", 0) + 1
         text = allowed.get((p["file_id"], repr(sorted(p["locator"].items()))))
         if text is not None and grounded(text, p):
             # Legacy/scripted adapters may omit the new field. Only recover a label
