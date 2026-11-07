@@ -1,4 +1,5 @@
-# Checks every push to main and every pull request on Linux, Windows and macOS: types, ruff and
+# Checks every push to main, to a check/* branch (scripts/push-checked.sh: main is pushed only after it
+# passes there) and every pull request on Linux, Windows and macOS: types, ruff and
 # clippy (`npm run check`), then the core's and the screen's tests; and the screen end to end in Chromium and
 # WebKit on Linux (`e2e`). Changes to *.md files alone skip it. Run by hand with update-snapshots, it makes the
 # screenshot baselines (the Ubuntu runner is their reference) and uploads them: `gh run download`, then commit.
@@ -7,7 +8,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "check/**"]
     paths-ignore: ["**/*.md"]
   pull_request:
     paths-ignore: ["**/*.md"]

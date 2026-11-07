@@ -8,7 +8,7 @@ name: Package
 
 on:
   push:
-    branches: [main]
+    branches: [main, "check/**"]
     paths:
       - "scripts/package-*"
       - "scripts/smoke-core.mjs"
