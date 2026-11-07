@@ -214,7 +214,7 @@ def typed() -> list[ModelChoice]:
 
 
 def add(name: str, base_url: str, key: str | None, model: str | None = None) -> StandardLink:
-    """Saves a new entry, with the model the engineer typed when there is one; its key goes to
+    """Reuses the provider/key entry, with the engineer's current model; its key goes to
     the key store only.
 
     Raises `ValueError` for a URL that is not http(s) with a host, `KeyInTheClear`,
@@ -224,13 +224,26 @@ def add(name: str, base_url: str, key: str | None, model: str | None = None) -> 
         raise ValueError("base_url must be an http:// or https:// address")
     if key and parts.scheme == "http" and not on_device(base_url):
         raise KeyInTheClear("a key needs https:// unless the server is on this computer")
-    link = StandardLink(uuid4().hex[:12], name, base_url.rstrip("/"), provider_of(base_url))
+    existing = next(
+        (
+            e
+            for e in _entries()
+            if provider_of(e["base_url"]) == provider_of(base_url)
+            and (keys.get_key(PREFIX + e["id"]) or None) == (key or None)
+        ),
+        None,
+    )
+    entry_id = existing["id"] if existing else uuid4().hex[:12]
+    link = StandardLink(entry_id, name, base_url.rstrip("/"), provider_of(base_url))
     if key:
         keys.set_key(link.id, key)
     entry = {"id": link.id.removeprefix(PREFIX), "name": link.name, "base_url": link.base_url}
     if model:
         entry["model"] = model
-    settings.save_ai("standard", [*_entries(), entry | {"provider": link.provider}])
+    settings.save_ai(
+        "standard",
+        [e for e in _entries() if e["id"] != entry_id] + [entry | {"provider": link.provider}],
+    )
     return link
 
 

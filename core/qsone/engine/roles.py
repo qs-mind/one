@@ -175,3 +175,42 @@ def costlier(
 def available(sheet, current):
     """Refresh stale per-request choices while retaining available explicit picks."""
     return chosen(list(sheet)) | {r: c for r, c in current.items() if not refused(c)}
+
+
+async def select_lead(choice, sheet, found, on_usage=None):
+    """Apply a model switch and validate the cheaper automatic quick candidate once."""
+    from qsone.engine import connectors
+
+    typed = next(
+        (
+            c
+            for c in sheet
+            if c.choice.connector == choice.connector
+            and c.choice.model.removeprefix("models/") == choice.model.removeprefix("models/")
+        ),
+        None,
+    )
+    if typed is None:
+        choose("lead", choice)
+        return
+    # Remove old explicit roles only after the new connection has been checked.
+    picked = _around(typed, sheet)
+    while picked["quick"] != typed.choice:
+        quick = picked["quick"]
+        used = []
+        failed = await connectors.check(
+            f"{quick.connector}/{quick.model}", among=found, on_usage=used.append
+        )
+        if used and on_usage is not None:
+            card = next(c for c in sheet if c.choice == quick)
+            on_usage(card, used[0])
+        if failed is None:
+            break
+        # A transient failure must not select this candidate either, but only a
+        # provider refusal is persisted by check(). Keep retries bounded locally.
+        sheet = [c for c in sheet if c.choice != quick]
+        picked = _around(typed, sheet)
+    settings.save_ai(
+        "roles", {r: {"connector": c.connector, "model": c.model} for r, c in picked.items()}
+    )
+    allow_model(typed.choice)

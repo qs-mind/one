@@ -58,6 +58,12 @@ def digest(rec):
             "AND (s.sheet<>'Model' OR NOT EXISTS (SELECT 1 FROM map_sheets p "
             "WHERE p.file_id=s.file_id AND p.sheet<>'Model' AND p.valid_until IS NULL))"
         ).fetchone()
+        drawing_names = store.rows(
+            c,
+            "SELECT f.id,f.name FROM files f WHERE f.valid_until IS NULL AND "
+            "(f.kind IN ('dwg','dxf') OR EXISTS (SELECT 1 FROM map_sheets s "
+            "WHERE s.file_id=f.id AND s.valid_until IS NULL)) ORDER BY f.name LIMIT 30",
+        )
         sheets = store.rows(
             c,
             "SELECT f.name,s.sheet,s.number,s.title FROM map_sheets s "
@@ -74,6 +80,8 @@ def digest(rec):
         ).fetchone()[0]
     if drawing_count:
         lines.append(f"Drawing files: {drawing_count}; drawing sheets: {sheet_count}")
+        for drawing in drawing_names:
+            lines.append(f"Drawing file: {drawing['id']} | {drawing['name']}")
         for sheet in sheets:
             lines.append(
                 f"{sheet['name'][:60]} | {sheet['sheet'][:40]} | "

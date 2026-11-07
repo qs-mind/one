@@ -9,7 +9,7 @@ import json
 import re
 import struct
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol
 
 from qsone.records import arabic, qs_terms
@@ -440,6 +440,7 @@ def search(
         matches.append((" OR ".join(f'"{p}"*' for p in plan.phrases), TERMS_WEIGHT))
     # A complete phrase/near match outweighs isolated query words.
     matches += [(" AND ".join(_quoted(norm)), 2.0) for norm in plan.norms if len(norm.split()) > 1]
+    matches += [(f'"{norm}"', 4.0) for norm in plan.norms if len(norm.split()) > 1]
     lists: list[tuple[str, list[int], float]] = []
     with rec.read() as conn:
         for match, weight in matches:
@@ -458,9 +459,27 @@ def search(
                 if kind not in found_by.get(i, ()):
                     found_by[i] = (*found_by.get(i, ()), kind)
         fused = rrf([ids for _, ids, _ in lists], weights=[w for *_, w in lists])
+        candidates = _hits(conn, fused, found_by)
+
+        def bonus(hit):
+            score = 0.0
+            for text in texts:
+                norm = arabic.normalise(text, stem=False)
+                if len(norm.split()) < 2:
+                    continue
+                phrase = " " + norm + " "
+                if phrase in " " + arabic.normalise(hit.text, stem=False) + " ":
+                    score = max(score, 1.0)
+                for line in hit.text.splitlines():
+                    tokens = arabic.normalise(line, stem=False)
+                    if len(line) <= 100 and (" " + tokens + " ").startswith(phrase):
+                        score = max(score, 2.0)
+            return score
+
+        candidates = [replace(h, score=h.score + bonus(h)) for h in candidates]
+        candidates.sort(key=lambda h: (-h.score, h.chunk_id))
         hits = _distinct_hits(
-            [h for h in _hits(conn, fused, found_by) if file_ids is None or h.file_id in file_ids],
-            k,
+            [h for h in candidates if file_ids is None or h.file_id in file_ids], k
         )
 
     return Result(hybrid, hits[:k])

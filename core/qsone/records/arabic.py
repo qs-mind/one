@@ -67,7 +67,7 @@ def _stem(word: str) -> str:
     return word
 
 
-def normalise(s: str) -> str:
+def normalise(s: str, *, stem: bool = True) -> str:
     """For the word index and for queries: folded letters, lower case, light-stemmed words."""
     words = _WORD.findall(clean(s).lower().translate(_FOLD))
-    return " ".join(_stem(w) if _ARABIC.search(w) else w for w in words)
+    return " ".join(_stem(w) if stem and _ARABIC.search(w) else w for w in words)
