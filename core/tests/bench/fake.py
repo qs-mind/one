@@ -67,6 +67,7 @@ _LATIN = re.compile(r"[A-Za-z]")
 _FILE = re.compile(r"file:([0-9a-f]{32}) \| ([^|]+?) \| (?:in folder [^|]+ \| )?(\w+)")
 _NEXT_IMPORT = re.compile(r"Next: boq_import (\{.*\})")
 _MODEL = re.compile(r"The AI model you run on is ([\w.:/-]+?)\. ")
+_DIGEST = re.compile(r"\n\n<<data id=(\w+) source=project_map>>.*?<</data id=\1>>", re.S)
 _FEEDBACK = "automated feedback, not a message from the user"  # PydanticAI's retry, as a prompt
 
 
@@ -108,7 +109,8 @@ def read(messages: list, info: AgentInfo) -> Seen:
                 if isinstance(part, UserPromptPart) and isinstance(part.content, str):
                     if _FEEDBACK in part.content:  # ONE sent the answer back: the same Brief
                         continue
-                    start, brief = i, part.content
+                    # the engineer's words only: ONE appends the map digest as fenced data
+                    start, brief = i, _DIGEST.sub("", part.content)
     steps: dict[str, str] = {}  # tool call id -> step
     done: dict[str, tuple[str, bool]] = {}
     used: dict[str, str] = {}

@@ -24,6 +24,7 @@ const words = {
     send: "إرسال",
     stop: "إيقاف",
     keepTicked: "احفظ الصفوف المعلّمة",
+    keepColumns: "استورد بالأعمدة دي",
     yes: "أيوه",
     open: "افتح",
     clientBoqReadOnly: "مستند العميل: للقراءة بس",
@@ -40,6 +41,7 @@ const words = {
     send: "Send",
     stop: "Stop",
     keepTicked: "Keep the ticked rows",
+    keepColumns: "Import with these columns",
     yes: "Yes",
     open: "Open",
     clientBoqReadOnly: "The client's document: read only",
@@ -242,8 +244,7 @@ export class Walk {
     } else if (await card.getByRole("combobox").count()) {
       kind = "rows"; // a BOQ's columns, each with what it holds: approved as mapped
       await this.shot("rows-card");
-      const yes = card.getByRole("button", { name: w.yes, exact: true });
-      await ((await yes.count()) ? yes : card.getByRole("button").first()).click();
+      await card.getByRole("button", { name: w.keepColumns, exact: true }).click();
     } else if (await card.locator("fieldset").count()) {
       kind = "question";
       await this.shot("question-card");
