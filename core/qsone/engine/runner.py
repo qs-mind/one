@@ -1719,7 +1719,7 @@ class _Brief:
                 for run in self.store.runs(self.brief_id)
                 for name, ok, _ in outcomes(run["history"])
             )
-            found += truth.tender_search_problem(output, self.text, searched)
+            found += truth.tender_search_problem(output, self.text, searched, rec=rec)
         if rec is not None:  # each number at the row or page the reply cites for it
             found += truth.unread_citations(output, self._read_returns(), rec=rec)
             with rec.read() as c:
