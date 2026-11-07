@@ -99,3 +99,26 @@ async def test_estimate_tracks_scripted_recorded_cost(rec, monkeypatch):
     assert await ai.run(rec, SimpleNamespace(), request=request, passes={"read": read})
     assert recorded <= estimate <= recorded * 2
     assert estimate < Decimal("0.02")
+
+
+async def test_unknown_price_card_is_explicit(rec, monkeypatch):
+    from types import SimpleNamespace
+
+    from qsone.engine import oneshot
+
+    files.add_file(rec, "sample.txt", b"Sample bid validity 90 days", actor="engineer")
+    drain(rec)
+    card = SimpleNamespace(choice=SimpleNamespace(model="claude-haiku-5-5"))
+    monkeypatch.setattr(oneshot, "map_model", lambda _: card)
+    monkeypatch.setattr(ai, "estimate_cost", lambda *a, **kw: None)
+    seen = []
+
+    async def ask(card):
+        seen.append(card)
+        return "no"
+
+    assert not await ai.run(rec, SimpleNamespace(host=SimpleNamespace(ask=ask)))
+    shown = seen[0]
+    assert "ONE has no price for claude-haiku-5-5 yet" in str(shown)
+    assert "US$?" not in str(shown)
+    assert shown.payload["estimate"]["price_unknown"] is True

@@ -355,17 +355,27 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None, vision_r
         vision_card=(vision_card or card) if vision_request is not None else None,
     )
     if estimate is None or estimate > settings.map_auto_usd():
-        cost_text = "?" if estimate is None else format(estimate.quantize(Decimal(".01")), "f")
+        model = getattr(getattr(card, "choice", None), "model", None) or getattr(card, "id", "AI")
+        detail = (
+            copy.fill(copy.MAP_AI_PRICE_UNKNOWN, model=model)
+            if estimate is None
+            else copy.fill(
+                copy.MAP_AI_COST,
+                count=str(len(digests)),
+                cost=format(estimate.quantize(Decimal(".01")), "f"),
+            )
+        )
         approval = Card(
             uuid4().hex,
             "cost",
             copy.MAP_AI_LABEL,
-            copy.fill(copy.MAP_AI_COST, count=str(len(digests)), cost=cost_text),
+            detail,
             ("yes", "no"),
             {
                 "labels": {"yes": copy.MAP_AI_RUN},
                 "purpose": copy.MAP_AI_LABEL,
                 "estimate": {
+                    "price_unknown": estimate is None,
                     "model": getattr(getattr(card, "choice", None), "model", None),
                     "price_source": getattr(card, "price_source", None),
                     "at": rec.clock(),

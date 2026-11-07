@@ -154,6 +154,47 @@ def _summary(tool_name: str, content, args: dict | None = None) -> str:
     text = _text(content)
     if text.startswith("not done:"):  # a refusal stays one (engine.truth reads it: done or not)
         return text.split("\n", 1)[0][:300]
+    if tool_name in ("files_read", "read_chunk"):
+        from qsone.records.key_lines import key_lines
+
+        kept_lines = []
+        locator = ""
+        size = 0
+        seen_locators = set()
+        for line in text.splitlines():
+            if tool_name == "read_chunk" and line.startswith("{"):
+                try:
+                    header = json.loads(line)
+                    locator = (
+                        "Key lines "
+                        + json.dumps(
+                            {"file_id": header.get("file_id"), **header.get("locator", {})},
+                            ensure_ascii=False,
+                        )
+                        + ":"
+                    )
+                except ValueError:
+                    pass
+            elif line.startswith("Key lines "):
+                locator = line
+                size = 0
+            elif locator and key_lines(line) and size + len(line) + 1 <= 600:
+                if locator not in seen_locators:
+                    kept_lines.append(locator)
+                    seen_locators.add(locator)
+                kept_lines.append(line)
+                size += len(line) + 1
+            elif tool_name == "files_read":
+                locator = ""
+        again = f"call {tool_name} {json.dumps(args or {}, ensure_ascii=False)}"
+        return (
+            f"{_STUB}{tool_name} result, trimmed to save room:\n"
+            + "\n".join(kept_lines)
+            + "\nyou read this; its full text was shortened to save room — "
+            "the key lines above are from it; "
+            + again
+            + " to read it again before quoting other text]"
+        )
     ids = ids_in(text, 20)
     values = list(dict.fromkeys(_VALUE.findall(text)))[:20]
     tool = REGISTRY.get(tool_name)
@@ -175,8 +216,8 @@ def _summary(tool_name: str, content, args: dict | None = None) -> str:
 def trim_history(messages: list, *, limit_tokens: int = RESULTS_TOKENS) -> list:
     """With at most `limit_tokens` of tool results, the history as it is. Over it, the oldest
     successful tool results become short stubs (`_summary`), oldest first, until the rest fit.
-    Errors and the latest message stay whole; nothing else changes, and the saved history is
-    never changed in place."""
+    Errors and results from the Brief’s last two model steps stay whole. The saved history
+    is never changed in place."""
     from dataclasses import replace
 
     from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
@@ -190,9 +231,23 @@ def trim_history(messages: list, *, limit_tokens: int = RESULTS_TOKENS) -> list:
         for p in m.parts
         if isinstance(p, ToolCallPart)
     }
+    # A model step may return several parallel calls, each in its own request.
+    # Protect all results of the last two responses in this Brief.
+    from pydantic_ai.messages import UserPromptPart
+
+    start = max(
+        (
+            i
+            for i, m in enumerate(messages)
+            if isinstance(m, ModelRequest) and any(isinstance(p, UserPromptPart) for p in m.parts)
+        ),
+        default=0,
+    )
+    steps = [i for i, m in enumerate(messages) if i >= start and isinstance(m, ModelResponse)]
+    protected = steps[-2] if len(steps) >= 2 else start
     out = list(messages)
     for i, message in enumerate(out[:-1]):
-        if not isinstance(message, ModelRequest):
+        if not isinstance(message, ModelRequest) or i > protected:
             continue
         parts = list(message.parts)
         for j, part in enumerate(parts):
