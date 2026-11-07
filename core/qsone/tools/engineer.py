@@ -13,7 +13,6 @@ Importing this module registers the tool. No PydanticAI here."""
 import json
 import re
 from datetime import datetime
-from difflib import SequenceMatcher
 from typing import Annotated
 from uuid import uuid4
 
@@ -166,38 +165,50 @@ def answered(store: Store, card_id: str) -> dict | None:
 async def _ask(ctx: ToolContext, args: AskArgs) -> str:
     brief = ctx.store.brief(ctx.brief_id)["text"]
 
-    # Question framing adds no requested fact. Ownership and choice qualifiers
-    # deliberately stay: "your rate" differs from a tender's rate.
+    # Compare the question against the whole Brief: a requested sub-fact can
+    # be a small part of a multi-part engineer request.
     framing = set(
         normalise(
             "what is are the a an and or can could would you me tell give show please "
-            "ما هو هي هل ممكن قول لي لو سمحت من فضلك ايه كام"
+            "how many much in on of from all every this that to for does do "
+            "ما هو هي هل ممكن قول لي لو سمحت من فضلك ايه كام في من علي ده دي"
         ).split()
     )
+    extensions = {"dwg", "dxf", "pdf", "xlsx", "xls", "csv", "docx", "doc"}
 
-    def tokens(text):
-        return [
-            word for word in re.findall(r"\w+", normalise(text).casefold()) if word not in framing
-        ]
+    def tokens(text: str) -> set[str]:
+        words = normalise(text).split()
+        # Fold regular English plurals, including block acronyms (MCCBs).
+        return {
+            word[:-1] if word.isascii() and word.endswith("s") and not word.endswith("ss") else word
+            for word in words
+            if word not in framing and word not in extensions
+        }
 
     original = tokens(brief)
     for q in args.questions:
         proposed = tokens(q.text)
-        overlap = len(set(original) & set(proposed)) / max(1, len(set(proposed)))
-        similar = SequenceMatcher(None, " ".join(original), " ".join(proposed)).ratio()
-        # Shared QS nouns do not make the same request: a new qualifier such as
-        # "your"/"عندك", or a different fact (rate vs grade), changes what is asked.
-        new_words = set(proposed) - set(original)
-        owned_rate = bool(set(proposed) & {"your", "عندك", "سعرك", "اسعارك"}) and bool(
-            set(proposed) & {"rate", "rates", "price", "prices", "سعر", "اسعار", "سعرك", "اسعارك"}
+        overlap = len(original & proposed) / max(1, len(proposed))
+        owned_rate = bool(proposed & tokens("your عندك سعرك اسعارك")) and bool(
+            proposed & tokens("rate rates price prices سعر اسعار سعرك اسعارك")
         )
-        choice = bool(set(proposed) & {"choose", "prefer", "اختيارك", "تفضل"})
-        restates = not new_words and (similar >= 0.72 or (len(proposed) >= 2 and overlap >= 0.8))
-        if restates and (proposed == original or not (owned_rate or choice)):
-            raise ModelRetry(
-                "Do not send the Brief's request back as a question: answer from the files "
-                "or say plainly what was not found. Ask only for their own prices or choices."
+        # These ask for an engineer action/decision, rather than a fact in files.
+        decision = bool(
+            proposed
+            & tokens(
+                "choose prefer choice approve approval permission upload attach provide "
+                "supply send تفضل اختيارك اختار توافق موافق موافقه ارفع ابعت ارسل ارفق وفر"
             )
+        )
+        choice = bool(
+            re.search(
+                r"\b(which|whether)\b.*\b(should|use|price|version|versions|option|options)\b"
+                r"|\b(?:or|ولا|ام)\b",
+                normalise(q.text, stem=False),
+            )
+        )
+        if proposed and overlap >= 0.6 and not (owned_rate or decision or choice):
+            raise ModelRetry(copy.QUESTION_OWN_REQUEST["en"])
     _check_language(ctx, args)
     questions = [q.model_dump(exclude_defaults=True) for q in args.questions]
     card = Card(
