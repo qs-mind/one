@@ -359,20 +359,24 @@ def test_native_model_selection(running, tmp_path):
     session, _ = running
     key = tmp_path / "native.txt"
     key.write_text("sample-bench-ok-value")
-    cli(
-        session,
-        "setup",
-        "ai",
-        "--provider",
-        "anthropic",
-        "--model",
-        "sample-model",
-        "--key-file",
-        key,
-    )
     c = Client(json.loads(session.read_text()))
     try:
-        assert c.get("/settings/model")["id"] == "sample-model"
+        # Reuse the connector: old role assignments must not upgrade the new lead.
+        for model in ("sample-model", "claude-haiku-5-5"):
+            result = cli(
+                session,
+                "setup",
+                "ai",
+                "--provider",
+                "anthropic",
+                "--model",
+                model,
+                "--key-file",
+                key,
+            )
+            assert c.get("/settings/model")["id"] == model
+            assert all(r["model"] == model for r in result["roles"].values())
+            assert len(result["roles"]) == 4
     finally:
         c.close()
 

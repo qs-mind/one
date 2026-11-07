@@ -3,7 +3,9 @@
 Ranking is by `price_in + price_out`. A card with no price is never a default and never a
 fallback: only the engineer can pick it. An on-device card (price 0) can be both. Nor is a model
 its provider refused, one the price book marks deprecated, or a "-latest" alias (finding 12).
-The model the engineer typed with a Standard Link is their own pick: it leads, priced or not.
+The engineer's selected model leads and sets the other roles to the same model. Automatic
+alternatives require known prices at or below that model's known price; an unknown price keeps
+all roles on it. Only explicit role choices may upgrade. Fresh defaults retain price ranking.
 """
 
 from decimal import Decimal
@@ -75,8 +77,9 @@ def _around(typed: ModelCard, sheet: list[ModelCard]) -> dict[Role, ModelChoice]
 def defaults(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
     """The Recommended Settings; empty when no card ONE may pick has a price.
 
-    With a model the engineer typed: `_around` it, so the Checking QS is never the model whose
-    work it checks (decisions: a same-provider check uses another model). Otherwise:
+    With a typed model, use it or known-price alternatives no costlier than it. If its price
+    is unknown, every role uses it. A stronger role requires the engineer's explicit choice.
+    Without a typed model:
     - Lead QS: `LEAD_MODEL`, else the most expensive model.
     - Checking QS: the most expensive model of another provider; with one provider, the most
       expensive other model (a Same-provider check); with one model, that model.
@@ -85,6 +88,27 @@ def defaults(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
     typed = typed_card(sheet)
     if typed is not None:
         return _around(typed, sheet)
+    for choice in standard.typed():
+        card = next(
+            (
+                c
+                for c in sheet
+                if c.choice.connector == choice.connector
+                and c.choice.model.removeprefix("models/") == choice.model.removeprefix("models/")
+            ),
+            None,
+        )
+        if card is None:
+            if not refused(choice):
+                # An absent typed model has no sourced price either.
+                return dict.fromkeys(ROLES, choice)
+            return {}
+        # A refused typed model may only give way to known-price, cheaper alternatives.
+        alternatives = same_or_cheaper(sheet, card.choice, set())
+        if not alternatives:
+            return {}
+        replacement = next(c for c in sheet if c.choice == alternatives[0])
+        return _around(replacement, sheet)
     ranked = _ranked([c for c in sheet if _eligible(c)])
     if not ranked:
         return {}
@@ -125,16 +149,37 @@ def saved() -> dict[Role, ModelChoice]:
 
 
 def choose(role: Role, choice: ModelChoice) -> None:
-    """Raises `OSError` when the settings file cannot be written."""
+    """A new Lead QS clears the other roles' saved choices: they follow the lead again
+    (`chosen`), never costlier than it. Another role's choice is the engineer's own override.
+
+    Raises `OSError` when the settings file cannot be written.
+    """
     current = {r: {"connector": c.connector, "model": c.model} for r, c in saved().items()}
+    if role == "lead":
+        current = {}
     current[role] = {"connector": choice.connector, "model": choice.model}
     settings.save_ai("roles", current)
     allow_model(choice)
 
 
 def chosen(sheet: list[ModelCard]) -> dict[Role, ModelChoice]:
-    """The engineer's choices over the defaults; a choice its provider refused gives way."""
-    return defaults(sheet) | {r: c for r, c in saved().items() if not refused(c)}
+    """Explicit roles override a team bounded by the engineer's lead, when selected.
+
+    A refused choice gives way; without a selected lead, fresh defaults retain their ranking.
+    """
+    selected = saved()
+    explicit = {r: c for r, c in selected.items() if not refused(c)}
+    lead = selected.get("lead")
+    if lead is None:
+        return defaults(sheet) | explicit
+    if refused(lead):
+        alternatives = same_or_cheaper(sheet, lead, set())
+        if not alternatives:
+            return explicit
+        lead = alternatives[0]
+    card = next((c for c in sheet if c.choice == lead), None)
+    team = _around(card, sheet) if card is not None else dict.fromkeys(ROLES, lead)
+    return team | explicit
 
 
 def _failed_price(sheet: list[ModelCard], failed: ModelChoice) -> Decimal | None:
