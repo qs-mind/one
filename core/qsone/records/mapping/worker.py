@@ -7,6 +7,7 @@ import logging
 import re
 
 import pdf_inspector
+from pypdfium2 import PdfiumError
 
 from qsone import copy
 from qsone.records import boq, files, ocr
@@ -329,7 +330,9 @@ def step(
                 _update(rec, file_id, {"local_state": "failed", "note": copy.OCR_TESSERACT_FAILED})
                 original.clear()
                 return True
-            note = copy.MAP_ARABIC_MISSING if "ara" not in languages[1].split("+") else row["note"]
+            note = row["note"]
+            if note != copy.MAP_LOCAL_RETRY and "ara" not in languages[1].split("+"):
+                note = copy.MAP_ARABIC_MISSING
             if cancelled():
                 return False
             from qsone.tools.files import _local_page
@@ -381,6 +384,7 @@ def step(
             {
                 "local_state": "done",
                 "mapped_at": rec.clock(),
+                "note": None if row["note"] == copy.MAP_LOCAL_RETRY else row["note"],
                 "ocr_done_pages": sorted(set(scanned) & read),
                 "read_how": ("mixed" if row["text_pages"] else "ocr")
                 if scanned
@@ -409,7 +413,16 @@ def step(
             frames,
         )
         original.clear()
-        _update(rec, file_id, {"local_state": "failed", "note": copy.MAP_FAILED})
+        transient = isinstance(error, (PdfiumError, OSError))
+        retry = transient and row["note"] != copy.MAP_LOCAL_RETRY
+        _update(
+            rec,
+            file_id,
+            {
+                "local_state": row["local_state"] if retry else "failed",
+                "note": copy.MAP_LOCAL_RETRY if retry else copy.MAP_FAILED,
+            },
+        )
     return True
 
 

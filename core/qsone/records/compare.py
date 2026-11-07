@@ -20,6 +20,7 @@ import pypdfium2.raw as pdfium_c
 
 from qsone import copy
 from qsone.records import files, render
+from qsone.records.pdfium_guard import PDFIUM
 from qsone.records.project import Records, RecordsError
 
 SMALL, LARGE = 600, 1400
@@ -101,7 +102,7 @@ def overlay_pixels(old: np.ndarray, new: np.ndarray) -> tuple[np.ndarray, int]:
 
 
 def _images(old: bytes, new: bytes, before: int, after: int, width: int):
-    with render._RENDERS:
+    with PDFIUM:
         docs = []
         pages = []
         try:

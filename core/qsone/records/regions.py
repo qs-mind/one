@@ -12,6 +12,7 @@ import pypdfium2.raw as raw
 
 from qsone import copy
 from qsone.records import files
+from qsone.records.pdfium_guard import pdfium_locked
 from qsone.records.project import Records, RecordsError
 
 _TOKEN = re.compile(r"(?<![\w.,٬٫])[+-]?\d[\d,٬]*(?:[.٫]\d+)?(?![\w.,٬٫])")
@@ -24,6 +25,7 @@ def _number(text):
         return None
 
 
+@pdfium_locked
 def pdf_numbers(data: bytes, page: int) -> dict:
     """Native numeric tokens and glyph boxes in the displayed CropBox/rotation frame."""
     try:

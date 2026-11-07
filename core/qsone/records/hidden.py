@@ -17,6 +17,7 @@ from typing import Literal, Protocol
 import pypdfium2.raw as pdfium_c
 
 from qsone.records.arabic import display_number, display_text, normalise
+from qsone.records.pdfium_guard import pdfium_locked
 
 FlagKind = Literal[
     "white_text",
@@ -116,6 +117,7 @@ _STROKE_ONLY = {pdfium_c.FPDF_TEXTRENDERMODE_STROKE, pdfium_c.FPDF_TEXTRENDERMOD
 _LIGHT = 235  # a grey level this light or lighter counts as white
 
 
+@pdfium_locked
 def pdf_page_flags(page, textpage, number: int) -> list[Flag]:
     """White, tiny, invisible and off-page text on one open pypdfium2 page.
 
@@ -172,6 +174,7 @@ def pdf_page_flags(page, textpage, number: int) -> list[Flag]:
     return flags
 
 
+@pdfium_locked
 def _chars(tp, indexes: list[int]) -> str:
     """The characters at `indexes`, with a space where the run breaks."""
     out, prev = [], None
@@ -183,6 +186,7 @@ def _chars(tp, indexes: list[int]) -> str:
     return "".join(out)
 
 
+@pdfium_locked
 def _on_white(page, indexes: list[int], boxes: dict) -> list[int]:
     """The white characters whose surroundings are white on the rendered page: at least three of
     four points just outside the corners of the character's box. Spaces follow their run."""
@@ -210,6 +214,7 @@ def _on_white(page, indexes: list[int], boxes: dict) -> list[int]:
         bitmap.close()
 
 
+@pdfium_locked
 def _ocr_layer(page, invisible: list[int], tp, chars: int) -> bool:
     """Nine tenths of the page's text is invisible and the page has an image: a scan's text."""
     shown = sum(not chr(pdfium_c.FPDFText_GetUnicode(tp, i)).isspace() for i in invisible)

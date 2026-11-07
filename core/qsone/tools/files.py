@@ -38,6 +38,7 @@ from qsone.engine.types import Card, Progress
 from qsone.records import boq, files, ocr, render
 from qsone.records.files import FileInfo
 from qsone.records.mapping import drawing_evidence
+from qsone.records.pdfium_guard import PDFIUM, pdfium_locked
 from qsone.records.project import Records, RecordsError
 from qsone.tools import cite
 from qsone.tools.cite import SourceRef
@@ -51,7 +52,7 @@ PART_BYTES = 4 * 1024  # of file text in one result; the rest is for flags and s
 MAX_PAGES = 1000  # in one call
 MAX_FLAGS = 5  # flags named in one result; the rest are counted
 READ_AT_ONCE = 2  # AI requests at the same time
-_OCR_IMAGES = threading.RLock()  # PDFium calls cannot overlap across OCR workers
+_OCR_IMAGES = threading.RLock()  # Bound OCR image preparation; acquire before PDFIUM.
 
 _PAGED = {"pdf", "png", "jpg", "webp"}
 _IMAGES = {"png", "jpg", "webp"}
@@ -409,7 +410,8 @@ def _template_blanks(rec, info, chunks):
 
     recovered = {}
     try:
-        with _OCR_IMAGES, pdfium.PdfDocument(files.read_original(rec, info.id)) as doc:
+        data = files.read_original(rec, info.id)
+        with _OCR_IMAGES, PDFIUM, pdfium.PdfDocument(data) as doc:
             for number in sorted(pages):
                 page = doc[number - 1]
                 tp = None
@@ -607,6 +609,7 @@ def _render(rec: Records, info: FileInfo, args: ReadArgs, sel: _Selection, notes
 # files_read: scanned pages, local OCR then the engineer's AI ---------------------------------
 
 
+@pdfium_locked
 def _jpeg_png(data: bytes) -> bytes:
     """A JPEG redrawn as a PNG, at most PAGE_WIDTH wide, in memory (pdfium decodes it)."""
     pdf = pdfium.PdfDocument.new()
@@ -629,7 +632,7 @@ def _jpeg_png(data: bytes) -> bytes:
 
 
 def _image(kind: str, data: bytes, page: int) -> bytes:
-    with _OCR_IMAGES:
+    with _OCR_IMAGES, PDFIUM:
         if kind == "pdf":
             with pdfium.PdfDocument(data) as doc:
                 pdf_page = doc[page - 1]
@@ -673,8 +676,8 @@ async def _ask_cost(ctx: ToolContext, info: FileInfo, reader, pages: list[int]) 
 
 
 def _local_page(data: bytes, kind: str, page: int, executable: str, tessdata, languages):
-    with _OCR_IMAGES:
-        png = _image(kind, data, page)
+    png = _image(kind, data, page)
+    with _OCR_IMAGES, PDFIUM:
         if kind == "pdf":
             doc = pdfium.PdfDocument(data)
             try:

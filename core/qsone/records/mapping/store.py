@@ -359,7 +359,9 @@ def rejected_entries(rec, *, cursor=None, limit=100):
     with rec.read() as c:
         found = rows(
             c,
-            "SELECT * FROM map_rejected_facts WHERE id>? ORDER BY id LIMIT ?",
+            "SELECT r.*, f.name AS file FROM map_rejected_facts r "
+            "LEFT JOIN files f ON f.id=json_extract(r.proposal, '$.file_id') "
+            "WHERE r.id>? ORDER BY r.id LIMIT ?",
             (cursor or "", limit + 1),
         )
     return {

@@ -2,19 +2,19 @@
 
 Plan 7 defines this module for the canvas; Plan 5 needs it first, to send a scanned page to the
 engineer's AI. pdfium renders to RGBA, and `_png` writes the PNG by hand (IHDR, one IDAT, IEND).
-At most two pages render at once."""
+PDFium operations are serialized process-wide."""
 
 import math
 import struct
-import threading
 import zlib
 
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-_RENDERS = threading.Semaphore(2)
+from qsone.records.pdfium_guard import PDFIUM, pdfium_locked
 
 
+@pdfium_locked
 def page_count(pdf_bytes: bytes) -> int:
     doc = pypdfium2.PdfDocument(pdf_bytes)
     try:
@@ -26,7 +26,7 @@ def page_count(pdf_bytes: bytes) -> int:
 def page_png(pdf_bytes: bytes, page: int, width: int) -> bytes:
     """Page `page` (from 1) as a PNG `width` pixels wide, on white. Raises `IndexError` for a
     page the file does not have."""
-    with _RENDERS:
+    with PDFIUM:
         doc = pypdfium2.PdfDocument(pdf_bytes)
         try:
             if not 1 <= page <= len(doc):

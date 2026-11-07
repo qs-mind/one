@@ -3031,3 +3031,8 @@ MAP_FACT_REJECTED = {
     "en": "Found but not verified",
     "ar": "اتلاقت، بس لسه مش متحقق منها",
 }
+
+MAP_LOCAL_RETRY = {
+    "en": "Local reading paused after a temporary error; ONE will retry once.",
+    "ar": "القراءة المحلية وقفت بسبب خطأ مؤقت؛ ONE هيحاول مرة كمان.",
+}

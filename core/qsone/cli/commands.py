@@ -1,5 +1,6 @@
 """Thin route adapters shared by argparse and YAML walks."""
 
+import hashlib
 import os
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ import httpx
 from qsone.cli import session
 from qsone.cli.follow import follow
 from qsone.cli.texts import TEXT, CliError
+from qsone.records.pdfium_guard import PDFIUM
 
 
 class Commands:
@@ -103,9 +105,28 @@ class Commands:
                             f"/projects/{project}/files",
                             params={"name": path.name, **({"folder": folder} if folder else {})},
                             content=source,
+                            timeout=300,
                         )
                     )
             except (CliError, OSError, httpx.HTTPError) as error:
+                if isinstance(error, httpx.TimeoutException):
+                    try:
+                        with path.open("rb") as source:
+                            digest = hashlib.file_digest(source, "sha256").hexdigest()
+                        found = self.client.get(f"/projects/{project}/files")["files"]
+                        match = next(
+                            (
+                                f
+                                for f in found
+                                if f.get("name") == path.name and f.get("sha256") == digest
+                            ),
+                            None,
+                        )
+                        if match is not None:
+                            result.append(match)
+                            continue
+                    except (CliError, OSError, httpx.HTTPError):
+                        pass
                 result.append(
                     {
                         "name": path.name,
@@ -193,6 +214,9 @@ class Commands:
             page = self.client.get(route, cursor=result["next_cursor"], **params)
             result[key].extend(page[key])
             result["next_cursor"] = page.get("next_cursor")
+        if rejected:
+            for row in result.get("rejected", []):
+                row.update(row.get("proposal", {}))
         return result
 
     def files_report(self, project):
@@ -258,6 +282,10 @@ class Commands:
     def download(self, route, out, *, method="GET", **params):
         response = self.client.http.request(method, route, params=params)
         self.client.check(response)
+        out = Path(out)
+        if out.is_dir():
+            parts = route.rstrip("/").split("/")
+            out = out / ((parts[-2] if len(parts) > 1 else "document") + ".pdf")
         result = {"out": str(out), "bytes": len(response.content)}
         if response.content.startswith(b"%PDF"):
             from io import BytesIO
@@ -289,7 +317,7 @@ class Commands:
 
             import pypdfium2 as pdfium
 
-            with pdfium.PdfDocument(response.content) as rendered:
+            with PDFIUM, pdfium.PdfDocument(response.content) as rendered:
                 result["page_texts"] = []
                 for page_index in range(len(rendered)):
                     with closing(rendered[page_index]) as page:
