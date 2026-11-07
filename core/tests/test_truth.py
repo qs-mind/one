@@ -438,3 +438,19 @@ def test_search_hit_is_exact_read_passage():
     assert truth.unread_citations(
         "Security 2% (sample.pdf, page 50).", [("search_records", result)]
     )
+
+
+def test_a_read_page_missing_one_value_is_not_called_unread():
+    """Retest 13: page 20 was read (it shows 1%), the reply also gave a 2% from another file.
+    The model is told to fix the value; the engineer is not told the page was unread."""
+    returns = [
+        (
+            "files_read",
+            'file_id: sample | file: sample.pdf\n{"page": 20}\nSample security 1 percent\nsources:',
+        )
+    ]
+    [problem] = truth.unread_citations("Security 2% to 1%, sample.pdf, page 20.", returns)
+    assert problem.flag is None and "was read" in problem.fix
+    [unread] = truth.unread_citations("Security 1%, sample.pdf, page 21.", returns)
+    assert unread.flag is not None and "was not read" in unread.fix
+    assert not truth.unread_citations("Security 1%, sample.pdf, page 20.", returns)
