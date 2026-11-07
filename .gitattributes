@@ -1,0 +1,2 @@
+# One line ending everywhere: a Windows checkout gets LF too (tests and scripts read files as LF).
+* text=auto eol=lf
