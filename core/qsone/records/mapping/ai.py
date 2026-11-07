@@ -293,6 +293,15 @@ def estimate_cost(rec, card, digests, *, enrichment=False, vision_card=None):
 
 async def run(rec, models, *, file_ids=None, request=None, passes=None, vision_request=None):
     """Map ready files once. Unknown prices require approval too; a refusal sends no text."""
+    # A drop is priced only once every current original has finished local reading.
+    # Recheck here as foreground mapping can bypass the background worker's idle gate.
+    with rec.read() as c:
+        if c.execute(
+            "SELECT 1 FROM files f LEFT JOIN map_files m ON m.file_id=f.id "
+            "WHERE f.valid_until IS NULL AND (m.file_id IS NULL OR "
+            "m.local_state IN ('waiting','reading')) LIMIT 1"
+        ).fetchone():
+            return False
     vision_card = None
     if request is None:
         vision_card = oneshot.map_picture_model(models)

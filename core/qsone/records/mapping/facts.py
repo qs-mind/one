@@ -171,6 +171,28 @@ def shown(row):
     return row
 
 
+def same_fact(left, right):
+    """Identity comes from either bilingual name or the grounded source label."""
+
+    def names(row):
+        return {
+            grounding_text(v)
+            for v in [*row["name"].values(), row.get("source_label")]
+            if isinstance(v, str) and grounding_text(v)
+        }
+
+    def values(row):
+        found = {row["value"], (row.get("picture_check") or {}).get("text_value")}
+        return {clean(unicodedata.normalize("NFKC", v)) for v in found if isinstance(v, str)}
+
+    return (
+        left["file_id"] == right["file_id"]
+        and left["locator"] == right["locator"]
+        and bool(names(left) & names(right))
+        and bool(values(left) & values(right))
+    )
+
+
 def accept(rec, proposals, *, picture_fallback=True, rejected=None):
     ids, prepared, rejected_proposals = [], [], []
     rejected = rejected if rejected is not None else {}
@@ -238,22 +260,6 @@ def accept(rec, proposals, *, picture_fallback=True, rejected=None):
                 ),
                 None,
             )
-            old = store.rows(
-                c,
-                "SELECT * FROM map_facts WHERE file_id=? AND valid_until IS NULL",
-                (p["file_id"],),
-            )
-            if any(
-                store.decoded(r)["name"] == name
-                and store.decoded(r)["locator"] == locator
-                and (
-                    r["value"] == value
-                    or (store.decoded(r).get("picture_check") or {}).get("text_value") == value
-                )
-                for r in old
-            ):
-                reject("duplicate")
-                continue
             row = dict(
                 evidence=evidence,
                 picture_check=None,
@@ -290,15 +296,13 @@ def accept(rec, proposals, *, picture_fallback=True, rejected=None):
                     (row["file_id"],),
                 )
             ]
-            if any(
-                r["name"] == row["name"]
-                and r["locator"] == row["locator"]
-                and (
-                    r["value"] == row["value"]
-                    or (r.get("picture_check") or {}).get("text_value") == row["value"]
-                )
-                for r in old
-            ):
+            matches = [r for r in old if same_fact(r, row)]
+            if matches:
+                # Keep the current fact (and its confirmation); retire legacy duplicates.
+                for duplicate in matches[1:]:
+                    store.write(
+                        c, rec, "map_facts", {"id": duplicate["id"], "valid_until": rec.clock()}
+                    )
                 reject("duplicate")
                 continue
             store.write(c, rec, "map_facts", row)

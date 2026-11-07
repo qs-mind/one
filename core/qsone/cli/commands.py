@@ -182,7 +182,11 @@ class Commands:
                 for card in cards.values()
                 if card.get("kind") == "cost" and card.get("status") == "pending"
             ]
-            if pending:
+            status = result.get("status", {})
+            local_busy = bool(status.get("waiting", 0) or status.get("reading", 0)) or any(
+                f.get("local_state") in ("waiting", "reading") for f in states
+            )
+            if pending and not local_busy:
                 self.saved["cards"].update({card["id"]: card for card in pending})
                 session.save(self.path, self.saved)
                 return result | {"cards": pending, "state": "waiting_engineer"}
