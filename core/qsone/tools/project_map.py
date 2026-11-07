@@ -1,6 +1,7 @@
 """Read the map as untrusted navigation evidence, never as proof a page was read."""
 
 import json
+from difflib import get_close_matches
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -84,6 +85,24 @@ def local_evidence(rec, row, args):
 async def read_map(ctx, args):
     if ctx.rec is None:
         raise ModelRetry(copy.FILE_NOT_IN_PROJECT["en"])
+    if args.file_id:
+        with ctx.rec.read() as c:
+            candidates = c.execute("SELECT id,name FROM files WHERE valid_until IS NULL").fetchall()
+        match = next((fid for fid, name in candidates if args.file_id == fid), None)
+        if match is None:
+            matches = [
+                fid for fid, name in candidates if normalise(name) == normalise(args.file_id)
+            ]
+            match = matches[0] if len(matches) == 1 else None
+        if match is None:
+            names = [name for _, name in candidates]
+            closest = get_close_matches(args.file_id, names, n=5, cutoff=0)
+            raise ModelRetry(
+                copy.FILE_NOT_IN_PROJECT["en"]
+                + " Closest file names: "
+                + json.dumps(closest, ensure_ascii=False)
+            )
+        args = args.model_copy(update={"file_id": match})
     if args.mode in ("sheets", "counts"):
         result = drawing_evidence(ctx.rec, args)
     elif args.mode in ("facts", "links"):

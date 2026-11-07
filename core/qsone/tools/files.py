@@ -448,6 +448,12 @@ def _lines(chunks: list[tuple[dict, str]]) -> list[tuple[dict, str, bool]]:
             if locator != current:
                 out.append((locator, _json(locator), True))
                 current = locator
+            from qsone.records.key_lines import key_lines
+
+            keys = key_lines(text)
+            if keys:
+                out.append((locator, "Key lines " + _json(locator) + ":", False))
+                out += [(locator, t, False) for t in keys]
             lines = [t for t in text.split("\n") if t.strip()] or ["[no text on this page]"]
             out += [(locator, t, False) for t in lines]
         else:

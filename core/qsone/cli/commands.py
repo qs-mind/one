@@ -48,11 +48,10 @@ class Commands:
                     "model": model,
                 },
             )
-            try:
-                self.client.post("/settings/ai/check", {"via": "standard", "connector": link["id"]})
-            except Exception:
-                self.client.request("DELETE", f"/settings/ai/standard/{link['id']}")
-                raise
+            self.client.post("/settings/ai/check", {"via": "standard", "connector": link["id"]})
+            self.client.request(
+                "PUT", "/settings/model", json={"id": model, "connector": link["id"]}
+            )
         return {"roles": self.client.get("/settings/ai")["roles"]}
 
     def finish(self):

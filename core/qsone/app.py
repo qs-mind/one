@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 import anthropic
 import httpx2
@@ -113,6 +114,7 @@ class ModelIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     id: str = Field(min_length=1, max_length=200)
+    connector: str = "anthropic"
 
 
 def create_app(
@@ -384,12 +386,32 @@ def create_app(
 
     @app.get("/settings/model")
     def lead_model() -> dict:
-        return {"id": chat.lead_model_id()}
+        lead = roles.saved().get("lead")
+        return {"id": lead.model if lead else chat.lead_model_id()}
 
     @app.put("/settings/model")
-    def choose_lead_model(body: ModelIn) -> JSONResponse:
+    async def choose_lead_model(body: ModelIn) -> JSONResponse:
         try:
-            roles.choose("lead", ModelChoice("anthropic", body.id))
+            if body.connector == "anthropic":
+                roles.choose("lead", ModelChoice(body.connector, body.id))
+            else:
+                sheet, found = await engine.sheet()
+
+                def count_probe(card, used):
+                    if engine.cost_book() is not None:
+                        engine.spending.after_response(
+                            brief_id=f"check-{uuid4().hex}",
+                            project_id=None,
+                            run_id=uuid4().hex,
+                            role="quick",
+                            card=card,
+                            input_tokens=used.input_tokens or 0,
+                            output_tokens=used.output_tokens or 0,
+                        )
+
+                await roles.select_lead(
+                    ModelChoice(body.connector, body.id), sheet, found, count_probe
+                )
         except OSError:
             return JSONResponse({"error": copy.MODEL_NOT_SAVED}, status_code=503)
         return JSONResponse({"id": body.id})
