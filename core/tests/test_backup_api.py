@@ -1,5 +1,7 @@
 """The Backup routes of the HTTP contract (Plan 8, Task 4), over the bearer secret."""
 
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -24,6 +26,15 @@ def project(client):
     data = sample_xlsx({"BOQ": [["03/02", "خرسانة مسلحة للأسقف", "م3", 120]]})
     r = client.post(f"/projects/{pid}/files", params={"name": BOQ}, content=data, headers=AUTH)
     assert r.status_code == 201
+    # local reading adds to the audit trail; let it finish so each backup sees a still project
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        status = client.get(f"/projects/{pid}/map", headers=AUTH).json()["status"]
+        if status["waiting"] == 0 and status["reading"] == 0:
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError(f"local reading did not finish: {status}")
     return pid
 
 
