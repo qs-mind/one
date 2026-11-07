@@ -56,6 +56,8 @@ def tender_facts(rec, *, preview=False):
             state=fact["state"],
             conflict_with=fact["conflict_with"],
         )
+        if not preview and fact.get("source_label"):
+            item["source_label"] = fact["source_label"]
         if preview:
             item["name"] = {lang: _short(text, 60) for lang, text in item["name"].items()}
             item["value"] = _short(item["value"], 120)

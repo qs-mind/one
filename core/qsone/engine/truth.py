@@ -862,8 +862,12 @@ def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]
     A new citation ends the previous scope. A trailing Source line applies only to the
     preceding uncited lines, never across another citation. Markdown emphasis is presentation.
     """
+    from qsone.records.arabic import clean
+
+    text = clean(text or "")
     segments = _SEGMENT.split(re.sub(r"[*`]+", "", text or ""))
     parsed = []
+    last_file = None
     for segment in segments:
         places: list[Place] = []
         blank = segment
@@ -877,9 +881,31 @@ def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]
         for m in _BARE_ROW.finditer(blank):
             places.append(Place("", rows=_numbers_of(m["rows"])))
             blank = blank.replace(m[0], " " * len(m[0]))
-        filename = re.search(r"[\w-]+\.(?:pdf|xlsx?|docx?|csv|txt|dwg|dxf)\b", segment, re.I)
-        if filename:
-            places = [Place(p.sheet, p.rows, p.pages, filename[0]) for p in places]
+        filenames = list(
+            re.finditer(
+                r"(?:^|[:،,(]|\band\s+)(?:\s*)[«\"']?([\w-]+(?:[ \t]+[\w-]+)*"
+                r"\.(?:pdf|xlsx?|docx?|csv|txt|dwg|dxf))\b",
+                segment,
+                re.I,
+            )
+        )
+        page_matches = list(_PAGE.finditer(segment))
+        assigned = []
+        page_index = 0
+        for place in places:
+            position = len(segment)
+            if place.sheet is None:
+                position = page_matches[page_index].start()
+                page_index += 1
+            preceding = [m for m in filenames if m.start() < position]
+            filename = re.sub(r"^and\s+", "", preceding[-1][1], flags=re.I) if preceding else None
+            if filename is None and re.search(r"\bsame\b|نفس الملف|نفس المصدر", segment, re.I):
+                filename = last_file
+            assigned.append(Place(place.sheet, place.rows, place.pages, filename))
+        places = assigned
+        if filenames:
+            last_file = re.sub(r"^and\s+", "", filenames[-1][1], flags=re.I)
+        blank = re.sub(r"(?:article|clause|المادة|مادة)\s+\d+", "", blank, flags=re.I)
         parsed.append([segment, places, list(numbers_guard._counted(blank))])
     active = []
     pending = []
@@ -893,6 +919,7 @@ def citations(text: str) -> list[tuple[str, list[Place], list[tuple[str, str]]]]
             pending = []
         elif active:
             entry[1] = active
+            pending.append(entry)
         else:
             pending.append(entry)
     return [(segment, places, numbers) for segment, places, numbers in parsed if places]
@@ -1333,6 +1360,8 @@ def read_passages(returns: list[tuple[str, str]]) -> list[tuple[str, dict, str]]
 
 def unread_citations(text: str, returns: list[tuple[str, str]], *, rec=None) -> list[Problem]:
     """A cited place must occur in this Brief's returned text, including specialists' reads."""
+    from qsone.records.arabic import clean
+
     passages = read_passages(returns)
     if rec is not None:
         from qsone.engine.map_digest import tender_facts
@@ -1367,9 +1396,7 @@ def unread_citations(text: str, returns: list[tuple[str, str]], *, rec=None) -> 
             # Dates are intentionally excluded by the general quantity guard; here
             # they are tender values and must match the cited evidence too.
             dates = re.findall(r"(?<!\d)\d{1,4}/\d{1,2}/\d{1,4}(?!\d)", segment)
-            dates_match = all(
-                d.translate(_DIGITS) in " ".join(read_text).translate(_DIGITS) for d in dates
-            )
+            dates_match = all(clean(d) in clean(" ".join(read_text)) for d in dates)
             if (
                 not all(any(matches(loc, n) for _, loc, _ in passages) for n in coordinates)
                 or any(value not in have for _, value in numbers)
@@ -1392,7 +1419,8 @@ def unread_citations(text: str, returns: list[tuple[str, str]], *, rec=None) -> 
 
 
 _TENDER_ABSENCE = re.compile(
-    r"not found|could(?:n't| not) find|not (?:specified|stated|provided)|لم "
+    r"missing|still missing|ناقص|not found|could(?:n't| not) find|"
+    r"not (?:specified|stated|provided)|لم "
     r"(?:أجد|اجد|يتم العثور)|غير (?:موجود|مذكور|محدد)|مش (?:موجود|مذكور)|ملقيتش|مفيش",
     re.I,
 )
@@ -1401,7 +1429,60 @@ _TENDER_QUESTION = re.compile(
 )
 
 
-def tender_search_problem(output, question, searched):
+def tender_search_problem(output, question, searched, *, rec=None):
+    from qsone.engine.map_digest import tender_facts
+    from qsone.records.arabic import normalise
+
+    found = []
+    # Match the absent item's clause, not other answered items in the reply.
+    aliases = ("bid security", "tender security", "الضمان الابتدائي", "التامين الابتدائي")
+
+    def words(text):
+        text = normalise(text)
+        for alias in aliases:
+            text = text.replace(normalise(alias), " bidsecurity ")
+        return set(re.findall(r"\w+", text)) - {
+            "the",
+            "of",
+            "a",
+            "is",
+            "not",
+            "found",
+            "missing",
+            "amount",
+            "or",
+            "percentage",
+        }
+
+    absent = [line for line in re.split(r"[\n.;؛]", output) if _TENDER_ABSENCE.search(line)]
+    for fact in tender_facts(rec) if rec is not None and absent else []:
+        if fact["state"] == "blank" or not str(fact["value"] or "").strip():
+            continue
+        labels = list(fact["name"].values()) + [fact.get("source_label") or ""]
+
+        def matches(label, line):
+            named, missing = words(label), words(line)
+            overlap = named & missing
+            return bool(named) and (
+                named <= missing or "bidsecurity" in overlap or len(overlap) >= 2
+            )
+
+        if not any(matches(label, line) for label in labels for line in absent):
+            continue
+        page = fact["locator"].get("page")
+        if page is None:
+            continue
+        name = fact["name"].get("en") or fact["name"].get("ar")
+        found.append(
+            Problem(
+                "tender_summary",
+                f"The Tender summary has {name} = {fact['value']} at {fact['file']}, page {page}. "
+                "Read that page with files_read and answer from it, citing it; "
+                "if the page says otherwise, say so.",
+            )
+        )
+    if found:
+        return found
     if not searched and _TENDER_QUESTION.search(question) and _TENDER_ABSENCE.search(output):
         return [Problem("tender_search", copy.TENDER_SEARCH_NUDGE["en"], None)]
     return []
