@@ -12,7 +12,7 @@ def tender_fact(rec):
     f = files.add_file(
         rec,
         "sample-conditions.txt",
-        "فتح العروض 16/04/1448".encode(),
+        "فتح العروض 03/02/1450".encode(),
         folder="01 المستلم",
         actor="t",
     )
@@ -25,10 +25,10 @@ def tender_fact(rec):
                 id="sample-opening",
                 file_id=f.id,
                 name={"en": "Opening of offers", "ar": "فتح العروض"},
-                value="16/04/1448",
+                value="03/02/1450",
                 locator={"page": 7},
                 state="found",
-                evidence="فتح العروض 16/04/1448",
+                evidence="فتح العروض 03/02/1450",
             ),
         )
     return f
@@ -37,17 +37,17 @@ def tender_fact(rec):
 def test_digest_keeps_tender_value_and_verification(rec):
     f = tender_fact(rec)
     text = digest(rec)
-    assert "16/04/1448" in text and f.name in text
+    assert "03/02/1450" in text and f.name in text
     assert "Opening of offers" in text and "فتح العروض" in text
     assert "unchecked" in text and "Received" in text
 
 
 def test_map_grounded_fact_counts_as_read_only_at_its_source(rec):
     f = tender_fact(rec)
-    assert not truth.unread_citations(f"Opening: 16/04/1448 ({f.name}, page 7).", [], rec=rec)
-    assert truth.unread_citations(f"Opening: 17/04/1448 ({f.name}, page 7).", [], rec=rec)
-    assert truth.unread_citations(f"Opening: 16/04/1448 ({f.name}, page 8).", [], rec=rec)
-    assert truth.unread_citations("Opening: 16/04/1448 (other.txt, page 7).", [], rec=rec)
+    assert not truth.unread_citations(f"Opening: 03/02/1450 ({f.name}, page 7).", [], rec=rec)
+    assert truth.unread_citations(f"Opening: 04/02/1450 ({f.name}, page 7).", [], rec=rec)
+    assert truth.unread_citations(f"Opening: 03/02/1450 ({f.name}, page 8).", [], rec=rec)
+    assert truth.unread_citations("Opening: 03/02/1450 (other.txt, page 7).", [], rec=rec)
 
 
 @pytest.mark.parametrize(
@@ -60,6 +60,6 @@ def test_map_grounded_fact_counts_as_read_only_at_its_source(rec):
     ],
 )
 def test_english_tender_query_finds_arabic(rec, query, words):
-    f = files.add_file(rec, "sample-arabic.txt", (words + " 16/04/1448").encode(), actor="t")
+    f = files.add_file(rec, "sample-arabic.txt", (words + " 03/02/1450").encode(), actor="t")
     result = search.search(rec, query)
     assert result.hits and result.hits[0].file_id == f.id

@@ -422,7 +422,7 @@ async def test_tender_search_excludes_company_working_files(ctx, rec):
     tender = files.add_file(
         rec,
         "Sample tender.txt",
-        "فتح العروض 16/04/1448".encode(),
+        "فتح العروض 03/02/1450".encode(),
         actor="engineer",
         folder="received",
     )
@@ -444,7 +444,7 @@ async def test_tender_search_excludes_company_working_files(ctx, rec):
     exact = unfence(
         await call(
             "search_records",
-            {"query": "فتح العروض", "all_terms": ["1448"], "received_only": True},
+            {"query": "فتح العروض", "all_terms": ["1450"], "received_only": True},
             ctx,
         )
     )

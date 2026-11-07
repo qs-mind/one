@@ -13,7 +13,7 @@ def test_local_key_pages_survive_ai_omission(rec):
     f = files.add_file(
         rec,
         "sample.txt",
-        "فتح العروض 16/04/1448\nالترسية 29/06/1448\nبدء الأعمال 07/07/1448".encode(),
+        "فتح العروض 03/02/1450\nالترسية 18/04/1450\nبدء الأعمال 25/04/1450".encode(),
         actor="engineer",
     )
     drain(rec)
@@ -25,28 +25,28 @@ def test_local_key_pages_survive_ai_omission(rec):
 
 @pytest.mark.anyio
 async def test_project_sheets_and_filtered_counts(rec):
-    f = files.add_file(rec, "MAIN POWER SINGLE LINE DIAGRAM.dwg", b"sample", actor="engineer")
+    f = files.add_file(rec, "SAMPLE POWER DIAGRAM.dwg", b"sample", actor="engineer")
     with rec.write("one") as c:
-        for n in (505, 504):
+        for n in (202, 201):
             store.write(
                 c,
                 rec,
                 "map_sheets",
                 dict(
                     file_id=f.id,
-                    sheet=f"SLD{n}",
-                    number=f"EL-{n}",
+                    sheet=f"SampleLayout{n}",
+                    number=f"E-{n}",
                     title="Main single line diagram",
-                    counts={"MCCB": 3, "Other": 8},
-                    source={"layout": f"SLD{n}"},
+                    counts={"BREAKER": 3, "Other": 8},
+                    source={"layout": f"SampleLayout{n}"},
                 ),
             )
     ctx = SimpleNamespace(rec=rec)
     result = json.loads(await read_map(ctx, MapArgs(mode="sheets", limit=1)))
-    assert result["sheets"][0]["number"] == "EL-504"
+    assert result["sheets"][0]["number"] == "E-201"
     assert result["sheets"][0]["file"] == f.name
     assert result["next_page"] == 2
-    result = json.loads(await read_map(ctx, MapArgs(mode="counts", label="mccb", limit=1)))
+    result = json.loads(await read_map(ctx, MapArgs(mode="counts", label="breaker", limit=1)))
     assert result["project_total"] == 6
     assert result["counts"][0]["file_id"] == f.id
     assert result["file_totals"][f.id] == 6
@@ -100,7 +100,7 @@ async def test_arabic_real_shaped_facts_keep_three_dates_and_sources(rec):
             "ساري المفعول لمدة 90 يوم (من تاريخ فتح المظاريف)"
         ),
         3: "مدة سريان العروض تسعين يوماً",
-        7: "فتح العروض 16/04/1448\nالترسية 29/06/1448\nبدء الأعمال 07/07/1448",
+        7: "فتح العروض 03/02/1450\nالترسية 18/04/1450\nبدء الأعمال 25/04/1450",
     }
     f = files.add_file(
         rec,
@@ -126,9 +126,9 @@ async def test_arabic_real_shaped_facts_keep_three_dates_and_sources(rec):
         for label, en, value, page in [
             ("ضمان ابتدائي", "Bid security", "(1%) إلى (2%)", 2),
             ("مدة سريان العروض", "Bid validity", "تسعين يوماً", 3),
-            ("فتح العروض", "Offer opening", "16/04/1448", 7),
-            ("الترسية", "Award", "29/06/1448", 7),
-            ("بدء الأعمال", "Commencement", "07/07/1448", 7),
+            ("فتح العروض", "Offer opening", "03/02/1450", 7),
+            ("الترسية", "Award", "18/04/1450", 7),
+            ("بدء الأعمال", "Commencement", "25/04/1450", 7),
         ]:
             proposals.append(
                 facts.Fact(
@@ -190,7 +190,7 @@ def test_facts_do_not_take_tender_duration_from_our_programme(rec):
 
 
 @pytest.mark.anyio
-async def test_scripted_model_lists_all_sheets_and_mccb_with_file_source(rec):
+async def test_scripted_model_lists_all_sheets_and_breaker_with_file_source(rec):
     from pydantic_ai import Agent
     from pydantic_ai.messages import ModelRequest, ToolReturnPart
 
@@ -199,9 +199,9 @@ async def test_scripted_model_lists_all_sheets_and_mccb_with_file_source(rec):
     f = files.add_file(rec, "sample-main-single-line.dwg", b"sample", actor="engineer")
     with rec.write("one") as c:
         for n, title, counts in [
-            (501, "Lighting", {}),
-            (502, "Power", {}),
-            (504, "Main single line diagram", {"MCCB": 7}),
+            (198, "Lighting", {}),
+            (199, "Power", {}),
+            (201, "Main single line diagram", {"BREAKER": 7}),
         ]:
             store.write(
                 c,
@@ -209,12 +209,12 @@ async def test_scripted_model_lists_all_sheets_and_mccb_with_file_source(rec):
                 "map_sheets",
                 dict(
                     file_id=f.id,
-                    sheet=f"SLD{n}",
-                    number=f"EL-{n}",
+                    sheet=f"SampleLayout{n}",
+                    number=f"E-{n}",
                     title=title,
                     discipline="electrical",
                     counts=counts,
-                    source={"layout": f"SLD{n}"},
+                    source={"layout": f"SampleLayout{n}"},
                 ),
             )
 
@@ -227,16 +227,16 @@ async def test_scripted_model_lists_all_sheets_and_mccb_with_file_source(rec):
             if isinstance(p, ToolReturnPart)
         ]
         sheets, counts = returns
-        assert [s["number"] for s in sheets["sheets"]] == ["EL-501", "EL-502", "EL-504"]
+        assert [s["number"] for s in sheets["sheets"]] == ["E-198", "E-199", "E-201"]
         source = counts["counts"][0]
         return (
             "; ".join(s["number"] + ": " + s["title"] for s in sheets["sheets"])
-            + f"; MCCB {counts['project_total']} (source: {source['file']}, {source['number']})"
+            + f"; BREAKER {counts['project_total']} (source: {source['file']}, {source['number']})"
         )
 
     model = scripted(
         call("project_map", {"mode": "sheets"}),
-        call("project_map", {"mode": "counts", "label": "mccb"}),
+        call("project_map", {"mode": "counts", "label": "breaker"}),
         answer,
     )
     agent = Agent(model)
@@ -245,9 +245,11 @@ async def test_scripted_model_lists_all_sheets_and_mccb_with_file_source(rec):
     async def project_map(mode: str, label: str | None = None) -> str:
         return await read_map(SimpleNamespace(rec=rec), MapArgs(mode=mode, label=label))
 
-    result = await agent.run("List electrical sheets with number/title and MCCB in the main SLD.")
-    assert "EL-504: Main single line diagram" in result.output
-    assert "MCCB 7 (source: sample-main-single-line.dwg, EL-504)" in result.output
+    result = await agent.run(
+        "List electrical sheets with number/title and BREAKER in the main SLD."
+    )
+    assert "E-201: Main single line diagram" in result.output
+    assert "BREAKER 7 (source: sample-main-single-line.dwg, E-201)" in result.output
 
 
 @pytest.mark.anyio

@@ -63,7 +63,7 @@ def test_sheet_paging_starts_at_zero_and_retains_model_counts(rec):
                 "file_id": f.id,
                 "sheet": "Model",
                 "number": "EL-000",
-                "counts": {"MCCB": 3},
+                "counts": {"BREAKER": 3},
             },
         )
     first = drawing_evidence(rec, MapArgs(mode="sheets", limit=10))
@@ -132,7 +132,7 @@ def test_file_map_and_file_list_do_not_call_model_a_sheet(rec):
 
     f = files.add_file(rec, "sample.dxf", b"sample", actor="test")
     with rec.write("one") as c:
-        for layout, counts in (("Model", {"MCCB": 3}), ("Paper", {})):
+        for layout, counts in (("Model", {"BREAKER": 3}), ("Paper", {})):
             store.write(
                 c,
                 rec,
@@ -146,6 +146,6 @@ def test_file_map_and_file_list_do_not_call_model_a_sheet(rec):
             )
     detail = store.detail(rec, f.id)
     assert [s["sheet"] for s in detail["sheets"]] == ["Paper"]
-    assert detail["file_counts"] == {"MCCB": 3}
+    assert detail["file_counts"] == {"BREAKER": 3}
     assert detail["file_counts_source"] == {"file_id": f.id}
     assert "1 sheets" in _list(rec, False)

@@ -24,7 +24,7 @@ from tests.test_engine_runner import (  # noqa: F401
 from tests.test_truth_runner import reply
 
 
-async def test_lead_answers_electrical_sheets_and_mccb_from_local_map(
+async def test_lead_answers_electrical_sheets_and_breaker_from_local_map(
     make_engine, project, registry
 ):
     rec = registry.get(project)
@@ -40,7 +40,7 @@ async def test_lead_answers_electrical_sheets_and_mccb_from_local_map(
                 "number": "E-101",
                 "title": "Main single line diagram",
                 "discipline": "electrical",
-                "counts": {"MCCB": 7},
+                "counts": {"BREAKER": 7},
                 "source": {"page": 1},
                 "state": "local",
             },
@@ -58,17 +58,17 @@ async def test_lead_answers_electrical_sheets_and_mccb_from_local_map(
         data = json.loads(result[result.index("{") : result.rindex("}") + 1])
         sheet = data["files"][0]["sheets"][0]
         return (
-            f"{sheet['number']}: {sheet['title']}; MCCB: "
-            f"{sheet['counts']['MCCB']} pcs "
+            f"{sheet['number']}: {sheet['title']}; BREAKER: "
+            f"{sheet['counts']['BREAKER']} pcs "
             f"(source: {data['files'][0]['name']}, drawing {sheet['number']})."
         )
 
     lead = scripted(call("project_map", {"mode": "find", "label": "electrical"}), answer)
     engine = await started(make_engine(links(lead=lead)))
-    brief = await engine.start_brief(project, "List electrical sheets and MCCB counts.")
+    brief = await engine.start_brief(project, "List electrical sheets and BREAKER counts.")
     events = await asyncio.wait_for(finish(engine, brief), 10)
     assert lead.calls == 2
-    assert "E-101: Main single line diagram; MCCB: 7 pcs" in reply(events)
+    assert "E-101: Main single line diagram; BREAKER: 7 pcs" in reply(events)
     assert "source: sample-electrical.pdf" in reply(events)
     assert not [event for event in events if isinstance(event, (Asked, Unsourced))]
 
@@ -88,7 +88,7 @@ async def test_lead_answers_opening_from_grounded_summary_without_page_read(
         folder="01 المستلم",
         actor="t",
     )
-    words = "فتح العروض 16/04/1448"
+    words = "فتح العروض 03/02/1450"
     with rec.write("one") as c:
         c.execute(
             "UPDATE chunks SET text=? WHERE file_id=? AND json_extract(locator,'$.page')=7",
@@ -99,7 +99,7 @@ async def test_lead_answers_opening_from_grounded_summary_without_page_read(
         [
             dict(
                 name={"en": "Opening of offers", "ar": "فتح العروض"},
-                value="16/04/1448",
+                value="03/02/1450",
                 file_id=file.id,
                 locator={"page": 7},
                 state="found",
@@ -117,13 +117,13 @@ async def test_lead_answers_opening_from_grounded_summary_without_page_read(
             for p in m.parts
             if isinstance(p, UserPromptPart)
         ]
-        assert "16/04/1448" in str(prompts) and "unchecked" in str(prompts)
-        return "فتح العروض 16/04/1448 (sample-tender.pdf، صفحة 7)، قريته ولسه مش متأكد منه."
+        assert "03/02/1450" in str(prompts) and "unchecked" in str(prompts)
+        return "فتح العروض 03/02/1450 (sample-tender.pdf، صفحة 7)، قريته ولسه مش متأكد منه."
 
     lead = scripted(answer)
     engine = await started(make_engine(links(lead=lead)))
     brief = await engine.start_brief(project, "هات تاريخ فتح العروض")
     events = await asyncio.wait_for(finish(engine, brief), 10)
     assert lead.calls == 1
-    assert "16/04/1448" in reply(events)
+    assert "03/02/1450" in reply(events)
     assert not [event for event in events if isinstance(event, (Asked, Unsourced))]
