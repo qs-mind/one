@@ -163,15 +163,20 @@ describe("the notice from another chat", () => {
 
   it("says another chat waits for you, and goes when it no longer waits", async () => {
     setCurrentProject(P2);
+    // "waiting" holds until the test has seen the notice: a slow runner can miss one 20 ms poll.
+    let seen = false;
+    let polls = 0;
     core({
       routes: {
         "GET /api/projects/p2/files": () => Response.json({ files: [] }),
-        "GET /api/briefs/activity": answers([chat("general", "working")], [chat("general", "waiting")], [chat("general", "working")]),
+        "GET /api/briefs/activity": () =>
+          Response.json({ chats: [chat("general", polls++ === 0 || seen ? "working" : "waiting")] }),
       },
     });
     render(<App />);
     const line = fill(texts.activityNoticeWaiting.ar, { name: "⁨" + texts.generalChat.ar + "⁩" });
     expect(await screen.findByRole("region", { name: line })).toBeInTheDocument();
+    seen = true;
     await waitFor(() => expect(screen.queryByRole("region", { name: line })).toBeNull());
   });
 
