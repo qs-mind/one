@@ -265,7 +265,7 @@ def test_a_saved_role_on_a_refused_model_falls_back_to_the_default():
 
 def test_the_model_typed_with_the_link_leads_and_nothing_costs_more(data_dir):
     """Finding 12: the engineer typed gemini-3.1-flash-lite; no role goes to a costlier model,
-    and the Checking QS is never the model it checks (decisions: a same-provider check)."""
+    including after the typed model is refused by its provider."""
     link = standard.add("Google", GOOGLE_URL, STANDARD_KEY, model="gemini-3.1-flash-lite")
     saved = json.loads((data_dir / "settings.json").read_text(encoding="utf-8"))
     assert saved["ai"]["standard"][0]["model"] == "gemini-3.1-flash-lite"
@@ -279,7 +279,7 @@ def test_the_model_typed_with_the_link_leads_and_nothing_costs_more(data_dir):
     # another provider at or under the typed model's price checks it
     assert roles.defaults([*sheet, DEEPSEEK])["checker"] == DEEPSEEK.choice
     connectors.note_refused(lite.choice)
-    assert roles.defaults(sheet)["lead"] == pro.choice  # a typed model refused: the usual ranking
+    assert roles.defaults(sheet)["lead"] == older.choice  # refusal never authorizes an upgrade
 
 
 def test_a_typed_model_with_no_price_still_leads():
