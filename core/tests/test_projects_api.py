@@ -123,8 +123,9 @@ def test_search_takes_also_mode_and_k(client, project):
 
 
 def test_same_bytes_and_new_versions(client, project):
-    first = upload(client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "قديم"]]})).json()
-    again = upload(client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "قديم"]]}))
+    same = sample_xlsx({"BOQ": [["03/02", "قديم"]]})  # built once: a workbook stamps its time
+    first = upload(client, project, BOQ, same).json()
+    again = upload(client, project, BOQ, same)
     assert again.status_code == 200 and again.json()["duplicate"] is True
     assert again.json()["id"] == first["id"]
     assert again.json()["same_as"] == copy.FILE_SAME_AGAIN

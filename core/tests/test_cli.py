@@ -40,7 +40,8 @@ def test_isolation(running, tmp_path):
     saved = json.loads(session.read_text(encoding="utf-8"))
     assert started["mode"] == "scripted"
     assert saved["port"] not in (1440, 1442)
-    assert Path(saved["data_dir"]).is_relative_to(Path(tempfile.gettempdir()).resolve())
+    # resolve both: macOS /var is /private/var, Windows may give a short (RUNNER~1) name
+    assert Path(saved["data_dir"]).resolve().is_relative_to(Path(tempfile.gettempdir()).resolve())
     if os.name != "nt":
         assert session.stat().st_mode & 0o777 == 0o600
         assert session.parent.stat().st_mode & 0o777 == 0o700
