@@ -11,6 +11,8 @@ import re
 from functools import cache
 from pathlib import Path
 
+from pydantic_ai.models.wrapper import WrapperModel
+
 from qsone import copy
 from qsone.engine.tools import REGISTRY
 from qsone.engine.tools_records import RECORDS_TOOLS
@@ -99,23 +101,39 @@ def build_agent(spec: AgentSpec, model, toolset, *, output_type=str):
     """A PydanticAI agent for one run of `spec` on `model`, with `toolset` (or no tools) and
     the history trim. The runner gives `output_type` (with deferred calls, for the Lead)."""
     from pydantic_ai import Agent
-    from pydantic_ai.capabilities import ProcessHistory
 
     return Agent(
-        model,
+        RequestHistory(model),
         name=spec.id,
         instructions=spec.instructions,
         toolsets=None if toolset is None else [toolset],
         output_type=output_type,
-        capabilities=[ProcessHistory(trim_history)],
     )
+
+
+class RequestHistory(WrapperModel):
+    """Compact only the provider request; PydanticAI's durable run keeps full evidence.
+
+    Wrap outside the cost/tool wrappers so their accounting sees what is actually sent.
+    No per-run cache: rebuilding from a checkpoint applies the same deterministic trim.
+    """
+
+    async def request(self, messages, model_settings, model_request_parameters):
+        return await self.wrapped.request(
+            trim_history(messages), model_settings, model_request_parameters
+        )
+
+    def request_stream(self, messages, model_settings, model_request_parameters, run_context=None):
+        return self.wrapped.request_stream(
+            trim_history(messages), model_settings, model_request_parameters, run_context
+        )
 
 
 # History --------------------------------------------------------------------------------------
 
 # Every request carries the whole history: past this many tokens of tool results (ONE's estimate,
-# `request_size`), the oldest become short stubs. 3,500 holds a search's hits and a read page. Once
-# stubbed a result stays stubbed, so the start of the history stays the same for the cache.
+# `request_size`), the oldest become short stubs. 3,500 holds a search's hits and a read page.
+# The trim is deterministic, so unchanged older requests keep the same stubs for caching.
 RESULTS_TOKENS = 3_500
 _ID = re.compile(r'"(\w*id)"\s*:\s*"([^"]{1,80})"|\b(file)(?:_id)?:\s?([0-9a-f]{32})\b')
 _VALUE = re.compile(r'"value"\s*:\s*"([^"]{1,40})"')
@@ -217,7 +235,7 @@ def trim_history(messages: list, *, limit_tokens: int = RESULTS_TOKENS) -> list:
     """With at most `limit_tokens` of tool results, the history as it is. Over it, the oldest
     successful tool results become short stubs (`_summary`), oldest first, until the rest fit.
     Errors and results from the Brief’s last two model steps stay whole. The saved history
-    is never changed in place."""
+    is never changed in place. This is a request-only projection, never durable evidence."""
     from dataclasses import replace
 
     from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart, ToolReturnPart
