@@ -184,7 +184,13 @@ async def test_a_dense_page_comes_in_parts_with_its_locator(rec):
     first = await call("files_read", {"file_id": file_id}, ctx)
     more = f'more: call files_read {{"file_id": "{file_id}", "pages": "1-2", "part": 2}}'
     assert more in first
+    assert first.count("Key lines") == 1
+    key_block = first.split('Key lines {"page": 1}:\n', 1)[1].splitlines()
+    # The full page starts again at its first line after the navigation block.
+    end = key_block.index(key_block[0], 1)
+    assert end <= 12 and len("\n".join(key_block[:end])) <= 600
     second = await call("files_read", {"file_id": file_id, "pages": "1-2", "part": 2}, ctx)
+    assert "Key lines" not in second
     assert second.split("---\n", 1)[1].startswith('{"page": 1}')  # the page is named again
     assert "Last - sample" in second and f"file:{file_id}#page=2" in second
 
@@ -466,3 +472,9 @@ async def test_csv_can_read_a_physical_source_row_with_embedded_newlines(rec):
     out = await call("files_read", {"file_id": file, "rows": "4"}, ctx)
     assert "200" in out and "100" not in out
     assert '"line": 4' in out
+
+
+def test_key_lines_do_not_change_page_parts():
+    chunks = [({"page": 1}, "\n".join(f"Clause {n} " + "sample " * 10 for n in range(90)))]
+    parts = files_tools._parts(files_tools._lines(chunks))
+    assert all("Key lines" not in line for part in parts for _, line, _ in part)

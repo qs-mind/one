@@ -13,7 +13,7 @@ from qsone.engine import truth
 from qsone.engine.types import Unsourced
 from qsone.records import ledger
 from qsone.records.files import add_file
-from tests.engine_fakes import scripted
+from tests.engine_fakes import call, scripted
 from tests.engine_fakes import text as said
 from tests.samples import sample_pdf, sample_xlsx
 from tests.test_engine_runner import (  # noqa: F401 - the runner's fixtures
@@ -95,10 +95,16 @@ def test_a_number_at_a_cited_page_has_a_source(files):
 async def test_the_lead_cites_the_wrong_row_then_fixes_it(make_engine, project, files):
     wrong = "تسعير بند 16: الفئة 72 جنيه للمتر (من شيت «مقايسة»، صف 4)."
     right = "تسعير بند 16: الفئة 72 جنيه للمتر (من شيت «مقايسة»، صف 2)."
-    lead = scripted(said(wrong), said(right))
+    with files.read() as c:
+        file_id = c.execute("SELECT id FROM files WHERE kind = 'xlsx'").fetchone()[0]
+    lead = scripted(
+        call("files_read", {"file_id": file_id, "sheet": "مقايسة ", "rows": "2-2"}),
+        said(wrong),
+        said(right),
+    )
     engine = await started(make_engine(links(lead=lead)))
     events = await finish(engine, await engine.start_brief(project, "فئة السيراميك كام؟"))
-    assert lead.calls == 2 and "row 4" in str(lead.seen[1])
+    assert lead.calls == 3 and "row 4" in str(lead.seen[2])
     assert not datas(events, "facts")
 
 

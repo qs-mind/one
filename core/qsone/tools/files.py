@@ -448,12 +448,6 @@ def _lines(chunks: list[tuple[dict, str]]) -> list[tuple[dict, str, bool]]:
             if locator != current:
                 out.append((locator, _json(locator), True))
                 current = locator
-            from qsone.records.key_lines import key_lines
-
-            keys = key_lines(text)
-            if keys:
-                out.append((locator, "Key lines " + _json(locator) + ":", False))
-                out += [(locator, t, False) for t in keys]
             lines = [t for t in text.split("\n") if t.strip()] or ["[no text on this page]"]
             out += [(locator, t, False) for t in lines]
         else:
@@ -577,11 +571,33 @@ def _render(rec: Records, info: FileInfo, args: ReadArgs, sel: _Selection, notes
     head += [f"status: {info.status}"] + ([f"pages: {info.pages}"] if info.pages else [])
     if len(parts) > 1 and sel.sheet is None:
         head.append(f"part {args.part} of {len(parts)}")
+    # Navigation is extra: page text alone determines the continuation boundaries.
+    from qsone.records.key_lines import key_lines
+
+    earlier_pages = {loc.get("page") for prior in parts[: args.part - 1] for loc, _, _ in prior}
+    page_text = {}
+    for loc, text in chunks:
+        if "page" in loc:
+            page_text.setdefault(loc["page"], []).append(text)
+    rendered = []
+    for loc, line, is_locator in part:
+        rendered.append(line)
+        page = loc.get("page")
+        if is_locator and page not in earlier_pages:
+            earlier_pages.add(page)
+            keys, size = [], 0
+            for key in key_lines("\n".join(page_text.get(page, []))):
+                if len(keys) == 12 or size + len(key) + 1 > 600:
+                    break
+                keys.append(key)
+                size += len(key) + 1
+            if keys:
+                rendered.extend(["Key lines " + _json(loc) + ":", *keys])
     body = [
         " | ".join(head),
         "Cite with add_source: this file_id and the locator printed with the text, as they are.",
         "---",
-        *(line for _, line, _ in part),
+        *rendered,
     ]
     with rec.read() as conn:
         done = files.read_pages(conn, info.id)
