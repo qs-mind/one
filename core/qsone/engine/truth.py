@@ -1397,24 +1397,32 @@ def unread_citations(text: str, returns: list[tuple[str, str]], *, rec=None) -> 
             # they are tender values and must match the cited evidence too.
             dates = re.findall(r"(?<!\d)\d{1,4}/\d{1,2}/\d{1,4}(?!\d)", segment)
             dates_match = all(clean(d) in clean(" ".join(read_text)) for d in dates)
-            if (
-                not all(any(matches(loc, n) for _, loc, _ in passages) for n in coordinates)
-                or any(value not in have for _, value in numbers)
-                or not dates_match
-            ):
-                where = place.words()
-                if any(p.fix.startswith(where["en"] + " was") for p in problems):
-                    continue
+            read = all(any(matches(loc, n) for _, loc, _ in passages) for n in coordinates)
+            if read and dates_match and all(value in have for _, value in numbers):
+                continue
+            where = place.words()
+            if any(p.fix.startswith(where["en"] + " was") for p in problems):
+                continue
+            if read:  # read, but a value is not there: the model fixes it; the number check flags
                 problems.append(
                     Problem(
                         "unread_citation",
                         where["en"]
-                        + " was not read in this Brief. Read it with files_read or read_chunk "
-                        "before citing it; if unavailable, remove that claim "
-                        "and say what is missing.",
-                        copy.fill(copy.TRUTH_UNREAD_PLACE, place=where),
+                        + " was read, but a value or date this sentence gives is not on it. "
+                        "Cite each value at the place that shows it, or remove it.",
                     )
                 )
+                continue
+            problems.append(
+                Problem(
+                    "unread_citation",
+                    where["en"]
+                    + " was not read in this Brief. Read it with files_read or read_chunk "
+                    "before citing it; if unavailable, remove that claim "
+                    "and say what is missing.",
+                    copy.fill(copy.TRUTH_UNREAD_PLACE, place=where),
+                )
+            )
     return problems
 
 
