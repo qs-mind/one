@@ -7,10 +7,33 @@ from qsone.records.mapping.roles import file_role
 
 # Facts are evidence already grounded by the map; labels/key pages remain navigation.
 FACT_BYTES = 6000
+DIGEST_FACT_BYTES = 1000
+DIGEST_DRAWING_BYTES = 1500
+DIGEST_FILE_BYTES = 400
 
 
-def tender_facts(rec):
-    """The exact bounded evidence shared by the first request and truth check."""
+def _short(value, limit):
+    return value if len(value) <= limit else value[: limit - 1] + "…"
+
+
+def _section(header, entries, total, budget, mode):
+    """Budget includes headings, separators and the exact omitted-count footer."""
+    lines = [header]
+    shown = 0
+    for entry in entries:
+        remaining = total - shown - 1
+        footer = [f"{remaining} more: project_map mode {mode}"] if remaining else []
+        if len("\n".join([*lines, entry, *footer]).encode()) > budget:
+            break
+        lines.append(entry)
+        shown += 1
+    if total > shown:
+        lines.append(f"{total - shown} more: project_map mode {mode}")
+    return "\n".join(lines)
+
+
+def tender_facts(rec, *, preview=False):
+    """Full bounded truth-check evidence; optional shortened first-request previews."""
     with rec.read() as c:
         rows = store.rows(
             c,
@@ -33,8 +56,12 @@ def tender_facts(rec):
             state=fact["state"],
             conflict_with=fact["conflict_with"],
         )
+        if preview:
+            item["name"] = {lang: _short(text, 60) for lang, text in item["name"].items()}
+            item["value"] = _short(item["value"], 120)
+            item["file"] = _short(item["file"], 60)
         length = len(json.dumps(item, ensure_ascii=False, separators=(",", ":")).encode())
-        if size + length <= FACT_BYTES:
+        if preview or size + length <= FACT_BYTES:
             result.append(item)
             size += length
     return result
@@ -51,6 +78,16 @@ def digest(rec):
             "JOIN files f ON f.id=m.file_id WHERE m.valid_until IS NULL "
             "AND f.valid_until IS NULL AND m.key_pages != '[]' ORDER BY m.file_id LIMIT 30",
         )
+        fact_states = dict(
+            c.execute(
+                "SELECT a.state,count(*) FROM map_facts a JOIN files f ON f.id=a.file_id "
+                "WHERE a.valid_until IS NULL AND f.valid_until IS NULL GROUP BY a.state"
+            ).fetchall()
+        )
+        page_total = c.execute(
+            "SELECT count(*) FROM map_files m JOIN files f ON f.id=m.file_id "
+            "WHERE m.valid_until IS NULL AND f.valid_until IS NULL AND m.key_pages != '[]'"
+        ).fetchone()[0]
         sheet_count, drawing_count = c.execute(
             "SELECT count(*),count(DISTINCT s.file_id) FROM map_sheets s "
             "JOIN files f ON f.id=s.file_id WHERE s.valid_until IS NULL "
@@ -79,40 +116,81 @@ def digest(rec):
             "WHERE s.file_id=f.id AND s.valid_until IS NULL))"
         ).fetchone()[0]
     if drawing_count:
-        lines.append(f"Drawing files: {drawing_count}; drawing sheets: {sheet_count}")
-        for drawing in drawing_names:
-            lines.append(f"Drawing file: {drawing['id']} | {drawing['name']}")
-        for sheet in sheets:
-            lines.append(
-                f"{sheet['name'][:60]} | {sheet['sheet'][:40]} | "
-                f"{(sheet['number'] or 'unknown')[:40]} | {(sheet['title'] or 'unknown')[:100]}"
-            )
-        lines.append(
+        heading = f"Drawing files: {drawing_count}; drawing sheets: {sheet_count}"
+        names = _section(
+            heading,
+            [f"Drawing file: {d['id']} | {_short(d['name'], 60)}" for d in drawing_names],
+            drawing_count,
+            450,
+            "sheets",
+        )
+        guidance = (
             "Sheets: project_map mode sheets; page until next_page is null. "
             "Block counts: mode counts"
+        )
+        sheet_lines = [
+            f"{_short(s['name'], 60)} | {_short(s['number'] or s['sheet'], 40)} | "
+            f"{_short(s['title'] or 'unknown', 60)}"
+            for s in sheets
+        ]
+        lines.append(
+            _section(
+                names,
+                sheet_lines,
+                sheet_count,
+                DIGEST_DRAWING_BYTES - len(guidance.encode()) - 1,
+                "sheets",
+            )
+            + "\n"
+            + guidance
         )
 
     candidates = []
     for row in pages:
-        for page in json.loads(row["key_pages"])[:3]:
-            candidates.append(
-                json.dumps(
-                    {
-                        "file_id": row["file_id"],
-                        "file": row["name"][:80],
-                        "role": file_role(row["folder"], row["ai_kind"]),
-                        **page,
-                    },
-                    ensure_ascii=False,
-                )
+        key_pages = json.loads(row["key_pages"])
+        candidates.append(
+            json.dumps(
+                {
+                    "file_id": row["file_id"],
+                    "file": _short(row["name"], 60),
+                    "role": file_role(row["folder"], row["ai_kind"]),
+                    "key_pages": [
+                        {
+                            **page,
+                            "label": {
+                                lang: _short(text, 60) for lang, text in page["label"].items()
+                            },
+                        }
+                        for page in key_pages[:3]
+                    ],
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
             )
-    for line in candidates:
-        if len(("\n".join(lines) + "\n" + line).encode()) <= 1200:
-            lines.append(line)
-    facts = tender_facts(rec)
-    if facts:
-        lines.append(
-            "Tender summary (grounded evidence; cite source; preserve verification/conflicts):"
         )
-        lines.extend(json.dumps(f, ensure_ascii=False, separators=(",", ":")) for f in facts)
+    if page_total:
+        lines.append(
+            _section(
+                "Files/key pages:",
+                candidates,
+                page_total,
+                DIGEST_FILE_BYTES,
+                "overview",
+            )
+        )
+    facts = tender_facts(rec, preview=True)
+    if fact_states:
+        header = (
+            "Tender summary (previews; cite source; preserve verification/conflicts): "
+            + ", ".join(f"{state}: {count}" for state, count in sorted(fact_states.items()))
+        )
+        lines.append(
+            _section(
+                header,
+                [json.dumps(f, ensure_ascii=False, separators=(",", ":")) for f in facts],
+                sum(fact_states.values()),
+                DIGEST_FACT_BYTES,
+                "facts",
+            )
+        )
     return "\n".join(lines) if len(lines) > 1 else ""

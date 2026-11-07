@@ -23,7 +23,7 @@ async def test_brief_echo_refused(rec, text):
     )
     with rec.write("engineer") as c:
         c.execute("UPDATE briefs SET text=? WHERE id=?", (text, ctx.brief_id))
-    with pytest.raises(ModelRetry, match="answer from the files"):
+    with pytest.raises(ModelRetry, match="Answer it from the files"):
         await call(
             "ask_engineer", {"questions": [{"id": "q1", "text": text, "free_text": True}]}, ctx
         )
@@ -111,7 +111,7 @@ async def test_normalised_and_partial_echo_refused(rec, brief, question):
     )
     with rec.write("engineer") as c:
         c.execute("UPDATE briefs SET text=? WHERE id=?", (brief, ctx.brief_id))
-    with pytest.raises(ModelRetry, match="answer from the files"):
+    with pytest.raises(ModelRetry, match="Answer it from the files"):
         await call("ask_engineer", {"questions": [{"id": "q1", "text": question}]}, ctx)
     assert not ctx.host.cards
 
@@ -232,7 +232,7 @@ async def test_short_echo_of_one_requested_fact_is_refused(rec):
             "UPDATE briefs SET text=? WHERE id=?",
             ("What is the submission deadline and project duration?", ctx.brief_id),
         )
-    with pytest.raises(ModelRetry, match="answer from the files"):
+    with pytest.raises(ModelRetry, match="Answer it from the files"):
         await call("ask_engineer", {"questions": [{"id": "q1", "text": "Project duration?"}]}, ctx)
 
 
@@ -273,7 +273,7 @@ async def test_polite_rewording_is_still_a_brief_echo(rec, question):
             "UPDATE briefs SET text=? WHERE id=?",
             ("What is the submission deadline and project duration?", ctx.brief_id),
         )
-    with pytest.raises(ModelRetry, match="answer from the files"):
+    with pytest.raises(ModelRetry, match="Answer it from the files"):
         await call("ask_engineer", {"questions": [{"id": "q1", "text": question}]}, ctx)
     assert not ctx.host.cards
 
@@ -292,3 +292,135 @@ async def test_requested_pricing_can_ask_for_engineers_own_rate(rec):
         "ask_engineer", {"questions": [{"id": "q1", "text": "Your concrete rate?"}]}, ctx
     )
     assert "sample" in result
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "brief,question,refused",
+    [
+        (
+            "List every drawing sheet in this project: sheet number and title, "
+            "from all the DWG files. "
+            "And how many MCCB are in the main single line diagram?",
+            "How many MCCBs are in the MAIN POWER SINGLE LINE DIAGRAM.dwg?",
+            True,
+        ),
+        (
+            "List the BOQ versions and price the BOQ.",
+            "Which of the two BOQ versions should I price?",
+            False,
+        ),
+        ("Count MCCB in the SLD.", "Please upload the SLD", False),
+        ("Approve the SLD and count MCCB.", "Do you approve the SLD?", False),
+        ("عدد قواطع MCCB في المخطط الرئيسي", "كام عدد قواطع MCCB في المخطط الرئيسي.dwg؟", True),
+        ("List sheet number title", "List sheet number title revision date", True),
+        ("List sheet number", "List sheet number revision date", True),
+        ("List sheet", "List sheet number revision date", False),
+    ],
+)
+async def test_content_overlap_guard(rec, brief, question, refused):
+    from qsone import copy
+
+    ctx = tool_ctx(
+        rec, answers={"question": json.dumps({"choice": "sent", "answers": {"q1": "sample"}})}
+    )
+    with rec.write("engineer") as c:
+        c.execute("UPDATE briefs SET text=? WHERE id=?", (brief, ctx.brief_id))
+    args = {"questions": [{"id": "q1", "text": question, "free_text": True}]}
+    if refused:
+        with pytest.raises(ModelRetry) as error:
+            await call("ask_engineer", args, ctx)
+        assert copy.QUESTION_OWN_REQUEST["en"] in str(error.value)
+        assert not ctx.host.cards
+        assert not ctx.store.pending(ctx.brief_id)
+    else:
+        assert "sample" in await call("ask_engineer", args, ctx)
+        assert len(ctx.host.cards) == 1
+
+
+@pytest.mark.anyio
+async def test_factual_echo_with_options_is_not_a_choice(rec):
+    ctx = tool_ctx(
+        rec, answers={"question": json.dumps({"choice": "sent", "answers": {"q1": "sample"}})}
+    )
+    with rec.write("engineer") as c:
+        c.execute(
+            "UPDATE briefs SET text=? WHERE id=?",
+            ("How many MCCB are in the main diagram?", ctx.brief_id),
+        )
+    with pytest.raises(ModelRetry, match="engineer's own question"):
+        await call(
+            "ask_engineer",
+            {
+                "questions": [
+                    {
+                        "id": "q1",
+                        "text": "How many MCCB are in the main diagram?",
+                        "options": ["Sample count A", "Sample count B"],
+                    }
+                ]
+            },
+            ctx,
+        )
+    assert not ctx.host.cards
+
+
+@pytest.mark.anyio
+async def test_digest_bounds_long_facts_sheets_and_navigation(rec):
+    from qsone.engine.map_digest import digest
+    from qsone.records import files
+    from qsone.records.mapping import store
+    from qsone.tools.project_map import MapArgs, read_map
+
+    f = files.add_file(rec, "عينة" * 35 + ".dwg", b"sample drawing", actor="engineer")
+    with rec.write("one") as c:
+        store.write(
+            c,
+            rec,
+            "map_files",
+            {
+                "file_id": f.id,
+                "key_pages": [{"label": {"en": "Sample key page", "ar": "صفحة عينة"}, "page": 7}],
+            },
+        )
+        for i in range(30):
+            store.write(
+                c,
+                rec,
+                "map_facts",
+                {
+                    "id": f"sample-{i:02}",
+                    "file_id": f.id,
+                    "name": {"en": "Sample name " * 20, "ar": "اسم عينة " * 20},
+                    "value": "قيمة عينة " * 100,
+                    "locator": {"page": 7},
+                    "state": "found",
+                },
+            )
+        for i in range(51):
+            store.write(
+                c,
+                rec,
+                "map_sheets",
+                {
+                    "file_id": f.id,
+                    "sheet": f"Paper{i}",
+                    "number": f"EL-{i:03}",
+                    "title": "Sample sheet title " * 20,
+                },
+            )
+    text = digest(rec)
+    assert len(text.encode()) <= 3000
+    assert "more: project_map mode facts" in text
+    assert "more: project_map mode sheets" in text
+    assert "Sample key page" in text
+    assert "EL-000" in text
+    assert "…" in text
+    fact_lines = [json.loads(line) for line in text.splitlines() if line.startswith('{"name":')]
+    assert fact_lines
+    for fact in fact_lines:
+        assert len(fact["value"]) <= 120 and fact["value"].endswith("…")
+        assert all(len(name) <= 60 for name in fact["name"].values())
+        assert len(fact["file"]) <= 60
+    full = json.loads(await read_map(tool_ctx(rec), MapArgs(mode="facts")))
+    assert full["facts"][0]["value"] == "قيمة عينة " * 100

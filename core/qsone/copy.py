@@ -1783,6 +1783,14 @@ DOING_CONNECTOR = {
 DOING_ASK = {"en": "Waiting for your answer", "ar": "مستني ردك"}
 
 # ask_engineer's card. {agent} is the agent's name; the questions are the agent's own words.
+QUESTION_OWN_REQUEST = {
+    "en": "That is the engineer's own question. Answer it from the files you read "
+    "(drawing reads start with sheets and block counts; project_map modes sheets/counts); "
+    "if truly absent, say what you searched.",
+    "ar": "ده نفس سؤال المهندس. جاوب عليه من الملفات اللي قريتها "
+    "(قراءة الرسومات بتبدأ باللوحات وأعداد البلوكات؛ وأوضاع project_map هي sheets/counts)؛ "
+    "ولو المعلومة مش موجودة فعلاً، قول دورت على إيه.",
+}
 QUESTION_TITLE = {"en": "{agent} asks", "ar": "{agent} بيسأل"}
 QUESTION_DETAIL = {
     "en": "Answer every question, then press Send. Your answers are kept as the source of "
