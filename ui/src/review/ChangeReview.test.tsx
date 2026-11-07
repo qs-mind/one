@@ -65,7 +65,8 @@ describe("BOQ change review", () => {
   it("a changed cell shows the new value in Copper over the old one struck through in Slate", async () => {
     board();
     await screen.findByText("03/02");
-    const rate = within(rowOf("03/02")).getByText("40,000.00").closest("ins")!;
+    // the row can show before its changes arrive: wait for the changed value itself
+    const rate = (await within(rowOf("03/02")).findByText("40,000.00")).closest("ins")!;
     expect(rate).toHaveClass("text-copper");
     const old = within(rowOf("03/02")).getByText("39,850.50").closest("del")!;
     expect(old).toHaveClass("text-slate");
