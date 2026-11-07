@@ -198,7 +198,7 @@ def list_map(rec, *, parent=None, cursor=None, limit=100):
             c,
             "SELECT f.id AS file_id,f.name,f.folder,f.kind,f.pages,"
             "coalesce(m.read_how,'stored') AS read_how,m.ai_title,m.ai_group,"
-            "coalesce(m.key_pages,'[]') AS key_pages,m.ai_state,m.note,"
+            "coalesce(m.key_pages,'[]') AS key_pages,m.ai_state,m.ai_stage,m.note,"
             "coalesce(m.local_state,'waiting') AS local_state "
             "FROM files f LEFT JOIN map_files m ON m.file_id=f.id "
             f"WHERE f.valid_until IS NULL AND f.id>? AND (? IS NULL OR {group}=?) "
