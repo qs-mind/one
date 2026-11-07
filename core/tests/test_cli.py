@@ -1270,6 +1270,10 @@ def test_upload_http_failure_continues(tmp_path):
     from qsone.cli.commands import Commands
 
     class Core:
+        def get(self, route, **params):
+            assert route == "/projects/p/files"
+            return {"files": []}
+
         def request(self, method, route, **kwargs):
             if kwargs["params"]["name"] == "a.txt":
                 raise httpx.ReadTimeout("slow")

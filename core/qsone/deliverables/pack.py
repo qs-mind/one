@@ -13,6 +13,7 @@ from qsone import copy
 from qsone.export.pdf import _compile
 from qsone.records import office
 from qsone.records.files import file_info, read_original
+from qsone.records.pdfium_guard import PDFIUM
 from qsone.records.project import RecordsError
 
 
@@ -271,7 +272,7 @@ def preview(rec, deliverable_id, version, page):
     from qsone.deliverables import store
 
     data = build_view(rec, store.view(rec, deliverable_id, version=version))
-    with pdfium.PdfDocument(data) as pdf:
+    with PDFIUM, pdfium.PdfDocument(data) as pdf:
         if not 1 <= page <= len(pdf):
             raise refusal("page")
         rendered = pdf[page - 1]

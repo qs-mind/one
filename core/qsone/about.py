@@ -9,6 +9,7 @@ import os
 from importlib.metadata import version
 
 import qsone
+from qsone.records.pdfium_guard import PDFIUM
 
 
 def about() -> dict:
@@ -18,7 +19,9 @@ def about() -> dict:
 def native() -> dict:
     import cryptography
     import keyring
-    import pypdfium2
+
+    with PDFIUM:
+        import pypdfium2
     import sqlcipher3.dbapi2 as sqlcipher
     import sqlite_vec
     import tokenizers
@@ -38,7 +41,8 @@ def native() -> dict:
         conn.close()
 
     AESGCM(AESGCM.generate_key(bit_length=256))  # the Rust binding loads
-    pdfium = pypdfium2.PDFIUM_INFO  # the pdfium library is opened on import
+    with PDFIUM:
+        pdfium = pypdfium2.PDFIUM_INFO  # the pdfium library is opened on import
     wasmtime.Engine()
     onnx = None
     if importlib.util.find_spec("onnxruntime") is not None:  # no wheel for Intel Macs

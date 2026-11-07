@@ -2,8 +2,8 @@
 
 TEXT = {
     "upload_timeout": {
-        "en": "Upload timed out after 60 s.",
-        "ar": "وقت رفع الملف خلص بعد ٦٠ ثانية.",
+        "en": "Upload timed out after 300 s.",
+        "ar": "وقت رفع الملف خلص بعد ٣٠٠ ثانية.",
     },
     "upload_http_error": {
         "en": "ONE could not upload this file because the core connection failed.",
@@ -119,6 +119,8 @@ LABELS = {
     "bookmarks": {"en": "Bookmarks", "ar": "علامات المستند"},
     "title": {"en": "Title", "ar": "العنوان"},
     "out": {"en": "Output file", "ar": "ملف الناتج"},
+    "file": {"en": "Source file", "ar": "ملف المصدر"},
+    "evidence": {"en": "Evidence", "ar": "الدليل"},
     "bytes": {"en": "Bytes", "ar": "الحجم بالبايت"},
     "checked": {"en": "Current version checked", "ar": "النسخة الحالية اتراجعت"},
     "closeout": {"en": "Review outcome", "ar": "نتيجة المراجعة"},

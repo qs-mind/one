@@ -6,6 +6,7 @@ import subprocess
 
 from qsone import copy
 from qsone.records import arabic, files, ocr
+from qsone.records.pdfium_guard import PDFIUM
 
 MAX_FACTS = 100
 IMAGE_TOKENS = 2000  # Conservative reserve per small evidence crop, before approval.
@@ -85,7 +86,8 @@ def crop(rec, fid, locator, evidence, value):
     from qsone.records.mapping.facts import grounding_text
 
     try:
-        with pdfium.PdfDocument(files.read_original(rec, fid)) as doc:
+        data = files.read_original(rec, fid)
+        with PDFIUM, pdfium.PdfDocument(data) as doc:
             page = doc[locator["page"] - 1]
             tp = page.get_textpage()
             # Map normalized quote characters back to actual pdfium character indices.

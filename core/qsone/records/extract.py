@@ -22,6 +22,7 @@ import xlrd
 from qsone.records import hidden, office
 from qsone.records.arabic import display_number, display_text
 from qsone.records.hidden import Flag
+from qsone.records.pdfium_guard import pdfium_locked
 
 EXTRACTOR_VERSION = 2
 
@@ -292,6 +293,7 @@ _ARABIC_LETTER = re.compile("[\u0621-\u064a]")
 _ALEF_LAM = re.compile("[\u0627\u0623\u0625\u0622\u0649]\u0644")
 
 
+@pdfium_locked
 def _page_text(textpage) -> str:
     """The page's text, with each lam-alef ligature in its letters' order (`_ALEF_LAM`) and
     Arabic-Indic clause numbers in reading order (`_RTL_RUN`): only in a line with Arabic
@@ -317,6 +319,7 @@ def _page_text(textpage) -> str:
     return "".join(out) + text[done:] if out else text
 
 
+@pdfium_locked
 def _box(tp, i: int) -> tuple[float, ...] | None:
     box = [ctypes.c_double() for _ in range(4)]  # left, right, bottom, top
     if not pdfium_c.FPDFText_GetCharBox(tp, i, *box):
@@ -324,6 +327,7 @@ def _box(tp, i: int) -> tuple[float, ...] | None:
     return tuple(b.value for b in box)
 
 
+@pdfium_locked
 def _ligatures(tp, text: str) -> str:
     """`text` with each alef-then-lam pair drawn as one glyph turned to lam-then-alef."""
     chars = None
@@ -337,6 +341,7 @@ def _ligatures(tp, text: str) -> str:
     return text if chars is None else "".join(chars)
 
 
+@pdfium_locked
 def _left_to_right(tp, first: int, last: int) -> bool:
     """Character `first` is left of character `last` on the page."""
     boxes = []
@@ -413,6 +418,7 @@ def select_pdf_text(data: bytes, index: int, text: str, *, inspector=None) -> tu
     return text, "pdfium"
 
 
+@pdfium_locked
 def _pdf(data: bytes) -> Extracted:
     pieces, flags, pdf = [], [], None
     sources = {}
