@@ -5,6 +5,14 @@ export type Language = "ar" | "en";
 export type Text = { en: string; ar: string };
 
 export const texts = {
+  aiModel: { en: "Model", ar: "الموديل" },
+  pasteAiKey: { en: "Paste your AI key", ar: "الصق مفتاحك" },
+  advancedAi: { en: "Advanced settings", ar: "إعدادات متقدمة" },
+  aiProviderUrl: { en: "Provider base URL", ar: "الرابط الأساسي لمزوّد الخدمة" },
+  aiUnknownKey: { en: "Add your provider’s base URL so ONE can check this key.", ar: "اكتب الرابط الأساسي لمزوّد الخدمة عشان ONE يتأكد من المفتاح." },
+  aiNoCheapModel: { en: "No capable model with a known price was found. Choose a model in Advanced settings.", ar: "ملقيناش موديل مناسب بسعر معروف. اختار موديل من الإعدادات المتقدمة." },
+  aiReadyModel: { en: "{provider} · Works · {model}", ar: "{provider} · شغّال · {model}" },
+
   projectMap: {en:"Project Map", ar:"خريطة المشروع"},
   mapEmpty: {en:"No files in this project yet.", ar:"لسه مفيش ملفات في المشروع."},
   mapSummary: {en:"Tender summary", ar:"ملخص المناقصة"},

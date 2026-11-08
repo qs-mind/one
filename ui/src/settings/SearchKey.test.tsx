@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../i18n";
+import { FixAction } from "../shell/FixAction";
 import { App } from "../shell/App";
 import { calls, core } from "../shell/testing";
 import { SearchKey } from "./SearchKey";
@@ -96,9 +97,18 @@ describe("SearchKey", () => {
     await user.click(within(screen.getByRole("banner")).getByRole("button", { name: texts.more.ar }));
     await user.click(await screen.findByRole("button", { name: new RegExp(texts.ai.ar) }));
     const panel = (await screen.findByRole("region", { name: texts.aiTitle.ar })).parentElement!;
+    await user.click(await screen.findByText(texts.advancedAi.ar));
     expect(within(panel).getByRole("region", { name: texts.searchTitle.ar })).toBeInTheDocument();
     expect(within(panel).getByRole("region", { name: texts.connectors.ar })).toBeInTheDocument();
     await waitFor(() => expect(within(panel).getByText(texts.searchByNative.ar)).toBeInTheDocument());
+  });
+
+  it("the search fix opens Advanced settings and reveals the search controls", async () => {
+    searchCore({ provider: "none", own_key: false });
+    const user = userEvent.setup();
+    render(<><App /><FixAction fix="search" /></>);
+    await user.click(screen.getByRole("button", { name: texts.setUpSearch.ar }));
+    expect(await screen.findByRole("region", { name: texts.searchTitle.ar })).toBeVisible();
   });
 
   it("every new label exists in both languages", () => {

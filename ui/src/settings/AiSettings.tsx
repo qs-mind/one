@@ -1,4 +1,4 @@
-// AI settings: the AI Connectors (the Claude key, Standard Links, the engineer's own Claude Code), which model does
+// AI settings: one pasted key, with detailed AI connections in Advanced settings, which model does
 // each job, prices One does not know, and the Spending Caps. The engineer picks every model; nothing here is fixed.
 // No Save or Check button: a key checks itself, a choice saves when it is made, an amount after a pause in typing
 // or on leaving its field, a file path on leaving its field (never a half-typed path), each with its quiet line.
@@ -13,9 +13,12 @@ import { AutoHeight } from "../ui/AutoHeight";
 import { perMillion } from "../ui/digits";
 import { SavedCheck } from "../ui/InkCheck";
 import { looksLikeAmount, SaveNote, useSaving } from "../ui/live";
+import { onOpenAdvanced } from "../shell/FixAction";
 import { UndoNotice } from "../ui/UndoNotice";
 import type { Removed } from "./Connectors";
-import { AiKey } from "./AiKey";
+import { PasteKey } from "./PasteKey";
+import { SearchKey } from "./SearchKey";
+import { Connectors } from "./Connectors";
 
 export type Role = "lead" | "checker" | "specialist" | "quick";
 export type Choice = { connector: string; model: string };
@@ -119,6 +122,9 @@ export function AiSettings({ ai, onClose }: { ai: Ai; onClose?: () => void }) {
   useLanguage();
   const title = useId();
   const { loaded } = ai;
+  const [advanced, setAdvanced] = useState(false);
+  const [opened, setOpened] = useState(false);
+  useEffect(() => onOpenAdvanced(() => { setAdvanced(true); setOpened(true); }), []);
 
   return (
     <section aria-labelledby={title} className="border-b border-stone px-4 py-4">
@@ -147,21 +153,31 @@ export function AiSettings({ ai, onClose }: { ai: Ai; onClose?: () => void }) {
         )}
         {loaded.state === "ready" && (
           <>
-            {!ai.connected && <p>{t("noAiYet")}</p>}
-            <ClaudeKey settings={loaded.settings} onSaved={() => void ai.load()} />
-            <StandardLinks connectors={loaded.settings.connectors} onChanged={() => void ai.load()} />
-            <ClaudeCode connectors={loaded.settings.connectors} onChanged={() => void ai.load()} />
-            {ai.connected && (
-              <>
-                <RoleModels settings={loaded.settings} onSaved={ai.setRoles} />
-                <PriceForm sheet={loaded.settings.sheet} onSaved={() => void ai.load()} />
-                <div className="flex flex-col gap-3">
-                  <h3 className="font-semibold">{t("caps")}</h3>
-                  <p className="text-slate">{t("capsHelp")}</p>
-                  <CapsForm />
+            <PasteKey onSaved={() => void ai.load()} currentModel={loaded.settings.roles.lead?.model} />
+            <MainModel settings={loaded.settings} onSaved={ai.setRoles} />
+            <details open={advanced} onToggle={event => { setAdvanced(event.currentTarget.open); if (event.currentTarget.open) setOpened(true); }}>
+              <summary className="cursor-pointer text-slate">{t("advancedAi")}</summary>
+              {opened && (
+                <div className="mt-4 flex flex-col gap-6">
+                  {loaded.settings.key_store === "file" && <p className="text-slate">{t("keyStoreFile")}</p>}
+                  <StandardLinks connectors={loaded.settings.connectors} onChanged={() => void ai.load()} />
+                  <ClaudeCode connectors={loaded.settings.connectors} onChanged={() => void ai.load()} />
+                  {ai.connected && (
+                    <>
+                      <RoleModels settings={loaded.settings} onSaved={ai.setRoles} />
+                      <PriceForm sheet={loaded.settings.sheet} onSaved={() => void ai.load()} />
+                      <div className="flex flex-col gap-3">
+                        <h3 className="font-semibold">{t("caps")}</h3>
+                        <p className="text-slate">{t("capsHelp")}</p>
+                        <CapsForm />
+                      </div>
+                    </>
+                  )}
+                  <SearchKey />
+                  <Connectors />
                 </div>
-              </>
-            )}
+              )}
+            </details>
           </>
         )}
       </AutoHeight>
@@ -169,18 +185,32 @@ export function AiSettings({ ai, onClose }: { ai: Ai; onClose?: () => void }) {
   );
 }
 
-function ClaudeKey({ settings, onSaved }: { settings: Settings; onSaved: () => void }) {
-  const saved = settings.connectors.some((c) => c.id === "anthropic" && c.key_set);
+/** The everyday model choice; per-role choices remain in Advanced settings. */
+function MainModel({ settings, onSaved }: { settings: Settings; onSaved: (roles: Roles) => void }) {
+  const { saving, now } = useSaving();
+  const current = settings.roles.lead;
+  if (!current) return null;
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="flex items-center gap-2 font-semibold">
-        <ProviderLogo provider="anthropic" />
-        {t("aiKey")}
-      </h3>
-      {saved && <p className="text-slate">{t("claudeKeySaved")}</p>}
-      {settings.key_store === "file" && <p className="text-slate">{t("keyStoreFile")}</p>}
-      <Alert line={settings.connectors.find((c) => c.id === "anthropic" && c.key_set)?.error ?? undefined} />
-      <AiKey onChecked={onSaved} />
+      <label className="flex items-center gap-2">
+        {t("aiModel")}
+        <select dir="ltr" value={keyOf(current)} className={field} disabled={saving.state === "busy"}
+          onChange={event => {
+            const card = settings.sheet.find(card => keyOf(card) === event.target.value);
+            if (!card) return;
+            const next = { ...settings.roles, lead: { connector: card.connector, model: card.model } };
+            void now(async () => {
+              const response = await send("/settings/ai/roles", "PUT", next);
+              if (!response?.ok) return coreLine(response, texts.roleNotSaved);
+              onSaved(await response.json() as Roles);
+              return null;
+            });
+          }}>
+          {!settings.sheet.some(card => keyOf(card) === keyOf(current)) && <option value={keyOf(current)}>{current.model}</option>}
+          {settings.sheet.map(card => <option key={keyOf(card)} value={keyOf(card)}>{card.name}</option>)}
+        </select>
+      </label>
+      {saving.state === "failed" && <Alert line={saving.line} />}
     </div>
   );
 }

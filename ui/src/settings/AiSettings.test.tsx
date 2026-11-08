@@ -51,6 +51,7 @@ function settings(more: { connectors?: object[] } = {}) {
       card("standard:s1", "sample-model", "sample-model", null),
     ],
     roles,
+    cheapest: { anthropic: haiku },
     defaults: { ...roles, checker: { connector: "standard:s1", model: "sample-model" } },
   };
 }
@@ -66,6 +67,8 @@ function core(routes: Record<string, Route> = {}) {
     const route = routes[key];
     if (route) return route(init);
     if (key === "GET /api/settings/ai") return Response.json(settings());
+    if (key === "PUT /api/settings/ai/roles") return Response.json(roles);
+    if (key === "PUT /api/settings/model") return Response.json({ id: haiku.model });
     if (key === "GET /api/settings/ai/caps") return Response.json({ caps, recommended });
     return new Response("not found", { status: 404 });
   });
@@ -96,6 +99,7 @@ describe("AiSettings", () => {
     try {
       core();
       render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
       await screen.findByRole("combobox", { name: texts.roleLead.ar });
       expect(animate).toHaveBeenCalledWith([{ height: "80px" }, { height: expect.stringMatching(/^\d+px$/) }], expect.anything());
       const [[from, to]] = animate.mock.calls[0]! as unknown as [Keyframe[]];
@@ -108,6 +112,7 @@ describe("AiSettings", () => {
   it("role selects show each model's price and source; an unknown price says so", async () => {
     core();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const lead = await screen.findByRole("combobox", { name: texts.roleLead.ar });
     expect(lead).toHaveValue(JSON.stringify(opus));
     const options = within(lead).getAllByRole("option").map((option) => option.textContent);
@@ -129,11 +134,13 @@ describe("AiSettings", () => {
   it("says the keys are kept in a file only when this computer has no key store", async () => {
     core();
     const { unmount } = render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     await screen.findByRole("combobox", { name: texts.roleLead.ar });
     expect(screen.queryByText(texts.keyStoreFile.ar)).toBeNull();
     unmount();
     core({ "GET /api/settings/ai": () => Response.json({ ...settings(), key_store: "file" }) });
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     expect(await screen.findByText(texts.keyStoreFile.ar)).toBeInTheDocument();
   });
 
@@ -141,6 +148,7 @@ describe("AiSettings", () => {
     const fetch = core({ "PUT /api/settings/ai/roles": (init) => Response.json(JSON.parse(String(init.body))) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const lead = await screen.findByRole("combobox", { name: texts.roleLead.ar });
     await user.selectOptions(lead, JSON.stringify(haiku));
     await waitFor(() => expect(bodies(fetch, "PUT", "/api/settings/ai/roles")).toEqual([{ ...roles, lead: haiku }]));
@@ -152,6 +160,7 @@ describe("AiSettings", () => {
     core({ "PUT /api/settings/ai/roles": () => Response.json({ role: "lead", allowed: [opus] }, { status: 422 }) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const lead = await screen.findByRole("combobox", { name: texts.roleLead.ar });
     await user.selectOptions(lead, JSON.stringify(haiku));
     expect((await screen.findByText(texts.roleNotSaved.ar)).closest("[role=alert]")).not.toBeNull();
@@ -162,9 +171,9 @@ describe("AiSettings", () => {
     const local = { id: "standard:s2", kind: "model", name: "Local - sample", provider: "localhost:11434", on_device: true, key_set: false, error: null };
     core({ "GET /api/settings/ai": () => Response.json(settings({ connectors: [local] })) });
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const logo = (text: string) => screen.getByText(text).closest("h3, li")!.querySelector("svg[data-logo]")?.getAttribute("data-logo");
     await screen.findByText("Local - sample");
-    expect(logo(texts.aiKey.ar)).toBe("claude");
     expect(logo(texts.claudeCode.ar)).toBe("claude");
     expect(logo("Local - sample")).toBe("ollama");
     expect(logo("Sample provider")).toBe("unknown");
@@ -182,6 +191,7 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     await user.type(await screen.findByLabelText(texts.providerName.ar), "Local - sample");
     await user.type(screen.getByLabelText(texts.baseUrl.ar), "http://127.0.0.1:11434/v1");
     const key = screen.getByLabelText(texts.providerKey.ar);
@@ -206,6 +216,7 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     await user.type(await screen.findByLabelText(texts.providerName.ar), "Gemini - sample");
     await user.type(screen.getByLabelText(texts.baseUrl.ar), "https://generativelanguage.googleapis.com/v1beta/openai");
     await user.click(screen.getByRole("button", { name: texts.addProvider.ar }));
@@ -217,6 +228,7 @@ describe("AiSettings", () => {
     const fetch = core({ "POST /api/settings/ai/standard": () => Response.json({}, { status: 201 }) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     await user.type(await screen.findByLabelText(texts.providerName.ar), "Ollama - sample");
     await user.type(screen.getByLabelText(texts.baseUrl.ar), "http://localhost:11434/v1");
     await user.click(screen.getByRole("button", { name: texts.addProvider.ar }));
@@ -231,6 +243,7 @@ describe("AiSettings", () => {
     const fetch = core({ "POST /api/settings/ai/standard": () => Response.json({}, { status: 201 }) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     await user.type(await screen.findByLabelText(texts.providerName.ar), "Gemini - sample");
     await user.type(screen.getByLabelText(texts.baseUrl.ar), "https://generativelanguage.googleapis.com/v1beta/openai");
     await user.type(screen.getByLabelText(texts.providerModel.ar), " gemini-3.1-flash-lite ");
@@ -251,6 +264,7 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const row = (await screen.findByText("Sample provider")).closest("li")!;
     expect(within(row).getByText("مقدرناش نوصل لـ Sample provider.")).toBeInTheDocument();
     await user.click(within(row).getByRole("button", { name: texts.remove.ar }));
@@ -267,6 +281,7 @@ describe("AiSettings", () => {
     core({ "POST /api/settings/ai/standard": () => Response.json({ detail }, { status: 422 }) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     await user.type(await screen.findByLabelText(texts.providerName.ar), "Remote - sample");
     await user.type(screen.getByLabelText(texts.baseUrl.ar), "http://example.com/v1");
     await user.type(screen.getByLabelText(texts.providerKey.ar), "sk-sample");
@@ -285,6 +300,7 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const ready = await screen.findByText("Claude Code 2.1.318 جاهز.");
     expect(ready.closest("[data-feedback]")).toHaveAttribute("data-feedback", "done");
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -318,7 +334,8 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(await screen.findByLabelText(texts.aiKeyLabel.ar));
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
+    await user.click(await screen.findByLabelText(texts.pasteAiKey.ar));
     await user.paste(KEY);
     const line = (await screen.findByText(refused.ar)).closest("[data-key-line]") as HTMLElement;
     expect(line.textContent).not.toMatch(PLACE);
@@ -333,7 +350,8 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(await screen.findByLabelText(texts.aiKeyLabel.ar));
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
+    await user.click(await screen.findByLabelText(texts.pasteAiKey.ar));
     await user.paste(KEY);
     const line = (await screen.findByText(offline.ar)).closest("[data-key-line]") as HTMLElement;
     expect(line.textContent).not.toMatch(PLACE);
@@ -353,7 +371,8 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(await screen.findByLabelText(texts.aiKeyLabel.ar));
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
+    await user.click(await screen.findByLabelText(texts.pasteAiKey.ar));
     await user.paste(KEY);
     const line = (await screen.findByText(consent.ar)).closest("[data-key-line]") as HTMLElement;
     expect(within(line).getByRole("button", { name: texts.connectAi.ar })).toBeInTheDocument();
@@ -368,9 +387,10 @@ describe("AiSettings", () => {
     });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const line = await screen.findByText(texts.claudeCodeSignedOut.ar);
     expect(line.textContent).not.toMatch(PLACE);
-    await user.click(screen.getByRole("button", { name: texts.tryAgain.ar }));
+    await user.click(within(line.parentElement!.parentElement!).getByRole("button", { name: texts.tryAgain.ar }));
     await waitFor(() => expect(calls(fetch, "GET", "/api/settings/ai/claude-code")).toHaveLength(2));
   });
 
@@ -384,6 +404,7 @@ describe("AiSettings", () => {
     const fetch = core({ "PUT /api/settings/ai/claude-code": (init) => Response.json(JSON.parse(String(init.body))) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     await user.click(await screen.findByRole("checkbox", { name: texts.useClaudeCode.ar }));
     expect(await screen.findByText(texts.claudeCodeCopy.ar)).toBeInTheDocument();
     expect(bodies(fetch, "PUT", "/api/settings/ai/claude-code")).toEqual([{ path: null, on: true }]);
@@ -394,6 +415,7 @@ describe("AiSettings", () => {
     const fetch = core({ "PUT /api/settings/ai/prices": (init) => Response.json(JSON.parse(String(init.body))) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const form = (await screen.findByRole("heading", { name: texts.enterPrice.ar })).closest("form")!;
     expect(within(form).getAllByRole("option").map((o) => o.textContent)).toEqual(["sample-model"]);
     await user.type(within(form).getByLabelText(texts.priceIn.ar), "0.27");
@@ -412,6 +434,7 @@ describe("AiSettings", () => {
     const fetch = core({ "PUT /api/settings/ai/caps": saved });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const day = await screen.findByLabelText(texts.capDay.ar);
     await waitFor(() => expect(day).toHaveValue("15.00"));
     expect(screen.getByLabelText(texts.budgetAbove.ar)).toHaveValue("0.50");
@@ -429,6 +452,7 @@ describe("AiSettings", () => {
   it("each cap shows the recommended amount beside it", async () => {
     core();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const brief = await screen.findByLabelText(texts.capBrief.ar);
     await waitFor(() => expect(brief).toHaveValue("2.00"));
     const hint = (value: string) => fill(texts.recommendedAmount.ar, { value });
@@ -442,6 +466,7 @@ describe("AiSettings", () => {
     const fetch = core({ "PUT /api/settings/ai/caps": () => Response.json({ error: notExact, field: "day" }, { status: 422 }) });
     const user = userEvent.setup();
     render(<Harness />);
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     const day = await screen.findByLabelText(texts.capDay.ar);
     await waitFor(() => expect(day).toHaveValue("15.00"));
     await user.clear(day);
@@ -467,6 +492,30 @@ describe("AiSettings", () => {
     render(<Harness />);
     expect(await screen.findByRole("alert")).toHaveTextContent(texts.aiFailed.ar);
     await user.click(screen.getByRole("button", { name: texts.retry.ar }));
+    await userEvent.click(await screen.findByText(texts.advancedAi.ar));
     expect(await screen.findByRole("combobox", { name: texts.roleLead.ar })).toBeInTheDocument();
   });
+});
+
+it("opens with one key box and Advanced settings closed", async () => {
+  core({ "GET /api/settings/ai": () => Response.json({ connectors: [], sheet: [], roles: {}, defaults: {} }) });
+  const { container } = render(<Harness />);
+  expect(await screen.findByLabelText(texts.pasteAiKey.ar)).toBeInTheDocument();
+  expect(container.querySelector("details")).not.toHaveAttribute("open");
+  expect(screen.queryByLabelText(texts.baseUrl.ar)).toBeNull();
+  expect(screen.queryByRole("heading", { name: texts.connectors.ar })).toBeNull();
+  await userEvent.click(screen.getByText(texts.advancedAi.ar));
+  expect(await screen.findByLabelText(texts.baseUrl.ar)).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: texts.searchTitle.ar })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: texts.connectors.ar })).toBeInTheDocument();
+});
+
+it("changes the main model without opening Advanced settings and reports a refused change", async () => {
+  const fetch = core({ "PUT /api/settings/ai/roles": () => Response.json({ error: { en: "Model unavailable.", ar: "الموديل مش متاح." } }, { status: 409 }) });
+  render(<Harness />);
+  const select = await screen.findByRole("combobox", { name: texts.aiModel.ar });
+  await userEvent.selectOptions(select, JSON.stringify(haiku));
+  expect(await screen.findByText("الموديل مش متاح.")).toHaveAttribute("role", "alert");
+  expect(select).toHaveValue(JSON.stringify(opus));
+  expect(bodies(fetch, "PUT", "/api/settings/ai/roles")).toEqual([{ ...roles, lead: haiku }]);
 });

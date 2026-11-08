@@ -27,9 +27,19 @@ export function onOpenPanel(listener: (panel: FixPanel) => void): () => void {
 /** The web search setting, in AI settings (SearchKey): the panel opens there (audit B8). */
 export const SEARCH_SETTING = "search-setting";
 
+const advancedListeners = new Set<() => void>();
+let advancedWaiting = false;
+export function onOpenAdvanced(listener: () => void): () => void {
+  advancedListeners.add(listener);
+  if (advancedWaiting) { advancedWaiting = false; listener(); }
+  return () => { advancedListeners.delete(listener); };
+}
+
 function openSearch() {
+  if (!advancedListeners.size) advancedWaiting = true;
+  for (const listener of advancedListeners) listener();
   openPanel("ai");
-  requestAnimationFrame(() => document.getElementById(SEARCH_SETTING)?.scrollIntoView?.({ block: "start" }));
+  requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(SEARCH_SETTING)?.scrollIntoView?.({ block: "start" })));
 }
 
 type Label = "openAiSettings" | "connectAi" | "openBackup" | "setUpSearch";
