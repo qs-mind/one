@@ -187,8 +187,7 @@ describe("ProjectPicker", () => {
     render(<App />);
     await user.click(switcher(texts.generalChat.en));
     const region = screen.getByRole("region", { name: texts.projects.en });
-    await user.click(await within(region).findByRole("button", { name: texts.newProject.en }));
-    expect(within(region).getByRole("button", { name: texts.chooseProjectFiles.en })).toBeInTheDocument();
-    expect(within(region).getByRole("button", { name: texts.chooseProjectFolder.en })).toBeInTheDocument();
+    expect(await within(region).findByRole("button", { name: texts.newProject.en })).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: texts.newProjectFromFolder.en })).toBeInTheDocument();
   });
 });

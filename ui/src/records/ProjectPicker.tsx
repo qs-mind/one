@@ -1,6 +1,6 @@
 // Pick the chat to work in: the General chat outside every project, or a project; or create one. A narrow, calm list
 // under the project button: each row with what its Briefs are doing (a mark and a word), a search field once there
-// are more than six projects, and "New project" asks only for files or a folder.
+// are more than six projects, and "New project" opens the file dialog at once; "New project from a folder" the folder dialog.
 // No Close button: Escape or a click outside closes it (FloatingPanel). The arrow keys move between the rows (one
 // tab stop), and one Stone block glides behind the row reached. The core lists every project on this computer, newest
 // first; one it cannot read is listed with the reason, never hidden. Archived projects come last, each marked.
@@ -24,6 +24,7 @@ type List = { state: "loading" } | { state: "ready"; projects: Listed[] } | { st
 /** More projects than this, and a search field shows above them. */
 export const SEARCH_FROM = 6;
 const NEW = "new";
+const NEW_FOLDER = "new-folder";
 
 /** Goes to the General chat: no project is current, and the one that was is closed in the core. */
 export function leaveProject() {
@@ -58,7 +59,6 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
   const activity = useActivity();
   const [list, setList] = useState<List>({ state: "loading" });
   const [query, setQuery] = useState("");
-  const [naming, setNaming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Text>();
   const [stop, setStop] = useState<string>(); // the row that holds the list's one tab stop
@@ -90,7 +90,7 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
   const archived = shown.filter((p) => "name" in p && p.archived_at);
   const general = shows(t("generalChat"));
   const firstKey = current && projects.some((p) => p.id === current.id) ? current.id : (projects[0]?.id ?? NEW);
-  const keys = [...(general ? [GENERAL] : []), ...[...working, ...archived].filter((p) => "name" in p).map((p) => p.id), NEW];
+  const keys = [...(general ? [GENERAL] : []), ...[...working, ...archived].filter((p) => "name" in p).map((p) => p.id), NEW, NEW_FOLDER];
   const tabStop = [stop, firstKey].find((key) => key !== undefined && keys.includes(key)) ?? keys[0];
 
   useEffect(() => {
@@ -99,10 +99,6 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
     if (searchable) search.current?.focus();
     else rows.current?.querySelector<HTMLElement>(`[data-row="${firstKey}"]`)?.focus();
   }, [list.state]);
-
-  useEffect(() => {
-    if (!naming) newRow.current?.focus();
-  }, [naming]);
 
   async function open(id: string) {
     setBusy(true);
@@ -266,11 +262,12 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
           <li className="px-3 py-1.5 text-sm text-slate">{t("noProjectMatch")}</li>
         )}
         <li className="mt-0.5 border-t border-ink/[0.06] pt-0.5">
-          {naming ? <div className="flex gap-2">
-            <button type="button" className={row} onClick={() => fileField.current?.click()}>{t("chooseProjectFiles")}</button>
-            <button type="button" className={row} onClick={() => { chooseFolder(false, true); onClose(); }}>{t("chooseProjectFolder")}</button>
-          </div> : <button ref={newRow} type="button" {...rowProps(NEW)} disabled={busy} onClick={() => files ? void create() : setNaming(true)} className={`${row} text-slate`}>
+          {/* the system's file dialog opens at once; a folder has its own row (no dialog picks both) */}
+          <button ref={newRow} type="button" {...rowProps(NEW)} disabled={busy} onClick={() => files ? void create() : fileField.current?.click()} className={`${row} text-slate`}>
             <span aria-hidden="true">+</span><span>{t("newProject")}</span>
+          </button>
+          {!files && <button type="button" {...rowProps(NEW_FOLDER)} disabled={busy} onClick={() => { chooseFolder(false, true); onClose(); }} className={`${row} text-slate`}>
+            <span aria-hidden="true">+</span><span>{t("newProjectFromFolder")}</span>
           </button>}
           <input ref={fileField} type="file" multiple hidden onChange={event => { if (event.target.files?.length) void create(Array.from(event.target.files)); }} />
         </li>

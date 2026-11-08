@@ -242,11 +242,12 @@ describe("the compact projects list", () => {
     render(<App />);
     await open(user);
     expect(within(picker()).queryByRole("button", { name: texts.close.ar })).toBeNull(); // Escape or a click outside
-    const row = within(picker()).getByRole("button", { name: texts.newProject.ar });
-    await user.click(row);
-    expect(within(picker()).queryByRole("textbox", { name: texts.projectName.ar })).toBeNull();
-    expect(within(picker()).getByRole("button", { name: texts.chooseProjectFolder.ar })).toBeInTheDocument();
     const input = picker().querySelector('input[type="file"]') as HTMLInputElement;
+    const opened = vi.spyOn(input, "click");
+    await user.click(within(picker()).getByRole("button", { name: texts.newProject.ar }));
+    expect(opened).toHaveBeenCalled(); // New project opens the file dialog at once: no step between
+    expect(within(picker()).queryByRole("textbox", { name: texts.projectName.ar })).toBeNull();
+    expect(within(picker()).getByRole("button", { name: texts.newProjectFromFolder.ar })).toBeInTheDocument();
     await user.upload(input, new File(["sample"], "sample.txt"));
     await waitFor(() => expect(currentProject()?.id).toBe("p1"));
     const [, init] = calls(fetch, "POST", "/api/projects")[0]!;
@@ -265,6 +266,8 @@ describe("the compact projects list", () => {
     await user.keyboard("{ArrowUp}{ArrowUp}");
     expect(within(picker()).getByRole("button", { name: new RegExp(texts.generalChat.ar) })).toHaveFocus();
     await user.keyboard("{End}");
+    expect(within(picker()).getByRole("button", { name: texts.newProjectFromFolder.ar })).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
     expect(within(picker()).getByRole("button", { name: texts.newProject.ar })).toHaveFocus();
     const stops = within(picker()).getAllByRole("button").filter((b) => b.tabIndex === 0);
     expect(stops).toHaveLength(1);
