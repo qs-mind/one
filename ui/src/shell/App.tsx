@@ -23,8 +23,6 @@ import { currentProject, restoreProject, useProject } from "../records/project";
 import { leaveProject, openChat, ProjectPicker } from "../records/ProjectPicker";
 import { RecordsPanel } from "../records/RecordsPanel";
 import { AiSettings, useAiSettings } from "../settings/AiSettings";
-import { Connectors } from "../settings/Connectors";
-import { SearchKey } from "../settings/SearchKey";
 import { useOpened, workspaceApi } from "../workspace/api";
 import { DocumentsContext, useDocuments } from "../workspace/documents";
 import { DocumentHead, Workspace } from "../workspace/Workspace";
@@ -320,8 +318,6 @@ export function App({ sourcesFor = projectSources }: { sourcesFor?: (projectId: 
       {panel === "ai" && (
         <>
           <AiSettings ai={ai} onClose={closePanel} />
-          <SearchKey />
-          <Connectors />
         </>
       )}
       {panel === "projects" && (

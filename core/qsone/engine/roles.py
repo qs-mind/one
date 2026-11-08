@@ -259,3 +259,16 @@ async def select_lead(choice, sheet, found, on_usage=None):
         "roles", {r: {"connector": c.connector, "model": c.model} for r, c in picked.items()}
     )
     allow_model(typed.choice)
+
+
+def cheapest(sheet: list[ModelCard]) -> dict[str, ModelChoice]:
+    """Cheapest known-price, eligible tool-capable model on each connection.
+
+    Compare the same input-plus-output price ranking as existing role defaults.
+    Unknown prices never justify an automatic selection.
+    """
+    result: dict[str, ModelChoice] = {}
+    for card in reversed(_ranked(sheet)):
+        if card.tools and _eligible(card):
+            result.setdefault(card.choice.connector, card.choice)
+    return result

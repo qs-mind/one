@@ -152,6 +152,7 @@ def settings_router(
             "sheet": [card_json(c) for c in listed],
             "roles": _roles_json(roles.chosen(listed)),
             "defaults": _roles_json(roles.defaults(listed)),
+            "cheapest": {k: _choice_json(v) for k, v in roles.cheapest(listed).items()},
             "effort": _effort(),  # the message box's last effort, or None (the provider's own)
             "key_store": keystore.kind(),  # "file" when this computer has no key store
         }
