@@ -343,21 +343,36 @@ describe("the chat in the shell", () => {
     core({ keySet: false });
     const { unmount } = render(<App />);
     expect(await screen.findByRole("heading", { name: texts.aiTitle.ar })).toBeInTheDocument();
-    expect(screen.getByText(texts.noAiYet.ar)).toBeInTheDocument();
+    expect(await screen.findByLabelText(texts.pasteAiKey.ar)).toHaveAttribute("type", "password");
+    expect(screen.getByText(texts.advancedAi.ar).closest("details")).not.toHaveAttribute("open");
     expect(screen.queryByRole("textbox", { name: texts.message.ar })).not.toBeInTheDocument();
     unmount();
 
     setLanguage("en");
     render(<App />);
     expect(await screen.findByRole("heading", { name: texts.aiTitle.en })).toBeInTheDocument();
+    expect(await screen.findByLabelText(texts.pasteAiKey.en)).toHaveAttribute("type", "password");
+    expect(screen.getByText(texts.advancedAi.en).closest("details")).not.toHaveAttribute("open");
+    expect(screen.queryByRole("textbox", { name: texts.message.en })).not.toBeInTheDocument();
   });
 
   it("pasting the first key stores it in the core and checks it, without showing it, and opens the chat", async () => {
     const key = "sk-ant-sample-not-a-real-key-0000000000000"; // not a real key
-    const fetch = core({ keySet: false, routes: { "POST /api/settings/ai/check": () => Response.json({ ok: true }) } });
+    const choice = { connector: "anthropic", model: "claude-sample" };
+    let saved = false;
+    const fetch = core({ keySet: false, routes: {
+      "PUT /api/settings/ai-key": () => { saved = true; return Response.json({ set: true }); },
+      "GET /api/settings/ai": () => Response.json({
+        connectors: [{ id: "anthropic", kind: "model", name: "Claude", key_set: saved, error: null }],
+        sheet: [], roles: saved ? { lead: choice } : {}, defaults: {},
+        cheapest: saved ? { anthropic: choice } : {},
+      }),
+      "PUT /api/settings/model": () => Response.json({ roles: { lead: choice } }),
+      "POST /api/settings/ai/check": () => Response.json({ ok: true }),
+    } });
     const user = userEvent.setup();
     render(<App />);
-    const field = await screen.findByLabelText(texts.aiKeyLabel.ar);
+    const field = await screen.findByLabelText(texts.pasteAiKey.ar);
     expect(field).toHaveAttribute("type", "password");
     await user.click(field);
     await user.paste(key);
@@ -366,7 +381,12 @@ describe("the chat in the shell", () => {
     expect(screen.queryByDisplayValue(key)).not.toBeInTheDocument();
     const [, init] = calls(fetch, "PUT", "/api/settings/ai-key")[0]!;
     expect(bodyOf(init)).toEqual({ provider: "anthropic", value: key });
-    expect(calls(fetch, "POST", "/api/settings/ai/check")).toHaveLength(1);
+    const modelCalls = calls(fetch, "PUT", "/api/settings/model");
+    expect(modelCalls).toHaveLength(1);
+    expect(bodyOf(modelCalls[0]![1])).toEqual({ id: choice.model });
+    const checks = calls(fetch, "POST", "/api/settings/ai/check");
+    expect(checks).toHaveLength(1);
+    expect(bodyOf(checks[0]![1])).toEqual({ via: "api_key" });
   });
 
   it("“AI” opens its one settings panel while the chat stays, and closes again", async () => {
@@ -376,11 +396,13 @@ describe("the chat in the shell", () => {
     await user.click(await screen.findByRole("button", { name: texts.more.ar }));
     await user.click(await screen.findByRole("button", { name: texts.ai.ar }));
     const panel = await screen.findByRole("region", { name: texts.aiTitle.ar });
-    expect(await within(panel).findByRole("combobox", { name: texts.roleLead.ar })).toBeInTheDocument();
+    expect(await within(panel).findByLabelText(texts.pasteAiKey.ar)).toHaveAttribute("type", "password");
+    expect(within(panel).getByText(texts.advancedAi.ar).closest("details")).not.toHaveAttribute("open");
     expect(screen.getByRole("textbox", { name: texts.message.ar })).toBeInTheDocument();
     expect(screen.getAllByRole("region", { name: texts.aiTitle.ar })).toHaveLength(1);
     await user.click(within(panel).getByRole("button", { name: texts.close.ar }));
     expect(screen.queryByRole("region", { name: texts.aiTitle.ar })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: texts.message.ar })).toBeInTheDocument();
   });
 
   it("switches the language from the top bar; the chrome mirrors", async () => {
