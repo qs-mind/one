@@ -32,6 +32,7 @@ it("opens BOQ columns wide, keeps edits when chat folds, and submits the edited 
   const user = userEvent.setup();
   const answered = vi.fn();
   const { rerender } = render(<><ApprovalCard id="rows-wide-sample" card={card} onAnswered={answered} /><Document /></>);
+  await user.click(screen.getByRole("button", { name: texts.checkColumns.en }));
   await user.selectOptions(screen.getByRole("combobox"), "amount");
   await user.click(screen.getByRole("button", {name: texts.openAsDocument.en}));
   const doc = screen.getByTestId("document");

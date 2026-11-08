@@ -351,6 +351,7 @@ def step(
                 actor=store.ACTOR,
                 include_text_pages=True,
             )
+            _file_changed(rec, file_id)
             _update(
                 rec,
                 file_id,
@@ -476,3 +477,16 @@ def _duplicate(rec, file_id):
                 item.pop("id")
                 store.write(c, rec, table, item | {"file_id": file_id})
         return True
+
+
+def _file_changed(rec, file_id: str) -> None:
+    """The file's new status (a photo or scan read in the background) to the open screen, live."""
+    from dataclasses import asdict
+
+    from qsone.deliverables import events
+
+    info = files.file_info(rec, file_id)
+    note = getattr(copy, info.note) if info.note else None
+    kinds = info.flag_kinds.split(",") if info.flag_kinds else []
+    file = asdict(info) | {"note": note, "note_key": info.note, "flag_kinds": kinds}
+    events.publish(rec.id, {"type": "file", "file": file})

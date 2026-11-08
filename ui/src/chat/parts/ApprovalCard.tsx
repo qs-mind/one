@@ -271,6 +271,7 @@ export function ApprovalCard({
         {Kind && (
           <Kind
             card={shown}
+            inDocument={inDocument}
             stateId={sharedId}
             sending={busy}
             onAnswer={(choice, extra) => void answer(choice, extra)}

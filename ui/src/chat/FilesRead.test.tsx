@@ -34,12 +34,13 @@ describe("the report of a drop", () => {
     expect(paragraph).toHaveAttribute("dir", "rtl");
   });
 
-  it("shows each line in the page language, as ONE's own message", async () => {
+  it("shows its first line, the rest under Details, in the page language, as ONE's own message", async () => {
     core({ routes: { "GET /api/chat/p1/messages": () => Response.json({ messages: [report] }) } });
     render(<App />);
     const line = await screen.findByText((_, el) => el?.tagName === "P" && el.textContent === lines[1]!.ar);
     expect(line).toHaveAttribute("dir", "rtl");
-    expect(line.closest('[role="status"]')).toHaveTextContent(lines[0]!.ar);
+    expect(line.closest("[data-details]")).not.toBeNull(); // folded
+    expect(screen.getAllByRole("status").some((el) => el.textContent?.includes(lines[0]!.ar) && !el.closest("[data-details]"))).toBe(true); // the summary, in sight
     setLanguage("en");
     expect(await screen.findByText((_, el) => el?.tagName === "P" && el.textContent === lines[1]!.en)).toBeInTheDocument();
   });

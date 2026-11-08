@@ -54,9 +54,24 @@ def test_photo_is_read_and_has_preview(rec, monkeypatch, extension):
         "read_image",
         lambda *a, **kw: ocr.Page([ocr.Word("Sample", [1, 2, 30, 12], 95)], False),
     )
-    f = files.add_file(rec, "sample." + extension, out.getvalue(), actor="engineer")
-    drain(rec)
+    from qsone.deliverables import events
+
+    heard = []
+    stop = events.listen(lambda project_id, event: heard.append((project_id, event)))
+    try:
+        f = files.add_file(rec, "sample." + extension, out.getvalue(), actor="engineer")
+        drain(rec)
+    finally:
+        stop()
     assert files.file_info(rec, f.id).status == "read"
+    # the open screen hears the photo is read, so its list stops saying «Kept, not read»
+    assert any(
+        pid == rec.id
+        and e["type"] == "file"
+        and e["file"]["id"] == f.id
+        and e["file"]["status"] == "read"
+        for pid, e in heard
+    )
     assert store.detail(rec, f.id)["read_how"] == "ocr"
     assert workspace.page_count(rec, f.id) == 1
     assert ocr.png_size(workspace.page_image(rec, f.id, 1, 240)) == (240, 160)

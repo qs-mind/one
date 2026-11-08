@@ -20,6 +20,12 @@ def listen(listener: Listener) -> Callable[[], None]:
     return lambda: _listeners.remove(listener)
 
 
+def publish(project_id: str, event: dict) -> None:
+    """Any activity event from a worker thread to every listener (a file read in the background)."""
+    for listener in list(_listeners):
+        listener(project_id, event)
+
+
 def publish_deliverable(rec: Records, project_id: str, deliverable_id: str) -> None:
     """The Deliverable's list entry, as it is now, to every listener."""
     if not _listeners:

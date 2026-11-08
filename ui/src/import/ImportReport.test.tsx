@@ -42,27 +42,12 @@ afterEach(() => {
 });
 
 describe("the import summary", () => {
-  it("reads while the Brief works, says the card waits once it does, and folds small", async () => {
+  it("says nothing once every file came in: the files list and the chat say the rest (Kareem, 8 Nov)", async () => {
     activity = [{ chat_id: "p1", brief_id: "b1", state: "working", name: "مناقصة - عينة" }];
     render(<ImportReports />);
     await act(() => importFolders([file("عقد.pdf", "مناقصة/عقد.pdf")], { old: false }));
-    expect(await screen.findByText(texts.importUnderstanding.en)).toBeInTheDocument();
-    expect(screen.getByText(texts.importReportTitle.en)).toBeInTheDocument();
-
-    activity = [{ chat_id: "p1", brief_id: "b1", state: "waiting", name: "مناقصة - عينة" }];
-    expect(await screen.findByText(texts.importUnderstoodWaits.en)).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector("[data-import-report]")).toBeNull());
+    expect(screen.queryByText(texts.importReportTitle.en)).toBeNull();
     expect(screen.queryByText(texts.importUnderstanding.en)).toBeNull();
-    expect(screen.queryByText(texts.importReportTitle.en)).toBeNull(); // folded: one line, the card stays in sight
-    expect(screen.getByText("Added: 1")).toBeInTheDocument();
-  });
-
-  it("stops reading the moment the Brief has ended", async () => {
-    activity = [{ chat_id: "p1", brief_id: "b1", state: "working", name: null }];
-    render(<ImportReports />);
-    await act(() => importFolders([file("عقد.pdf", "مناقصة/عقد.pdf")], { old: false }));
-    expect(await screen.findByText(texts.importUnderstanding.en)).toBeInTheDocument();
-    activity = []; // the open chat's ended Brief is seen at once, so it leaves the list
-    await waitFor(() => expect(screen.queryByText(texts.importUnderstanding.en)).toBeNull());
-    expect(screen.getByText(texts.importUnderstoodDone.en)).toBeInTheDocument();
   });
 });

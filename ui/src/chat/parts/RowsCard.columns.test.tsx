@@ -1,7 +1,7 @@
 // The rows card of a BOQ import (core/qsone/tools/boq.py _card): one row per column of the sheet, each with what it
 // holds; the engineer sets each column's meaning, and Keep sends them as answers by column letter (tender day,
 // 5 Nov 2026: the card could only tick, and called the columns «الصفوف»).
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../../i18n";
@@ -58,6 +58,8 @@ describe("the BOQ columns card", () => {
     const fetch = core();
     const user = userEvent.setup();
     render(<ApprovalCard id="c9" card={boq} />);
+    expect(screen.queryByRole("combobox")).toBeNull(); // folded: the columns ONE took, in one line
+    await user.click(screen.getByRole("button", { name: texts.checkColumns.ar }));
     expect(screen.queryByRole("checkbox")).toBeNull(); // not ticks: a meaning per column
     const c = screen.getByRole("combobox", { name: "العمود C فيه إيه" });
     expect(c).toHaveValue("unit");
@@ -93,6 +95,7 @@ it("shows only the header after a repeated tender title, without stripping disti
     { column: "I", header: "مقايسة عينة", meaning: "none" },
   ] } };
   render(<ApprovalCard id="sample-heading" card={card} />);
+  fireEvent.click(screen.getByRole("button", { name: texts.checkColumns.ar }));
   expect(screen.queryAllByText(/مقايسة عينة ·/)).toHaveLength(0);
   expect(screen.getByText("الكمية الأصلية")).toBeInTheDocument();
   expect(screen.getByText("إجمالي الكمية")).toBeInTheDocument();
