@@ -3050,3 +3050,8 @@ MAP_LOCAL_RETRY = {
 }
 
 PROJECT_DATED_NAME = {"en": "Project {date}", "ar": "مشروع {date}"}
+
+TRUTH_READING_METHOD = {
+    "en": "The claimed reading method or OCR confidence is not supported by the reading record.",
+    "ar": "طريقة القراءة أو نسبة ثقة OCR المذكورة مش مثبتة في سجل القراءة.",
+}

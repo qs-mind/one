@@ -1721,6 +1721,7 @@ class _Brief:
             )
             found += truth.tender_search_problem(output, self.text, searched, rec=rec)
         if rec is not None:  # each number at the row or page the reply cites for it
+            found += truth.reading_problems(output, self._read_returns())
             found += truth.unread_citations(output, self._read_returns(), rec=rec)
             with rec.read() as c:
                 found += truth.miscited(c, output)

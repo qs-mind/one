@@ -1494,3 +1494,43 @@ def tender_search_problem(output, question, searched, *, rec=None):
     if not searched and _TENDER_QUESTION.search(question) and _TENDER_ABSENCE.search(output):
         return [Problem("tender_search", copy.TENDER_SEARCH_NUDGE["en"], None)]
     return []
+
+
+def reading_problems(text: str, returns: list[tuple[str, str]]) -> list[Problem]:
+    """Reading method is metadata, never something inferred from legibility."""
+    sentences = re.split(r"(?<!\d)\.(?!\d)|[\n؛]", text)
+    claims = [
+        line
+        for line in sentences
+        if re.search(r"\bOCR\b|التعرف الضوئي", line, re.I)
+        and not re.search(r"\b(?:no|not|never|without)\b|مش|ليس|بدون|مفيش", line, re.I)
+    ]
+    if not claims:
+        return []
+    passages = read_passages(returns)
+    # Only Tesseract explicitly identifies OCR. Model picture reading is vision,
+    # and absent read_by denotes the original text layer.
+    ocr = bool(passages) and all(loc.get("read_by") == "tesseract" for _, loc, _ in passages)
+    confidence = any(re.search(r"confidence|ثقة", line, re.I) for line in claims)
+    recorded = {str(loc["confidence"]) for _, loc, _ in passages if "confidence" in loc}
+    claimed = re.findall(r"[0-9٠-٩]+(?:[.,][0-9٠-٩]+)?", " ".join(claims))
+    from decimal import Decimal, InvalidOperation
+
+    def exact(value):
+        try:
+            return Decimal(value.replace(",", "."))
+        except InvalidOperation:
+            return None
+
+    supported = bool(claimed) and all(exact(v) in {exact(r) for r in recorded} for v in claimed)
+    if ocr and (not confidence or supported):
+        return []
+    return [
+        Problem(
+            "reading_method",
+            "Unsupported OCR method or confidence claim. Use only each reading record's read_by; "
+            "missing read_by means original text layer, not OCR. Do not invent confidence. "
+            "For mixed readings identify the exact file/page and method separately.",
+            copy.TRUTH_READING_METHOD,
+        )
+    ]

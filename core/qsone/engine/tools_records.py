@@ -443,10 +443,14 @@ _SOURCE_EXAMPLE = {
 }
 
 _SOURCE_DOC = """Add real evidence before recording a number; computed numbers use calculate.
-File kind quote/boq/specification/contract: file_id and locator from a read (page or sheet/row);
+File kind quote/boq/specification/contract/drawing: file_id and locator from a read
+(page or sheet/row);
 dated: document date, omit if unknown. Web: log_id from web_read; prices: ref from prices_lookup;
 engineer: card_id/question from ask_engineer; connector: call_id. Quote covers: supply,
 supply_and_install/install. where=engineer keeps it across projects after approval.
+Drawing picture evidence: locator {page, box:[x0,y0,x1,y1]} in PDF points, top-left origin.
+Keep take-off observations unchecked in ask_engineer cards, each naming file/page/region;
+record quantities only after confirmation, using the answer as evidence. calculate makes totals.
 Returns source_id/date.
 Example:
 """ + _json(_SOURCE_EXAMPLE)
