@@ -1,12 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The main window reaches the core only through the shim (core_fetch, core_cancel, core_upload), which holds the secret and lets through only the core's own routes, and asks the shell where the core's log is and whether it has started. It may ask whether a signed update is out and install it on the engineer's say-so (update_check, update_install); the updater plugin's own commands are not allowed. It may open the folder picker (screens ask for folders only; the dialog plugin cannot narrow that further) and save an export the engineer chose to save (save_export opens the native Save dialog itself). No shell, opener or file-system plugin: the page opens no outside link and reads no path itself.",
+  "description": "The main window reaches the core only through the shim (core_fetch, core_cancel, core_upload), which holds the secret and lets through only the core's own routes, and asks the shell where the core's log is and whether it has started. It may ask whether a signed update is out and install it on the engineer's say-so (update_check, update_install); the updater plugin's own commands are not allowed. It may open the folder picker and read only the files the engineer picked or dropped (folder_pick, folder_read; screens ask for folders only; the dialog plugin cannot narrow that further) and save an export the engineer chose to save (save_export opens the native Save dialog itself). No shell, opener or file-system plugin: the page opens no outside link and reads no path itself.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:allow-open",
     "allow-save-export",
+    "allow-folder-pick",
+    "allow-folder-read",
     "allow-core-fetch",
     "allow-core-cancel",
     "allow-core-upload",

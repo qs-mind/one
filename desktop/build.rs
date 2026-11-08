@@ -2,6 +2,8 @@ fn main() {
     // The app's own commands the page may call; each is allowed by name in capabilities/main.json.
     let commands = &[
         "save_export",
+        "folder_pick",
+        "folder_read",
         "core_fetch",
         "core_cancel",
         "core_upload",
