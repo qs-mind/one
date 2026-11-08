@@ -234,7 +234,7 @@ describe("the compact projects list", () => {
     const fetch = core({
       routes: {
         "POST /api/projects": () => Response.json({ ...P1, open: true }, { status: 201 }),
-        "POST /api/projects/p1/files?name=sample.txt": () => Response.json({ id: "sample", name: "sample.txt", status: "read" }, { status: 201 }),
+        "POST /api/projects/p1/files?name=sample.txt&folder=Tender": () => Response.json({ id: "sample", name: "sample.txt", status: "read" }, { status: 201 }),
         "GET /api/projects/p1/files": () => Response.json({ files: [] }),
       },
     });
@@ -242,16 +242,17 @@ describe("the compact projects list", () => {
     render(<App />);
     await open(user);
     expect(within(picker()).queryByRole("button", { name: texts.close.ar })).toBeNull(); // Escape or a click outside
-    const input = picker().querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector("[data-folder-chooser]") as HTMLInputElement;
     const opened = vi.spyOn(input, "click");
+    expect(within(picker()).getAllByRole("button", { name: new RegExp(texts.newProject.ar) })).toHaveLength(1);
     await user.click(within(picker()).getByRole("button", { name: texts.newProject.ar }));
-    expect(opened).toHaveBeenCalled(); // New project opens the file dialog at once: no step between
-    expect(within(picker()).queryByRole("textbox", { name: texts.projectName.ar })).toBeNull();
-    expect(within(picker()).getByRole("button", { name: texts.newProjectFromFolder.ar })).toBeInTheDocument();
-    await user.upload(input, new File(["sample"], "sample.txt"));
+    expect(opened).toHaveBeenCalled(); // New project opens the folder dialog at once: no step between
+    const sample = new File(["sample"], "sample.txt");
+    Object.defineProperty(sample, "webkitRelativePath", { value: "Tender/sample.txt" });
+    await user.upload(input, sample);
     await waitFor(() => expect(currentProject()?.id).toBe("p1"));
     const [, init] = calls(fetch, "POST", "/api/projects")[0]!;
-    expect(JSON.parse(String(init!.body))).toEqual({});
+    expect(JSON.parse(String(init!.body))).toEqual({ folder: "Tender" });
     await waitFor(() => expect(screen.queryByRole("region", { name: texts.projects.ar })).toBeNull());
   });
 
@@ -266,8 +267,6 @@ describe("the compact projects list", () => {
     await user.keyboard("{ArrowUp}{ArrowUp}");
     expect(within(picker()).getByRole("button", { name: new RegExp(texts.generalChat.ar) })).toHaveFocus();
     await user.keyboard("{End}");
-    expect(within(picker()).getByRole("button", { name: texts.newProjectFromFolder.ar })).toHaveFocus();
-    await user.keyboard("{ArrowUp}");
     expect(within(picker()).getByRole("button", { name: texts.newProject.ar })).toHaveFocus();
     const stops = within(picker()).getAllByRole("button").filter((b) => b.tabIndex === 0);
     expect(stops).toHaveLength(1);

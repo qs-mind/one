@@ -95,23 +95,27 @@ describe("ProjectPicker", () => {
     await waitFor(() => expect(called(fetch, "POST", `/api/projects/${tower.id}/close`)).toHaveLength(1));
   });
 
-  it("creates a project from files without a name", async () => {
+  it("creates a project from a folder without a name", async () => {
     const fetch = core({
       "GET /api/projects": () => Response.json({ projects: [] }),
       "POST /api/projects": () => Response.json({ ...school, open: true }, { status: 201 }),
+      [`POST /api/projects/${school.id}/files?name=sample.txt&folder=Tender`]: () => Response.json({ id: "sample", name: "sample.txt", status: "read" }, { status: 201 }),
+      [`GET /api/projects/${school.id}/files`]: () => Response.json({ files: [] }),
     });
     const user = userEvent.setup();
     render(<App />);
     await user.click(switcher());
     await user.click(await within(picker()).findByRole("button", { name: texts.newProject.ar }));
 
-    expect(within(picker()).queryByLabelText(texts.projectName.ar)).toBeNull();
-    const input = picker().querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, new File(["sample"], "sample.txt"));
+    expect(screen.queryByLabelText(texts.projectName.ar)).toBeNull();
+    const input = document.querySelector("[data-folder-chooser]") as HTMLInputElement;
+    const sample = new File(["sample"], "sample.txt");
+    Object.defineProperty(sample, "webkitRelativePath", { value: "Tender/sample.txt" });
+    await user.upload(input, sample);
 
     await waitFor(() => expect(switcher(school.name)).toBeInTheDocument());
     const [, init] = called(fetch, "POST", "/api/projects")[0]!;
-    expect(JSON.parse(String(init!.body))).toEqual({});
+    expect(JSON.parse(String(init!.body))).toEqual({ folder: "Tender" }); // named after the folder until the tender names it
     expect(currentProject()?.id).toBe(school.id);
   });
 
@@ -188,6 +192,6 @@ describe("ProjectPicker", () => {
     await user.click(switcher(texts.generalChat.en));
     const region = screen.getByRole("region", { name: texts.projects.en });
     expect(await within(region).findByRole("button", { name: texts.newProject.en })).toBeInTheDocument();
-    expect(within(region).getByRole("button", { name: texts.newProjectFromFolder.en })).toBeInTheDocument();
+    expect(within(region).getAllByRole("button", { name: /New project/ })).toHaveLength(1); // one row, no second way
   });
 });

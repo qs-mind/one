@@ -1,6 +1,6 @@
 // Pick the chat to work in: the General chat outside every project, or a project; or create one. A narrow, calm list
 // under the project button: each row with what its Briefs are doing (a mark and a word), a search field once there
-// are more than six projects, and "New project" opens the file dialog at once; "New project from a folder" the folder dialog.
+// are more than six projects, and "New project" opens the folder dialog at once.
 // No Close button: Escape or a click outside closes it (FloatingPanel). The arrow keys move between the rows (one
 // tab stop), and one Stone block glides behind the row reached. The core lists every project on this computer, newest
 // first; one it cannot read is listed with the reason, never hidden. Archived projects come last, each marked.
@@ -24,7 +24,6 @@ type List = { state: "loading" } | { state: "ready"; projects: Listed[] } | { st
 /** More projects than this, and a search field shows above them. */
 export const SEARCH_FROM = 6;
 const NEW = "new";
-const NEW_FOLDER = "new-folder";
 
 /** Goes to the General chat: no project is current, and the one that was is closed in the core. */
 export function leaveProject() {
@@ -65,7 +64,6 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
   const rows = useRef<HTMLUListElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const newRow = useRef<HTMLButtonElement>(null);
-  const fileField = useRef<HTMLInputElement>(null);
   useScrollEdges(rows);
 
   const load = useCallback(async () => {
@@ -90,7 +88,7 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
   const archived = shown.filter((p) => "name" in p && p.archived_at);
   const general = shows(t("generalChat"));
   const firstKey = current && projects.some((p) => p.id === current.id) ? current.id : (projects[0]?.id ?? NEW);
-  const keys = [...(general ? [GENERAL] : []), ...[...working, ...archived].filter((p) => "name" in p).map((p) => p.id), NEW, NEW_FOLDER];
+  const keys = [...(general ? [GENERAL] : []), ...[...working, ...archived].filter((p) => "name" in p).map((p) => p.id), NEW];
   const tabStop = [stop, firstKey].find((key) => key !== undefined && keys.includes(key)) ?? keys[0];
 
   useEffect(() => {
@@ -262,14 +260,10 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
           <li className="px-3 py-1.5 text-sm text-slate">{t("noProjectMatch")}</li>
         )}
         <li className="mt-0.5 border-t border-ink/[0.06] pt-0.5">
-          {/* the system's file dialog opens at once; a folder has its own row (no dialog picks both) */}
-          <button ref={newRow} type="button" {...rowProps(NEW)} disabled={busy} onClick={() => files ? void create() : fileField.current?.click()} className={`${row} text-slate`}>
+          {/* the system's folder dialog opens at once; loose files are dropped on the window */}
+          <button ref={newRow} type="button" {...rowProps(NEW)} disabled={busy} onClick={() => { if (files) void create(); else { chooseFolder(false, true); onClose(); } }} className={`${row} text-slate`}>
             <span aria-hidden="true">+</span><span>{t("newProject")}</span>
           </button>
-          {!files && <button type="button" {...rowProps(NEW_FOLDER)} disabled={busy} onClick={() => { chooseFolder(false, true); onClose(); }} className={`${row} text-slate`}>
-            <span aria-hidden="true">+</span><span>{t("newProjectFromFolder")}</span>
-          </button>}
-          <input ref={fileField} type="file" multiple hidden onChange={event => { if (event.target.files?.length) void create(Array.from(event.target.files)); }} />
         </li>
         <Glide as="li" />
       </ul>
