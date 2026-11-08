@@ -409,7 +409,6 @@ export const texts = {
   projectNotOpened: { en: "The project did not open. Try again.", ar: "لم يُفتح المشروع. حاول مرة أخرى." },
   newProject: { en: "New project", ar: "مشروع جديد" },
   projectNameNotUpdated: { en: "The project name could not be updated.", ar: "اسم المشروع ما اتغيرش." },
-  newProjectFromFolder: { en: "New project from a folder", ar: "مشروع جديد من مجلد" },
   projectName: { en: "Project name", ar: "اسم المشروع" },
   create: { en: "Create", ar: "إنشاء" },
   projectNotCreated: { en: "The project was not created. Try again.", ar: "لم يُنشأ المشروع. حاول مرة أخرى." },
