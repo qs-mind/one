@@ -16,15 +16,21 @@ export function chooseFolder(old: boolean) {
 /** The one folder chooser, kept mounted, so a menu that closes when the system dialog opens does not lose it. */
 export function FolderChooser() {
   const lang = useLanguage();
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<"selection" | "followup" | false>(false);
   const input = useRef<HTMLInputElement>(null);
   const old = useRef(false);
   useEffect(() => {
+    const clear = () => setFailed(false);
+    window.addEventListener("one-files-added", clear);
     chooser = (asOld) => {
       old.current = asOld;
       setFailed(false);
       if (isTauri()) {
-        void nativeFolder().then((files) => files && importFolders(files, { old: asOld, chosen: true })).catch(() => setFailed(true));
+        void nativeFolder().then(async (files) => {
+          if (!files) return;
+          try { await importFolders(files, { old: asOld, chosen: true }); }
+          catch { setFailed("followup"); }
+        }, () => setFailed("selection"));
         return;
       }
       if (!input.current) return;
@@ -32,12 +38,13 @@ export function FolderChooser() {
       input.current.click();
     };
     return () => {
+      window.removeEventListener("one-files-added", clear);
       chooser = null;
     };
   }, []);
   return (
     <>
-      {failed && <p role="alert" className="text-copper">{pick(texts.importFailed, lang)}</p>}
+      {failed && <p role="alert" className="text-copper">{pick(texts[failed === "selection" ? "folderSelectionFailed" : "importFollowupFailed"], lang)} <button onClick={() => setFailed(false)}>{pick(texts.close, lang)}</button></p>}
       <input
         ref={input}
         type="file"

@@ -9,7 +9,7 @@ mod folder;
 mod shim;
 mod update;
 
-use tauri::{Manager, RunEvent, Url};
+use tauri::{Emitter, Manager, RunEvent, Url};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_window_state::StateFlags;
 
@@ -142,6 +142,36 @@ fn main() {
                 })
                 .build(),
         )
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(event) = event {
+                match event {
+                    tauri::DragDropEvent::Enter { .. } => { let _ = window.emit("one-drop-hover", true); }
+                    tauri::DragDropEvent::Leave => { let _ = window.emit("one-drop-hover", false); }
+                    tauri::DragDropEvent::Drop { paths, .. } => {
+                        let _ = window.emit("one-drop-hover", false);
+                        let app = window.app_handle().clone();
+                        let paths = paths.clone();
+                        tauri::async_runtime::spawn_blocking(move || {
+                            let mut files = Vec::new();
+                            let mut errors = Vec::new();
+                            for path in paths {
+                                match folder::dropped(&path) {
+                                    Ok(mut found) => files.append(&mut found),
+                                    Err(reason) => errors.push(serde_json::json!({"name": path.file_name().unwrap_or_default().to_string_lossy(), "reason": reason})),
+                                }
+                            }
+                            if let Err(reason) = app.state::<folder::Selection>().remember(&files) {
+                                errors.push(serde_json::json!({"name": "", "reason": reason}));
+                                files.clear();
+                            }
+                            let files: Vec<_> = files.into_iter().map(|f| serde_json::json!({"path": f.path, "name": f.name, "folder": f.folder, "size": f.size})).collect();
+                            let _ = app.emit("one-files-dropped", serde_json::json!({"files": files, "errors": errors}));
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        })
         .manage(folder::Selection::default())
         .manage(shim::Calls::default())
         .manage(update::Updates::default())

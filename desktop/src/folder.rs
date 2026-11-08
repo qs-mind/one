@@ -126,3 +126,25 @@ mod selection_tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 }
+
+/// Only called with paths delivered by the OS drop event, never page-supplied paths.
+pub fn dropped(path: &Path) -> Result<Vec<FileEntry>, String> {
+    let path = path.canonicalize().map_err(|e| e.to_string())?;
+    if path.is_dir() {
+        return files(&path);
+    }
+    let metadata = path.metadata().map_err(|e| e.to_string())?;
+    if !metadata.is_file() {
+        return Err("Not a regular file".into());
+    }
+    Ok(vec![FileEntry {
+        name: path
+            .file_name()
+            .ok_or("File has no name")?
+            .to_string_lossy()
+            .into_owned(),
+        size: metadata.len(),
+        folder: String::new(),
+        path,
+    }])
+}

@@ -306,6 +306,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
         setProblems((list) => [...list, { name: file.name, line }]);
       }
     }
+    if (landed.length) window.dispatchEvent(new Event("one-files-added"));
     setAdding(false);
     ended();
     await reportDrop(id, landed); // one report in the project chat for the whole drop
@@ -379,6 +380,7 @@ export function RecordsPanel({ layout = "panel", onClose, onPickProject }: Recor
       {problems.some((problem) => !problem.quiet) && (
         <div role="alert" className="flex flex-col gap-1 text-copper">
           {lines(false)}
+          <button type="button" onClick={() => setProblems([])}>{t("close")}</button>
         </div>
       )}
       {problems.some((problem) => problem.quiet) && (

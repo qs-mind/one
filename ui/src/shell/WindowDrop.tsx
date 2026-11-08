@@ -3,8 +3,11 @@
 // it with its folders and loose files go to Project Records, Project files opening to show them come, as the document
 // area always did. In the General chat a folder becomes a new project (as before) and loose files ask which project
 // they are for, or a new one: the projects list opens with that question, and they go into the project picked there.
-// A drop a part of the screen took itself (Project files' own list) is left to it. dragDropEnabled is off: the webview's
-// drop is the page's, so the window never opens a dropped file in ONE's place.
+// Browser drops stay with the page; desktop drops use OS paths enumerated and authorised by Rust.
+import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { receiveDesktopDrop, type DesktopDrop } from "../import/desktopDrop";
+import { nativeFiles } from "../import/native";
 import { useEffect, useState } from "react";
 import { t, useLanguage } from "../i18n";
 import { importFolders, importInto } from "../import/importer";
@@ -62,7 +65,27 @@ const carriesFiles = (event: DragEvent) => event.dataTransfer?.types?.includes("
 export function WindowDrop() {
   useLanguage();
   const [over, setOver] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
   useEffect(() => {
+    if (!isTauri()) return;
+    let live = true;
+    const subscriptions = [
+      listen<boolean>("one-drop-hover", ({ payload }) => live && setOver(payload)),
+      listen<DesktopDrop>("one-files-dropped", ({ payload }) => {
+        if (!live) return;
+        setErrors(payload.errors.map((e) => `${e.name}: ${e.reason}`));
+        const receive = async () => {
+          if (!currentProject() && payload.files.length && payload.files.every((file) => !file.folder)) {
+            askForProject(await Promise.all(nativeFiles(payload.files).map((file) => file.read!())));
+          } else await receiveDesktopDrop(payload);
+        };
+        void receive().catch(() => setErrors([t("importFollowupFailed")]));
+      }),
+    ];
+    return () => { live = false; for (const subscription of subscriptions) void subscription.then((off) => off()); };
+  }, []);
+  useEffect(() => {
+    if (isTauri()) return;
     let depth = 0; // dragenter and dragleave come for every element crossed: counted, so it never blinks
     const enter = (event: DragEvent) => {
       if (!carriesFiles(event)) return;
@@ -103,7 +126,7 @@ export function WindowDrop() {
       window.removeEventListener("drop", drop);
     };
   }, []);
-  if (!over) return null;
+  if (!over) return errors.length ? <div role="alert" className="text-copper">{errors.map((error, i) => <p key={i}>{error}</p>)}<button onClick={() => setErrors([])}>{t("close")}</button></div> : null;
   return (
     <div
       data-window-drop

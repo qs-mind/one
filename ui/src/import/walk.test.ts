@@ -145,6 +145,7 @@ describe("uploading", () => {
       empty: [],
       zips: 1,
       failed: ["away.pdf"],
+      failureReasons: [{ name: "away.pdf", line: { en: "The file was not added. Try again.", ar: "الملف ماتضافش. جرّب تاني." } }],
       ids: [],
     });
   });
@@ -158,4 +159,10 @@ it("preserves lazy native reading when splitting an old-work folder into project
   expect(groups[0]!.picked[0]!.read).toBe(read);
   expect(await groups[0]!.picked[0]!.read!()).toBe(bytes);
   expect(groups[0]!.picked[0]!.folder).toBe("Project/sub");
+});
+it("keeps the core reason beside the failed filename", async () => {
+  const line = { en: "Project is archived", ar: "المشروع في الأرشيف" };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: line }), { status: 409 })));
+  const report = await upload("p1", [{ file: new File(["sample"], "sample.pdf"), folder: "" }], () => {});
+  expect(report.failureReasons).toEqual([{ name: "sample.pdf", line }]);
 });

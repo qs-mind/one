@@ -38,3 +38,20 @@ it("keeps the folder input in a browser", () => {
   fireEvent.change(container.querySelector("input")!, { target: { files: [file] } });
   expect(mocks.imported).toHaveBeenCalledWith([file], { old: false });
 });
+it("does not call a post-selection failure a file-add failure and lets it be dismissed", async () => {
+  mocks.invoke.mockResolvedValue([{ path: "/sample/a.pdf", name: "a.pdf", folder: "sample", size: 1 }]);
+  mocks.imported.mockRejectedValue(new Error("follow-up"));
+  const { getByRole, queryByRole } = render(<FolderChooser />);
+  await act(async () => chooseFolder(false));
+  expect(getByRole("alert").textContent).not.toContain("Some files were not added");
+  fireEvent.click(getByRole("button"));
+  expect(queryByRole("alert")).toBeNull();
+});
+it("clears a selection error when the next file add succeeds", async () => {
+  mocks.invoke.mockRejectedValue(new Error("permission"));
+  const { queryByRole } = render(<FolderChooser />);
+  await act(async () => chooseFolder(false));
+  expect(queryByRole("alert")).not.toBeNull();
+  act(() => window.dispatchEvent(new Event("one-files-added")));
+  expect(queryByRole("alert")).toBeNull();
+});
