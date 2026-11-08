@@ -195,9 +195,11 @@ describe("settings", () => {
     for (const lang of ["en", "ar"] as const) {
       setLanguage(lang);
       const { unmount } = render(<Settings />);
+      // the AI settings open on one box; the rest is under Advanced settings
+      await userEvent.click(await screen.findByText(texts.advancedAi[lang]));
       await screen.findByLabelText(texts.priceIn[lang]); // every part is there
       await screen.findByLabelText(texts.capDay[lang]);
-      await screen.findByText(texts.searchProvider[lang]);
+      await screen.findAllByText(texts.searchProvider[lang]);
       const names = screen.queryAllByRole("button").map((button) => button.textContent ?? "");
       expect(names.length).toBeGreaterThan(0);
       expect(names.filter((name) => /\b(save|check)\b|حفظ|احفظ|افحص|اتأكد/i.test(name))).toEqual([]);
