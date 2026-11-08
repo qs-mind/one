@@ -101,7 +101,7 @@ def test_missing_page_and_non_pdf(client, project):
     assert r.status_code == 409 and r.json() == {"error": copy.FILE_HAS_NO_PAGES, "field": "file"}
 
 
-@pytest.mark.parametrize("width", [199, 1601])
+@pytest.mark.parametrize("width", [199, 5601])  # 5,600 px: sharp pages when zoomed
 def test_page_width_is_bounded(client, project, width):
     fid = _upload(client, project, "مواصفات - عينة.pdf", sample_pdf([["Page one"]]))
     url = f"/projects/{project}/files/{fid}/pages/1"

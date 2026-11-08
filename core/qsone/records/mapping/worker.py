@@ -150,6 +150,8 @@ def _pdf_tables(data, *, ocr_words=None, table_pages=None):
 
 
 def _structure(rec, info, data):
+    if info.kind in ("png", "jpg", "webp"):
+        return {"pages": [{"page": 1, "type": "scan"}]}, [1], []
     if info.kind == "pdf":
         with rec.read() as c:
             text_pages = {
@@ -360,7 +362,7 @@ def step(
             )
             return True
         tables = None
-        if scanned:
+        if scanned and info.kind == "pdf":
             # The BOQ reader reuses the persisted OCR words and their exact source boxes.
             with rec.read() as c:
                 chunks = c.execute(

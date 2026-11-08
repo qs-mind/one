@@ -671,9 +671,7 @@ def _image(kind: str, data: bytes, page: int) -> bytes:
             while pixels * math.ceil(height * pixels / width) > 40_000_000:
                 pixels -= 1
             return render.page_png(data, page, pixels)
-        if kind == "jpg":
-            return _jpeg_png(data)
-        return data  # a PNG goes as it is
+        return render.image_png(data)
 
 
 async def _ask_cost(ctx: ToolContext, info: FileInfo, reader, pages: list[int]) -> None:
@@ -714,20 +712,8 @@ def _local_page(data: bytes, kind: str, page: int, executable: str, tessdata, la
                     pdf_page.close()
             finally:
                 doc.close()
-        elif kind == "jpg":
-            doc = pdfium.PdfDocument.new()
-            try:
-                image = pdfium.PdfImage.new(doc)
-                try:
-                    image.load_jpeg(io.BytesIO(data), inline=True)
-                    points = image.get_px_size()
-                finally:
-                    image.close()
-            finally:
-                doc.close()
         else:
-            # Standalone images use one point per original pixel (no PDF page dimensions).
-            points = ocr.png_size(data)
+            points = ocr.png_size(png)
     return ocr.read_image(
         png, points=points, executable=executable, tessdata=tessdata, languages=languages
     )

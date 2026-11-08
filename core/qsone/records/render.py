@@ -70,3 +70,21 @@ def _png(width: int, height: int, rgba: bytes, stride: int) -> bytes:
         + chunk(b"IDAT", zlib.compress(raw, 6))
         + chunk(b"IEND", b"")
     )
+
+
+def image_png(data: bytes, width: int | None = None) -> bytes:
+    """Decode a standalone image in memory; keep original pixel coordinates for OCR."""
+    import io
+
+    from PIL import Image
+
+    with Image.open(io.BytesIO(data)) as image:
+        image.load()
+        image = image.convert("RGB")
+        if width is not None:
+            image = image.resize(
+                (width, max(1, round(image.height * width / image.width))), Image.Resampling.LANCZOS
+            )
+        out = io.BytesIO()
+        image.save(out, format="PNG")
+        return out.getvalue()
