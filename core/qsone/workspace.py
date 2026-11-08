@@ -185,8 +185,10 @@ def _file_row(rec: Records, file_id: str) -> tuple[str, int | None]:
 
 
 def page_count(rec: Records, file_id: str) -> int:
-    """0 for a file that is not a PDF, or a PDF pdfium cannot open."""
+    """PDF pages or one standalone image; 0 for files without a picture preview."""
     kind, pages = _file_row(rec, file_id)
+    if kind in ("png", "jpg", "webp"):
+        return 1
     if kind != "pdf":
         return 0
     if pages is not None:
@@ -199,10 +201,15 @@ def page_count(rec: Records, file_id: str) -> int:
 
 def page_image(rec: Records, file_id: str, page: int, width: int) -> bytes:
     kind, _ = _file_row(rec, file_id)
-    if kind != "pdf":
+    if kind not in ("pdf", "png", "jpg", "webp"):
         raise RecordsError(copy.FILE_HAS_NO_PAGES, status=409, field="file")
     try:
-        return render.page_png(files.read_original(rec, file_id), page, width)
+        data = files.read_original(rec, file_id)
+        if kind != "pdf":
+            if page != 1:
+                raise IndexError(page)
+            return render.image_png(data, width)
+        return render.page_png(data, page, width)
     except IndexError:
         raise RecordsError(copy.PAGE_NOT_FOUND, status=404, field="page") from None
     except Exception:  # noqa: BLE001 - pdfium's own errors
@@ -271,7 +278,7 @@ def router(projects: Projects, waiting=lambda project_id: 0) -> APIRouter:
         project_id: str,
         file_id: str,
         page: int,
-        width: Annotated[int, Query(ge=200, le=1600)] = 600,
+        width: Annotated[int, Query(ge=200, le=5600)] = 600,
     ):
         found = await run(lambda: page_image(project(project_id), file_id, page, width))
         return found if isinstance(found, Response) else Response(found, media_type="image/png")

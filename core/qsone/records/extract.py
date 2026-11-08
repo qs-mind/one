@@ -1,8 +1,8 @@
 """Text from dropped files: PDF, Excel, CSV, plain text, Word, DXF, IFC and saved web pages, each
 in pieces with where it came from, and flags for text a person does not see. Drawing bytes
-are read by the local subprocess; images are kept with a plain note. Readers use memory except
-optional LibreOffice conversion
-of older Office/OpenDocument files in a disposable folder."""
+are read by the local subprocess; images are queued for local background OCR. Readers use
+memory except optional LibreOffice conversion of older Office/OpenDocument files in a
+disposable folder."""
 
 import csv
 import ctypes

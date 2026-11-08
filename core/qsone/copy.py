@@ -1912,8 +1912,8 @@ FILE_DWG_NOT_YET = {
     "ar": "الرسم ده اتحفظ قبل ما قارئ الرسومات بتاع ONE يبقى متاح.",
 }
 FILE_IMAGE_STORED = {
-    "en": "Kept. ONE reads the image when it is asked to.",
-    "ar": "اتحفظت. ONE هيقرا الصورة لما يتطلب منه.",
+    "en": "Kept. ONE is reading the image on this computer.",
+    "ar": "اتحفظت. ONE بيقرا الصورة على الجهاز ده.",
 }
 FILE_HIDDEN_TEXT = {
     "en": (

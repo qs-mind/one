@@ -429,9 +429,12 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None, vision_r
                 en=allowed[item.file_id]["name"][:300], ar=allowed[item.file_id]["name"][:300]
             )
             with rec.write(store.ACTOR) as c:
-                if not c.execute(
-                    "SELECT 1 FROM files WHERE id=? AND valid_until IS NULL", (item.file_id,)
-                ).fetchone():
+                current = c.execute(
+                    "SELECT m.ai_kind FROM files f JOIN map_files m ON m.file_id=f.id "
+                    "WHERE f.id=? AND f.valid_until IS NULL",
+                    (item.file_id,),
+                ).fetchone()
+                if not current:
                     continue
                 store.write(
                     c,
@@ -440,7 +443,7 @@ async def run(rec, models, *, file_ids=None, request=None, passes=None, vision_r
                     {
                         "file_id": item.file_id,
                         "ai_stage": "groups",
-                        "ai_kind": item.kind,
+                        "ai_kind": "drawing" if current[0] == "drawing" else item.kind,
                         "ai_title": title.model_dump(),
                         **_group_patch(rec, item.file_id, item.group),
                         "key_pages": valid_pages(item, allowed[item.file_id]),

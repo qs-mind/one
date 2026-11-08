@@ -14,7 +14,7 @@ import { FileRegionComments } from "./FileRegionComments";
 import { workspaceApi } from "../api";
 import { CompareDoc } from "./CompareDoc";
 
-/** Page images come in two widths: enough for the file on screen, never more (decision 13). */
+/** Base page widths; zoom requests proportionally sharper images, bounded by the core. */
 export const SMALL = 600;
 export const LARGE = 1400;
 /** How long the file's room must stay the same before its width is measured again, in ms. */
@@ -31,7 +31,7 @@ function where(locator: FilePiece["locator"]): string | undefined {
 }
 
 export type FilePage = {
-  /** The number of pages; 0 when the file is not a PDF, null until known. */
+  /** PDF pages or one standalone image; 0 for text/sheets, null until known. */
   pages: number | null;
   page: number;
   setPage(update: (page: number) => number): void;
@@ -48,6 +48,11 @@ export function useFilePage(sources: ProjectSources, fileId: string, opened?: Op
   const [pages, setPages] = useState<number | null>(null);
   const [page, setPage] = useState(opened?.anchor?.page ?? 1);
   const [mode, setMode] = useState<"image" | "text">("image");
+
+  useEffect(() => {
+    setMode("image");
+    setPage(opened?.anchor?.page ?? 1);
+  }, [fileId]); // eslint-disable-line react-hooks/exhaustive-deps -- reset once per file
 
   const openedRef = useRef(opened);
   openedRef.current = opened;
@@ -66,6 +71,7 @@ export function useFilePage(sources: ProjectSources, fileId: string, opened?: Op
 
   useEffect(() => {
     let live = true;
+    setPages(null);
     sources.pages(fileId).then(
       (n) => live && setPages(n),
       () => live && setPages(0),
@@ -105,6 +111,36 @@ export function FilePages({
   useLanguage();
   const { pages, page, setPage, mode, setMode, pageOf } = state;
   const [image, setImage] = useState<Image>(null);
+  const [zoom, setZoom] = useState(1);
+  const [renderWidth, setRenderWidth] = useState(width);
+  useEffect(() => {
+    const timer = setTimeout(() => setRenderWidth(Math.max(200, Math.min(5600, Math.round(width * zoom)))), RESIZE_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [width, zoom]);
+  useEffect(() => { setImage(null); }, [fileId, page]);
+  const viewport = useRef<HTMLDivElement>(null);
+  const pointers = useRef(new Map<number, {x: number; y: number}>());
+  const [ratio, setRatio] = useState(1);
+  const [fitWidth, setFitWidth] = useState<number | null>(null);
+  const changeZoom = (factor: number) => setZoom((z) => Math.max(0.25, Math.min(4, z * factor)));
+  useEffect(() => { setZoom(1); }, [fileId, page]);
+  useLayoutEffect(() => {
+    const el = viewport.current;
+    if (!el) return;
+    const measure = () => {
+      if (el.clientWidth && el.clientHeight) setFitWidth(Math.min(el.clientWidth, el.clientHeight * ratio));
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(el);
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      changeZoom(event.deltaY < 0 ? 1.25 : 0.8);
+    };
+    el.addEventListener("wheel", wheel, {passive: false});
+    return () => { observer?.disconnect(); el.removeEventListener("wheel", wheel); };
+  }, [ratio, mode, pages]);
   const [pieces, setPieces] = useState<FilePiece[] | null>(null);
 
   const [geometry, setGeometry] = useState<{width: number; height: number; boxes: PdfBox[]} | null>(null);
@@ -141,15 +177,14 @@ export function FilePages({
   useEffect(() => {
     if (!showImage) return;
     let live = true;
-    setImage(null);
-    sources.pageImage(fileId, page, width).then(
+    sources.pageImage(fileId, page, renderWidth).then(
       (url) => live && setImage({ url }),
       () => live && setImage("failed"),
     );
     return () => {
       live = false;
     };
-  }, [sources, fileId, page, width, showImage]);
+  }, [sources, fileId, page, renderWidth, showImage]);
 
   const showText = pages !== null && (pages === 0 || mode === "text");
   useEffect(() => {
@@ -169,7 +204,7 @@ export function FilePages({
     "rounded-lg border border-ink/20 px-3 py-1 hover:border-ink disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-ink";
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {controls && pages !== null && pages > 0 && (
         <div className="flex items-center gap-3 bg-stone/60 px-5 py-2">
           <button type="button" className={button} disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
@@ -191,6 +226,13 @@ export function FilePages({
           />
         </div>
       )}
+      {showImage && (
+        <div className="flex shrink-0 items-center gap-2 px-5 py-2">
+          <button type="button" className={button} disabled={zoom <= 0.25} onClick={() => changeZoom(0.8)}>{t("fileZoomOut")}</button>
+          <button type="button" className={button} disabled={zoom >= 4} onClick={() => changeZoom(1.25)}>{t("fileZoomIn")}</button>
+          <button type="button" className={button} onClick={() => { setZoom(1); viewport.current?.scrollTo?.(0, 0); }}>{t("fileFit")}</button>
+        </div>
+      )}
       {showImage && projectId && geometry && (
         <div className="flex items-center gap-3 px-5 py-2">
           <button type="button" className={button} aria-pressed={selecting} onClick={() => setSelecting(!selecting)}>
@@ -207,8 +249,32 @@ export function FilePages({
           {notice}
         </p>
       )}
-      {showImage &&
-        (image === "failed" ? (
+      {showImage && <div ref={viewport} data-testid="picture-pan" dir="ltr"
+        className="min-h-0 flex-1 overflow-auto" style={{touchAction: selecting ? "auto" : "none"}}
+        onPointerDown={(event) => {
+          if (selecting || event.button !== 0) return;
+          pointers.current.set(event.pointerId, {x:event.clientX, y:event.clientY});
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+        }}
+        onPointerMove={(event) => {
+          const before = pointers.current.get(event.pointerId);
+          if (!before) return;
+          const other = [...pointers.current.entries()].find(([id]) => id !== event.pointerId)?.[1];
+          if (other) {
+            const oldDistance = Math.hypot(before.x-other.x, before.y-other.y);
+            const distance = Math.hypot(event.clientX-other.x, event.clientY-other.y);
+            if (oldDistance > 0) changeZoom(distance / oldDistance);
+          } else {
+            event.currentTarget.scrollLeft -= event.clientX-before.x;
+            event.currentTarget.scrollTop -= event.clientY-before.y;
+          }
+          pointers.current.set(event.pointerId, {x:event.clientX,y:event.clientY});
+        }}
+        onPointerUp={(event) => { pointers.current.delete(event.pointerId); }}
+        onPointerCancel={(event) => { pointers.current.delete(event.pointerId); }}
+        onLostPointerCapture={(event) => { pointers.current.delete(event.pointerId); }}
+      ><div style={{width: fitWidth ? fitWidth * zoom : `${zoom * 100}%`, marginInline: zoom <= 1 ? "auto" : undefined}}>
+        {(image === "failed" ? (
           <p role="alert" className="px-5 py-3 text-copper">
             {t("pageNotShown")}
           </p>
@@ -223,11 +289,12 @@ export function FilePages({
             >
               <img
                 src={image.url} alt={pageOf ?? ""} className="block w-full" draggable={false}
+                onLoad={(event) => { const img = event.currentTarget; if (img.naturalHeight) setRatio(img.naturalWidth / img.naturalHeight); }}
                 {...{ [TARGET]: fileKey(fileId, { page }) }}
               />
             </PdfRegions>
           )
-        ))}
+        ))}</div></div>}
       {projectId && pages !== null && pages > 0 && (
         <FileRegionComments key={fileId} sources={sources} projectId={projectId} fileId={fileId}
           selection={selection} onAdded={() => setSelection(null)} onThreads={setThreads} />

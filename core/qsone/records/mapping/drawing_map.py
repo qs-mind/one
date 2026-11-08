@@ -25,6 +25,14 @@ def read(rec, info, data):
                 ).fetchone()[0]
             )
         )
+        boq_pages = {
+            json.loads(locator).get("page")
+            for (locator,) in c.execute(
+                "SELECT locator FROM map_tables WHERE file_id=? "
+                "AND looks_like_boq=1 AND valid_until IS NULL",
+                (info.id,),
+            )
+        }
     words = {}
     for raw, text in chunks:
         loc = json.loads(raw)
@@ -36,13 +44,54 @@ def read(rec, info, data):
     result = []
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages:
+            if page.page_number in boq_pages:
+                page.close()
+                continue
             positioned = words.get(page.page_number) or [
                 word | {"page": page.page_number} for word in page.extract_words()
             ]
             sheet = drawings.read_pdf_sheet(positioned, (page.width, page.height))
-            # Title-block evidence is mandatory, even on a large sheet.
-            if (sheet.number and sheet.title) or (
-                max(page.width, page.height) > 1000 and (sheet.number or sheet.title or sheet.scale)
+            # Title-block-like phrases can occur in prose too. Judge all positioned
+            # text, including OCR, before admitting either title or geometry evidence.
+            lines = sheet.texts
+            total_words = sum(len(line["text"].split()) for line in lines)
+            running_words = sum(
+                len(line["text"].split()) for line in lines if len(line["text"].split()) >= 8
+            )
+            running_text = bool(total_words and running_words / total_words >= 0.25)
+            short = [line for line in lines if len(line["text"].split()) <= 6]
+
+            def area(line):
+                x0, top, x1, bottom = line["box"]
+                return max(0, x1 - x0) * max(0, bottom - top)
+
+            text_area = sum(map(area, lines))
+            labels_dominate = bool(text_area and sum(map(area, short)) / text_area >= 0.8)
+            spread = bool(short) and (
+                max(line["box"][2] for line in short) - min(line["box"][0] for line in short)
+                >= page.width * 0.25
+                and max(line["box"][3] for line in short) - min(line["box"][1] for line in short)
+                >= page.height * 0.25
+            )
+            vectors = len(page.lines) + len(page.curves) + len(page.rects)
+            # Sparse text can live entirely in a corner of an architectural plan.
+            # Thousands of paths, overwhelmingly more than words, are an alternate
+            # geometry signal; prose/BOQ guards and file coverage still apply.
+            vector_dominated = vectors >= 1000 and vectors >= 20 * max(1, total_words)
+            geometric_plan = (
+                max(page.width, page.height) >= 1000
+                and vectors >= 40
+                and labels_dominate
+                and (spread or vector_dominated)
+            )
+            if not running_text and (
+                geometric_plan
+                or (sheet.number and sheet.title)
+                or (
+                    max(page.width, page.height) > 1000
+                    and sheet.number
+                    and (sheet.title or sheet.scale)
+                )
             ):
                 sheet.layout = str(page.page_number)
                 sheet.source["page"] = page.page_number
@@ -52,6 +101,11 @@ def read(rec, info, data):
                 result.append(sheet)
             page.close()
     return result
+
+
+def is_drawing_file(sheets, pages):
+    """Embedded diagrams stay citable sheets, but cannot reclassify a text document."""
+    return bool(pages and len({s.source.get("page") for s in sheets}) > pages / 2)
 
 
 def populate(rec, file_id, data):
@@ -73,6 +127,8 @@ def populate(rec, file_id, data):
             (file_id, file_id),
         ):
             store.write(c, rec, "map_links", old | {"valid_until": rec.clock()})
+        if sheets and (info.kind != "pdf" or is_drawing_file(sheets, info.pages)):
+            store.write(c, rec, "map_files", {"file_id": file_id, "ai_kind": "drawing"})
         for sheet in sheets:
             row = asdict(sheet)
             store.write(

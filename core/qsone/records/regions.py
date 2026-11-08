@@ -82,7 +82,16 @@ def pdf_numbers(data: bytes, page: int) -> dict:
 
 def page_boxes(rec: Records, file_id: str, page: int, value: str = "") -> dict:
     data = files.read_original(rec, file_id)
-    found = pdf_numbers(data, page)
+    info = files.file_info(rec, file_id)
+    if info.kind in ("png", "jpg", "webp"):
+        if page != 1:
+            raise RecordsError(copy.PAGE_NOT_FOUND, status=404, field="page")
+        from qsone.records import ocr, render
+
+        width, height = ocr.png_size(render.image_png(data))
+        found = {"width": width, "height": height, "numbers": []}
+    else:
+        found = pdf_numbers(data, page)
     target = _number(value) if value else None
     boxes = [
         n["box"] for n in found["numbers"] if target is not None and _number(n["text"]) == target

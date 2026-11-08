@@ -116,6 +116,13 @@ def _what(rec: Records, f: dict) -> dict:
             if any(counts)
             else _sorted_by_words(f["name"]) or _sorted_by_words(f["text"]) or "document"
         )
+        if entry["label"] == "document":
+            from qsone.records import files
+            from qsone.records.mapping import drawing_map
+
+            sheets = drawing_map.read(rec, files.file_info(rec, f["id"]), book.data)
+            if drawing_map.is_drawing_file(sheets, f["pages"]):
+                entry["label"] = "drawings"
         return entry
     if f["kind"] in boq.KINDS:
         try:
