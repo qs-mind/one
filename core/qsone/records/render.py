@@ -88,3 +88,36 @@ def image_png(data: bytes, width: int | None = None) -> bytes:
         out = io.BytesIO()
         image.save(out, format="PNG")
         return out.getvalue()
+
+
+# AI providers refuse large pictures (Anthropic: 10 MB per image) and scale big ones down anyway.
+MODEL_EDGE = 2576
+MODEL_BYTES = 3_500_000
+
+
+def for_model(png: bytes) -> tuple[bytes, str]:
+    """A picture an AI provider accepts: at most MODEL_EDGE px on its long side and MODEL_BYTES,
+    as PNG when that fits, else JPEG. Returns the bytes and their media type."""
+    import io
+
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        image = Image.open(io.BytesIO(png))
+    except UnidentifiedImageError:
+        return png, "image/png"  # not a picture PIL knows: the provider says what is wrong
+    with image:
+        if max(image.size) <= MODEL_EDGE and len(png) <= MODEL_BYTES:
+            return png, "image/png"
+        image = image.convert("RGB")
+        image.thumbnail((MODEL_EDGE, MODEL_EDGE), Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        image.save(out, format="PNG", optimize=True)
+        if out.tell() <= MODEL_BYTES:
+            return out.getvalue(), "image/png"
+        for quality in (90, 80, 70, 60):
+            out = io.BytesIO()
+            image.save(out, format="JPEG", quality=quality)
+            if out.tell() <= MODEL_BYTES:
+                break
+        return out.getvalue(), "image/jpeg"

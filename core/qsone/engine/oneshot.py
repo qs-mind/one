@@ -35,6 +35,7 @@ from qsone.engine import cards, connectors, roles
 from qsone.engine.connectors import claude_code
 from qsone.engine.costs import CostedModel, Spending, usd_text
 from qsone.engine.types import ModelCard, ModelChoice, Progress, Role, TeamHost, Text
+from qsone.records import render
 
 log = logging.getLogger("qsone.engine.oneshot")
 
@@ -239,13 +240,14 @@ async def transcribe(
     if found is None:
         raise OneShotFailed(copy.OCR_NEEDS_MODEL)
     card, role = found
+    png, media = render.for_model(png)
     if card.choice.connector == claude_code.ID:
         content = [
             {
                 "type": "image",
                 "source": {
                     "type": "base64",
-                    "media_type": "image/png",
+                    "media_type": media,
                     "data": base64.b64encode(png).decode(),
                 },
             },
@@ -257,7 +259,7 @@ async def transcribe(
         return text.strip(), card.choice.model
     agent = Agent(_costed(models, card, role), instructions=instructions, output_type=str)
     result = await _once(
-        models, card, role, agent, [f"Page {page}.", BinaryImage(png, media_type="image/png")]
+        models, card, role, agent, [f"Page {page}.", BinaryImage(png, media_type=media)]
     )
     return result.output.strip(), card.choice.model
 
@@ -472,6 +474,11 @@ async def map_pictures(models: Models, images, output_type, instructions: str):
     card = map_picture_model(models)
     if card is None or not SEND_PAGE_IMAGES:
         return None
+    images = [
+        {**image, "png": fitted, "media": media}
+        for image in images
+        for fitted, media in [render.for_model(image["png"])]
+    ]
     if card.choice.connector == claude_code.ID:
         content = []
         for image in images:
@@ -482,7 +489,7 @@ async def map_pictures(models: Models, images, output_type, instructions: str):
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/png",
+                            "media_type": image["media"],
                             "data": base64.b64encode(image["png"]).decode(),
                         },
                     },
@@ -502,7 +509,7 @@ async def map_pictures(models: Models, images, output_type, instructions: str):
         return output_type.model_validate_json(text)
     content = []
     for image in images:
-        content.extend([image["id"], BinaryImage(image["png"], media_type="image/png")])
+        content.extend([image["id"], BinaryImage(image["png"], media_type=image["media"])])
     agent = Agent(
         _costed(models, card, "quick"), instructions=instructions, output_type=output_type
     )

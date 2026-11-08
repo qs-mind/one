@@ -118,3 +118,36 @@ def test_no_temp_files_while_the_route_renders(client, project, monkeypatch):
         monkeypatch.setattr(tempfile, name, refuse)
     r = client.get(f"/projects/{project}/files/{fid}/pages/1", headers=AUTH)
     assert r.status_code == 200 and r.content[:4] == b"\x89PNG"
+
+
+def test_a_big_photo_is_made_small_enough_for_the_ai():
+    import io
+    import os
+
+    from PIL import Image
+
+    from qsone.records import render
+
+    noise = Image.frombytes(
+        "RGB", (5000, 4000), os.urandom(5000 * 4000 * 3)
+    )  # a photo PNG cannot shrink
+    out = io.BytesIO()
+    noise.save(out, format="PNG")
+    assert out.tell() > 10_485_760  # over Anthropic's 10 MB per image
+    data, media = render.for_model(out.getvalue())
+    assert len(data) <= render.MODEL_BYTES
+    with Image.open(io.BytesIO(data)) as small:
+        assert max(small.size) == render.MODEL_EDGE
+    assert media == "image/jpeg"
+
+
+def test_a_small_page_is_sent_as_it_is():
+    import io
+
+    from PIL import Image
+
+    from qsone.records import render
+
+    out = io.BytesIO()
+    Image.new("RGB", (800, 600), "white").save(out, format="PNG")
+    assert render.for_model(out.getvalue()) == (out.getvalue(), "image/png")
