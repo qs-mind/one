@@ -105,6 +105,9 @@ async def read_map(ctx, args):
         args = args.model_copy(update={"file_id": match})
     if args.mode in ("sheets", "counts"):
         result = drawing_evidence(ctx.rec, args)
+        from qsone.tools.drawing_guidance import GUIDANCE
+
+        result["drawing_guidance"] = GUIDANCE
     elif args.mode in ("facts", "links"):
         result = store.entries(ctx.rec, args.mode, cursor=args.cursor, limit=args.limit)
         if args.mode == "facts":

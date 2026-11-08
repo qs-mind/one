@@ -538,3 +538,23 @@ async def test_structured_one_validation_retry_is_costed(make, general, always_i
     assert len(seen) == 2
     assert sum(r[4] for r in costs_of(general)) == 200
     assert sum(r[5] for r in costs_of(general)) == 100
+
+
+async def test_drawing_picture_uses_connected_vision_and_caps(make, general, host):
+    async def unexpected(card):
+        raise AssertionError((card.kind, card.detail))
+
+    host.ask = unexpected
+    seen = []
+    claude = FakeLink(
+        "anthropic", "Claude", "anthropic", models={SONNET.choice.model: reads_the_page(seen)}
+    )
+    models = make({"specialist": SONNET.choice}, [claude])
+    reader = oneshot.page_reader(models)
+    await reader.picture(PNG, page=1, points=(600, 800))
+    [(messages, info)] = seen
+    for phrase in ("title block", "scale", "box", "PDF points", "unchecked", "600", "800"):
+        assert phrase in info.instructions
+    images = [c for c in messages[-1].parts[-1].content if isinstance(c, BinaryImage)]
+    assert [i.data for i in images] == [PNG]
+    assert len(costs_of(general)) == 1
