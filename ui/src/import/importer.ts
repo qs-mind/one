@@ -141,6 +141,7 @@ async function run(job: Job, picked: Picked[], { understandAfter }: { understand
   const id = job.projectId!;
   const report = await upload(id, picked, (done, total) => update(job.key, { done, total }));
   update(job.key, { report });
+  if (!report.failed.length && !report.tooBig.length && report.added + report.duplicates > 0) window.dispatchEvent(new Event("one-files-added"));
   if (!job.old) await reportDrop(id, report.ids);
   if (job.old) {
     const archived = await send(`/projects/${encodeURIComponent(id)}/archive`, "POST");

@@ -908,6 +908,8 @@ export const texts = {
   },
   importEmpty: { en: "Read, but its sheets are empty:", ar: "اتقرا، بس الشيتات بتاعته فاضية:" },
   importZips: { en: "Zips opened: {n}", ar: "ملفات مضغوطة اتفتحت: {n}" },
+  folderSelectionFailed: { en: "ONE could not open the folder. Choose it again.", ar: "ONE ماقدرش يفتح المجلد. اختاره تاني." },
+  importFollowupFailed: { en: "ONE could not finish the import follow-up. Check Project files for the files already added.", ar: "ONE ماقدرش يكمّل متابعة الإضافة. شوف الملفات اللي اتضافت في ملفات المشروع." },
   importFailed: { en: "Some files were not added. Try again.", ar: "في ملفات ماتضافتش. جرّب تاني." },
   importUnderstanding: { en: "The Lead QS is reading the folder…", ar: "كبير مهندسي الكميات بيقرا الفولدر…" },
   importUnderstoodWaits: {

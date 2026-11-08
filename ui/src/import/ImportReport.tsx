@@ -55,7 +55,7 @@ function Counts({ report }: { report: Report }) {
       <Names label={t("importLocked")} names={report.locked} />
       <Names label={t("importUnreadable")} names={report.unreadable} />
       <Names label={t("importEmpty")} names={report.empty} />
-      <Names label={t("importFailed")} names={report.failed} />
+      {report.failureReasons?.length ? <div role="alert">{report.failureReasons.map((failure, i) => <p key={i}><FileName name={failure.name} /> {pick(failure.line)}</p>)}</div> : <Names label={t("importFailed")} names={report.failed} />}
     </div>
   );
 }
@@ -83,7 +83,7 @@ function CountsLine({ report }: { report: Report }) {
             <Names label={t("importLocked")} names={report.locked} />
             <Names label={t("importUnreadable")} names={report.unreadable} />
             <Names label={t("importEmpty")} names={report.empty} />
-            <Names label={t("importFailed")} names={report.failed} />
+            {report.failureReasons?.length ? <div role="alert">{report.failureReasons.map((failure, i) => <p key={i}><FileName name={failure.name} /> {pick(failure.line)}</p>)}</div> : <Names label={t("importFailed")} names={report.failed} />}
           </div>
         </details>
       )}

@@ -2,6 +2,8 @@
 // the project one file at a time, so a 2 GB folder never sits in memory. The place goes up as `?folder=`, display
 // text only: the core never reads a path from the page (decision 14). The report counts what the core made of each.
 import { api } from "../api";
+import { coreLine } from "../core";
+import { texts, type Text } from "../i18n";
 
 /** One file and the path of its folder inside what was dropped ("" for a file dropped on its own). */
 export type Picked = { file: File | { name: string; size: number }; folder: string; read?: () => Promise<File> };
@@ -20,6 +22,7 @@ export type Report = {
   zips: number;
   /** Not added because the core refused or could not be reached: worth trying again. */
   failed: string[];
+  failureReasons?: { name: string; line: Text }[];
   /** The files added, for the one report of the drop in the project chat. */
   ids: string[];
 };
@@ -157,6 +160,7 @@ export async function upload(
         report.unreadable.push(file.name); // empty, or not a file the core can take
       } else {
         report.failed.push(file.name);
+        (report.failureReasons ??= []).push({ name: file.name, line: await coreLine(response || undefined, bytes ? texts.fileNotAdded : texts.fileNotAdded) });
       }
     }
     onProgress(index + 1, picked.length);
