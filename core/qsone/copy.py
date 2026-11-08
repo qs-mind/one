@@ -3048,3 +3048,5 @@ MAP_LOCAL_RETRY = {
     "en": "Local reading paused after a temporary error; ONE will retry once.",
     "ar": "القراءة المحلية وقفت بسبب خطأ مؤقت؛ ONE هيحاول مرة كمان.",
 }
+
+PROJECT_DATED_NAME = {"en": "Project {date}", "ar": "مشروع {date}"}

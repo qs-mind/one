@@ -184,7 +184,7 @@ describe("importing a folder", () => {
   it("a tender folder becomes a project named after it, then the Lead QS reads it", async () => {
     const uploads: string[] = [];
     const fetch = mockCore({
-      "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "2026-11-05T08:00:00Z", open: true }, { status: 201 }),
+      "POST /projects": (body) => Response.json({ id: "p1", name: body!.folder, created_at: "2026-11-05T08:00:00Z", open: true }, { status: 201 }),
       "POST /projects/p1/files": (_, url) => {
         uploads.push(decodeURIComponent(url.split("?")[1]!));
         return Response.json({ status: "read" }, { status: 201 });
@@ -208,7 +208,7 @@ describe("importing a folder", () => {
     let n = 0;
     const reported: unknown[] = [];
     const fetch = mockCore({
-      "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "2026-11-05T08:00:00Z", open: true }, { status: 201 }),
+      "POST /projects": (body) => Response.json({ id: "p1", name: body!.folder, created_at: "2026-11-05T08:00:00Z", open: true }, { status: 201 }),
       "POST /projects/p1/files": () => Response.json({ id: `f${++n}`, status: "read" }, { status: 201 }),
       "POST /projects/p1/files/report": (body) => {
         reported.push(body);
@@ -229,7 +229,7 @@ describe("importing a folder", () => {
   it("old work is archived without the AI step and offers to understand it", async () => {
     let n = 0;
     const fetch = mockCore({
-      "POST /projects": (body) => Response.json({ id: `p${++n}`, name: body!.name, created_at: "2026-11-05T08:00:00Z" }, { status: 201 }),
+      "POST /projects": (body) => Response.json({ id: `p${++n}`, name: body!.folder, created_at: "2026-11-05T08:00:00Z" }, { status: 201 }),
       "POST /projects/p1/files": () => Response.json({ status: "read" }, { status: 201 }),
       "POST /projects/p2/files": () => Response.json({ status: "read" }, { status: 201 }),
       "POST /projects/p1/archive": () => Response.json({ archived_at: "2026-11-05T09:00:00Z", backed_up: false, note: null }),
@@ -290,9 +290,9 @@ describe("importing a folder", () => {
     const names: unknown[] = [];
     mockCore({
       "POST /projects": (body) => {
-        names.push(body!.name);
+        names.push(body!.folder);
         if (names.length === 1) return Response.json({ error: { en: "Taken.", ar: "متاخد." }, project: { id: "p0", name: "برج", created_at: "x" } }, { status: 409 });
-        return Response.json({ id: "p1", name: body!.name, created_at: "x" }, { status: 201 });
+        return Response.json({ id: "p1", name: body!.folder, created_at: "x" }, { status: 201 });
       },
       "POST /projects/p1/files": () => Response.json({ status: "read" }, { status: 201 }),
       "POST /projects/p1/archive": () => Response.json({ archived_at: "2026-11-05T09:00:00Z", backed_up: false, note: null }),
@@ -306,7 +306,7 @@ describe("importing a folder", () => {
   it("names a locked workbook and asks for an open copy; names an empty one", async () => {
     let n = 0;
     mockCore({
-      "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "x" }, { status: 201 }),
+      "POST /projects": (body) => Response.json({ id: "p1", name: body!.folder, created_at: "x" }, { status: 201 }),
       "POST /projects/p1/files": () =>
         Response.json(
           ++n === 1 ? { status: "unreadable", note_key: "FILE_LOCKED" } : { status: "read", note_key: "FILE_SHEETS_EMPTY" },
@@ -323,7 +323,7 @@ describe("importing a folder", () => {
 
   it("says why the Lead QS could not start", async () => {
     mockCore({
-      "POST /projects": (body) => Response.json({ id: "p1", name: body!.name, created_at: "x" }, { status: 201 }),
+      "POST /projects": (body) => Response.json({ id: "p1", name: body!.folder, created_at: "x" }, { status: 201 }),
       "POST /projects/p1/files": () => Response.json({ status: "read" }, { status: 201 }),
       "POST /projects/p1/understand": () => Response.json({ error: { en: "Connect AI first.", ar: "وصّل الذكاء الاصطناعي الأول." } }, { status: 409 }),
     });
@@ -331,4 +331,14 @@ describe("importing a folder", () => {
     await act(() => importFolders([file("a.pdf", "مناقصة/a.pdf")], { old: false }));
     expect(await screen.findByText("Connect AI first.")).toBeInTheDocument();
   });
+});
+
+it('a folder chosen for a new project does not enter the open project', async () => {
+  setCurrentProject({ id: 'existing', name: 'Existing sample', created_at: '' });
+  mockCore({
+    'POST /projects': body => Response.json({ id: 'new', name: body!.folder, created_at: '' }, { status: 201 }),
+    'POST /projects/new/files?name=a.pdf&folder=New': () => Response.json({ id: 'f', name: 'a.pdf', status: 'read' }, { status: 201 }),
+  });
+  await act(() => importFolders([file('a.pdf', 'New/a.pdf')], { old: false, newProject: true }));
+  expect(currentProject()?.id).toBe('new');
 });

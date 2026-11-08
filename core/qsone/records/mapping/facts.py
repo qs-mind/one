@@ -20,11 +20,12 @@ from qsone.records.mapping.roles import file_role
 from qsone.records.project import RecordsError
 
 GUIDE = (
-    "dates, bid validity and security, contract form, performance security, "
+    "official project name, dates, bid validity and security, contract form, performance security, "
     "advance payment and repayment, retention and limit, payment terms, currency, "
     "price adjustment, delay damages and cap, defects period, insurances, programme"
 )
 TERMS = re.compile(
+    r"project name|name of project|اسم المشروع|"
     r"contract data|bid data|validity|security|retention|advance|payment|currency|"
     r"date|duration|opening|award|commencement|deadline|contract form|price adjustment|"
     r"damages|defects|insurance|programme|submission|"
@@ -308,6 +309,13 @@ def accept(rec, proposals, *, picture_fallback=True, rejected=None):
             store.write(c, rec, "map_facts", row)
             ids.append(row["id"])
         _conflicts(c, rec)
+        from qsone.records.naming import from_facts
+
+        renamed = from_facts(c, rec)
+    from qsone import activity
+
+    if renamed:
+        activity.publish(rec.id, {"type": "project-name"})
     store.retain_rejected(rec, rejected_proposals)
     return ids
 
@@ -350,7 +358,14 @@ def update(rec, fact_id, *, confirm=None, value=None, actor="engineer"):
             patch["corrected_value"] = value
         store.write(c, rec, "map_facts", patch, actor=actor)
         _conflicts(c, rec)
+        from qsone.records.naming import from_facts
+
+        renamed = from_facts(c, rec)
         result = store.decoded(store.rows(c, "SELECT * FROM map_facts WHERE id=?", (fact_id,))[0])
+    if renamed:
+        from qsone import activity
+
+        activity.publish(rec.id, {"type": "project-name"})
     return shown(result)
 
 
@@ -627,7 +642,8 @@ def prompt(pages):
         + ". Return facts with name {en,ar}, value, file_id, locator "
         "(page is required for PDF pages; sheet+row for sheets). file_id and page must be copied "
         "from the supplied source, never omitted or empty. Include state found or blank, "
-        "short verbatim evidence, and source_label. "
+        "short verbatim evidence, and source_label. Use the English fact name Project name "
+        "for the official project name (Arabic اسم المشروع). "
         "source_label is optional: words immediately before/around the value, "
         "e.g. فتح العروض → 03/02/1450, never a document title, letterhead or file name. "
         "Copy the label into the name in "

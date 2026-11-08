@@ -11,6 +11,7 @@
 // The project button carries one small mark when another chat needs a look (chatActivity.ts): working, waiting for
 // you, failed, or done since you last looked; this chat is the one on the screen, so it is seen.
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { ProjectName } from "../records/ProjectName";
 import { Mark } from "../brand/Mark";
 import type { ProjectSources, ProjectStatus } from "../project/types";
 import { isMac } from "../project/keys";
@@ -147,11 +148,12 @@ export function TopBar(props: TopBarProps) {
       >
         {/* the project's name is cut last: the status folds, then the document's state and title give (DocumentSwitcher) */}
         <span dir="auto" className="min-w-0 truncate">
-          {project?.name ?? t("generalChat")}
+          {project ? t("projects") : t("generalChat")}
         </span>
         {other && <ActivityMark state={other} label={fill(t("activityElsewhere"), { state: activityWord(other) })} />}
         <span aria-hidden="true" className="text-xs text-slate">▾</span>
       </button>
+      {project && <ProjectName key={project.id} project={project} />}
       {project?.archived_at && (
         <button
           type="button"

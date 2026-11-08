@@ -101,7 +101,7 @@ describe("the top bar", () => {
       [texts.ai.ar, texts.aiTitle.ar, true], // AI settings are in More; focus goes back to More
       [P1.name, texts.projects.ar, false],
     ] as const) {
-      const opener = within(topBar()).getByRole("button", { name: new RegExp(inMore ? texts.more.ar : button) });
+      const opener = within(topBar()).getByRole("button", { name: new RegExp(inMore ? texts.more.ar : button === P1.name ? texts.projects.ar : button) });
       await user.click(opener);
       if (inMore) await user.click(await screen.findByRole("button", { name: new RegExp(button) }));
       const panel = await screen.findByRole("region", { name: heading });
@@ -146,7 +146,7 @@ describe("projects and the General chat", () => {
     const fetch = core();
     const user = userEvent.setup();
     render(<App sourcesFor={() => fakeSources({})} />);
-    await user.click(within(topBar()).getByRole("button", { name: new RegExp(P1.name) }));
+    await user.click(within(topBar()).getByTitle(texts.projects.ar));
     await user.click(await screen.findByRole("button", { name: texts.generalChat.ar }));
     expect(currentProject()).toBeUndefined();
     await waitFor(() => expect(calls(fetch, "POST", "/api/projects/p1/close")).toHaveLength(1));

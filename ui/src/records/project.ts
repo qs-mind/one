@@ -6,6 +6,8 @@ export type Project = {
   id: string;
   name: string;
   created_at: string;
+  name_pair?: import("../i18n").Text;
+  name_source?: { file_id: string; file: string; locator: { page: number } } | null;
   /** Archived: read-only until unarchived (Plan 8). */
   archived_at?: string | null;
   /** A Confidential Project: nothing in it is used outside it. */
