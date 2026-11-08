@@ -282,3 +282,21 @@ def test_inspector_parses_multi_page_pdf_once(monkeypatch):
     result = reader.extract("sample.pdf", sample_pdf([["Sample"]] * 4))
     assert len(result.pieces) == 4
     assert len(calls) == 1
+
+
+def test_rereading_a_pdf_with_no_map_row_creates_it(rec, monkeypatch):
+    """A project made before the map: re-reading its PDF used to fail (map_files.kind NOT NULL)
+    on every slice, so the map never started (Kareem's walk, 8 Nov 2026)."""
+    from qsone.records import files
+    from qsone.records.mapping import worker
+
+    f = files.add_file(rec, "sample.pdf", sample_pdf([["Sample"]]), actor="engineer")
+    with rec.write("one") as c:
+        c.execute("DELETE FROM meta WHERE key=?", ("extractor:" + f.id,))
+        c.execute("DROP TRIGGER map_files_no_delete")  # only to make the old project's shape
+        c.execute("DELETE FROM map_files WHERE file_id=?", (f.id,))
+    assert worker.step(rec)
+    with rec.read() as c:
+        assert c.execute(
+            "SELECT kind, pages, local_state FROM map_files WHERE file_id=?", (f.id,)
+        ).fetchone() == ("pdf", 1, "waiting")
