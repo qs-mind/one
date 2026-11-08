@@ -8,7 +8,7 @@
 // table (which scrolls sideways inside the card if it must). Each cell finds its own direction, and a long value shows
 // two lines with the whole of it as the cell's title. Table roles are set by hand: a stacked table keeps them. A row
 // whose number the core gives a source (`number_column`, `row_sources`) opens that number into its source card.
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { baseDirection, BidiText } from "../bidi";
 import type { Source } from "../../deliverables/types";
 import { fill, pick, t } from "../../i18n";
@@ -40,7 +40,7 @@ function Cell({ value, label, main, children }: { value: string; label: string; 
   );
 }
 
-export function RowsCard({ card, onAnswer, sending, label, lang, stateId }: CardKindProps) {
+export function RowsCard({ card, onAnswer, sending, label, lang, stateId, inDocument }: CardKindProps) {
   const [ticked, setTicked] = useRowState<number[]>(stateId, "ticked", []);
   const payload = card.payload ?? {};
   const columns = payload.columns ?? [];
@@ -87,6 +87,14 @@ export function RowsCard({ card, onAnswer, sending, label, lang, stateId }: Card
     if (option === REFUSE || !tickable) return onAnswer(option);
     onAnswer(option, { rows_ok: [...ticked].sort((a, b) => a - b) });
   }
+  // a BOQ import waiting: the columns ONE took, in one line; every column's choice only on "Check the columns"
+  // (Kareem, 8 Nov: two dozen «Not used» choices in the chat meant nothing to him)
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const folded = Boolean(meaningKey) && open && !columnsOpen && !inDocument;
+  const taken = rows
+    .map((row) => ({ letter: row.column ?? "", meaning: meanings[row.column ?? ""] ?? "none" }))
+    .filter((one) => one.meaning !== "none")
+    .map(({ letter, meaning }) => `${pick(payload.meanings?.find((m) => m.key === meaning)?.label ?? { en: meaning, ar: meaning }, lang)}: ${letter}`);
   const words = (option: string) => (meaningKey && option !== REFUSE ? t("keepColumns", lang) : label(option));
 
   /** A column's meaning: a choice while the card waits, its words once answered. */
@@ -114,7 +122,19 @@ export function RowsCard({ card, onAnswer, sending, label, lang, stateId }: Card
 
   return (
     <>
-      {rows.length > 0 && (
+      {meaningKey && open && !inDocument && (
+        <div className="flex flex-col items-start gap-1">
+          {taken.length > 0 && (
+            <p dir="auto" data-columns-taken className="text-slate">
+              <BidiText text={taken.join(" · ")} />
+            </p>
+          )}
+          <button type="button" aria-expanded={columnsOpen} onClick={() => setColumnsOpen(!columnsOpen)} className="text-slate underline decoration-slate/40 hover:text-ink">
+            {t(columnsOpen ? "hideColumns" : "checkColumns", lang)}
+          </button>
+        </div>
+      )}
+      {rows.length > 0 && !folded && (
         <div ref={source.host} className="relative">
           <div data-rows-scroll className="@container -mx-1 max-w-full overflow-x-auto px-1">
             <table role="table" className="block w-full border-collapse text-start @lg:table @lg:w-max @lg:min-w-full">

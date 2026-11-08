@@ -199,8 +199,7 @@ describe("importing a folder", () => {
     expect(uploads).toEqual(["name=عقد.pdf&folder=مناقصة", "name=BOQ.xlsx&folder=مناقصة/02 جداول"]);
     expect(keys(fetch)).toContain("POST /projects/p1/understand");
     expect(started).toEqual(["p1"]);
-    expect(await screen.findByText("Added: 2")).toBeInTheDocument();
-    expect(screen.getByText(texts.importUnderstanding.en)).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector("[data-import-report]")).toBeNull()); // all came in: nothing floats
   });
 
   it("a drop is reported in the project chat once, with every file of it, before the Lead QS starts", async () => {

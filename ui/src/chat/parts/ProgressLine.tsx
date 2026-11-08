@@ -4,8 +4,9 @@
 // With the core's work log (data-worklog: each step with its real start and end), it is an honest log. While the
 // Brief runs, Thinking shimmers over every step so far; a step still running is a chip with its own timer, counting
 // the real time since the core said it began, and three dots fading beside it; no fill bar, no guess. When the Brief
-// ends, Thinking settles to its real time and step count ("Worked for 2m 5s · 6 steps") and the steps fold into that
-// line, which opens them again. Nothing here runs on a timer but the chip's clock, and only while that step runs.
+// ends, Thinking settles to its real time and step count ("Worked for 2m 5s · 6 steps"). The steps stay folded
+// throughout (Kareem, 8 Nov: the chat shows the conversation, not the work): while it runs only the step running now
+// shows beside Thinking, and a click opens them all. Nothing here runs on a timer but the chip's clock, and only while that step runs.
 // With reduced motion there is no shimmer, no fade and no ticking clock: just the words.
 //
 // A Brief stored before the work log came shows the older line: one per agent, its latest words, updated in place.
@@ -167,6 +168,7 @@ function WorkLog({ log, lang, live }: { log: WorklogData; lang: Language; live: 
   const header = useRef<HTMLDivElement>(null);
   const ended = log.ended !== null;
   const steps = log.steps.length;
+  const running = live && !ended ? log.steps.findLast((step) => step.until === null) : undefined;
   const time = ended ? duration(span(log.started, log.ended!), lang) : "";
   // with no steps there is nothing to open: just the time, as words, not a button
   const settled = ended && steps ? fill(t("workedFor", lang), { time, steps: count("steps", steps, {}, lang) }) : undefined;
@@ -192,10 +194,25 @@ function WorkLog({ log, lang, live }: { log: WorklogData; lang: Language; live: 
         ) : ended ? (
           <span className="tabular-nums">{fill(t("workedForOnly", lang), { time })}</span>
         ) : (
-          live && <span className={reduced ? "text-slate" : "shimmer"}>{t("thinking", lang)}</span>
+          (live || steps > 0) && (
+            // while it works: one line, Thinking and the step running now; the steps open only on a click
+            <span className="flex min-w-0 flex-wrap items-baseline gap-2">
+              <button
+                type="button"
+                aria-expanded={open}
+                disabled={!steps}
+                onClick={() => setOpen(!open)}
+                className="flex items-baseline gap-2 text-start hover:text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:hover:text-slate"
+              >
+                {steps > 0 && <FoldMark open={open} lang={lang} />}
+                <span className={reduced || !live ? "text-slate" : "shimmer"}>{t("thinking", lang)}</span>
+              </button>
+              {!open && running && <RunningChip step={running} lang={lang} />}
+            </span>
+          )
         )}
       </div>
-      <AutoHeight>{(!ended || open) && log.steps.length > 0 && <Steps steps={log.steps} lang={lang} live={live && !ended} />}</AutoHeight>
+      <AutoHeight>{open && log.steps.length > 0 && <Steps steps={log.steps} lang={lang} live={live && !ended} />}</AutoHeight>
     </div>
   );
 }

@@ -178,10 +178,13 @@ describe("a Brief with no steps", () => {
 describe("while the Brief runs", () => {
   const running: WorklogData = { started: T0, ended: null, steps: [step("بيقرا المقايسة", 0, 3), step("بيقرا A-101.dwg", 3, null)] };
 
-  it("Thinking shimmers and every step shows, none folded", () => {
+  it("Thinking shimmers beside the step running now; the steps done stay folded until it is clicked", async () => {
     render(<ProgressLine items={[]} worklog={running} lang="ar" live />);
     expect(screen.getByText(texts.thinking.ar)).toHaveClass("shimmer");
     expect(screen.queryByRole("button", { name: /اشتغل/ })).toBeNull();
+    expect(screen.queryByText("بيقرا المقايسة")).toBeNull(); // a step done: folded
+    expect(document.querySelector("[data-running]")).toHaveTextContent("بيقرا A-101.dwg");
+    fireEvent.click(screen.getByRole("button", { name: texts.thinking.ar }));
     expect(screen.getByText("بيقرا المقايسة")).toBeInTheDocument();
   });
 
@@ -211,9 +214,10 @@ describe("while the Brief runs", () => {
     expect(document.querySelector("[data-running]")).toBeNull();
   });
 
-  it("a step left open in a Brief that is not live has no timer: nothing ticks on its own", () => {
+  it("a step left open in a Brief that is not live has no timer: nothing ticks on its own", async () => {
     render(<ProgressLine items={[]} worklog={running} lang="ar" />);
     expect(document.querySelector("[data-running]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: texts.thinking.ar }));
     expect(screen.getByText("بيقرا A-101.dwg")).toBeInTheDocument();
   });
 

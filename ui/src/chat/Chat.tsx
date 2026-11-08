@@ -18,6 +18,7 @@ import { ContinueBriefs } from "./parts/ContinueBriefs";
 import { CoordinationRoom } from "./parts/CoordinationRoom";
 import { CostNotice } from "./parts/CostNotice";
 import { FactsLine, withoutRedone } from "./parts/FactsLine";
+import { FoldMark, summaryLook } from "./parts/Fold";
 import { ProgressLine } from "./parts/ProgressLine";
 import { ReviewBadge } from "./parts/ReviewBadge";
 import { type OnePart, partsOf } from "./parts/types";
@@ -113,6 +114,32 @@ function OwnText({ text }: { text: string }) {
   );
 }
 
+/** Where a reply's summary ends: whole paragraphs (or a long one's first lines) up to about four short lines; the
+ * rest is its details, folded (Kareem, 8 Nov: the chat shows summaries, not walls of text). */
+export function splitSummary(text: string, room = 320): [string, string] {
+  const blocks = text.trim().split(/\n\s*\n/);
+  const shown: string[] = [];
+  let used = 0;
+  for (const block of blocks) {
+    if (shown.length && used + block.length > room) break;
+    if (!shown.length && block.length > room * 1.5) {
+      // one long first block (a long list): its first lines
+      const lines = block.split("\n");
+      const first: string[] = [];
+      for (const line of lines) {
+        if (first.length && used + line.length > room) break;
+        first.push(line);
+        used += line.length;
+      }
+      const rest = [lines.slice(first.length).join("\n"), ...blocks.slice(1)].filter((b) => b.trim()).join("\n\n");
+      return [first.join("\n"), rest];
+    }
+    shown.push(block);
+    used += block.length;
+  }
+  return [shown.join("\n\n"), blocks.slice(shown.length).join("\n\n")];
+}
+
 const failedReply = (parts: OnePart[]) => partsOf(parts, "status").at(-1)?.data.state === "failed";
 
 function BriefReply({
@@ -129,19 +156,44 @@ function BriefReply({
   // one card open at a time; the top bar's "Waiting for you" goes to it (data-waiting)
   const cardAt = useApprovalQueue(partsOf(parts, "card"), said);
   const firstText = parts.findIndex((part) => part.type === "text");
+  const [summary, more] = splitSummary(text);
+  const reply = (words: string, key: string) => (
+    <Reply
+      key={key}
+      text={words}
+      lang={progress.find((part) => part.data.lang)?.data.lang}
+      unsourced={partsOf(parts, "unsourced").flatMap((one) => one.data.values)}
+      sourced={Object.assign({}, ...partsOf(parts, "sourced").map((one) => one.data.numbers))}
+      projectId={projectId}
+    />
+  );
+  // the summary in sight; everything else ONE has to say (the rest of the words, which files it read, its records'
+  // facts, notices with nothing to do) under one folded Details
+  const quietNotices = partsOf(parts, "notice").filter((notice) => !fixOf(notice.data.fix));
+  const filesRead = partsOf(parts, "files_read");
+  // a reply with no words of its own (a drop's report): its first line is the summary
+  const headline = !summary ? filesRead[0]?.data.lines[0] : undefined;
+  const details = [
+    more && reply(more, "more"),
+    ...filesRead.map((found, at) => (
+      <div key={found.id} className="flex flex-col gap-1">
+        {found.data.lines.slice(headline && at === 0 ? 1 : 0).map((line, index) => (
+          <p key={index} dir={dir(said)}>
+            <BidiText text={pick(line, said)} />
+          </p>
+        ))}
+      </div>
+    )),
+    ...partsOf(parts, "facts").map((facts) => <FactsLine key={facts.id} facts={facts.data} lang={said} />),
+    ...quietNotices.map((notice) => (
+      <p key={notice.id} dir="auto" className="text-slate">
+        {pick(notice.data.text, said)}
+      </p>
+    )),
+  ].filter(Boolean);
   // the words, the views, the cards and the "I understood this" card each in its own place, in the order they came
   const inOrder = parts.map((part, index) => {
-    if (part.type === "text")
-      return index === firstText && text ? (
-        <Reply
-          key="text"
-          text={text}
-          lang={progress.find((part) => part.data.lang)?.data.lang}
-          unsourced={partsOf(parts, "unsourced").flatMap((one) => one.data.values)}
-          sourced={Object.assign({}, ...partsOf(parts, "sourced").map((one) => one.data.numbers))}
-          projectId={projectId}
-        />
-      ) : null;
+    if (part.type === "text") return index === firstText && summary ? reply(summary, "text") : null;
     const [one] = partsOf([part], "view");
     if (one) return <ViewPart key={`view:${one.id}`} id={one.id} view={one.data} projectId={projectId} />;
     const [card] = partsOf([part], "card");
@@ -156,19 +208,21 @@ function BriefReply({
       <ProgressLine items={progress} worklog={partsOf(parts, "worklog").at(-1)?.data} lang={said} live={live} />
       <CoordinationRoom messages={partsOf(parts, "team")} />
       {inOrder}
-      {partsOf(parts, "files_read").map((found) => (
-        <div key={found.id} role="status" className="flex flex-col gap-1">
-          {found.data.lines.map((line, index) => (
-            <p key={index} dir={dir(said)}>
-              <BidiText text={pick(line, said)} />
-            </p>
-          ))}
-        </div>
-      ))}
-      {partsOf(parts, "facts").map((facts) => (
-        <FactsLine key={facts.id} facts={facts.data} lang={said} />
-      ))}
-      {partsOf(parts, "notice").map((notice) => (
+      {headline && (
+        <p role="status" dir={dir(said)}>
+          <BidiText text={pick(headline, said)} />
+        </p>
+      )}
+      {details.length > 0 && (
+        <details data-details className="text-slate">
+          <summary className={`${summaryLook} hover:text-ink`}>
+            <FoldMark open={false} lang={said} />
+            {t("replyDetails", said)}
+          </summary>
+          <div className="mt-2 flex flex-col gap-3 text-ink">{details}</div>
+        </details>
+      )}
+      {partsOf(parts, "notice").filter((notice) => fixOf(notice.data.fix)).map((notice) => (
         <div key={notice.id} role="status" className="flex flex-col gap-2 text-copper">
           <p dir="auto">{pick(notice.data.text, said)}</p>
           <FixAction fix={fixOf(notice.data.fix)} lang={said} />

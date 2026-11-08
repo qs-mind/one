@@ -25,6 +25,8 @@ export type CardKindProps = {
   label: (option: string) => string;
   /** The Brief's language, the card's words' (optional: the page's). */
   lang?: Language;
+  /** Shown wide as a document, where there is room for every detail. */
+  inDocument?: boolean;
 };
 
 export const cardKinds: Partial<Record<string, (p: CardKindProps) => JSX.Element>> = {

@@ -119,6 +119,12 @@ export function ImportReport({ job }: { job: Job }) {
   useLanguage();
   const reading = useReading(job);
   const adding = !job.report && !job.failed;
+  // once everything came in, there is nothing to say: the files list shows them and the chat says what ONE is doing
+  // (Kareem, 8 Nov: the floating «New project … Added: 7» meant nothing to him). Only a problem or a step stays.
+  const r = job.report;
+  const missed = r ? r.tooBig.length + r.locked.length + r.unreadable.length + r.empty.length + r.failed.length + (r.failureReasons?.length ?? 0) : 0;
+  const understandingFailed = Boolean(job.understanding && job.understanding !== "started");
+  if (r && !missed && !job.failed && !understandingFailed && !(job.old && job.archived)) return null;
   // once the Lead QS is no longer reading, the summary folds to a line: the "I understood this" card stays in sight
   const folded = Boolean(job.report) && (reading === "waiting" || reading === "ended");
   const title = job.into
