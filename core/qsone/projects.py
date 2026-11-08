@@ -8,6 +8,7 @@ Next to `records.db` sits `key.json`: the project key wrapped by the Backup key,
 project's recovery code for a Confidential Project (Plan 8). When the key store loses a project
 key, One puts it back from there."""
 
+import json
 import logging
 import re
 import threading
@@ -103,6 +104,12 @@ class Projects:
         self._known[rec.id] = {
             "id": rec.id,
             "name": meta["name"],
+            **({"name_source": json.loads(meta["name_source"])} if meta.get("name_source") else {}),
+            **(
+                {"name_pair": json.loads(meta["name_pair"])}
+                if meta.get("name_pair") not in (None, "{}")
+                else {}
+            ),
             "created_at": meta["created_at"],
             "confidential": meta.get("confidential") == "1",  # a Confidential Project
             "archived_at": meta.get("archived_at"),  # read-only while set (Plan 8)
@@ -117,15 +124,33 @@ class Projects:
             None,
         )
 
-    def create(self, name: str, actor: str) -> dict:
+    def create(self, name: str | None, actor: str, *, folder: str | None = None) -> dict:
         """A new project, open. Raises `NameTaken` when one of that name is here already: two
         projects never share a name."""
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        explicit = name is not None
+        date = datetime.now(ZoneInfo("Africa/Cairo")).date().isoformat()
+        pair = copy.fill(copy.PROJECT_DATED_NAME, date=date)
+        name = name or folder or pair["en"]
+        if not explicit and not folder:
+            base = name
+            n = 2
+            while self.named(name):
+                name = f"{base} ({n})"
+                n += 1
+            if n > 2:
+                pair = {k: f"{v} ({n - 1})" for k, v in pair.items()}
         found = self.named(name)
         if found is not None:
             raise NameTaken(found)
         project_id = uuid.uuid4().hex
+        meta = {"name_origin": "engineer" if explicit else "folder" if folder else "dated"}
+        if not explicit and not folder:
+            meta["name_pair"] = json.dumps(pair, ensure_ascii=False)
         try:
-            rec = Records.create(self.root / project_id, name=name, actor=actor)
+            rec = Records.create(self.root / project_id, name=name, actor=actor, meta=meta)
         except KeyringError:
             raise RecordsError(copy.PROJECT_KEY_STORE_DOWN, status=503) from None
         self._key_doc(rec, confidential=False)
@@ -180,6 +205,7 @@ class Projects:
                     raise
                 self._open[project_id] = rec
                 self._key_doc(rec, confidential=self._known[project_id]["confidential"])
+            self._remember(rec)
             opened = {**self._known[project_id], "open": True}
             return opened | {"note": copy.PROJECT_KEY_RESTORED} if restored else opened
 
@@ -270,6 +296,12 @@ class ReportIn(BaseModel):
 class ProjectIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    folder: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class RenameIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     name: str = Field(min_length=1, max_length=200)
 
 
@@ -394,10 +426,19 @@ def router(
     @r.post("/projects")
     def create_project(body: ProjectIn) -> JSONResponse:
         try:
-            return JSONResponse(projects.create(body.name, ACTOR), status_code=201)
+            return JSONResponse(
+                projects.create(body.name, ACTOR, folder=body.folder), status_code=201
+            )
         except NameTaken as e:  # the screen offers the one there instead
             body = copy.error(e.text) | {"field": e.field, "project": e.project}
             return JSONResponse(body, status_code=e.status)
+
+    @r.patch("/projects/{project_id}")
+    def rename_project(project_id: str, body: RenameIn) -> dict:
+        from qsone.records.naming import rename
+
+        rename(projects.get(project_id), body.name, actor=ACTOR)
+        return projects._remember(projects.get(project_id))
 
     @r.post("/projects/{project_id}/open")
     def open_project(project_id: str) -> dict:

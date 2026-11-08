@@ -1,10 +1,12 @@
 // Pick the chat to work in: the General chat outside every project, or a project; or create one. A narrow, calm list
 // under the project button: each row with what its Briefs are doing (a mark and a word), a search field once there
-// are more than six projects, and "New project" as one row that turns into a field (Enter creates, Escape cancels).
+// are more than six projects, and "New project" asks only for files or a folder.
 // No Close button: Escape or a click outside closes it (FloatingPanel). The arrow keys move between the rows (one
 // tab stop), and one Stone block glides behind the row reached. The core lists every project on this computer, newest
 // first; one it cannot read is listed with the reason, never hidden. Archived projects come last, each marked.
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { chooseFolder } from "../import/FolderDrop";
+import { upload } from "../import/walk";
 import { api } from "../api";
 import { count, pick, t, type Text, texts, useLanguage } from "../i18n";
 import { askForBackupFolder } from "../backup/ask";
@@ -57,15 +59,13 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
   const [list, setList] = useState<List>({ state: "loading" });
   const [query, setQuery] = useState("");
   const [naming, setNaming] = useState(false);
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Text>();
   const [stop, setStop] = useState<string>(); // the row that holds the list's one tab stop
   const rows = useRef<HTMLUListElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const newRow = useRef<HTMLButtonElement>(null);
-  const nameField = useRef<HTMLInputElement>(null);
-  const backToNew = useRef(false);
+  const fileField = useRef<HTMLInputElement>(null);
   useScrollEdges(rows);
 
   const load = useCallback(async () => {
@@ -101,9 +101,7 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
   }, [list.state]);
 
   useEffect(() => {
-    if (naming) nameField.current?.focus();
-    else if (backToNew.current) newRow.current?.focus();
-    backToNew.current = false;
+    if (!naming) newRow.current?.focus();
   }, [naming]);
 
   async function open(id: string) {
@@ -115,27 +113,28 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
     else onClose();
   }
 
-  async function create() {
-    const trimmed = name.trim();
-    if (!trimmed || busy) return;
+  async function create(picked: File[] = []) {
+    if (busy) return;
     setBusy(true);
     setFailed(undefined);
     const response = await api("/projects", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: trimmed }),
+      body: JSON.stringify({}),
     }).catch(() => undefined);
     setBusy(false);
     if (!response?.ok) return setFailed(await coreLine(response, texts.projectNotCreated));
-    switchProject((await response.json()) as Project);
+    const project = (await response.json()) as Project;
+    switchProject(project);
+    if (picked.length) {
+      const report = await upload(project.id, picked.map(file => ({ file, folder: "" })), () => {});
+      if (report.failed.length || report.tooBig.length || report.unreadable.length) {
+        setFailed(texts.importFailed);
+        return;
+      }
+    }
     onClose();
     void askForBackupFolder();
-  }
-
-  function cancelNaming() {
-    backToNew.current = true;
-    setName("");
-    setNaming(false);
   }
 
   /** Up and Down (Home, End) move between the rows; Up from the first goes back to the search field. */
@@ -200,7 +199,7 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
     ) : p.archived_at ? (
       // an archived project: open it to read, or Unarchive it right here
       <li key={p.id} className="flex items-center gap-1">
-        <div className="min-w-0 flex-1">{chatRow(p.id, p.name, () => void open(p.id), true)}</div>
+        <div className="min-w-0 flex-1">{chatRow(p.id, p.name_pair ? pick(p.name_pair) : p.name, () => void open(p.id), true)}</div>
         <button
           type="button"
           disabled={busy}
@@ -219,7 +218,7 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
         </button>
       </li>
     ) : (
-      <li key={p.id}>{chatRow(p.id, p.name, () => void open(p.id))}</li>
+      <li key={p.id}>{chatRow(p.id, p.name_pair ? pick(p.name_pair) : p.name, () => void open(p.id))}</li>
     );
 
   return (
@@ -267,47 +266,13 @@ export function ProjectPicker({ onClose, files = 0 }: { onClose: () => void; fil
           <li className="px-3 py-1.5 text-sm text-slate">{t("noProjectMatch")}</li>
         )}
         <li className="mt-0.5 border-t border-ink/[0.06] pt-0.5">
-          {naming ? (
-            <div className="flex items-center gap-1 px-1 py-0.5">
-              <input
-                ref={nameField}
-                data-row={NEW}
-                dir="auto"
-                maxLength={200}
-                aria-label={t("projectName")}
-                placeholder={t("projectName")}
-                value={name}
-                disabled={busy}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void create();
-                  } else if (event.key === "Escape") {
-                    event.preventDefault(); // cancels the new project; the list stays open
-                    cancelNaming();
-                  }
-                }}
-                onBlur={(event) => {
-                  if (!name.trim() && !event.currentTarget.parentElement?.contains(event.relatedTarget as Node)) setNaming(false);
-                }}
-                className="min-w-0 flex-1 rounded-lg border border-ink/20 bg-paper px-2 py-1 outline-none focus:border-ink"
-              />
-              <button
-                type="button"
-                disabled={!name.trim() || busy}
-                onClick={() => void create()}
-                className="shrink-0 rounded-lg px-2.5 py-1 text-sm text-ink hover:bg-stone focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-40"
-              >
-                {t("create")}
-              </button>
-            </div>
-          ) : (
-            <button ref={newRow} type="button" {...rowProps(NEW)} onClick={() => setNaming(true)} className={`${row} text-slate`}>
-              <span aria-hidden="true">+</span>
-              <span>{t("newProject")}</span>
-            </button>
-          )}
+          {naming ? <div className="flex gap-2">
+            <button type="button" className={row} onClick={() => fileField.current?.click()}>{t("chooseProjectFiles")}</button>
+            <button type="button" className={row} onClick={() => { chooseFolder(false, true); onClose(); }}>{t("chooseProjectFolder")}</button>
+          </div> : <button ref={newRow} type="button" {...rowProps(NEW)} disabled={busy} onClick={() => files ? void create() : setNaming(true)} className={`${row} text-slate`}>
+            <span aria-hidden="true">+</span><span>{t("newProject")}</span>
+          </button>}
+          <input ref={fileField} type="file" multiple hidden onChange={event => { if (event.target.files?.length) void create(Array.from(event.target.files)); }} />
         </li>
         <Glide as="li" />
       </ul>

@@ -116,7 +116,7 @@ describe("the projects' rows", () => {
     const user = userEvent.setup();
     render(<App />);
     await within(topBar()).findByRole("img", { name: elsewhereLabel("waiting") });
-    await user.click(within(topBar()).getByRole("button", { name: new RegExp(P1.name) }));
+    await user.click(within(topBar()).getByTitle(texts.projects.ar));
     const general = await within(picker()).findByRole("button", { name: `${texts.generalChat.ar} ${texts.activityWorking.ar}` });
     expect(general.querySelector('[data-activity="working"]')).not.toBeNull();
     const tower = within(picker()).getByRole("button", { name: `${P2.name} ${texts.activityWaiting.ar}` });
@@ -230,10 +230,11 @@ describe("the compact projects list", () => {
     return within(picker()).findByRole("button", { name: P2.name });
   };
 
-  it("New project turns into a field: Enter creates, Escape cancels", async () => {
+  it("New project asks for files or a folder, with no name", async () => {
     const fetch = core({
       routes: {
         "POST /api/projects": () => Response.json({ ...P1, open: true }, { status: 201 }),
+        "POST /api/projects/p1/files?name=sample.txt": () => Response.json({ id: "sample", name: "sample.txt", status: "read" }, { status: 201 }),
         "GET /api/projects/p1/files": () => Response.json({ files: [] }),
       },
     });
@@ -243,20 +244,14 @@ describe("the compact projects list", () => {
     expect(within(picker()).queryByRole("button", { name: texts.close.ar })).toBeNull(); // Escape or a click outside
     const row = within(picker()).getByRole("button", { name: texts.newProject.ar });
     await user.click(row);
-    const field = within(picker()).getByRole("textbox", { name: texts.projectName.ar });
-    expect(field).toHaveFocus();
-    await user.type(field, "عينة");
-    await user.keyboard("{Escape}");
-    expect(picker()).toBeInTheDocument(); // only the field closed
     expect(within(picker()).queryByRole("textbox", { name: texts.projectName.ar })).toBeNull();
-    expect(within(picker()).getByRole("button", { name: texts.newProject.ar })).toHaveFocus();
-
-    await user.keyboard("{Enter}");
-    await user.type(within(picker()).getByRole("textbox", { name: texts.projectName.ar }), "  مدرسة - عينة {Enter}");
+    expect(within(picker()).getByRole("button", { name: texts.chooseProjectFolder.ar })).toBeInTheDocument();
+    const input = picker().querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(["sample"], "sample.txt"));
     await waitFor(() => expect(currentProject()?.id).toBe("p1"));
     const [, init] = calls(fetch, "POST", "/api/projects")[0]!;
-    expect(JSON.parse(String(init!.body))).toEqual({ name: "مدرسة - عينة" });
-    expect(screen.queryByRole("region", { name: texts.projects.ar })).toBeNull();
+    expect(JSON.parse(String(init!.body))).toEqual({});
+    await waitFor(() => expect(screen.queryByRole("region", { name: texts.projects.ar })).toBeNull());
   });
 
   it("the arrow keys move between the rows, one tab stop", async () => {

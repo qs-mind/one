@@ -6,11 +6,11 @@ import { pick, texts, useLanguage } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import { importFolders } from "./importer";
 
-let chooser: ((old: boolean) => void) | null = null;
+let chooser: ((old: boolean, newProject?: boolean) => void) | null = null;
 
 /** "Choose folder" from anywhere (the top bar's More, say): a tender (old: false) or old work (old: true). */
-export function chooseFolder(old: boolean) {
-  chooser?.(old);
+export function chooseFolder(old: boolean, newProject = false) {
+  chooser?.(old, newProject);
 }
 
 /** The one folder chooser, kept mounted, so a menu that closes when the system dialog opens does not lose it. */
@@ -19,16 +19,18 @@ export function FolderChooser() {
   const [failed, setFailed] = useState<"selection" | "followup" | false>(false);
   const input = useRef<HTMLInputElement>(null);
   const old = useRef(false);
+  const newProject = useRef(false);
   useEffect(() => {
     const clear = () => setFailed(false);
     window.addEventListener("one-files-added", clear);
-    chooser = (asOld) => {
+    chooser = (asOld, asNew = false) => {
       old.current = asOld;
+      newProject.current = asNew;
       setFailed(false);
       if (isTauri()) {
         void nativeFolder().then(async (files) => {
           if (!files) return;
-          try { await importFolders(files, { old: asOld, chosen: true }); }
+          try { await importFolders(files, { old: asOld, chosen: true, ...(asNew ? { newProject: true } : {}) }); }
           catch { setFailed("followup"); }
         }, () => setFailed("selection"));
         return;
@@ -55,7 +57,7 @@ export function FolderChooser() {
         {...{ webkitdirectory: "", directory: "" }}
         onChange={(event) => {
           const files = event.target.files;
-          if (files?.length) void importFolders(Array.from(files), { old: old.current });
+          if (files?.length) void importFolders(Array.from(files), { old: old.current, ...(newProject.current ? { newProject: true } : {}) });
         }}
       />
     </>

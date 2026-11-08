@@ -66,6 +66,7 @@ export type Team = { desks: DeskInfo[]; agents: AgentInfo[] };
 
 /** Plan 4: GET /projects/{id}/activity, one JSON per server-sent event. */
 export type ActivityEvent =
+  | { type: "project-name" }
   | { type: "agent"; agent: AgentInfo }
   | { type: "agent-gone"; id: string }
   | { type: "deliverable"; deliverable: DeliverableInfo }

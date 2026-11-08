@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setLanguage, texts } from "../i18n";
+import { setLanguage, t, texts } from "../i18n";
 import { App } from "../shell/App";
 import { currentProject, setCurrentProject } from "./project";
 
@@ -31,8 +31,8 @@ function core(routes: Record<string, Route>) {
 
 const picker = () => screen.getByRole("region", { name: texts.projects.ar });
 /** The top bar's project button: the project's name, or "General chat" with none open. */
-const switcher = (name: string = texts.generalChat.ar) =>
-  within(screen.getByRole("banner")).getByRole("button", { name: new RegExp(name) });
+const switcher = (_name: string = texts.generalChat.ar) =>
+  within(screen.getByRole("banner")).getByTitle(t("projects"));
 const called = (fetch: ReturnType<typeof core>, method: string, url: string) =>
   fetch.mock.calls.filter(([u, init]) => String(u) === url && (init?.method ?? "GET") === method);
 
@@ -85,7 +85,8 @@ describe("ProjectPicker", () => {
     });
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: new RegExp(tower.name) }));
+    await waitFor(() => expect(currentProject()?.id).toBe(tower.id));
+    await user.click(switcher());
     const current = await within(picker()).findByRole("button", { name: new RegExp(tower.name) });
     expect(current).toHaveAttribute("aria-current", "true");
     expect(current).toHaveTextContent(texts.open.ar);
@@ -94,7 +95,7 @@ describe("ProjectPicker", () => {
     await waitFor(() => expect(called(fetch, "POST", `/api/projects/${tower.id}/close`)).toHaveLength(1));
   });
 
-  it("creates a project from a name", async () => {
+  it("creates a project from files without a name", async () => {
     const fetch = core({
       "GET /api/projects": () => Response.json({ projects: [] }),
       "POST /api/projects": () => Response.json({ ...school, open: true }, { status: 201 }),
@@ -104,14 +105,13 @@ describe("ProjectPicker", () => {
     await user.click(switcher());
     await user.click(await within(picker()).findByRole("button", { name: texts.newProject.ar }));
 
-    const name = within(picker()).getByLabelText(texts.projectName.ar);
-    expect(name).toHaveAttribute("dir", "auto");
-    await user.type(name, "  مدرسة - عينة ");
-    await user.click(within(picker()).getByRole("button", { name: texts.create.ar }));
+    expect(within(picker()).queryByLabelText(texts.projectName.ar)).toBeNull();
+    const input = picker().querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(["sample"], "sample.txt"));
 
     await waitFor(() => expect(switcher(school.name)).toBeInTheDocument());
     const [, init] = called(fetch, "POST", "/api/projects")[0]!;
-    expect(JSON.parse(String(init!.body))).toEqual({ name: "مدرسة - عينة" });
+    expect(JSON.parse(String(init!.body))).toEqual({});
     expect(currentProject()?.id).toBe(school.id);
   });
 
@@ -188,7 +188,7 @@ describe("ProjectPicker", () => {
     await user.click(switcher(texts.generalChat.en));
     const region = screen.getByRole("region", { name: texts.projects.en });
     await user.click(await within(region).findByRole("button", { name: texts.newProject.en }));
-    expect(within(region).getByLabelText(texts.projectName.en)).toBeInTheDocument();
-    expect(within(region).getByRole("button", { name: texts.create.en })).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: texts.chooseProjectFiles.en })).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: texts.chooseProjectFolder.en })).toBeInTheDocument();
   });
 });

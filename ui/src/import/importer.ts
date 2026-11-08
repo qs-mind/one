@@ -88,7 +88,7 @@ async function picking(source: DataTransfer | FileList | File[] | Picked[]): Pro
 }
 
 async function create(name: string): Promise<{ project?: Project; taken?: Project; line?: Text }> {
-  const response = await send("/projects", "POST", { name: name.slice(0, 200) });
+  const response = await send("/projects", "POST", { folder: name.slice(0, 200) });
   if (response?.ok) return { project: (await response.json()) as Project };
   if (response?.status === 409) {
     const body = (await response.clone().json().catch(() => ({}))) as { project?: Project };
@@ -153,12 +153,12 @@ async function run(job: Job, picked: Picked[], { understandAfter }: { understand
 }
 
 /** A dropped or chosen tender folder (old: false), or old work (old: true), each folder its own project. */
-export async function importFolders(source: DataTransfer | FileList | File[] | Picked[], { old, chosen: fromChooser }: { old: boolean; chosen?: boolean }) {
+export async function importFolders(source: DataTransfer | FileList | File[] | Picked[], { old, chosen: fromChooser, newProject = false }: { old: boolean; chosen?: boolean; newProject?: boolean }) {
   const { picked, chosen: fromInput } = await picking(source);
   const chosen = fromChooser ?? fromInput;
   if (!picked.length) return;
   const open = currentProject();
-  if (!old && open && !open.archived_at) return importInto(open.id, picked); // the tender open now takes it
+  if (!newProject && !old && open && !open.archived_at) return importInto(open.id, picked); // the tender open now takes it
   // a tender is one project, named after the (first) folder; old work is one project per folder dropped, or per
   // folder inside the one chosen
   const groups = !old ? [{ name: byTopFolder(picked)[0]!.name, picked }] : chosen ? oldProjects(picked) : byTopFolder(picked);
