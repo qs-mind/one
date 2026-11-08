@@ -306,6 +306,9 @@ def reread_pdf(rec):
             "map_files",
             dict(
                 file_id=file_id,
+                # a project made before the map has no map row yet: kind and pages create it
+                kind="pdf",
+                pages=result.pages,
                 valid_until=None,
                 local_state="waiting",
                 ai_state=None,
