@@ -1,4 +1,4 @@
-"""The truth checks (engine/truth.py), on the exact words a weak model wrote in the tender-day
+"""The truth checks (engine/truth/), on the exact words a weak model wrote in the tender-day
 walk (gemini-3.1-flash-lite, 5 Nov 2026). Synthetic «عينة» files only."""
 
 import json

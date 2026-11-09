@@ -5,7 +5,7 @@ Importing this module registers them. All need an open project (`ctx.rec`). Writ
 name. Reading file text (`search_records`, `read_chunk`) comes back fenced as data, with the
 file's id and name, so the agent cites the file with no id asked of the engineer.
 
-This is the only engine file that imports `qsone.calc` (Plan 3): each calc tool becomes an
+This is the only engine package that imports `qsone.calc` (Plan 3): each calc tool becomes an
 engine `Tool` with its own doc, request model and refusals; `explain_number` reads, the others
 write; an "error" reply becomes `ModelRetry` with its English text, field and example.
 
