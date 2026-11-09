@@ -187,7 +187,7 @@ async def test_an_undated_file_is_dated_the_day_it_was_received(ctx):
 
 
 async def test_undated_files_can_be_refused_by_one_switch(ctx, monkeypatch):
-    monkeypatch.setattr(tools_records, "UNDATED_FILES", "refuse")
+    monkeypatch.setattr(tools_records.source_evidence, "UNDATED_FILES", "refuse")
     boq = boq_file(ctx.rec)
     with pytest.raises(ModelRetry, match="needs the date"):
         await call(
