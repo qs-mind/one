@@ -137,7 +137,7 @@ class ClaudeCodeStatus:
     compatible: bool
     signed_in: bool | None
     version: str | None
-    code: str | None  # name of a copy.py text, e.g. "CLAUDE_CODE_TOO_OLD"
+    code: str | None  # name of a `copy` text, e.g. "CLAUDE_CODE_TOO_OLD"
     models: tuple[str, ...]  # aliases from --model's help, e.g. ("opus", "sonnet")
 
 
@@ -198,7 +198,7 @@ def _runnable(path: Path) -> bool:
 
 
 def executable(picked: str | None) -> tuple[Path | None, str | None]:
-    """The file to run, or the name of the copy.py text that says why there is none.
+    """The file to run, or the name of the `copy` text that says why there is none.
 
     Only the file the engineer picked (an absolute path) or PATH: One never installs Claude
     Code or looks in its folders."""

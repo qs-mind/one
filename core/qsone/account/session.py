@@ -47,7 +47,7 @@ ACCESS_MARGIN = timedelta(seconds=60)  # an access token this close to its end i
 
 
 class AccountError(RecordsError):
-    """A refusal the engineer can read; `text` is from copy.py."""
+    """A refusal the engineer can read; `text` is from `copy`."""
 
 
 def _code(error: Exception) -> str:

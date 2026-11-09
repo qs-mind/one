@@ -20,7 +20,7 @@ FILE_NAME = "records.db"
 
 
 class RecordsError(Exception):
-    """A refusal the engineer can read: `text` is an {en, ar} pair from `copy.py`."""
+    """A refusal the engineer can read: `text` is an {en, ar} pair from `copy`."""
 
     def __init__(self, text: dict[str, str], status: int = 409, field: str | None = None):
         super().__init__(text["en"])

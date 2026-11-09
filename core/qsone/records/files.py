@@ -33,7 +33,7 @@ class FileInfo:
     size: int
     sha256: str
     status: str
-    note: str | None  # name of a copy.py text
+    note: str | None  # name of a `copy` text
     pages: int | None
     chunks: int
     added_at: str
@@ -91,7 +91,7 @@ def add_file(
     `name` and `folder` are display text only and never touch the disk. `flags` are hidden-text
     flags the caller found and the stored bytes no longer show (a web page's hidden elements),
     kept with the file's own; they are not added again when the same bytes are already stored.
-    `note` (a copy.py name) replaces what reading the file noted: a zip kept and not opened."""
+    `note` (a `copy` name) replaces what reading the file noted: a zip kept and not opened."""
     name = re.split(r"[/\\]", name)[-1][:255]
     folder = clean_folder(folder)
     if not data:

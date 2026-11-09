@@ -41,7 +41,7 @@ class Extracted:
     status: Status
     pages: int | None  # PDF pages, workbook sheets, or 1 for an image
     pieces: list[Piece]
-    note: str | None  # name of a copy.py text, e.g. "FILE_SCANNED_PAGES"
+    note: str | None  # name of a `copy` text, e.g. "FILE_SCANNED_PAGES"
     flags: list[Flag] = field(default_factory=list)  # hidden text and orders to an AI
     page_sources: dict[int, str] = field(default_factory=dict)
 

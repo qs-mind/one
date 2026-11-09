@@ -46,7 +46,7 @@ SCRYPT_MAXMEM = 256 * 1024 * 1024
 
 
 class BackupError(RecordsError):
-    """A refusal the engineer can read; `text` is from copy.py."""
+    """A refusal the engineer can read; `text` is from `copy`."""
 
 
 class Escrow(Protocol):

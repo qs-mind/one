@@ -250,7 +250,7 @@ def _field(loc: tuple) -> str:
 
 
 def _key(text: dict) -> str | None:
-    """The copy.py name of an unfilled text."""
+    """The `copy` name of an unfilled text."""
     return next((k for k, v in vars(copy).items() if v is text), None)
 
 

@@ -539,7 +539,7 @@ def test_review_pdf_reads_the_real_review_report(rec):
 
 
 def test_export_labels_have_both_languages():
-    """The exports' labels live in copy.py with every other text the engineer reads."""
+    """The exports' labels live in `copy` with every other text the engineer reads."""
     assert not hasattr(qsone.export, "LABELS")
     for name, text in copy.EXPORT_LABELS.items():
         assert set(text) == {"en", "ar"} and all(v.strip() for v in text.values()), name

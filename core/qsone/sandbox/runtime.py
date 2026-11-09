@@ -149,7 +149,7 @@ def install(
 ) -> Path:
     """Downloads what is missing, checks it, unpacks it; returns the runtime folder.
 
-    Raises `meaning.download.DownloadError` (a copy.py pair in `.text`, the Sandbox's own
+    Raises `meaning.download.DownloadError` (a `copy` pair in `.text`, the Sandbox's own
     words) or `DownloadStopped`."""
     base = base or root()
     if found := find(base):
