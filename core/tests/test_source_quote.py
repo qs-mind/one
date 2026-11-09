@@ -102,6 +102,7 @@ def counting(monkeypatch) -> list[dict]:
         return texts_at(conn, file_id, locator)
 
     monkeypatch.setattr(store.truth, "texts_at", counted)
+    monkeypatch.setattr(store.truth.sources, "texts_at", counted)  # for value_in, per_day_at
     return asked
 
 
