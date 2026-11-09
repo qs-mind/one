@@ -40,7 +40,7 @@ async def test_ones_own_refusal_is_never_blamed_on_the_provider(make_engine, pro
 
 
 async def test_the_step_limit_says_why_and_what_it_got(make_engine, project, registry, monkeypatch):
-    monkeypatch.setattr(runner, "STEP_LIMIT", 4)
+    monkeypatch.setattr(runner.lead, "STEP_LIMIT", 4)
     boq(registry.get(project), 1)
     steps = [call("ledger_numbers", {"item": "01-01-001"}) for _ in range(4)]
     lead = scripted(*steps, said("لقيت لحد دلوقتي البند الأول بس - عينة."))
