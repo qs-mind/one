@@ -262,7 +262,7 @@ def test_team_and_activity_routes(serve_app):
 
 def test_lead_on_the_subscription_link_end_to_end(serve_app, data_dir, tmp_path, monkeypatch):
     made = iter(range(1, 1000))
-    monkeypatch.setattr(team, "uuid4", lambda: UUID(int=next(made)))
+    monkeypatch.setattr(team.handlers, "uuid4", lambda: UUID(int=next(made)))
     specialist_id = UUID(int=1).hex  # the first id the team tools make
     one_step = {"steps": [{"specialist": "Take-off QS", "task": "Quantities", "requests": 2}]}
     script = [
