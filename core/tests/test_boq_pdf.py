@@ -289,8 +289,9 @@ def test_cropbox_number_matches_regions(rec):
     )
 
 
+@pytest.mark.parametrize("agrees", [True, False])
 @pytest.mark.parametrize("ruled", [True, False])
-def test_scanned_table_reads_stored_ocr_words(rec, ruled):
+def test_scanned_table_reads_stored_ocr_words(rec, ruled, agrees):
     from pypdf import PdfWriter
     from pypdf.generic import DecodedStreamObject, NameObject, RectangleObject
 
@@ -350,7 +351,13 @@ def test_scanned_table_reads_stored_ocr_words(rec, ruled):
     with pytest.raises(RecordsError):  # numbers read here are unchecked until the AI reads them
         boq_tools._write(tool_ctx(rec), rec, args, plan)
     text = "Item Description Unit Quantity\n1 Concrete م3 12.50\n2 Concrete م3 20.00"
+    if not agrees:  # the AI read 200.00 where this computer read 20.00
+        text = text.replace("20.00", "200.00")
     add_ocr_pages(rec, file_id, {1: text}, read_by="sample-vision", actor="engineer")
+    if not agrees:
+        with pytest.raises(RecordsError):
+            boq_tools._write(tool_ctx(rec), rec, args, plan)
+        return
     boq_tools._write(tool_ctx(rec), rec, args, plan)
     view = imported.sheet(rec, file_id)
     for row, value, y in zip(view["rows"], ("12.50", "20.00"), (55, 85), strict=True):

@@ -287,6 +287,16 @@ SOURCE_READ_LOCALLY = {
         "الصفحة (files_read مع ocr=true) أو اسأل المهندس، وبعدها خد المصدر من القراية دي."
     ),
 }
+SOURCE_LOCAL_DIFFERS = {
+    "en": (
+        "The number read here from the page's picture is not in your AI's reading of that page, "
+        "so it is not checked. Cite the page itself (its AI reading) or ask the engineer."
+    ),
+    "ar": (
+        "الرقم اللي اتقرا هنا من صورة الصفحة مش موجود في قراية نموذجك للصفحة دي، فلسه ما "
+        "اتراجعش. خد المصدر من الصفحة نفسها (قراية النموذج) أو اسأل المهندس."
+    ),
+}
 OCR_LOW_CONFIDENCE = {
     "en": (
         "Low-confidence OCR: the Lead QS must check this page against its image "
