@@ -330,13 +330,27 @@ def router(projects: Projects, waiting=lambda project_id: 0) -> APIRouter:
     return r
 
 
+# Where an answer may hold the engineer's content: project content, page images and chats, and
+# with the Phase 1 contract tender names, the Lead's summary, lessons, the team and the AI links.
+_NO_STORE = (
+    "/projects",
+    "/chat",
+    "/home",
+    "/engineer",
+    "/team",
+    "/settings",
+    "/setup",
+    "/briefs",
+)
+
+
 def no_store(app):
-    """ASGI middleware: every answer under `/projects` and `/chat` (project content, page
-    images, chats) carries `Cache-Control: no-store`, so the webview never keeps it on disk."""
+    """ASGI middleware: every answer under the paths of `_NO_STORE` carries
+    `Cache-Control: no-store`, so the webview never keeps it on disk."""
 
     async def middleware(scope, receive, send):
         path = scope.get("path", "") if scope["type"] == "http" else ""
-        if not (path.startswith("/projects") or path.startswith("/chat")):
+        if not path.startswith(_NO_STORE):
             return await app(scope, receive, send)
 
         async def sending(message):

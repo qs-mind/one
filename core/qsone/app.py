@@ -22,6 +22,7 @@ from qsone import (
     copy,
     keys,
     models,
+    phase1_stubs,
     projects,
     settings,
     undo,
@@ -416,4 +417,7 @@ def create_app(
             return JSONResponse({"error": copy.MODEL_NOT_SAVED}, status_code=503)
         return JSONResponse({"id": body.id})
 
+    # The Phase 1 routes that are declared and not built yet (501). Keep this the last route
+    # added: it then never takes a request an older route answers.
+    app.include_router(phase1_stubs.router())
     return app

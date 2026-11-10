@@ -120,3 +120,10 @@ UPDATE_OFFLINE = {
     "en": "Could not check for updates. Check the internet connection, then try again.",
     "ar": "مقدرناش ندوّر على تحديثات. اتأكد إن النت شغال وجرّب تاني.",
 }
+
+# The Phase 1 contract: a route that is declared and whose job has not landed yet answers 501
+# with this (qsone.phase1_stubs).
+NOT_BUILT = {
+    "en": "This part of ONE is not built yet.",
+    "ar": "الجزء ده من ONE لسه ما اتبناش.",
+}

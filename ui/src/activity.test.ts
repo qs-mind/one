@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { subscribeActivity } from "./activity";
+import { subscribeActivity, subscribeGeneral, subscribeTender } from "./activity";
+import type { GeneralActivity, TenderActivity } from "./api/client";
 import type { ActivityEvent } from "./project/types";
 
 // A fetch whose each call answers a stream the test writes to and closes.
@@ -126,5 +127,62 @@ describe("subscribeActivity", () => {
     await settle();
     expect(fetch).toHaveBeenCalledTimes(2);
     stopC();
+  });
+});
+
+// The Phase 1 contract's events travel on the same stream. Synthetic «عينة» data only.
+describe("the contract's events", () => {
+  const brief: TenderActivity = { type: "brief", brief_id: "5a".padEnd(32, "0"), state: "running" };
+  const noPlan: TenderActivity = { type: "plan", plan: null };
+
+  it("a tender's events and today's share one stream, and each listener gets its own", async () => {
+    vi.useFakeTimers();
+    const { fetch, calls } = streamingFetch();
+    const old: ActivityEvent[] = [];
+    const tender: TenderActivity[] = [];
+    const stopOld = subscribeActivity("p7", (e) => old.push(e));
+    const stopTender = subscribeTender("p7", (e) => tender.push(e));
+    await settle();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    calls[0]!.write(line(brief) + line(waiting(1)) + line(noPlan) + line({ type: "home" }));
+    await settle();
+    expect(tender).toEqual([brief, noPlan]); // a plan that is gone is said too; `home` belongs to no tender
+    expect(old).toEqual([waiting(1)]);
+    stopOld();
+    expect(calls[0]!.signal.aborted).toBe(false);
+    stopTender();
+    expect(calls[0]!.signal.aborted).toBe(true);
+  });
+
+  it("the events of no tender arrive on the general stream", async () => {
+    vi.useFakeTimers();
+    const { calls } = streamingFetch();
+    const got: GeneralActivity[] = [];
+    const reconnected = vi.fn();
+    const stop = subscribeGeneral((e) => got.push(e), reconnected);
+    await settle();
+    expect(calls[0]!.url).toBe("/api/projects/general/activity");
+    calls[0]!.write(line({ type: "home" }) + line(brief) + line({ type: "lessons" }));
+    await settle();
+    expect(got).toEqual([{ type: "home" }, { type: "lessons" }]);
+    calls[0]!.close();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(reconnected).toHaveBeenCalledOnce(); // the listener then loads its routes again
+    stop();
+  });
+
+  it("an event without what it must carry is skipped", async () => {
+    vi.useFakeTimers();
+    const { calls } = streamingFetch();
+    const got: TenderActivity[] = [];
+    const stop = subscribeTender("p8", (e) => got.push(e));
+    await settle();
+    calls[0]!.write(
+      line({ type: "plan" }) + line({ type: "finding" }) + line({ type: "room", room: {} }) + line({ type: "brief", state: "running" }) +
+        line({ type: "constructor" }) + line(brief),
+    );
+    await settle();
+    expect(got).toEqual([brief]);
+    stop();
   });
 });
