@@ -12,7 +12,7 @@ export type Answer<T> = { data: T; error?: undefined } | { data?: undefined; err
 const isText = (value: unknown): value is Text =>
   typeof value === "object" && value !== null && typeof (value as Text).en === "string" && typeof (value as Text).ar === "string";
 
-async function call<T>(path: string, method = "GET", body?: unknown): Promise<Answer<T>> {
+export async function call<T>(path: string, method = "GET", body?: unknown): Promise<Answer<T>> {
   const init: RequestInit = { method };
   if (body !== undefined) {
     init.headers = { "content-type": "application/json" };
