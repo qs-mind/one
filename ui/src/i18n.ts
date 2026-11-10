@@ -1190,14 +1190,20 @@ export function dir(lang: Language = current): "rtl" | "ltr" {
 }
 
 export function setLanguage(lang: Language) {
-  current = lang;
-  document.documentElement.lang = lang;
-  document.documentElement.dir = dir(lang);
   try {
     localStorage.setItem(storageKey, lang);
   } catch {
     // private window or blocked storage: the choice lasts for this session only
   }
+  followLanguage(lang);
+}
+
+/** Follows the new interface's screen language (ui/src/texts/language.ts), in memory only: nothing new goes in web
+ * storage (contract, Phase 1 row 9). */
+export function followLanguage(lang: Language) {
+  current = lang;
+  document.documentElement.lang = lang;
+  document.documentElement.dir = dir(lang);
   for (const listener of listeners) listener();
 }
 
