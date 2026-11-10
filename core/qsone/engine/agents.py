@@ -40,11 +40,14 @@ LEAD_TOOLS = (
     "show",  # decision 16.1: a view built from ONE's blocks (qsone/view.py)
     "settings_set",  # Phase 1: settings by talking to the Lead (qsone/settings_registry.py)
     "keep_member",  # Phase 1: keep a member for later tenders (engine/team/keep.py)
+    "tender_plan_write",  # Phase 1: the tender plan (engine/plan)
+    "tender_plan_change",
 )
 CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
 
 
 def _registered(names: tuple[str, ...]) -> tuple[str, ...]:
+    import qsone.engine.plan.tool  # noqa: F401 - registers the tender plan's tools
     import qsone.tools  # noqa: F401 - registers every Plan 5 tool; it imports the engine
 
     return tuple(name for name in names if name in REGISTRY)

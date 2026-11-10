@@ -28,6 +28,7 @@ from qsone.copy.identity import *
 from qsone.copy.journey import *
 from qsone.copy.ledger import *
 from qsone.copy.lookup import words_for
+from qsone.copy.plan import *
 from qsone.copy.prices import *
 from qsone.copy.profile import *
 from qsone.copy.project_map import *

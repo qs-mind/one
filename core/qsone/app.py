@@ -47,6 +47,7 @@ from qsone.engine import connectors as engine_connectors
 from qsone.engine import identity_routes, mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
+from qsone.engine.plan import routes as plan_routes
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
 from qsone.journey import profile
@@ -278,6 +279,7 @@ def create_app(
     registry.country = lambda: profile.country(engine.engineer_records)  # contract Q14
     app.include_router(settings_routes.router(ai_http, trash, engine))  # Phase 1: C10
     app.include_router(home_routes.router(registry, engine, trash))  # Home and lessons (C7)
+    app.include_router(plan_routes.router(registry, engine))  # the tender plan (Phase 1)
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):

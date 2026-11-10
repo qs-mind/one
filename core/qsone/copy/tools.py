@@ -96,6 +96,11 @@ TOOL_WORDS = {
     "compare_files": {"en": "Comparing file revisions", "ar": "بيقارن نسخ الملفات"},
     "pack_propose": {"en": "Arranging the tender pack", "ar": "بيرتّب ملف المناقصة"},
     "web_search": {"en": "Searching the web", "ar": "بيدوّر على الويب"},
+    "tender_plan_write": {"en": "Writing the tender plan", "ar": "بيكتب خطة المناقصة"},
+    "tender_plan_change": {
+        "en": "Suggesting a change to the tender plan",
+        "ar": "بيقترح تعديل على خطة المناقصة",
+    },
 }
 
 

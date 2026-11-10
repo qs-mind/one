@@ -486,6 +486,18 @@ CREATE TABLE project_members (id TEXT PRIMARY KEY, card TEXT NOT NULL CHECK (jso
   proposed INTEGER NOT NULL CHECK (proposed IN (0, 1)), joined_at TEXT NOT NULL);
 """
 
+# The tender plan (Phase 1, C2): every state of the plan is a new row, the newest is current. A
+# row holds the whole plan as JSON (`qsone.engine.plan.store`); rows are never changed or removed.
+TENDER_PLANS_SQL = """
+CREATE TABLE tender_plans (
+ rev INTEGER PRIMARY KEY, plan_id TEXT NOT NULL, version INTEGER NOT NULL,
+ body TEXT NOT NULL CHECK(json_valid(body)), at TEXT NOT NULL, "by" TEXT NOT NULL);
+CREATE TRIGGER tender_plans_no_update BEFORE UPDATE ON tender_plans
+ BEGIN SELECT RAISE(ABORT, 'Plan versions are retained'); END;
+CREATE TRIGGER tender_plans_no_delete BEFORE DELETE ON tender_plans
+ BEGIN SELECT RAISE(ABORT, 'Plan versions are retained'); END;
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -517,4 +529,5 @@ MIGRATIONS: list[str] = [
     "CREATE TRIGGER map_rejected_facts_no_delete BEFORE DELETE ON map_rejected_facts "
     "BEGIN SELECT RAISE(ABORT, 'Map proposals are retained'); END;",
     MEMBERS_SQL,
+    TENDER_PLANS_SQL,
 ]
