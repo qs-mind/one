@@ -25,6 +25,8 @@ type PlanCardProps = {
   onChange: (changeId: string, accept: boolean) => void;
   /** Opens a submission date's source at its place (S39). */
   onOpenSource?: (source: Source) => void;
+  /** The Lead is still working in this conversation: the core refuses approving a plan until it ends. */
+  busy?: boolean;
 };
 
 const day = (value: string, t: Translate) => formatDate(new Date(`${value}T00:00:00Z`), t.lang, { day: "numeric", month: "long", timeZone: "UTC" });
@@ -58,7 +60,7 @@ function Dated({ source, onOpen }: { source: Source | null; onOpen?: (source: So
   );
 }
 
-export function PlanCard({ plan, version, onApprove, onDiscuss, onChange, onOpenSource }: PlanCardProps) {
+export function PlanCard({ plan, version, onApprove, onDiscuss, onChange, onOpenSource, busy = false }: PlanCardProps) {
   const t = useText();
   if (!plan) return null;
   if (version < plan.version)
@@ -109,6 +111,7 @@ export function PlanCard({ plan, version, onApprove, onDiscuss, onChange, onOpen
       </CardContent>
       {(plan.status === "proposed" || change) && (
         <CardFooter className="flex-wrap gap-3 max-sm:flex-col max-sm:items-stretch">
+          {busy && !change && <p className="w-full text-xs text-muted-foreground">{t(conversation.planBusy)}</p>}
           {change ? (
             <>
               {change.paid ? (
@@ -127,11 +130,11 @@ export function PlanCard({ plan, version, onApprove, onDiscuss, onChange, onOpen
           ) : (
             <>
               {plan.paid ? (
-                <HoldButton wrap hint={t(conversation.approveHint)} onHold={() => onApprove(plan.version)}>
+                <HoldButton wrap disabled={busy} hint={t(conversation.approveHint)} onHold={() => onApprove(plan.version)}>
                   {t(conversation.approve)}
                 </HoldButton>
               ) : (
-                <Button wrap onClick={() => onApprove(plan.version)}>
+                <Button wrap disabled={busy} onClick={() => onApprove(plan.version)}>
                   {t(conversation.approve)}
                 </Button>
               )}

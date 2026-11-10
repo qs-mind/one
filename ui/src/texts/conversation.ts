@@ -73,6 +73,7 @@ export const conversation = defineTexts({
   stageBarNone: { en: "No stage has started yet", ar: "لسه ولا مرحلة بدأت" },
   stageBarDone: { en: "Every stage is signed off", ar: "كل المراحل اتعتمدت" },
   approve: { en: "Approve and start", ar: "وافق وابدأ" },
+  planBusy: { en: "The Lead is still writing. You can answer once it ends.", ar: "الـ Lead لسه بيكتب. تقدر ترد أول ما يخلص." },
   approveHint: { en: "Approving starts paid work", ar: "الموافقة بتبدأ شغل مدفوع" },
   discuss: { en: "Discuss the plan", ar: "ناقش الخطة" },
   approvedOn: { en: "Approved {date}", ar: "اتوافق عليها {date}" },

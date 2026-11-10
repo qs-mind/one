@@ -99,6 +99,17 @@ describe.each(DIRS)("PlanCard (%s)", (dir) => {
     expect(h.onDiscuss).toHaveBeenCalledTimes(1);
   });
 
+  it("while the Lead still writes, Approve waits and says why", async () => {
+    vi.useFakeTimers();
+    const h = handlers();
+    renderIn(dir, <PlanCard plan={planProposed} version={1} busy {...h} />);
+    expect(screen.getByText(text(conversation.planBusy, lang))).toBeInTheDocument();
+    const approve = screen.getByRole("button", { name: text(conversation.approve, lang) });
+    await hold(approve);
+    expect(h.onApprove).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: text(conversation.discuss, lang) })).toBeEnabled();
+  });
+
   it("an approved plan with a Suggested change shows its reason and both answers", async () => {
     vi.useFakeTimers();
     const h = handlers();

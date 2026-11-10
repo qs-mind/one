@@ -170,6 +170,7 @@ try {
     await app.click(button("اطلب من الـ Lead QS يكتب الخطة"), { timeout: 90_000 });
     await app.waitFor({ text: "خطة التندر" }, 90_000);
     await app.shot("plan-card");
+    await app.waitGone({ text: "الـ Lead لسه بيكتب. تقدر ترد أول ما يخلص." }, 90_000); // Approve waits for the Lead's reply to end
     await hold(button("وافق وابدأ"));
     await app.waitFor({ text: /^اتوافق عليها/ }, 30_000);
     await app.shot("plan-approved");
