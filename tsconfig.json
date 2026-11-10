@@ -15,7 +15,8 @@
     "allowJs": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "paths": { "@/*": ["./ui/src/*"] }
   },
   "include": ["ui/src", "ui/e2e", "ui/bench", "vite.config.ts", "vite.bench.config.ts", "playwright.config.ts", "playwright.bench.config.ts", "scripts"]
 }

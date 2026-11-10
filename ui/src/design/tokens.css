@@ -1,0 +1,230 @@
+/* QS Mind ONE — design tokens of the new interface. The only file that may name a colour.
+   base.css (imported below) holds the font faces, the base layer and the unlayered rules. */
+@import "tailwindcss" source(none);
+@import "./ui/shadcn-tailwind.css";
+@import "@fontsource/zain/arabic-400.css";
+@import "@fontsource/zain/arabic-700.css";
+@import "./base.css";
+
+/* Only the new interface is scanned: the old screens share this Vite root. Later jobs add their folders here. */
+@source "../design";
+@source "../next";
+
+/* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+/* The gallery shows a state without the pointer: data-force="hover", "pressed" or "focus". */
+@custom-variant hover (&:hover, &[data-force~="hover"]);
+@custom-variant active (&:active, &[data-force~="pressed"]);
+@custom-variant focus-visible (&:focus-visible, &[data-force~="focus"]);
+
+:root {
+  color-scheme: light;
+
+  /* The five colours: the only hex values in the interface. */
+  --ink: #0e0f12;
+  --stone: #f2eee7;
+  --paper: #f9f8f4;
+  --slate: #6e6a64;
+  --copper: #a6491b;
+
+  /* Light values. The dark values are in theme-dark below. */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --muted: var(--stone);
+  --muted-foreground: var(--slate);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--paper));
+  --primary-pressed: color-mix(in srgb, var(--ink) 78%, var(--paper));
+  --accent: color-mix(in srgb, var(--ink) 5%, transparent);
+  --pressed: color-mix(in srgb, var(--ink) 10%, transparent);
+  --border: color-mix(in srgb, var(--slate) 10%, var(--stone));
+  --line: color-mix(in srgb, var(--slate) 21%, var(--stone));
+  --muted-hover: color-mix(in srgb, var(--ink) 5%, var(--muted));
+  --row-line: color-mix(in srgb, var(--slate) 5%, var(--stone));
+  --now: var(--copper);
+  --selection: color-mix(in srgb, var(--ink) 14%, transparent);
+  --scrim: color-mix(in srgb, var(--ink) 45%, transparent);
+
+  /* The same in both themes: they follow the values above. */
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --accent-foreground: var(--foreground);
+  --input: var(--line);
+  --ring: var(--foreground);
+  --waiting: var(--now);
+  --disabled: var(--border);
+  --hold-fill: color-mix(in srgb, var(--primary-foreground) 30%, transparent);
+  --radius: 0.625rem;
+
+  /* Layout */
+  --rail-w: 4.75rem;
+  --side-w: 21.25rem;
+  --measure: 40.5rem;
+  --gutter: 1rem;
+  --sheet-row-h: 2.25rem;
+  --sheet-cell-px: 0.75rem;
+
+  /* Arabic first: Zain, then Kumbh Sans for Latin letters and digits. */
+  --font-ui: "Zain", "Kumbh Sans Variable", system-ui, sans-serif;
+}
+:root:lang(en) {
+  --font-ui: "Kumbh Sans Variable", "Zain", system-ui, sans-serif;
+}
+@media (width >= 40rem) {
+  :root {
+    --gutter: 1.5rem;
+  }
+}
+@media (width >= 56.25rem) {
+  :root {
+    --gutter: 2.5rem;
+  }
+}
+@media (width >= 75rem) {
+  :root {
+    --gutter: 3.5rem;
+  }
+}
+
+/* The dark values, written once and applied under both conditions. */
+@utility theme-dark {
+  color-scheme: dark;
+  --background: var(--ink);
+  --foreground: var(--paper);
+  --card: color-mix(in srgb, var(--stone) 4%, var(--ink));
+  --muted: color-mix(in srgb, var(--stone) 8%, var(--ink));
+  --muted-foreground: color-mix(in srgb, var(--slate) 60%, var(--paper));
+  --primary: var(--paper);
+  --primary-foreground: var(--ink);
+  --primary-hover: color-mix(in srgb, var(--paper) 88%, var(--ink));
+  --primary-pressed: color-mix(in srgb, var(--paper) 78%, var(--ink));
+  --accent: color-mix(in srgb, var(--paper) 7%, transparent);
+  --pressed: color-mix(in srgb, var(--paper) 12%, transparent);
+  --muted-hover: color-mix(in srgb, var(--paper) 7%, var(--muted));
+  --border: color-mix(in srgb, var(--stone) 13%, var(--ink));
+  --line: color-mix(in srgb, var(--stone) 22%, var(--ink));
+  --row-line: color-mix(in srgb, var(--stone) 9%, var(--ink));
+  --now: color-mix(in srgb, var(--copper) 60%, var(--paper));
+  --selection: color-mix(in srgb, var(--paper) 20%, transparent);
+  --scrim: color-mix(in srgb, var(--ink) 70%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    @apply theme-dark;
+  }
+}
+:root[data-theme="dark"] {
+  @apply theme-dark;
+}
+
+/* Tailwind's own palette, sizes, weights, letter spacing, shadows and loops are removed: only ONE's remain.
+   A state change is instant; only real progress moves (an explicit duration-240 on a bar). */
+@theme {
+  --color-*: initial;
+  --text-*: initial;
+  --font-weight-*: initial;
+  --tracking-*: initial;
+  --leading-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --animate-*: initial;
+
+  --text-xs: 0.9375rem;
+  --text-xs--line-height: 1.6;
+  --text-sm: 1.0625rem;
+  --text-sm--line-height: 1.6;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.6;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.6;
+  --text-2xl: 1.625rem;
+  --text-2xl--line-height: 1.6;
+  --text-3xl: 2.125rem;
+  --text-3xl--line-height: 1.6;
+
+  --leading-tight: 1.5;
+  --leading-snug: 1.5;
+  --leading-normal: 1.6;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 400;
+  --font-weight-semibold: 700;
+  --font-weight-bold: 700;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+
+  --default-transition-duration: 0s;
+
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 56.25rem;
+  --breakpoint-lg: 75rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-ui);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted-hover: var(--muted-hover);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-pressed: var(--pressed);
+  --color-border: var(--border);
+  --color-line: var(--line);
+  --color-row-line: var(--row-line);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-now: var(--now);
+  --color-waiting: var(--waiting);
+  --color-disabled: var(--disabled);
+  --color-scrim: var(--scrim);
+  --color-hold: var(--hold-fill);
+}
+
+/* A number, an amount, an item code: left to right, kept in one piece inside Arabic. */
+@utility num {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+/* A text link: the text colour, underlined. Never copper. */
+@utility link {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+  text-decoration-skip-ink: auto; /* keeps the line off Zain's tails (descent 0.47em) */
+  &:hover,
+  &[data-force~="hover"] {
+    text-decoration-thickness: 2px;
+  }
+}
