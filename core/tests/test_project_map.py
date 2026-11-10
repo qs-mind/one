@@ -2,7 +2,6 @@
 
 import json
 import time
-from pathlib import Path
 
 from qsone.records import files, ocr
 from qsone.records.mapping import store, worker
@@ -29,8 +28,7 @@ def test_text_pdf_and_duplicate(rec):
 
 
 def test_scanned_page_stores_searchable_boxes(rec, monkeypatch):
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "find_languages", lambda _, **kw: (Path("/fake"), "ara+eng"))
+    monkeypatch.setattr(ocr, "ready", lambda: True)
     monkeypatch.setattr(
         ocr,
         "read_image",
@@ -83,14 +81,16 @@ def test_excel_boq_and_replacement(rec):
 
 
 def test_resume_and_missing_ocr(rec, monkeypatch):
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: None)
+    monkeypatch.setattr(ocr, "ready", lambda: False)
     f = files.add_file(rec, "scan.pdf", sample_pdf([[]]), actor="engineer")
     assert worker.step(rec)
     assert store.detail(rec, f.id)["local_state"] == "reading"
     # A fresh worker has no in-memory progress and resumes the persisted row.
     drain(rec)
     row = store.detail(rec, f.id)
-    assert row["local_state"] == "failed" and set(row["note"]) == {"en", "ar"}
+    # The scanned page waits for the AI page reader; the rest of the file is mapped.
+    assert row["local_state"] == "done" and set(row["note"]) == {"en", "ar"}
+    assert row["ocr_done_pages"] == []
 
 
 def test_paging_2000_files(rec):
@@ -237,8 +237,7 @@ def test_inspector_scan_with_partial_text_still_gets_ocr(rec, monkeypatch):
         "classify_pdf_bytes",
         lambda _: types.SimpleNamespace(pages_needing_ocr=[0], page_count=1),
     )
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "find_languages", lambda _, **kw: (Path("/fake"), "ara+eng"))
+    monkeypatch.setattr(ocr, "ready", lambda: True)
     monkeypatch.setattr(
         ocr,
         "read_image",
@@ -297,58 +296,6 @@ def test_word_headings_and_clauses(rec):
     assert structure["numbered_clauses"][0]["paragraph"] == 2
 
 
-def test_missing_arabic_download_failure_uses_english(rec, monkeypatch, tmp_path):
-    from qsone import copy
-
-    system = tmp_path / "system"
-    system.mkdir()
-    (system / "eng.traineddata").touch()
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "system_folders", lambda _: [system])
-
-    def refuse():
-        raise ocr.download.DownloadError(copy.MEANING_DOWNLOAD_FAILED)
-
-    monkeypatch.setattr(ocr, "ensure_models", refuse)
-    languages = []
-
-    def read(*args, **kwargs):
-        languages.append(kwargs["languages"])
-        return ocr.Page([ocr.Word("Sample", [10, 10, 80, 30], 95)], False)
-
-    monkeypatch.setattr(ocr, "read_image", read)
-    f = files.add_file(rec, "sample.pdf", sample_pdf([[], []]), actor="engineer")
-    drain(rec)
-    row = store.detail(rec, f.id)
-    assert languages == ["eng", "eng"]
-    assert row["local_state"] == "done" and row["ocr_done_pages"] == [1, 2]
-    assert row["note"] == copy.MAP_ARABIC_MISSING
-
-
-def test_missing_arabic_download_success_uses_both(rec, monkeypatch, tmp_path):
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "system_folders", lambda _: [])
-    downloaded = []
-
-    def ensure():
-        downloaded.append(True)
-        return tmp_path
-
-    monkeypatch.setattr(ocr, "ensure_models", ensure)
-    languages = []
-
-    def read(*args, **kwargs):
-        languages.append(kwargs["languages"])
-        return ocr.Page([ocr.Word("Sample", [10, 10, 80, 30], 95)], False)
-
-    monkeypatch.setattr(ocr, "read_image", read)
-    f = files.add_file(rec, "sample.pdf", sample_pdf([[]]), actor="engineer")
-    drain(rec)
-    row = store.detail(rec, f.id)
-    assert downloaded and languages == ["ara+eng"]
-    assert row["local_state"] == "done" and row["note"] is None
-
-
 def test_mapping_failure_logs_type_without_private_content(rec, monkeypatch, caplog):
     import logging
 
@@ -368,8 +315,7 @@ def test_mapping_failure_logs_type_without_private_content(rec, monkeypatch, cap
 
 
 def test_ocr_file_pass_reads_original_once(rec, monkeypatch):
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "find_languages", lambda _: (Path("/fake"), "ara+eng"))
+    monkeypatch.setattr(ocr, "ready", lambda: True)
     monkeypatch.setattr(ocr, "read_image", lambda *a, **kw: ocr.Page([], True))
     f = files.add_file(rec, "sample.pdf", sample_pdf([[], [], []]), actor="engineer")
     reads = []
@@ -448,8 +394,7 @@ def test_service_keeps_one_file_pass_across_open_projects(rec, tmp_path, monkeyp
     other = Records.create(tmp_path / "other", name="Sample", actor="engineer")
     first = files.add_file(rec, "sample.pdf", sample_pdf([[], []]), actor="engineer")
     second = files.add_file(other, "sample.pdf", sample_pdf([[], []]), actor="engineer")
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "find_languages", lambda _: (Path("/fake"), "ara+eng"))
+    monkeypatch.setattr(ocr, "ready", lambda: True)
     monkeypatch.setattr(ocr, "read_image", lambda *a, **kw: ocr.Page([], True))
     reads = []
     original = files.read_original
@@ -479,17 +424,6 @@ def test_service_keeps_one_file_pass_across_open_projects(rec, tmp_path, monkeyp
     finally:
         service.stop()
         other.close()
-
-
-def test_no_ocr_languages_fails_with_bilingual_note(rec, monkeypatch):
-    from qsone import copy
-
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "find_languages", lambda _: None)
-    f = files.add_file(rec, "sample.pdf", sample_pdf([[]]), actor="engineer")
-    drain(rec)
-    row = store.detail(rec, f.id)
-    assert row["local_state"] == "failed" and row["note"] == copy.OCR_TESSERACT_FAILED
 
 
 def test_existing_exact_copy_reuses_local_map_without_reading(rec, monkeypatch):

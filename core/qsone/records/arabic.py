@@ -71,3 +71,86 @@ def normalise(s: str, *, stem: bool = True) -> str:
     """For the word index and for queries: folded letters, lower case, light-stemmed words."""
     words = _WORD.findall(clean(s).lower().translate(_FOLD))
     return " ".join(_stem(w) if stem and _ARABIC.search(w) else w for w in words)
+
+
+# Visual order to logical order -----------------------------------------------------------------
+
+_MIRROR = dict(zip("()[]{}<>«»", ")(][}{><»«", strict=True))
+
+
+def _bidi(ch: str) -> str:
+    kind = unicodedata.bidirectional(ch)
+    if kind in ("R", "AL"):
+        return "R"
+    return kind if kind in ("L", "EN", "AN", "ES", "CS", "ET", "NSM") else "N"
+
+
+def logical_order(items: list[tuple[str, object]]) -> list[tuple[str, object]]:
+    """A printed line's characters as a recogniser reads them (left to right on the page), each
+    with a payload, in the order they are read. ONE's own small subset of UAX#9, enough for one
+    line (no python-bidi, which is LGPL): a line with no right-to-left letter stays as it is;
+    left-to-right runs (Latin words, numbers with the separators the bidi rules join to them:
+    `. , : /` between digits of one script, `+ -` between Western digits) keep their order and
+    everything else is reversed around them; brackets in right-to-left text are mirrored back.
+    So «٢-١-١٢» on the page is «١٢-١-٢» in the text, as ONE's PDF reader has it."""
+    kinds = [_bidi(ch) for ch, _ in items]
+    if "R" not in kinds:
+        return list(items)
+    n = len(items)
+    ltr = [k in ("L", "EN", "AN") for k in kinds]
+
+    def digit(i):
+        return 0 <= i < n and kinds[i] in ("EN", "AN")
+
+    for i, k in enumerate(kinds):  # W4/W5: separators and terminators that belong to a number
+        if k == "CS" and digit(i - 1) and digit(i + 1) and kinds[i - 1] == kinds[i + 1]:
+            ltr[i] = True
+        elif k == "ES" and digit(i - 1) and digit(i + 1) and kinds[i - 1] == kinds[i + 1] == "EN":
+            ltr[i] = True
+        elif k == "ET" and ((i and kinds[i - 1] == "EN") or (i + 1 < n and kinds[i + 1] == "EN")):
+            ltr[i] = True
+    for i, k in enumerate(kinds):  # marks follow their base
+        if k == "NSM" and i and ltr[i - 1]:
+            ltr[i] = True
+    i = 0
+    while i < n:  # neutrals between two Latin runs stay inside the Latin text
+        if ltr[i]:
+            i += 1
+            continue
+        j = i
+        while j < n and not ltr[j] and kinds[j] != "R":
+            j += 1
+        left = i - 1
+        if j > i and left >= 0 and j < n and ltr[left] and ltr[j]:
+            strong = next((kinds[p] for p in range(left, -1, -1) if kinds[p] in ("L", "R")), "R")
+            if kinds[left] in ("L", "EN") and kinds[j] == "L" and strong == "L":
+                for p in range(i, j):
+                    ltr[p] = True
+        i = max(j, i + 1)
+    tokens, i = [], 0
+    while i < n:
+        if ltr[i]:
+            j = i
+            while j < n and ltr[j]:
+                j += 1
+            tokens.append(items[i:j])
+            i = j
+        else:
+            ch, payload = items[i]
+            tokens.append([(_MIRROR.get(ch, ch), payload)])
+            i += 1
+    out = [item for token in reversed(tokens) for item in token]
+    fixed, k = [], 0
+    while k < len(out):  # a combining mark read before its letter goes after it
+        if (
+            unicodedata.bidirectional(out[k][0]) == "NSM"
+            and k + 1 < len(out)
+            and _bidi(out[k + 1][0]) == "R"
+            and (not fixed or _bidi(fixed[-1][0]) != "R")
+        ):
+            fixed += [out[k + 1], out[k]]
+            k += 2
+        else:
+            fixed.append(out[k])
+            k += 1
+    return fixed

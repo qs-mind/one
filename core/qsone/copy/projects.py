@@ -252,25 +252,40 @@ FILE_DRAWING_PREVIEW = {
     "ar": "معاينة الرسم لسه مش متاحة؛ ONE بيعرض النص اللي قراه من الرسم.",
 }
 
-# Scanned pages: local OCR first, then the engineer's AI.
-OCR_TESSERACT_MISSING = {
+# Scanned pages: read on this computer first, then the engineer's AI.
+OCR_LOCAL_NOT_READY = {
     "en": (
-        "Tesseract is not installed. Get it at "
-        "https://tesseract-ocr.github.io/tessdoc/Installation.html. "
-        "ONE can still use your AI reader."
+        "The text reader for pictures is still being set up on this computer, "
+        "so your AI reads these pages for now."
+    ),
+    "ar": "قارئ النص في الصور لسه بيتجهز على الجهاز ده، فنموذجك هو اللي هيقرا الصفحات دي دلوقتي.",
+}
+OCR_LOCAL_FAILED = {
+    "en": "ONE could not read these pages on this computer. Your AI reads them instead.",
+    "ar": "ONE مقدرش يقرا الصفحات دي على الجهاز ده. نموذجك هو اللي هيقراها.",
+}
+OCR_NUMBERS_UNCHECKED = {
+    "en": (
+        "Pages {pages} were read on this computer, for search and finding places only: their "
+        "numbers are not checked. Before a number from them is cited, imported or priced, your "
+        "AI reads the page (files_read with ocr=true) or the engineer confirms it."
     ),
     "ar": (
-        "Tesseract مش متثبت. نزّله من "
-        "https://tesseract-ocr.github.io/tessdoc/Installation.html. "
-        "ONE لسه يقدر يقرا عن طريق نموذجك."
+        "الصفحات {pages} اتقرت على الجهاز ده للبحث وتحديد الأماكن بس: أرقامها لسه ما اتراجعتش. "
+        "قبل ما رقم منها يتاخد مصدر أو يتستورد أو يتسعّر، نموذجك يقرا الصفحة "
+        "(files_read مع ocr=true) أو المهندس يأكده."
     ),
 }
-OCR_TESSERACT_FAILED = {
+SOURCE_READ_LOCALLY = {
     "en": (
-        "The local OCR reader or its language data could not be used. ONE can still use your "
-        "AI reader."
+        "This page was read from its picture on this computer, so its numbers are not checked. "
+        "Have your AI read the page (files_read with ocr=true) or ask the engineer, then cite "
+        "that reading."
     ),
-    "ar": "القراية المحلية أو بيانات لغاتها مش متاحة. ONE لسه يقدر يقرا عن طريق نموذجك.",
+    "ar": (
+        "الصفحة دي اتقرت من صورتها على الجهاز ده، فأرقامها لسه ما اتراجعتش. خلّي نموذجك يقرا "
+        "الصفحة (files_read مع ocr=true) أو اسأل المهندس، وبعدها خد المصدر من القراية دي."
+    ),
 }
 OCR_LOW_CONFIDENCE = {
     "en": (
@@ -313,20 +328,6 @@ OCR_IMAGE_KIND = {
     "ar": "ONE بيقرا صور PNG و JPEG. احفظ الصورة دي PNG أو JPEG وارميها تاني.",
 }
 A_FILE = {"en": "a file", "ar": "ملف"}  # DOING_FILES_READ's {name} before the file is known
-
-OCR_ARABIC_MISSING = {
-    "en": (
-        "ONE read with English OCR only. Arabic reading needs the Arabic model "
-        "(ara.traineddata). ONE could not download it to {folder}. "
-        "It will download when online, with enough free space, "
-        "the next time ONE reads a page using OCR."
-    ),
-    "ar": (
-        "ONE قرا بالإنجليزي بس. قراية العربي محتاجة نموذج العربي (ara.traineddata). "
-        "ONE مقدرش ينزّله في {folder}. هينزّله لما الإنترنت يرجع وتبقى فيه مساحة كفاية، "
-        "أول ما ONE يقرا صفحة من الصورة."
-    ),
-}
 
 # Revision comparison: observed words/pixels only, never inferred engineering changes.
 COMPARE_PAIRING_REVIEW = {

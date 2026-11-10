@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 
 class FilePass:
-    """One original and OCR setup, reused across page slices; never a file queue."""
+    """One original, reused across page slices; never a file queue."""
 
     def __init__(self):
         self.clear()
@@ -25,7 +25,6 @@ class FilePass:
     def clear(self):
         self.key = None
         self.data = None
-        self.ocr_config = None
 
     def __call__(self, rec, file_id):
         if self.key != (rec, file_id):
@@ -33,13 +32,6 @@ class FilePass:
             self.data = files.read_original(rec, file_id)
             self.key = (rec, file_id)
         return self.data
-
-    def languages(self):
-        if self.ocr_config is None:
-            executable = ocr.find_tesseract()
-            languages = ocr.find_languages(executable) if executable else None
-            self.ocr_config = executable, languages
-        return self.ocr_config
 
 
 def _table(sheet, locator):
@@ -321,33 +313,27 @@ def step(
                 )
             }
         remaining = [p for p in scanned if p not in read]
+        if remaining and not ocr.ready():
+            # Never spends: the scanned pages wait for the engineer's AI page reader.
+            row["note"] = copy.MAP_PICTURES_BY_AI if ocr.available() else copy.SETUP_OCR_NOT_HERE
+            remaining = []
         if remaining:
             data = original(rec, file_id)
-            executable, languages = original.languages()
-            if not executable:
-                _update(rec, file_id, {"local_state": "failed", "note": copy.OCR_TESSERACT_MISSING})
-                original.clear()
-                return True
-            if not languages:
-                _update(rec, file_id, {"local_state": "failed", "note": copy.OCR_TESSERACT_FAILED})
-                original.clear()
-                return True
-            note = row["note"]
-            if note != copy.MAP_LOCAL_RETRY and "ara" not in languages[1].split("+"):
-                note = copy.MAP_ARABIC_MISSING
+            waited = (copy.MAP_PICTURES_BY_AI, copy.SETUP_OCR_NOT_HERE)  # the reader is here now
+            note = None if row["note"] in waited else row["note"]
             if cancelled():
                 return False
             from qsone.tools.files import _local_page
 
-            page = remaining[0]
-            result = _local_page(data, info.kind, page, executable, *languages)
+            page = remaining[0]  # one page a slice: the reader's memory peaks once
+            result = _local_page(data, info.kind, page)
             if cancelled():
                 return False
             files.add_ocr_pages(
                 rec,
                 file_id,
                 {page: result.pieces(page)},
-                read_by="tesseract",
+                read_by=ocr.READ_BY,
                 actor=store.ACTOR,
                 include_text_pages=True,
             )
@@ -371,12 +357,16 @@ def step(
                 ).fetchall()
             import json
 
-            words = {}
+            words, read_by = {}, {}
             for loc, text in chunks:
                 loc = json.loads(loc)
-                if loc.get("read_by") == "tesseract" and "box" in loc:
+                if ocr.is_local(loc) and "box" in loc:
                     words.setdefault(loc["page"], []).append({"text": text, "box": loc["box"]})
+                    read_by[loc["page"]] = loc["read_by"]
             tables = _pdf_tables(original(rec, file_id), ocr_words=words)
+            for table in tables:  # built from locally read numbers: they stay unchecked
+                if (page := table["locator"].get("page")) in read_by:
+                    table["locator"]["read_by"] = read_by[page]
         from qsone.records.mapping import drawing_map, remap
 
         drawing_map.populate(rec, file_id, original(rec, file_id))

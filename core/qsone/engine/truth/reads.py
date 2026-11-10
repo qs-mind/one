@@ -228,9 +228,11 @@ def reading_problems(text: str, returns: list[tuple[str, str]]) -> list[Problem]
     if not claims:
         return []
     passages = read_passages(returns)
-    # Only Tesseract explicitly identifies OCR. Model picture reading is vision,
+    # Only ONE's local readers identify OCR. Model picture reading is vision,
     # and absent read_by denotes the original text layer.
-    ocr = bool(passages) and all(loc.get("read_by") == "tesseract" for _, loc, _ in passages)
+    from qsone.records.ocr import is_local
+
+    ocr = bool(passages) and all(is_local(loc) for _, loc, _ in passages)
     confidence = any(re.search(r"confidence|ثقة", line, re.I) for line in claims)
     recorded = {str(loc["confidence"]) for _, loc, _ in passages if "confidence" in loc}
     claimed = re.findall(r"[0-9٠-٩]+(?:[.,][0-9٠-٩]+)?", " ".join(claims))

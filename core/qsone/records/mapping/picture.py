@@ -69,7 +69,7 @@ def compare(value, page):
         return None
     if all(a == b or a == b[::-1] for a, b in zip(source, seen, strict=True)):
         return None
-    result = reading(value, text, method="tesseract", confidence=min(w.confidence for w in words))
+    result = reading(value, text, method=ocr.READ_BY, confidence=min(w.confidence for w in words))
     result["ocr_text"] = text
     return result
 
@@ -127,31 +127,17 @@ def crop(rec, fid, locator, evidence, value):
 
 
 def check(rec, fid, locator, evidence, value):
+    """The number's crop read on this computer by the recogniser alone (never a download, never
+    the AI); advisory only, as a local reading of Arabic-Indic digits often differs."""
+    if not ocr.ready():
+        return None
     png = crop(rec, fid, locator, evidence, value)
     if png is None:
         return None
-    executable = ocr.find_tesseract()
-    if not executable:
-        return None
-    # This check is local-only: never trigger model downloads.
-    folders = [ocr.model_folder(), *ocr.system_folders(executable)]
-    folder = next(
-        (
-            f
-            for f in folders
-            if all((f / (lang + ".traineddata")).is_file() for lang in ("ara", "eng"))
-        ),
-        None,
-    )
-    if folder is None:
-        return None
     try:
         width, height = ocr.png_size(png)
-        result = ocr.read_image(
-            png, points=(width / 3, height / 3), executable=executable, tessdata=folder
-        )
-        return compare(value, result)
-    except (OSError, ValueError, subprocess.SubprocessError):
+        return compare(value, ocr.read_crop(png, points=(width / 3, height / 3)))
+    except (OSError, ValueError):
         return None
 
 

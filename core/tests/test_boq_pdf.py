@@ -323,7 +323,8 @@ def test_scanned_table_reads_stored_ocr_words(rec, ruled):
     assert names == [("PDF 1.1", False)]
     row = next(row for row in sheet.cells.values() if row.get(4) and row[4].value == "12.50")
     assert row[3].value == "م3"
-    assert row[4].locator == {"page": 1, "box": [285, 55, 325, 65]}
+    # read from the page's picture on this computer: the number stays unchecked
+    assert row[4].locator == {"page": 1, "box": [285, 55, 325, 65], "read_by": "tesseract"}
     header, columns = boq.guess(sheet, sheet.last_row)
     plan = boq.plan_sheet(
         rec, boq.workbook(rec, file_id), sheet, header_row=header, columns=columns
@@ -344,6 +345,12 @@ def test_scanned_table_reads_stored_ocr_words(rec, ruled):
     args = boq_tools.ImportArgs(
         file_id=file_id, sheet=plan.sheet, header_row=plan.header_row, columns=plan.columns
     )
+    from qsone.records.project import RecordsError
+
+    with pytest.raises(RecordsError):  # numbers read here are unchecked until the AI reads them
+        boq_tools._write(tool_ctx(rec), rec, args, plan)
+    text = "Item Description Unit Quantity\n1 Concrete م3 12.50\n2 Concrete م3 20.00"
+    add_ocr_pages(rec, file_id, {1: text}, read_by="sample-vision", actor="engineer")
     boq_tools._write(tool_ctx(rec), rec, args, plan)
     view = imported.sheet(rec, file_id)
     for row, value, y in zip(view["rows"], ("12.50", "20.00"), (55, 85), strict=True):

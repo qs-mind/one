@@ -25,7 +25,7 @@ from qsone.engine.tools_records.shared import (
     _json,
     _target,
 )
-from qsone.records import boq, ledger
+from qsone.records import boq, ledger, ocr
 from qsone.records.project import Records, RecordsError
 
 # Writing to the Source Ledger ------------------------------------------------------------------
@@ -162,6 +162,24 @@ def _inside(conn, file_id: str, pages: int | None, place: dict) -> None:
         raise _no_evidence("locator")
 
 
+def _read_here_only(conn, file_id: str, place: dict) -> bool:
+    """A page that only ONE's local text reader read, or a word of it the AI has not read: its
+    numbers are unchecked observations, never evidence by themselves (decisions §17.19)."""
+    if "page" not in place:
+        return False
+    readers = {
+        by
+        for (by,) in conn.execute(
+            "SELECT DISTINCT json_extract(locator, '$.read_by') FROM chunks"
+            " WHERE file_id = ? AND json_extract(locator, '$.page') = ?",
+            (file_id, place["page"]),
+        )
+    }
+    if place.get("read_by") in ocr.LOCAL_READERS:
+        return not any(by is not None and by not in ocr.LOCAL_READERS for by in readers)
+    return bool(readers) and readers <= ocr.LOCAL_READERS
+
+
 def _made_by_a_script(conn, file_id: str) -> bool:
     """A file a Sandbox script wrote (and nobody had before): what it holds was computed."""
     return (
@@ -189,6 +207,8 @@ def _file_source(conn, args: SourceArgs) -> dict:
     if not place:
         raise _no_evidence("locator")
     _inside(conn, args.file_id, pages, place)
+    if _read_here_only(conn, args.file_id, place):
+        raise RecordsError(copy.SOURCE_READ_LOCALLY, status=422, field="locator")
     if args.dated is not None:
         dated, how = args.dated, "document"
     elif UNDATED_FILES == "received":

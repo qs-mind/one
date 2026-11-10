@@ -8,9 +8,15 @@ MAP_FAILED = {
     "en": "ONE could not map this file locally. The original is kept.",
     "ar": "ONE مقدرش يقرا خريطة الملف ده محليًا. الأصل محفوظ.",
 }
-MAP_ARABIC_MISSING = {
-    "en": "Arabic OCR data is missing. ONE kept reading the other files.",
-    "ar": "بيانات قراية الصور بالعربي مش موجودة. ONE كمل قراية باقي الملفات.",
+MAP_PICTURES_BY_AI = {
+    "en": (
+        "The text reader for pictures is not ready on this computer yet, so your AI reads this "
+        "file's scanned pages when they are needed. ONE mapped the rest."
+    ),
+    "ar": (
+        "قارئ النص في الصور لسه مش جاهز على الجهاز ده، فنموذجك هو اللي هيقرا الصفحات المتصورة "
+        "في الملف ده لما نحتاجها. ONE قرا خريطة الباقي."
+    ),
 }
 MAP_CURSOR_INVALID = {
     "en": "This map page cursor is invalid. Open the map again.",

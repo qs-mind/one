@@ -19,6 +19,7 @@ from qsone.records import audit, hidden, search, unread
 from qsone.records.arabic import NORMALISER_VERSION, display_text
 from qsone.records.extract import EXTRACTOR_VERSION, Piece, chunk, extract
 from qsone.records.hidden import Flag
+from qsone.records.ocr import LOCAL_READERS
 from qsone.records.project import Records, RecordsError
 
 MAX_FILE_BYTES = 256 * 1024 * 1024
@@ -250,6 +251,33 @@ def read_pages(conn, file_id: str) -> set[int]:
     return {int(page) for (page,) in rows}
 
 
+def _readings(conn, file_id: str) -> dict[int, set]:
+    """Per page, who read it: None for the text layer, else each reading's `read_by`."""
+    found: dict[int, set] = {}
+    for page, by in conn.execute(
+        "SELECT DISTINCT json_extract(locator, '$.page'), json_extract(locator, '$.read_by')"
+        " FROM chunks WHERE file_id = ? AND json_extract(locator, '$.page') IS NOT NULL",
+        (file_id,),
+    ):
+        found.setdefault(int(page), set()).add(by)
+    return found
+
+
+def pages_wanting_ai(conn, file_id: str) -> set[int]:
+    """Pages only a local reader read that it sent on to the AI page reader (`ocr.wants_ai`):
+    not read by the AI yet, and with no text layer (where an AI reading is never stored)."""
+    marked = {
+        int(page)
+        for (page,) in conn.execute(
+            "SELECT DISTINCT json_extract(locator, '$.page') FROM chunks WHERE file_id = ?"
+            " AND json_extract(locator, '$.wants_ai') IS NOT NULL",
+            (file_id,),
+        )
+    }
+    readings = _readings(conn, file_id)
+    return {n for n in marked if readings[n] <= LOCAL_READERS}
+
+
 def _extraction_meta(rec, conn, file_id, extracted):
     rec.set_meta(conn, "extractor:" + file_id, str(EXTRACTOR_VERSION))
     rec.set_meta(conn, "pdf_sources:" + file_id, json.dumps(extracted.page_sources))
@@ -347,7 +375,8 @@ def add_ocr_pages(
     chunks with the locator {"page": n, "read_by": <model id>}, the word index,
     flags for lines that look like orders to an AI, the file's status, and one audit row. A
     page that already has text is left as it is (unless include_text_pages appends
-    local OCR to a sparse text layer); a page read as empty is kept as read. Vectors
+    local OCR to a sparse text layer, or the AI reads a page only a local reader read: both
+    readings are kept); a page read as empty is kept as read. Vectors
     come from Plan 2b's worker, which embeds every chunk that has none. Returns how many pages
     were stored. Raises `RecordsError`: FILE_NOT_IN_PROJECT, or FILE_PAGES_OUT_OF_RANGE
     (field "pages")."""
@@ -363,7 +392,11 @@ def add_ocr_pages(
             raise RecordsError(text, status=422, field="pages")
         done = read_pages(conn, file_id)
         already = done
-        if include_text_pages:
+        if read_by not in LOCAL_READERS:
+            # The AI reads beside a local reading, never over a text layer or another AI's.
+            readings = _readings(conn, file_id)
+            already = {n for n, by in readings.items() if not by <= LOCAL_READERS}
+        elif include_text_pages:
             # Sparse text layers can still be scanned pages. Append OCR words while
             # retaining original text and never duplicating a completed OCR page.
             already = {
