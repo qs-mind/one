@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* The new interface (U1 onward) has its own stylesheet; keep its classes out of this one. */
+@source not "./design";
+@source not "./next";
+@source not "./texts";
 
 /* QS Mind colours only. Kumbh Sans for Latin; it has no Arabic, so Arabic letters fall to Zain (open licence;
    Thmanyah files never go in this public repo). WebKitGTK 2.54, the Linux app's engine, misplaces a mark that ends

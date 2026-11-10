@@ -1,0 +1,41 @@
+// Sample words for the controls (group A): their tests and their gallery demos. Sample data only.
+import { defineTexts } from "../types";
+
+export const controls = defineTexts({
+  approve: { en: "Approve and start", ar: "وافق وابدأ" },
+  approveHint: { en: "Approving starts paid work", ar: "الموافقة تبدأ شغل مدفوع" },
+  discuss: { en: "Discuss the plan", ar: "ناقش الخطة" },
+  checking: { en: "Checking…", ar: "جاري التحقق…" },
+  details: { en: "Details", ar: "التفاصيل" },
+  longDecision: { en: "Yes, prepare the clarification", ar: "موافق، جهّز الاستفسار" },
+  firstName: { en: "First name", ar: "الاسم الأول" },
+  role: { en: "Role", ar: "المنصب" },
+  roleExample: { en: "Example: senior pricing engineer", ar: "مثال: مهندس تسعير أول" },
+  orgType: { en: "Type of organisation", ar: "نوع الجهة" },
+  contractor: { en: "Contractor", ar: "مقاول" },
+  consultant: { en: "Consultant", ar: "استشاري" },
+  owner: { en: "Owner", ar: "مالك" },
+  supplier: { en: "Supplier", ar: "توريد" },
+  monthlyCap: { en: "Monthly spending cap", ar: "حد الصرف الشهري" },
+  currency: { en: "EGP", ar: "ج.م" },
+  submissionDate: { en: "Submission date", ar: "تاريخ التسليم" },
+  dateExample: { en: "Example: 21/11/2026", ar: "مثال: 21/11/2026" },
+  apiKey: { en: "Key", ar: "المفتاح" },
+  keyChecking: { en: "Checking the key…", ar: "جاري التحقق من المفتاح…" },
+  keyRejected: { en: "The provider did not accept this key", ar: "المزود مقبلش المفتاح ده" },
+  notes: { en: "Your notes", ar: "ملاحظاتك" },
+  models: { en: "Models", ar: "الموديلات" },
+  recommended: { en: "The recommended choice", ar: "الاختيار الموصى به" },
+  ownChoice: { en: "I choose a model for each role myself", ar: "أختار موديل لكل دور بنفسي" },
+  onDevice: { en: "On this device only", ar: "على الجهاز فقط" },
+  agree: { en: "Agree", ar: "موافق" },
+  heldDone: { en: "Held to the end: it goes ahead", ar: "اتضغط للآخر: هيكمل" },
+  // A placeholder stays short enough for a 320px field; the instruction is the field's help line.
+  keyPlaceholder: { en: "Paste any key here", ar: "الصق أي مفتاح هنا" },
+  keyHelp: { en: "ONE finds the provider and checks it at once", ar: "ONE هيعرف المزود ويتأكد منه فورا" },
+  notesSample: {
+    en: "Price item 7/03 on the specification.\nKeep the insulation at two layers.\nSend me the difference in cost.",
+    ar: "سعّر البند 7/03 على المواصفات.\nخلي العزل طبقتين.\nوابعتلي الفرق في التكلفة.",
+  },
+  labelLg: { en: "Connect a provider", ar: "وصّل مزود" },
+});
