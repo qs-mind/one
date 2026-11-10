@@ -157,6 +157,14 @@ DOING_WEB_SEARCH = {"en": "Search the web for: {query}", "ar": "يدوّر في 
 DOING_WEB_READ = {"en": "Open the web page: {url}", "ar": "يفتح صفحة الويب: {url}"}
 DOING_FILES_READ = {"en": "Read {name}, pages {pages}", "ar": "يقرا {name}، صفحات {pages}"}
 DOING_FILES_READ_PAGE = {"en": "Read {name}, page {page}", "ar": "يقرا {name}، صفحة {page}"}
+DOING_FILES_READ_OF = {  # the file's page count known
+    "en": "Read {name}, pages {pages} of {total}",
+    "ar": "يقرا {name}، صفحات {pages} من {total}",
+}
+DOING_FILES_READ_PAGE_OF = {
+    "en": "Read {name}, page {page} of {total}",
+    "ar": "يقرا {name}، صفحة {page} من {total}",
+}
 DOING_FILES_READ_ROWS = {
     "en": "Read {name}, sheet {sheet}, rows {rows}",
     "ar": "يقرا {name}، شيت {sheet}، الصفوف {rows}",

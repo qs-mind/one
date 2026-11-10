@@ -172,6 +172,28 @@ def test_word_97_text_tables_and_headings_are_read_without_libreoffice(monkeypat
     assert got[3] == ({"table": 1, "row": 2}, "1 |  | م٣")
 
 
+def test_word_97_and_docx_give_the_same_rows():
+    import io
+
+    import docx
+
+    rows = [["م", "البيان", "", "الكمية"], ["1", "", "م٣", ""], ["", "", "", ""]]
+    d = docx.Document()
+    table = d.add_table(rows=len(rows), cols=4)
+    for r, row in enumerate(rows):
+        for c, value in enumerate(row):
+            table.cell(r, c).text = value
+    out = io.BytesIO()
+    d.save(out)
+
+    def rows_of(name, data):
+        return [p.text for p in extract(name, data).pieces if "table" in p.locator]
+
+    expected = ["م | البيان |  | الكمية", "1 |  | م٣"]
+    assert rows_of("a.docx", out.getvalue()) == expected
+    assert rows_of("a.doc", word_doc([("table", rows)])) == expected
+
+
 def test_word_97_list_numbers_are_shown():
     data = word_doc([("li", "first", 0), ("li", "second", 0), ("li", "sub", 1), ("li", "third", 0)])
     assert [t for _, t in doc_text(data)] == ["1. first", "2. second", "2.1 sub", "3. third"]
@@ -221,6 +243,15 @@ def test_word_97_work_grows_with_the_file_not_with_its_tables():
     x = extract("a.doc", data)
     assert time.perf_counter() - start < 1.0
     assert x.flags[0].count > 5000
+    # hidden runs that are also white and tiny: each is matched to its hidden span by bisect
+    runs = " ".join(f"word{i} HIDEWHITE(h{i})" for i in range(20000))
+    start = time.perf_counter()
+    x = extract("a.doc", word_doc([("p", runs)]))
+    assert time.perf_counter() - start < 1.0
+    assert [f.kind for f in x.flags] == ["invisible_text"]
+    assert [f.kind for f in extract("a.doc", word_doc([("p", "a WHITE(w)")])).flags] == [
+        "white_text"
+    ]
     # a page named 50,000 times in the property table is read once
     repeated = word_doc([("p", "HIDE(h) sample")], chp_repeat=50000)
     start = time.perf_counter()
@@ -256,6 +287,19 @@ def test_a_files_json_says_what_was_not_read(rec, partly_read_dwg):
             "why": copy.UNREAD_WHY_TOO_MANY,
         }
     ]
+
+
+def test_the_live_file_event_says_what_was_not_read(rec, partly_read_dwg, monkeypatch):
+    from qsone.deliverables import events
+    from qsone.projects import _file
+    from qsone.records.mapping import worker
+
+    told = []
+    monkeypatch.setattr(events, "publish", lambda pid, event: told.append((pid, event)))
+    worker._file_changed(rec, partly_read_dwg.id)
+    [(pid, event)] = told
+    assert (pid, event["type"]) == (rec.id, "file")
+    assert event["file"]["unread"] == _file(partly_read_dwg, rec)["unread"] != []
 
 
 def test_a_file_kept_unread_is_one_part_with_its_note(rec):

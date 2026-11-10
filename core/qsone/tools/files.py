@@ -100,16 +100,25 @@ def _when(at: str) -> str:
 
 
 def _doing(
-    name: str | dict, *, pages: list[int] = (), sheet: str | None = None, rows: str | None = None
+    name: str | dict,
+    *,
+    pages: list[int] = (),
+    of: int = 0,
+    sheet: str | None = None,
+    rows: str | None = None,
 ) -> dict[str, str]:
     """«يقرا X، صفحة 2», «يقرا X، صفحات 1-3», «يقرا X، شيت BOQ، الصفوف 1-200», or the name
-    alone for a file with no pages: never «صفحات 1»."""
+    alone for a file with no pages: never «صفحات 1». With `of`, the file's page count follows:
+    «يقرا X، صفحة 12 من 64»."""
     if sheet is not None:
         return copy.fill(copy.DOING_FILES_READ_ROWS, name=name, sheet=sheet, rows=rows)
+    total = {"total": str(of)} if of else {}
     if len(pages) == 1:
-        return copy.fill(copy.DOING_FILES_READ_PAGE, name=name, page=str(pages[0]))
+        text = copy.DOING_FILES_READ_PAGE_OF if of else copy.DOING_FILES_READ_PAGE
+        return copy.fill(text, name=name, page=str(pages[0]), **total)
     if pages:
-        return copy.fill(copy.DOING_FILES_READ, name=name, pages=_ranges(list(pages)))
+        text = copy.DOING_FILES_READ_OF if of else copy.DOING_FILES_READ
+        return copy.fill(text, name=name, pages=_ranges(list(pages)), **total)
     return copy.fill(copy.DOING_FILE_READ, name=name)
 
 
@@ -286,11 +295,11 @@ class _Selection:
     defaults: dict = field(default_factory=dict)
     csv_rows: bool = False
 
-    def doing(self, name: str | dict) -> dict[str, str]:
-        """What the engineer sees while it is read (_doing)."""
+    def doing(self, name: str | dict, of: int = 0) -> dict[str, str]:
+        """What the engineer sees while it is read (_doing); `of` the file's page count."""
         if self.sheet is not None:
             return _doing(name, sheet=self.sheet, rows=f"{self.rows[0]}-{self.rows[1]}")
-        return _doing(name, pages=self.pages)
+        return _doing(name, pages=self.pages, of=of)
 
     def args(self, file_id: str) -> dict:
         """The call that reads this selection again."""
@@ -845,7 +854,7 @@ async def _files_read(ctx: ToolContext, args: ReadArgs) -> str:
     if info is None:
         raise RecordsError(copy.FILE_NOT_IN_PROJECT, status=422, field="file_id")
     sel = await asyncio.to_thread(_select, rec, info, args)
-    words = sel.doing(copy.file_name(info.name))
+    words = sel.doing(copy.file_name(info.name), of=info.pages or 0)
     ctx.host.emit(Progress(ctx.brief_id, ctx.run_id, ctx.agent.name, words))
     from qsone.tools.drawing_guidance import for_pages
 

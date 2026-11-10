@@ -6,7 +6,8 @@ LibreOffice. Just enough of the format for those tests; every text in them is sa
 `blocks`: ("p", text) a paragraph, ("h", text) a heading, ("li", text, level) a numbered list
 paragraph (one list: «1.», then «1.1» …, `nfc` its number format), ("table", [[cell, ...], ...])
 a table, "\\n" in a cell starting a paragraph. Inside a text: FIELD(instruction|result) a field,
-HIDE(text) a hidden run, DEL(text) a tracked deletion, SYM(text) symbol-font characters.
+HIDE(text) a hidden run, DEL(text) a tracked deletion, SYM(text) symbol-font characters,
+WHITE(text) white text, HIDEWHITE(text) hidden white text of 1 pt.
 `objects` are streams inside ObjectPool: {"Workbook": BIFF bytes} or {"Package": xlsx bytes}."""
 
 import re
@@ -93,9 +94,11 @@ CHARS = {
     "HIDE": _sprm(0x083C, b"\x01"),
     "DEL": _sprm(0x0800, b"\x01"),
     "SYM": _sprm(0x6A09, struct.pack("<HH", 0, 0xF0FC)),
+    "WHITE": _sprm(0x2A42, b"\x08"),
 }
+CHARS["HIDEWHITE"] = CHARS["HIDE"] + CHARS["WHITE"] + _sprm(0x4A43, struct.pack("<H", 2))
 SPECIAL = _sprm(0x0855, b"\x01")
-_MARKUP = re.compile(r"FIELD\((.*?)\|(.*?)\)|(HIDE|DEL|SYM)\((.*?)\)")
+_MARKUP = re.compile(r"FIELD\((.*?)\|(.*?)\)|(HIDEWHITE|HIDE|DEL|SYM|WHITE)\((.*?)\)")
 
 
 def _row_mark(cells: int, merged: frozenset) -> bytes:
