@@ -34,7 +34,7 @@ async function request<T>(path: string, init: RequestInit): Promise<Answer<T>> {
   return got.response.ok ? { data: got.json as T } : { error: wordsOf(got.json) };
 }
 
-function call<T>(path: string, method = "GET", body?: unknown): Promise<Answer<T>> {
+export function call<T>(path: string, method = "GET", body?: unknown): Promise<Answer<T>> {
   const init: RequestInit = { method };
   if (body !== undefined) {
     init.headers = { "content-type": "application/json" };
