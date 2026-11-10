@@ -46,5 +46,20 @@ def lead_block(engine) -> dict | None:
         return {"reason": copy.AI_CONSENT_NEEDED, "fix": "consent"}
     if not _connected(engine):
         return {"reason": copy.NO_AI, "fix": "ai"}
+    refused = getattr(engine, "key_refused", None)  # at the last listing of the models
+    if refused is not None:
+        return {"reason": refused, "fix": "ai"}
     reached = _cap_reached(engine)
     return None if reached is None else {"reason": reached, "fix": "caps"}
+
+
+def tender_block(engine, confidential: bool, blocked: dict | None) -> dict | None:
+    """One tender's `LeadBlock`: every tender's (`blocked`), or the Confidential rule's while
+    `ai.confidential_on_device` is on and no model on this computer is connected."""
+    from qsone.settings_registry import confidential_on_device
+
+    if blocked is not None or not confidential or not confidential_on_device():
+        return blocked
+    if any(getattr(c, "on_device", False) for c in engine.connectors()):
+        return None
+    return {"reason": copy.CONFIDENTIAL_NO_LOCAL_AI, "fix": "ai"}

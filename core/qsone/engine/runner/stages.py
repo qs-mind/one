@@ -21,7 +21,7 @@ from qsone.engine import (
 )
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.runner.histories import _tool_results
-from qsone.engine.runner.shared import utc_now
+from qsone.engine.runner.shared import kept_here, utc_now
 from qsone.engine.runner.truth_checks import _marked
 from qsone.engine.team import TeamSetup
 from qsone.engine.types import Data, ModelChoice, Role, TextDelta, Unsourced
@@ -33,10 +33,16 @@ class _BriefStages:
     # The whole Brief ---------------------------------------------------------------------------
 
     async def _prepare(self) -> None:
+        from qsone.tools.services import stays_here
+
         if self._given_sheet is not None:
             sheet, found = self._given_sheet
         else:
             sheet, found = await self.engine.sheet()
+        # A Confidential Project's work runs on this computer only; with no model here, NoAI
+        # ends the Brief in plain words.
+        self.here_only = stays_here(self.place.rec)
+        sheet = kept_here(self.place.rec, sheet)
         self.sheet, self.found = sheet, {c.id: c for c in found}
         allowed = {c.choice for c in sheet}
         defaults = roles.defaults(sheet)
@@ -76,6 +82,8 @@ class _BriefStages:
             self.lead_run_id = self.store.new_run(self.brief_id, spec, picked["lead"], None)
         else:
             self.lead_run_id = lead["id"]
+            if self.here_only and lead["choice"] not in allowed:  # made Confidential since
+                self.store.set_run(self.lead_run_id, choice=picked["lead"])
         self.lead_ctx = self._ctx(self.lead_run_id, spec)
         choice = self.store.run(self.lead_run_id)["choice"]
         self._agent(self.lead_run_id, spec=spec, model=choice.model, state="thinking")

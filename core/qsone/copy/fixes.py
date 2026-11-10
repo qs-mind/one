@@ -12,6 +12,7 @@ from qsone.copy.ai import (
     CLAUDE_CODE_SHIM,
     CLAUDE_CODE_SIGNED_OUT,
     CLAUDE_CODE_TOO_OLD,
+    CONFIDENTIAL_NO_LOCAL_AI,
     KEY_REFUSED,
     KEY_STORE_DOWN,
     MODEL_GONE,
@@ -43,6 +44,7 @@ FIXES = {
         PRICE_UNKNOWN,
         MODEL_GONE_TRY,
         MODEL_GONE,
+        CONFIDENTIAL_NO_LOCAL_AI,
     ),
     # the web search setting, in AI settings (audit B8)
     "search": (WEB_NO_SEARCH, WEB_SEARCH_KEY_REFUSED, WEB_SEARCH_LIMIT),
