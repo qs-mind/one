@@ -5,10 +5,10 @@ import { setTheme, type ThemeSetting } from "@/design/theme";
 import { setLang } from "@/texts/language";
 import type { Lang } from "@/texts/types";
 
-export type View = "gallery" | "specimens";
+export type View = "gallery" | "specimens" | "conversation";
 export type Address = { view: View; lang: Lang; theme: ThemeSetting };
 
-const VIEWS: readonly View[] = ["gallery", "specimens"];
+const VIEWS: readonly View[] = ["gallery", "specimens", "conversation"];
 const LANGS: readonly Lang[] = ["ar", "en"];
 const THEMES: readonly ThemeSetting[] = ["system", "light", "dark"];
 

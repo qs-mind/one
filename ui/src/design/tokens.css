@@ -9,6 +9,7 @@
 /* Only the new interface is scanned: the old screens share this Vite root. Later jobs add their folders here. */
 @source "../design";
 @source "../next";
+@source "../conversation";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {
