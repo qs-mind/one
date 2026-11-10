@@ -52,39 +52,6 @@ def router() -> APIRouter:
     def put_profile(body: c.ProfileIn):
         return _stub()
 
-    # Lessons Learned, Home and a tender's header (C7).
-    @r.get("/engineer/lessons", response_model=c.Lessons, responses=_refusals(409, 503))
-    def get_lessons():
-        return _stub()
-
-    @r.patch(
-        "/engineer/lessons/{lesson_id}",
-        response_model=c.Lesson,
-        responses=_refusals(404, 409, 422, 503),
-    )
-    def patch_lesson(lesson_id: str, body: c.LessonIn):
-        return _stub()
-
-    @r.delete(
-        "/engineer/lessons/{lesson_id}",
-        response_model=c.Undoable,
-        responses=_refusals(404, 409, 503),
-    )
-    def delete_lesson(lesson_id: str):
-        return _stub()
-
-    @r.get("/home", response_model=c.Home, responses=_refusals())
-    def home():
-        return _stub()
-
-    @r.get(
-        "/projects/{project_id}/tender",
-        response_model=c.TenderView,
-        responses=_refusals(404, 409, 503),
-    )
-    def tender(project_id: str):
-        return _stub()
-
     # The tender plan (C2).
     @r.get("/projects/{project_id}/plan", response_model=c.PlanView, responses=_refusals(404, 409))
     def get_plan(project_id: str):

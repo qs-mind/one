@@ -13,6 +13,7 @@ import logging
 import re
 import threading
 import uuid
+from contextlib import suppress
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -50,6 +51,7 @@ class Projects:
         self.root = Path(data_dir) / "projects"
         self._open: dict[str, Records] = {}
         self._known: dict[str, dict] = {}  # id -> {"id", "name", "created_at"}, from the file
+        self.tenders: dict[str, dict] = {}  # id -> the half of Home's row the file holds (home.py)
         self._lock = threading.RLock()
         self.backups: Backups | None = None  # set by the app: a copy on close, the escrow
 
@@ -100,7 +102,10 @@ class Projects:
         return self.root / project_id
 
     def _remember(self, rec: Records) -> dict:
+        from qsone import home, home_pulse
+
         meta = rec.meta()
+        before = self._known.get(rec.id), self.tenders.get(rec.id)
         self._known[rec.id] = {
             "id": rec.id,
             "name": meta["name"],
@@ -114,6 +119,9 @@ class Projects:
             "confidential": meta.get("confidential") == "1",  # a Confidential Project
             "archived_at": meta.get("archived_at"),  # read-only while set (Plan 8)
         }
+        self.tenders[rec.id] = home.snapshot(rec)  # so drawing Home opens no closed file
+        if (self._known[rec.id], self.tenders[rec.id]) != before:
+            home_pulse.changed(rec.id)
         return self._known[rec.id]
 
     def named(self, name: str) -> dict | None:
@@ -443,6 +451,8 @@ def router(
     @r.post("/projects/{project_id}/open")
     def open_project(project_id: str) -> dict:
         opened = projects.open(project_id)
+        with suppress(OSError):  # Home's `last_project_id`; the project opens anyway
+            settings.save("last_project_id", project_id)
         if engine is not None:
             engine.opened(project_id)
         wake()

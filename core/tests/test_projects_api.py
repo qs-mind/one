@@ -77,7 +77,8 @@ def test_an_added_file_is_told_on_the_activity_stream(client, project, monkeypat
     info = upload(
         client, project, BOQ, sample_xlsx({"BOQ": [["03/02", "خرسانة", "م3", 120]]})
     ).json()
-    assert told == [(project, {"type": "file", "file": info})]
+    files_told = [t for t in told if t[1]["type"] == "file"]  # a tender event follows (C7)
+    assert files_told == [(project, {"type": "file", "file": info})]
 
 
 @pytest.mark.parametrize("name", ["", "   ", "x" * 201])

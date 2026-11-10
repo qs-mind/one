@@ -8,7 +8,7 @@ adds `deliverable`). Nothing is kept: a screen that reconnects reloads the lists
 The General chat has no project: its events go under "general"."""
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 _QUEUE_LIMIT = 1000  # events waiting for one slow subscriber; older ones are dropped
 
@@ -39,10 +39,14 @@ class Hub:
 
 
 HUB = Hub()
+# Told of every event as it is published, on the publisher's thread (Home's `home_pulse`).
+LISTENERS: list[Callable[[str, dict], None]] = []
 
 
 def publish(project_id: str, event: dict) -> None:
     HUB.publish(project_id, event)
+    for listen in tuple(LISTENERS):
+        listen(project_id, event)
 
 
 def subscribe(project_id: str) -> AsyncIterator[dict]:

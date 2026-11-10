@@ -145,6 +145,10 @@ class Engine:
     def _in(self, channel: str) -> list[_Brief]:
         return [b for b in self._briefs.values() if b.place.channel == channel]
 
+    def running(self, channel: str) -> list[_Brief]:
+        """The Briefs this core runs now in a project ("general": the Home conversation)."""
+        return [b for b in self._in(channel) if not b.finished]
+
     def _publish(self, channel: str, event: dict) -> None:
         activity.publish(channel, event)
 
