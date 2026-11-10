@@ -178,6 +178,44 @@ def test_setup_offline_then_resume(hub, parts, tmp_path, helper, data_dir):
     assert hub.requests[0].headers["range"] == "bytes=100000-"  # from the .part file
 
 
+def test_a_part_waiting_for_the_network_goes_on_by_itself(hub, parts, tmp_path, helper):
+    hub.offline = True
+    setup = make(hub, parts, tmp_path, helper, again=0.05)
+    setup.start()  # nobody calls ensure() again: the setup thread tries again by itself
+    try:
+        for _ in range(200):
+            if states(setup)["first"] == "waiting_network":
+                break
+            time.sleep(0.01)
+        assert states(setup)["first"] == "waiting_network"
+        hub.offline = False
+        for _ in range(500):
+            if setup.state().ready:
+                break
+            time.sleep(0.01)
+        assert setup.state().ready
+    finally:
+        setup.stop()
+
+
+def test_bytes_are_published_at_most_twice_a_second(hub, parts, tmp_path, helper, monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr(runner, "time", type("Clock", (), {"monotonic": lambda: clock[0]}))
+    events = []
+    setup = make(hub, parts, tmp_path, helper, on_change=events.append)
+    for _ in range(10):  # ten MiB in the same moment: one event
+        setup._changed(bytes_only=True)
+    assert len(events) == 1
+    clock[0] += runner.EVENT_SECONDS / 2
+    setup._changed(bytes_only=True)
+    assert len(events) == 1
+    clock[0] += runner.EVENT_SECONDS / 2
+    setup._changed(bytes_only=True)
+    assert len(events) == 2
+    setup._changed()  # a change of state is always published
+    assert len(events) == 3
+
+
 def test_failed_part_names_what_breaks(hub, parts, tmp_path, helper):
     first, second, dwg = parts
     gone = _part("gone", hub.specs[1], broken=True)
