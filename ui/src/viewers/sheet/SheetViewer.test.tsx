@@ -7,6 +7,7 @@ import { deliverablesApi, dispositionName } from "../../deliverables/api";
 import type { Change, Explained, SheetView, Thread, ViewColumn, ViewRow } from "../../deliverables/types";
 import { fill, setLanguage, texts } from "../../i18n";
 import { workspaceApi } from "../../workspace/api";
+import { NumberTarget } from "./numberTarget";
 import { SheetViewer, type SheetHandle } from "./SheetViewer";
 
 const P = "p1";
@@ -384,6 +385,20 @@ describe("SheetViewer", () => {
     render(<SheetViewer projectId={P} view={sheet()} changes={[records]} />);
     expect(cellOf("1-1", "rate").querySelector("del")).toHaveTextContent("14");
     expect(cellOf("1-1", "rate").querySelector("ins")).toHaveTextContent("15");
+  });
+
+  it("hands a clicked number to the place that shows its source, when one is set (the tender's document)", async () => {
+    const user = userEvent.setup();
+    core({});
+    const asked = vi.fn();
+    render(
+      <NumberTarget.Provider value={asked}>
+        <SheetViewer projectId={P} view={sheet()} />
+      </NumberTarget.Provider>,
+    );
+    await user.click(cellOf("03/02", "rate"));
+    expect(asked).toHaveBeenCalledWith(expect.objectContaining({ cell: expect.objectContaining({ number_id: "n-rate" }) }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("the source popover shows the source and date, and the formula for an amount", async () => {

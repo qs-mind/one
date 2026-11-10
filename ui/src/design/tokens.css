@@ -15,6 +15,11 @@
 @source "../settings2";
 @source "../firstlaunch2";
 @source "../conversation";
+/* The kept engines the tender's viewers wrap (U5): their classes, with the old colour names read as tokens below. */
+@source "../{viewers,deliverables,sources,review,records}";
+@source "../workspace/{DocumentView.tsx,docs}";
+@source "../ui";
+@source "../chat/parts";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {
@@ -214,6 +219,13 @@
   --color-disabled: var(--disabled);
   --color-scrim: var(--scrim);
   --color-hold: var(--hold-fill);
+
+  /* The old colour names of the kept engines (U5), read as tokens. Copper is "now" only: the old copper reads as ink. */
+  --color-ink: var(--foreground);
+  --color-paper: var(--card);
+  --color-stone: var(--muted);
+  --color-slate: var(--muted-foreground);
+  --color-copper: var(--foreground);
 }
 
 /* A number, an amount, an item code: left to right, kept in one piece inside Arabic. */
@@ -233,4 +245,28 @@
   &[data-force~="hover"] {
     text-decoration-thickness: 2px;
   }
+}
+
+/* The kept sheet grid in the dense scope (U5; react-data-grid sits in its own layer, so these unlayered rules win):
+   rows divided by the row line only, no rule between columns, cells padded by --sheet-cell-px, the head row 15px
+   muted on a line; in a change review the rows with no change dim at once. Row heights: numberTarget.ts. */
+.dense .rdg-cell {
+  border-inline-end: none;
+  border-block-end-color: var(--row-line);
+  padding-inline: var(--sheet-cell-px);
+  font-variant-numeric: tabular-nums;
+}
+.dense .rdg-header-row {
+  background-color: var(--card);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+.dense .rdg-header-row > .rdg-cell {
+  background-color: var(--card);
+  border-block-end-color: var(--border);
+}
+.dense .sheet-review .review-dim > .rdg-cell {
+  opacity: 0.5;
+  color: var(--muted-foreground);
 }
