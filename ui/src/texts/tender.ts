@@ -9,6 +9,8 @@ export const tender = defineTexts({
   submission: { en: "Submission {date}", ar: "التسليم {date}" },
   noSubmission: { en: "No submission date yet", ar: "لسه مفيش تاريخ تسليم" },
   submissionPassed: { en: "The submission day has passed", ar: "يوم التسليم فات" },
+  submissionYours: { en: "The date you gave", ar: "التاريخ اللي إنت إديته" },
+  submissionUnsure: { en: "Read by OCR and not sure: check it", ar: "قراءة ضوئية مش أكيدة: راجعها" },
   confidential: { en: "Confidential", ar: "سرّي" },
   archived: { en: "This tender is archived. Nothing more can be sent here.", ar: "التندر ده متأرشف. مفيش حاجة تتبعت هنا تاني." },
   failed: { en: "That did not go through. Try again.", ar: "ماتمّش. جرّب تاني." },

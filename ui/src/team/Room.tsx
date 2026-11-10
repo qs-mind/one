@@ -8,10 +8,12 @@ import { paths } from "@/app/paths";
 import { Pill } from "@/design/Pill";
 import { SectionLabel } from "@/design/SectionLabel";
 import { Button } from "@/design/ui/button";
+import type { SourceLocator } from "@/project/types";
 import { common } from "@/texts/common";
 import { textDir } from "@/texts/language";
 import { team as texts } from "@/texts/team";
 import { useText } from "@/texts/useText";
+import { openSourceFile } from "@/workspace/reveal";
 import { MemberList } from "./MemberList";
 import { RoomComposer } from "./RoomComposer";
 import { RoomMessage } from "./RoomMessage";
@@ -105,8 +107,11 @@ export function Room({ projectId }: { projectId: string }) {
     if (el.scrollTop < NEAR && canOlder) older();
   };
 
+  // A source in a file opens that file as the document, at its place, as the tender's thread opens it.
   const openSource = (source: Source) => {
-    if (source.file_id) void navigate(paths.doc(projectId, source.file_id), { state: { source } });
+    if (!source.file_id) return;
+    openSourceFile(source.file_id, source.locator as SourceLocator, []);
+    void navigate(paths.doc(projectId, `file:${source.file_id}`));
   };
 
   const name = row?.name ?? "";

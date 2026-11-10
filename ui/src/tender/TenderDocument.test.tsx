@@ -1,9 +1,10 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { P2, server, startFakeCore } from "@/api/fakeCore";
+import { listening, P2, publish, server, startFakeCore } from "@/api/fakeCore";
+import { client } from "@/api/client";
 import { paths } from "@/app/paths";
 import type { DeliverableInfo, Explained, SheetView } from "@/deliverables/types";
 import { renderIn, resetPage, stubBrowser } from "@/design/test/harness";
@@ -103,6 +104,19 @@ describe("what opens beside the thread", () => {
     expect(screen.queryByText("Open a project or create one first")).toBeNull();
   });
 
+  it("lists a Deliverable the team writes while the tender is open, with no reload", async () => {
+    let held = [info];
+    server.use(http.get("*/api/projects/:id/deliverables", () => HttpResponse.json({ deliverables: held })));
+    open(paths.tender(P2));
+    const list = within(await screen.findByRole("region", { name: "Documents" }));
+    await list.findByRole("link", { name: info.title });
+    await waitFor(() => expect(listening(P2)).toBeGreaterThan(0));
+    const fresh = { ...info, id: "e".repeat(32), title: "تحليل الأسعار - عينة" } as DeliverableInfo;
+    held = [info, fresh];
+    act(() => publish(P2, { type: "deliverable", deliverable: fresh }));
+    expect(await list.findByRole("link", { name: fresh.title })).toHaveAttribute("href", paths.doc(P2, `deliverable:${fresh.id}`));
+  });
+
   it("opens a source of the thread as its file beside the thread", async () => {
     const router = open(paths.tender(P2));
     const finding = await waitFor(() => {
@@ -112,6 +126,32 @@ describe("what opens beside the thread", () => {
     });
     await userEvent.click(within(finding).getByRole("button", { name: /جدول الكميات - عينة/ }));
     expect(router.state.location.pathname).toBe(paths.doc(P2, "file:5a0000000000000000000000000000f3"));
+  });
+});
+
+describe("the submission date's source in the header", () => {
+  it("opens the file it was read from at its page, and marks an unsure OCR read", async () => {
+    const router = open(paths.tender(P2));
+    const header = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>("[data-place=tender] header");
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(header).toHaveTextContent(/Submission \W?16 November/);
+    expect(await within(header).findByText("Read by OCR and not sure: check it")).toBeInTheDocument();
+    await userEvent.click(within(header).getByRole("button", { name: /ملحق رقم 2 - عينة \(sample\)\W*, page \W?1/ }));
+    expect(router.state.location.pathname).toBe(paths.doc(P2, "file:5a0000000000000000000000000000f5"));
+  });
+
+  it("says when the date is the engineer's own, with nothing to open", async () => {
+    const { data } = await client.GET("/projects/{project_id}/tender", { params: { path: { project_id: P2 } } });
+    const mine = { kind: "engineer", title: "", locator: {}, dated: "2026-11-04" };
+    server.use(http.get("*/api/projects/:id/tender", () => HttpResponse.json({ ...data!, tender: { ...data!.tender, submission_source: mine } })));
+    open(paths.tender(P2));
+    const header = await screen.findByRole("heading", { level: 1 }).then((h) => h.closest("header")!);
+    expect(within(header).getByText("The date you gave")).toBeInTheDocument();
+    expect(within(header).queryByRole("button")).toBeNull();
+    expect(header).not.toHaveTextContent("OCR");
   });
 });
 

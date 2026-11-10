@@ -11,6 +11,7 @@ import { DIRS, renderIn, resetPage, stubBrowser } from "@/design/test/harness";
 import { common } from "@/texts/common";
 import { team } from "@/texts/team";
 import { text } from "@/texts/useText";
+import { workspaceApi } from "@/workspace/api";
 import { Room } from "./Room";
 
 startFakeCore();
@@ -61,7 +62,9 @@ describe.each(DIRS)("Room (%s)", (dir) => {
     expect(words).toHaveAttribute("dir", "rtl");
     const link = within(first).getByRole("button", { name: /3\/02/ });
     await userEvent.click(link);
-    expect(router.state.location.pathname).toBe(paths.doc(P2, id("f3")));
+    // the file as the document beside the room, opened at the source's place, as the tender's thread opens it
+    expect(router.state.location.pathname).toBe(paths.doc(P2, `file:${id("f3")}`));
+    expect(workspaceApi.current()?.key).toBe(`file:${id("f3")}`);
   });
 
   it("marks what the Lead raised to the engineer: waiting with the way to answer, or answered", async () => {

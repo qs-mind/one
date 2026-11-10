@@ -5,6 +5,7 @@
 // (its rows as high as the dense scope's --sheet-row-h), and a number clicked in it shows its source in a panel under it.
 import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { subscribeActivity } from "@/activity";
 import { paths } from "@/app/paths";
 import { httpSources } from "@/project/sources";
 import type { DocKey, ProjectSources } from "@/project/types";
@@ -27,22 +28,30 @@ export function docKeyOf(docId: string): DocKey | null {
 
 export type KeptDocuments = { sources: ProjectSources; docs: Documents | null };
 
-/** The tender's documents, read once per tender once the core has opened it (`open`): the sources the engines read
- * through, and the lists they name. */
+/** The tender's documents once the core has opened it (`open`): the sources the engines read through, and the lists
+ * they name, read again when a Deliverable or a file is written or changed and after the stream comes back. */
 export function useKeptDocuments(projectId: string, open: boolean): KeptDocuments {
   const sources = useMemo(() => httpSources(projectId), [projectId]);
   const [docs, setDocs] = useState<Documents | null>(null);
   useEffect(() => {
     let live = true;
+    let round = 0;
     setDocs(null);
     if (!open) return;
-    void Promise.all([sources.deliverables().catch(() => null), sources.files().catch(() => null)]).then(([deliverables, files]) => {
-      if (live) setDocs({ deliverables: deliverables ?? [], files: files ?? [], clientBoqs: [], desks: [], ...(files ? {} : { filesFailed: true }) });
-    });
+    const load = () => {
+      const mine = ++round; // only the latest read lands
+      void Promise.all([sources.deliverables().catch(() => null), sources.files().catch(() => null)]).then(([deliverables, files]) => {
+        if (live && mine === round)
+          setDocs({ deliverables: deliverables ?? [], files: files ?? [], clientBoqs: [], desks: [], ...(files ? {} : { filesFailed: true }) });
+      });
+    };
+    const stop = subscribeActivity(projectId, (event) => (event.type === "deliverable" || event.type === "file") && load(), load);
+    load();
     return () => {
       live = false;
+      stop();
     };
-  }, [sources, open]);
+  }, [projectId, sources, open]);
   return { sources, docs };
 }
 
