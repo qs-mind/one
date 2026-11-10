@@ -2,6 +2,7 @@
 // under it, and the message box. In the document view the same column is the narrow thread beside the document.
 import { useRef } from "react";
 import type { Schemas } from "@/api/client";
+import type { Source } from "@/conversation/parts";
 import { Composer } from "@/conversation/Composer";
 import { Thread } from "@/conversation/Thread";
 import { notify } from "@/design/notify";
@@ -18,11 +19,12 @@ type TenderThreadProps = {
   thread: ReturnType<typeof useThread>;
   /** The narrow thread beside a document: the Lead's name above it, as Document.dc.html draws. */
   narrow?: boolean;
+  onOpenSource: (source: Source) => void;
 };
 
 const LEAD = "lead-qs";
 
-export function TenderThread({ data, actions, thread, narrow = false }: TenderThreadProps) {
+export function TenderThread({ data, actions, thread, narrow = false, onOpenSource }: TenderThreadProps) {
   const t = useText();
   const box = useRef<HTMLDivElement>(null);
   const row = data.view?.tender;
@@ -44,7 +46,8 @@ export function TenderThread({ data, actions, thread, narrow = false }: TenderTh
           <bdi dir={textDir(leadName)}>{leadName}</bdi>
         </h2>
       )}
-      <div className="min-h-0 flex-1">
+      {/* a choice button wraps its words rather than run past a narrow card (the shared Button does not shrink) */}
+      <div className="min-h-0 flex-1 [&_[data-decision]_button]:shrink">
         <Thread
           messages={thread.messages}
           leadName={leadName}
@@ -54,6 +57,7 @@ export function TenderThread({ data, actions, thread, narrow = false }: TenderTh
           onDiscussPlan={discuss}
           onPlanChange={(changeId, accept) => void said(actions.answerChange(changeId, accept))}
           onDecide={(findingId, choice) => void said(actions.decide(findingId, choice))}
+          onOpenSource={onOpenSource}
         />
       </div>
       {data.plan === null && !archived && (

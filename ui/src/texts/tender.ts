@@ -28,6 +28,7 @@ export const tender = defineTexts({
   working: { en: "Working", ar: "شغّال" },
   waiting: { en: "Waiting", ar: "مستني" },
   idle: { en: "Nothing to do now", ar: "مفيش شغل دلوقتي" },
+  documentsTitle: { en: "Documents", ar: "المستندات" },
   memberFailed: { en: "Its last work did not finish", ar: "آخر شغل ليه ماخلصش" },
 
   // No plan yet

@@ -246,3 +246,27 @@
     text-decoration-thickness: 2px;
   }
 }
+
+/* The kept sheet grid in the dense scope (U5; react-data-grid sits in its own layer, so these unlayered rules win):
+   rows divided by the row line only, no rule between columns, cells padded by --sheet-cell-px, the head row 15px
+   muted on a line; in a change review the rows with no change dim at once. Row heights: numberTarget.ts. */
+.dense .rdg-cell {
+  border-inline-end: none;
+  border-block-end-color: var(--row-line);
+  padding-inline: var(--sheet-cell-px);
+  font-variant-numeric: tabular-nums;
+}
+.dense .rdg-header-row {
+  background-color: var(--card);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+.dense .rdg-header-row > .rdg-cell {
+  background-color: var(--card);
+  border-block-end-color: var(--border);
+}
+.dense .sheet-review .review-dim > .rdg-cell {
+  opacity: 0.5;
+  color: var(--muted-foreground);
+}

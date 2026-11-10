@@ -5,8 +5,10 @@
 // the four addresses.
 import { useSyncExternalStore } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
-import { useLocation, useParams, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Schemas } from "@/api/client";
+import { paths } from "@/app/paths";
+import type { Source } from "@/conversation/parts";
 import { MetaLine } from "@/design/MetaLine";
 import { Pill } from "@/design/Pill";
 import { common } from "@/texts/common";
@@ -14,11 +16,14 @@ import { formatDate } from "@/texts/format";
 import { textDir } from "@/texts/language";
 import { tender as texts } from "@/texts/tender";
 import { type Translate, useText } from "@/texts/useText";
+import type { SourceLocator } from "@/project/types";
+import { openSourceFile } from "@/workspace/reveal";
 import { DocumentHost, FULL, type Opened } from "./DocumentHost";
 import { SideColumn } from "./SideColumn";
 import { TenderThread } from "./TenderThread";
 import { useTender } from "./useTender";
 import { useThread } from "./useThread";
+import { useKeptDocuments } from "./viewers/KeptDocument";
 
 export type TenderView = "conversation" | "doc" | "room" | "member";
 
@@ -76,11 +81,20 @@ export function Tender() {
   const wide = useWide();
   const { brief, actions, ...data } = useTender(id);
   const thread = useThread(id, brief);
+  const kept = useKeptDocuments(id, data.open);
+  const navigate = useNavigate();
   const row = data.view?.tender;
+
+  // A source in the thread opens its file beside it, at its place (only a source in a file has one to open).
+  const openSource = (source: Source) => {
+    if (!source.file_id) return;
+    openSourceFile(source.file_id, source.locator as SourceLocator, []);
+    navigate(paths.doc(id, `file:${source.file_id}`));
+  };
 
   const opened: Opened | null =
     view === "doc" && docId ? { kind: "doc", docId } : view === "room" ? { kind: "room" } : view === "member" && memberId ? { kind: "member", memberId } : null;
-  const conversation = <TenderThread data={data} actions={actions} thread={thread} narrow={opened !== null} />;
+  const conversation = <TenderThread data={data} actions={actions} thread={thread} narrow={opened !== null} onOpenSource={openSource} />;
 
   let body;
   if (!row)
@@ -90,7 +104,7 @@ export function Tender() {
       </p>
     );
   else if (opened) {
-    const host = <DocumentHost projectId={id} opened={opened} members={data.members} sample={row.sample} />;
+    const host = <DocumentHost projectId={id} opened={opened} members={data.members} sample={row.sample} kept={kept} />;
     body = full ? (
       host
     ) : (
@@ -116,7 +130,7 @@ export function Tender() {
           </div>
           <div className="mx-auto min-h-0 w-full max-w-190 flex-1">{conversation}</div>
         </div>
-        <SideColumn projectId={id} waiting={data.view?.waiting ?? []} plan={data.plan} members={data.members} onReveal={reveal} />
+        <SideColumn projectId={id} waiting={data.view?.waiting ?? []} plan={data.plan} members={data.members} docs={kept.docs} onReveal={reveal} />
       </div>
     );
 

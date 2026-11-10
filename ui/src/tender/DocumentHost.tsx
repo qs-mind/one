@@ -13,7 +13,7 @@ import { common } from "@/texts/common";
 import { textDir } from "@/texts/language";
 import { tender as texts } from "@/texts/tender";
 import { useText } from "@/texts/useText";
-import { docKeyOf, KeptDocument, keptTitle, useKeptDocuments } from "./viewers/KeptDocument";
+import { docKeyOf, KeptDocument, type KeptDocuments, keptTitle } from "./viewers/KeptDocument";
 
 export type Opened = { kind: "doc"; docId: string } | { kind: "room" } | { kind: "member"; memberId: string };
 
@@ -25,14 +25,14 @@ type DocumentHostProps = {
   opened: Opened;
   members: readonly Schemas["TeamMember"][];
   sample: boolean;
+  kept: KeptDocuments;
 };
 
-export function DocumentHost({ projectId, opened, members, sample }: DocumentHostProps) {
+export function DocumentHost({ projectId, opened, members, sample, kept }: DocumentHostProps) {
   const t = useText();
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const full = search.has(FULL);
-  const kept = useKeptDocuments(projectId);
   const docKey = opened.kind === "doc" ? docKeyOf(opened.docId) : null;
 
   let title: string;

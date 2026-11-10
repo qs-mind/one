@@ -7,27 +7,47 @@ import { P1, P2, P3, publish, server, startFakeCore } from "@/api/fakeCore";
 import { client } from "@/api/client";
 import { paths } from "@/app/paths";
 import { DIRS, renderIn, resetPage, stubBrowser } from "@/design/test/harness";
+import { currentProject, setCurrentProject } from "@/records/project";
 import { Tender } from "./Tender";
 
 startFakeCore();
 
-// Today's routes the place reads beside the contract's: the stored conversation and the tender's documents.
+// Today's routes the place reads beside the contract's: opening the tender, the stored conversation and the tender's
+// documents. A call nothing answers fails the test, so nothing reaches the network.
 let requested: string[];
+let opened: string[];
+let unhandled: string[];
+server.events.on("request:unhandled", ({ request }) => unhandled.push(`${request.method} ${new URL(request.url).pathname}`));
 beforeEach(() => {
   stubBrowser();
   requested = [];
+  opened = [];
+  unhandled = [];
   server.use(
+    http.post("*/api/projects/:id/open", ({ params }) => {
+      opened.push(String(params.id));
+      return HttpResponse.json({ id: params.id, name: "مجمع مدارس - عينة", created_at: "2026-11-01T09:00:00Z", open: true });
+    }),
     http.get("*/api/chat/:id/messages", () => HttpResponse.json({ messages: [] })),
     http.get("*/api/chat/:id/stream", () => new HttpResponse(null, { status: 204 })),
     http.get("*/api/projects/:id/deliverables", () => HttpResponse.json({ deliverables: [] })),
     http.get("*/api/projects/:id/files", () => HttpResponse.json({ files: [] })),
+    http.get("*/api/projects/:id/map", () =>
+      HttpResponse.json({ status: { waiting: 0, reading: 0, total: 0, line: { en: "", ar: "" } }, groups: [], files: [], next_cursor: null }),
+    ),
+    http.get("*/api/projects/:id/map/facts", () => HttpResponse.json({ facts: [], next_cursor: null })),
+    http.get("*/api/projects/:id/map/links", () => HttpResponse.json({ links: [], next_cursor: null })),
     http.post("*/api/projects/:id/plan/request", ({ request }) => {
       requested.push(new URL(request.url).pathname);
       return HttpResponse.json({ brief_id: "5a" + "b".repeat(30) }, { status: 202 });
     }),
   );
 });
-afterEach(resetPage);
+afterEach(() => {
+  resetPage();
+  setCurrentProject(undefined);
+  expect(unhandled).toEqual([]);
+});
 
 const ROUTES = ["/tender/:id", "/tender/:id/doc/:docId", "/tender/:id/room", "/tender/:id/member/:memberId"];
 
@@ -63,6 +83,24 @@ describe.each(DIRS)("the tender place (%s)", (dir) => {
     expect(await screen.findByText(dir === "rtl" ? "الـ Lead QS بيكتب الخطة" : "The Lead QS is writing the plan")).toBeTruthy();
     expect(requested).toEqual([`/api/projects/${P3}/plan/request`]);
     expect(screen.queryByRole("button", { name: /Ask the Lead QS|اطلب من/ })).toBeNull();
+  });
+});
+
+describe("opening the tender", () => {
+  it("opens it in the core before it reads it, and makes it the current project", async () => {
+    open(paths.tender(P1));
+    await side();
+    expect(opened).toEqual([P1]);
+    expect(currentProject()?.id).toBe(P1);
+  });
+
+  it("says the core's words when the tender does not open, and reads nothing of it", async () => {
+    const words = { en: "This tender's records could not be opened (sample).", ar: "سجلات التندر ده ماتفتحتش - عينة" };
+    server.use(http.post("*/api/projects/:id/open", () => HttpResponse.json({ error: words }, { status: 409 })));
+    open(paths.tender(P2));
+    expect(await screen.findByRole("alert")).toHaveTextContent(words.en);
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(currentProject()).toBeUndefined();
   });
 });
 

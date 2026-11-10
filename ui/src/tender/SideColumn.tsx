@@ -1,5 +1,5 @@
-// The tender's side column (Main.dc.html's aside, specimen 1): what waits for the engineer, the plan's stages and the
-// team now, 40 apart. Beside the thread at desktop widths; under it, full width, below 900px. The waiting items are
+// The tender's side column (Main.dc.html's aside, specimen 1): what waits for the engineer, the plan's stages, the
+// team now and the documents to open, 40 apart. Beside the thread at desktop widths; under it, full width, below 900px. The waiting items are
 // Stone panels with no copper (they sit under their own label); one opens its place in the thread.
 import type { Schemas } from "@/api/client";
 import { ListRow } from "@/design/ListRow";
@@ -7,6 +7,8 @@ import { SectionLabel } from "@/design/SectionLabel";
 import { textDir } from "@/texts/language";
 import { tender as texts } from "@/texts/tender";
 import { useText } from "@/texts/useText";
+import type { Documents } from "@/workspace/documents";
+import { DocumentsList } from "./DocumentsList";
 import { Stages } from "./Stages";
 import { TeamNow } from "./TeamNow";
 
@@ -15,6 +17,7 @@ type SideColumnProps = {
   waiting: readonly Schemas["WaitingItem"][];
   plan: Schemas["TenderPlan"] | null | undefined;
   members: readonly Schemas["TeamMember"][];
+  docs: Documents | null;
   onReveal: (item: Schemas["WaitingItem"]) => void;
 };
 
@@ -47,7 +50,7 @@ function Waiting({ items, onReveal }: { items: SideColumnProps["waiting"]; onRev
   );
 }
 
-export function SideColumn({ projectId, waiting, plan, members, onReveal }: SideColumnProps) {
+export function SideColumn({ projectId, waiting, plan, members, docs, onReveal }: SideColumnProps) {
   const t = useText();
   return (
     <aside
@@ -57,6 +60,7 @@ export function SideColumn({ projectId, waiting, plan, members, onReveal }: Side
       <Waiting items={waiting} onReveal={onReveal} />
       {plan && plan.stages.length > 0 && <Stages stages={plan.stages} />}
       <TeamNow projectId={projectId} members={members} open={null} />
+      <DocumentsList projectId={projectId} docs={docs} />
     </aside>
   );
 }

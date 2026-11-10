@@ -16,7 +16,7 @@ import { Grid, type GridHandle, type SheetColumn } from "./grid";
 import { useSizes } from "../../ui/scale";
 import { COMPACT_PAD, linesHeight, makeMeasure, oneLineWidth, rowHeight, shownWidth, titleColumnOf } from "./heights";
 import { normalised, type Cell, type Range } from "./selection";
-import { NumberTarget } from "./numberTarget";
+import { DenseRowHeight, NumberTarget } from "./numberTarget";
 import { SourcePopover } from "./SourcePopover";
 import { hideSourceLine, showSourceLine } from "../../sources/line";
 import { sourceKeys } from "../../sources/targets";
@@ -96,7 +96,8 @@ export function SheetViewer(props: SheetViewerProps) {
   const full = props.mode === "full" || props.mode === "workspace";
   // the open document is denser: 32 px one-line rows under a 36 px header, so more of the bill shows
   const dense = props.mode === "workspace";
-  const pad = dense ? COMPACT_PAD : undefined;
+  const denseRow = useContext(DenseRowHeight);
+  const pad = dense ? (denseRow === null ? COMPACT_PAD : denseRow - linesHeight(1, 0)) : undefined;
   // every px here is at 100 %, drawn at the screen's scale (ui/scale.ts), so the rows line up with their cells
   const sizes = useSizes();
   const { space, text: textSize } = sizes;

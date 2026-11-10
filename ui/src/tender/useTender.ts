@@ -1,10 +1,12 @@
 // What the tender place shows, from its routes and its live events (contract, section 0): the header and what waits
-// (GET .../tender), the plan, the Findings and the team. It listens first, then reads, and reads again after the
-// stream comes back; an event that carries the whole thing replaces it, a plan event also reloads the team.
+// (GET .../tender), the plan, the Findings and the team. It listens first, opens the tender in the core
+// (openTender.ts), then reads, and does both again after the stream comes back; an event that carries the whole thing
+// replaces it, a plan event also reloads the team.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribeTender } from "@/activity";
 import { client, type Schemas, type TenderActivity } from "@/api/client";
 import { tender as texts } from "@/texts/tender";
+import { openTender } from "./openTender";
 
 export type TenderData = {
   /** null until read. */
@@ -15,9 +17,11 @@ export type TenderData = {
   plan: Schemas["TenderPlan"] | null | undefined;
   findings: Schemas["Finding"][];
   members: Schemas["TeamMember"][];
+  /** The core opened the tender: what reads its records (the documents) may start. */
+  open: boolean;
 };
 
-const EMPTY: TenderData = { view: null, refused: null, plan: undefined, findings: [], members: [] };
+const EMPTY: TenderData = { view: null, refused: null, plan: undefined, findings: [], members: [], open: false };
 /** The core's words in a refusal; a body with none (a malformed request, a bug) reads as "it did not go through". */
 const wordsOf = (error: unknown): Schemas["Text"] =>
   typeof error === "object" && error !== null && "error" in error ? (error as Schemas["Refusal"]).error : texts.failed;
@@ -40,6 +44,9 @@ export function useTender(projectId: string) {
   }, [projectId, put]);
 
   const read = useCallback(async () => {
+    const refused = await openTender(projectId, () => shown.current === projectId);
+    if (refused) return put((d) => (d.view ? d : { ...d, refused }));
+    put((d) => (d.open ? d : { ...d, open: true }));
     const path = { params: { path: { project_id: projectId } } };
     const [tender, plan, findings] = await Promise.all([
       client.GET("/projects/{project_id}/tender", path).catch(() => ({ data: undefined, error: undefined })),

@@ -100,7 +100,9 @@ const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/firstla
   "@/tender/", "@/team/", "@/app/paths", "@/api",
   // the kept engines the tender's viewers wrap (U5): the sheet, document and PDF viewers, and what they read
   "@/viewers/", "@/deliverables/", "@/workspace/DocumentView", "@/workspace/documents", "@/workspace/api", "@/workspace/reveal",
-  "@/project/", "@/i18n"];
+  "@/project/", "@/i18n",
+  // the kept current project, which the tender place sets when it opens the tender in the core (U5)
+  "@/records/project"];
 
 function normalise(path: string): string {
   const out: string[] = [];
