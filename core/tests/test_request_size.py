@@ -27,7 +27,8 @@ from tests.samples import sample_boq_xlsx, sample_pdf
 pytestmark = pytest.mark.anyio
 
 STEP_TARGET = 13_500  # 7 Nov: the last two steps' reads stay whole (retest 10); 10 Nov: +500 for
-# the Lead's kit and the plan and findings groups in open_tools (13,064 measured)
+# the Lead's kit and the plan and findings groups in open_tools (13,064 measured); C11's Lead
+# instructions (443 words): 13,406 measured
 BRIEF_TARGET = 60_000
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 
