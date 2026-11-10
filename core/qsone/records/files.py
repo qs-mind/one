@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from qsone import copy
-from qsone.records import audit, hidden, search
+from qsone.records import audit, hidden, search, unread
 from qsone.records.arabic import NORMALISER_VERSION, display_text
 from qsone.records.extract import EXTRACTOR_VERSION, Piece, chunk, extract
 from qsone.records.hidden import Flag
@@ -173,6 +173,8 @@ def add_file(
         map_store.enqueue(conn, rec, file_id, extracted.kind, extracted.pages, actor=actor)
         if extracted.kind == "pdf":
             _extraction_meta(rec, conn, file_id, extracted)
+        if extracted.unread:
+            unread.store(rec, conn, file_id, extracted.unread)
         indexed = []
         for seq, piece in enumerate(chunks):
             cur = conn.execute(

@@ -168,27 +168,23 @@ def test_ifc_magic_and_damage():
     assert (x.kind, x.status) == ("ifc", "read")  # a broken escape is decoded leniently
 
 
-def test_damaged_binary_dxf_and_dwg_have_a_plain_note():
+def test_damaged_binary_dxf_and_dwg_are_unreadable_and_say_why():
+    # nothing of either was read: «partly read» would not be true
     x = extract("مسقط - عينة.dxf", b"AutoCAD Binary DXF\r\n\x1a\x00" + b"\x00" * 20)
-    assert (x.kind, x.status, x.note, x.pieces) == (
-        "dxf",
-        "partly_read",
-        "FILE_DRAWINGS_REPAIRED",
-        [],
-    )
+    assert (x.kind, x.status, x.note, x.pieces) == ("dxf", "unreadable", "FILE_DRAWING_DAMAGED", [])
     x = extract("مسقط - عينة.dwg", b"AC1032" + b"\x00" * 20)
-    assert (x.kind, x.status, x.note, x.pieces) == (
-        "dwg",
-        "partly_read",
-        "FILE_DRAWINGS_REPAIRED",
-        [],
-    )
+    assert (x.kind, x.status, x.note, x.pieces) == ("dwg", "unreadable", "FILE_DRAWING_DAMAGED", [])
 
 
 def test_old_word_is_stored_with_a_plain_note(monkeypatch):
+    from tests.doc_writer import word_doc
+
     monkeypatch.setattr("qsone.records.office.find_soffice", lambda: None)
+    word95 = word_doc([("p", "sample")], ident=0xA5DC, nfib=0x0065)
+    x = extract("مواصفات - عينة.doc", word95)
+    assert (x.kind, x.status, x.note, x.pieces) == ("doc", "stored", "FILE_OLD_WORD", [])
     x = extract("مواصفات - عينة.doc", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 20)
-    assert (x.kind, x.status, x.note, x.pieces) == ("doc", "stored", "FILE_LIBREOFFICE_MISSING", [])
+    assert (x.kind, x.status, x.note) == ("doc", "unreadable", "FILE_UNREADABLE")
 
 
 def test_image_is_stored_and_read_later():

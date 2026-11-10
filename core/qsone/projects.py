@@ -28,7 +28,7 @@ from starlette.concurrency import run_in_threadpool
 from qsone import activity, copy, settings
 from qsone.backup import keys as backup_keys
 from qsone.meaning.service import Meaning, ModelFailed
-from qsone.records import audit, files, office, report, search, unzip, vault
+from qsone.records import audit, files, office, report, search, unread, unzip, vault
 from qsone.records.project import FILE_NAME, Records, RecordsError
 
 if TYPE_CHECKING:
@@ -318,19 +318,21 @@ class RenameIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
-def _file(info: files.FileInfo) -> dict:
+def _file(info: files.FileInfo, rec: Records) -> dict:
     """FileInfo as JSON, its note turned from a `copy` name into its {en, ar} pair; `note_key`
     keeps the name (the import report names a locked or an empty file by it); `flag_kinds` the
-    kinds of its hidden-text flags (the screen tells hidden rows from orders to an AI)."""
+    kinds of its hidden-text flags (the screen tells hidden rows from orders to an AI);
+    `unread` the parts of it ONE did not read, each with why."""
     note = getattr(copy, info.note) if info.note else None
     kinds = info.flag_kinds.split(",") if info.flag_kinds else []
-    return asdict(info) | {"note": note, "note_key": info.note, "flag_kinds": kinds}
+    found = asdict(info) | {"note": note, "note_key": info.note, "flag_kinds": kinds}
+    return found | {"unread": unread.of(rec, info)}
 
 
-def _answer(info: files.FileInfo, dropped: str) -> dict:
+def _answer(info: files.FileInfo, dropped: str, rec: Records) -> dict:
     """`_file`, and for bytes already here, `same_as`: the line said after the name dropped
     («same.xlsx» is the same file as «<the one kept>»; kept once)."""
-    found = _file(info)
+    found = _file(info, rec)
     if info.duplicate:
         name = re.split(r"[/\\]", dropped)[-1][:255]
         found["dropped_as"] = name
@@ -355,8 +357,8 @@ def add_upload(rec: Records, name: str, data: bytes, *, folder: str | None) -> t
     note. Each added file reaches the canvas live. Raises what `files.add_file` raises."""
     if not unzip.is_zip(name, data):
         info = files.add_file(rec, name, data, actor=ACTOR, folder=folder)
-        found = _answer(info, name)
-        activity.publish(rec.id, {"type": "file", "file": _file(info)})  # the canvas, live
+        found = _answer(info, name, rec)
+        activity.publish(rec.id, {"type": "file", "file": _file(info, rec)})  # the canvas, live
         return found, 200 if info.duplicate else 201
     added: list[dict] = []
     skipped: list[dict] = []
@@ -374,17 +376,17 @@ def add_upload(rec: Records, name: str, data: bytes, *, folder: str | None) -> t
                     raise
                 skipped.append({"name": member, "folder": where, "error": e.text})
                 continue
-            added.append(_answer(info, member))
-            activity.publish(rec.id, {"type": "file", "file": _file(info)})
+            added.append(_answer(info, member, rec))
+            activity.publish(rec.id, {"type": "file", "file": _file(info, rec)})
     except RecordsError as refused:  # kept as it came, not opened
         if refused.text not in (copy.ZIP_TOO_BIG, copy.ZIP_UNSAFE):
             raise  # e.g. an archived project
         note = _zip_note(refused.text)
         kept = files.add_file(rec, name, data, actor=ACTOR, folder=folder, note=note)
-        activity.publish(rec.id, {"type": "file", "file": _file(kept)})
+        activity.publish(rec.id, {"type": "file", "file": _file(kept, rec)})
         if not added:
-            return _file(kept), 200 if kept.duplicate else 201
-        added.append(_file(kept))
+            return _file(kept, rec), 200 if kept.duplicate else 201
+        added.append(_file(kept, rec))
     with rec.write(ACTOR) as conn:  # counts only, for Usage Stats' `zips`
         audit.record(
             conn,
@@ -473,7 +475,7 @@ def router(
     @r.get("/projects/{project_id}/files")
     def list_files(project_id: str, include_old: bool = False) -> dict:
         rec = projects.get(project_id)
-        return {"files": [_file(f) for f in files.list_files(rec, include_old=include_old)]}
+        return {"files": [_file(f, rec) for f in files.list_files(rec, include_old=include_old)]}
 
     @r.get("/projects/{project_id}/files/{file_id}/flags")
     def list_flags(project_id: str, file_id: str) -> dict:

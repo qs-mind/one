@@ -215,7 +215,12 @@ def test_a_scripted_lead_reads_a_file_then_asks_the_engineer(serve_app):
             before, after = answer_the_question(client, url, r.iter_lines())
     progress = [c["data"]["text"] for c in before if c["type"] == "data-progress"]
     assert (
-        copy.fill(copy.DOING_FILES_READ_PAGE, name=copy.file_name("مواصفات - عينة.pdf"), page="1")
+        copy.fill(
+            copy.DOING_FILES_READ_PAGE_OF,
+            name=copy.file_name("مواصفات - عينة.pdf"),
+            page="1",
+            total="2",
+        )
         in progress
     )
     all_chunks = before + after

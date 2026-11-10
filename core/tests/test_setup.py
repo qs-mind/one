@@ -282,7 +282,8 @@ def test_the_app_default_finds_parts_in_its_data_folder(data_dir):
 @pytest.mark.skipif(os.name == "nt", reason="the stand-in helper is a shell script")
 def test_the_dwg_helper_is_checked_by_its_version_answer(tmp_path, monkeypatch):
     script = tmp_path / "qsone-drawings"
-    script.write_text("#!/bin/sh\necho qsone-drawings 0.1.0\n", encoding="utf-8")
+    answer = '{"reader":"qsone-drawings","version":"0.1.0"}'
+    script.write_text(f"#!/bin/sh\necho '{answer}'\n", encoding="utf-8")
     script.chmod(0o755)
     monkeypatch.setattr(runner, "find_binary", lambda: script)
     assert runner.answering_helper() == script

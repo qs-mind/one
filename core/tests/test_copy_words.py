@@ -45,6 +45,11 @@ def test_one_page_is_said_as_one_page_and_a_file_without_pages_by_its_name():
     assert _doing(name, pages=[1, 2, 3])["ar"] == f"يقرا {name}، صفحات 1-3"
     assert _doing(name)["ar"] == f"يقرا {name}"
     assert "صفحات 1" not in _doing(name)["ar"]
+    assert _doing(name, pages=[12], of=64) == {
+        "en": f"Read {name}, page 12 of 64",
+        "ar": f"يقرا {name}، صفحة 12 من 64",
+    }
+    assert _doing(name, pages=[1, 2], of=64)["ar"] == f"يقرا {name}، صفحات 1-2 من 64"
     rows = _doing(name, sheet="BOQ", rows="1-200")
     assert rows == {
         "en": f"Read {name}, sheet BOQ, rows 1-200",

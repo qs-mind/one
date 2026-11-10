@@ -98,9 +98,10 @@ def render(
     notes: Sequence[str] = (),
     defaults_used: dict | None = None,
     more: str | None = None,
+    last: Sequence[str] = (),
 ) -> str:
-    """The result text: `text`, then each part given, at most `LIMIT` bytes in all. Raises
-    `TypeError` for a float (or anything but plain data) in `data`."""
+    """The result text: `text`, then each part given, `last` at the very end, at most `LIMIT`
+    bytes in all. Raises `TypeError` for a float (or anything but plain data) in `data`."""
     tail = []
     if data is not None:
         tail.append(f"data: {_json(data)}")
@@ -114,6 +115,7 @@ def render(
         tail += ["sources:", *(source_line(s) for s in sources)]
     if more:
         tail.append(f"more: {more}")
+    tail += [_one_line(n) for n in last]
     end = "\n".join(tail)
     room = LIMIT - len(end.encode()) - 1
     body = text.rstrip("\n")

@@ -15,6 +15,7 @@ the app starts; the core answers meanwhile. Each part is, as the contract says:
 counts only."""
 
 import importlib.util
+import json
 import logging
 import subprocess
 import threading
@@ -87,9 +88,13 @@ def answering_helper() -> Path | None:
     except (OSError, subprocess.SubprocessError) as error:
         log.warning("dwg-reader: no answer (%s)", type(error).__name__)
         return None
-    return (
-        binary if answer.returncode == 0 and answer.stdout.startswith(b"qsone-drawings") else None
-    )
+    if answer.returncode != 0:
+        return None
+    try:
+        reader = json.loads(answer.stdout).get("reader")
+    except (ValueError, AttributeError):
+        return None
+    return binary if reader == "qsone-drawings" else None
 
 
 def _chain(error: BaseException) -> list[BaseException]:

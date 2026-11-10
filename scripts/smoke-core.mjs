@@ -19,7 +19,7 @@ import { root } from "./python.mjs";
 // of the engineer's own Engineer Records. scripts/keystore-isolation.test.mjs checks every script that starts a core.
 export const ISOLATED_KEYS = { PYTHON_KEYRING_BACKEND: "keyring.backends.fail.Keyring" };
 
-const NATIVE = ["sqlcipher", "sqlite_vec", "pdfium", "tokenizers", "wasmtime", "typst", "keyring_backend", "cryptography"];
+const NATIVE = ["sqlcipher", "sqlite_vec", "pdfium", "tokenizers", "wasmtime", "typst", "keyring_backend", "cryptography", "drawings"];
 
 function freePort() {
   return new Promise((resolve, reject) => {

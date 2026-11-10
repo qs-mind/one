@@ -61,4 +61,24 @@ def native() -> dict:
         "typst": version("typst"),
         "keyring_backend": f"{type(backend).__module__}.{type(backend).__name__}",
         "cryptography": cryptography.__version__,
+        "drawings": _drawings(),
     }
+
+
+def _drawings() -> str | None:
+    """The drawing reader's version and library («0.1.0 acadrust 0.6.8»), from `--version`;
+    None when it is missing or does not answer."""
+    import json
+    import subprocess
+
+    from qsone.records.drawings import find_binary
+
+    binary = find_binary()
+    if binary is None:
+        return None
+    try:
+        run = subprocess.run([str(binary), "--version"], capture_output=True, timeout=10)
+        found = json.loads(run.stdout)
+        return f"{found['version']} {found['library']}"
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+        return None

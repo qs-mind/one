@@ -11,7 +11,7 @@ from qsone.app import create_app
 from qsone.records import report
 from qsone.records.files import add_file
 from tests.conftest import AUTH, SECRET
-from tests.samples import sample_pdf, sample_xlsx
+from tests.samples import sample_dxf, sample_pdf, sample_xlsx
 
 HEADER = ["البند", "الوصف", "الوحدة", "الكمية", "الفئة", "القيمة"]
 BOQ_ROWS = [
@@ -54,11 +54,13 @@ def test_a_drop_is_reported_from_the_records(rec):
 
 def test_what_could_not_be_read_is_said_and_drawings_need_no_text(rec):
     locked = add_file(rec, "عرض سعر - عينة.xlsx", b"PK\x03\x04 not a zip", actor="engineer")
-    dwg = add_file(rec, "لوحات - عينة.dwg", b"AC1032 sample", actor="engineer")
-    found = report.make(rec, [locked.id, dwg.id])
+    damaged = add_file(rec, "لوحات - عينة.dwg", b"AC1032 sample", actor="engineer")
+    dxf = add_file(rec, "لوحات - عينة.dxf", sample_dxf({"0": []}), actor="engineer")
+    found = report.make(rec, [locked.id, damaged.id, dxf.id])
     lines = [line["en"] for line in found["lines"]]
     assert lines[1].endswith(getattr(copy, locked.note or "FILE_UNREADABLE")["en"])
-    assert lines[2].endswith(": Drawings.")
+    assert lines[2].endswith(copy.FILE_DRAWING_DAMAGED["en"])  # nothing of it was read
+    assert lines[3].endswith(": Drawings.")
     assert "Drawings" not in lines[-1] and lines[-1].startswith("Not among")
 
 

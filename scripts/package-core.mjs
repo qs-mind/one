@@ -123,6 +123,8 @@ const each = (dir, test, act) => existsSync(dir) && readdirSync(dir).filter(test
 export function trim(dir, target) {
   const { win, lib, site } = layout(dir, target);
   each(site, (n) => n === "pip" || /^pip-.*\.dist-info$/.test(n), remove);
+  // olefile's Python 2 copies and its HTML and Markdown docs; its licence stays
+  each(path.join(site, "olefile"), (n) => /^(olefile2\.py|OleFileIO_PL\.py|doc)$|\.html$/.test(n), remove);
   for (const name of ["ensurepip", "idlelib", "tkinter", "test"]) remove(path.join(lib, name));
   remove(path.join(dir, "include"));
   if (win) {

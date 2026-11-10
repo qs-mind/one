@@ -10,7 +10,7 @@ import pdf_inspector
 from pypdfium2 import PdfiumError
 
 from qsone import copy
-from qsone.records import boq, files, ocr
+from qsone.records import boq, files, ocr, unread
 from qsone.records.mapping import facts, links, store
 
 log = logging.getLogger(__name__)
@@ -489,4 +489,5 @@ def _file_changed(rec, file_id: str) -> None:
     note = getattr(copy, info.note) if info.note else None
     kinds = info.flag_kinds.split(",") if info.flag_kinds else []
     file = asdict(info) | {"note": note, "note_key": info.note, "flag_kinds": kinds}
+    file["unread"] = unread.of(rec, info)
     events.publish(rec.id, {"type": "file", "file": file})

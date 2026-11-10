@@ -51,16 +51,17 @@ def read(data: bytes) -> tuple[list[Piece], list[Flag], list[Piece]]:
             cells, hid = [], {k: "" for k in _HIDING}
             for tc in _blocks(tr, (_TC,)):
                 if _continues_merge(tc):
-                    continue  # the cell above, merged down: read once
+                    cells.append("")  # the cell above, merged down: read once, its place kept
+                    continue
                 shaded = _shaded(tc.tcPr)
                 parts = []
                 for p in tc.iter(_P):
                     text, more = _paragraph(Paragraph(p, document), shaded=shaded)
                     parts.append(text)
                     hid = {k: hid[k] + more[k] for k in _HIDING}
-                cell = display_text("\n".join(parts))
-                if cell:
-                    cells.append(cell)
+                cells.append(display_text("\n".join(parts)))  # an empty cell keeps its column
+            while cells and not cells[-1]:
+                cells.pop()
             if cells:
                 pieces.append(Piece({"table": table, "row": row}, " | ".join(cells)))
             _flag({"table": table, "row": row}, hid, flags, hidden)

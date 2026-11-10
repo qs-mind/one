@@ -11,7 +11,7 @@ import io
 import re
 import unicodedata
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 import openpyxl
@@ -44,6 +44,7 @@ class Extracted:
     note: str | None  # name of a `copy` text, e.g. "FILE_SCANNED_PAGES"
     flags: list[Flag] = field(default_factory=list)  # hidden text and orders to an AI
     page_sources: dict[int, str] = field(default_factory=dict)
+    unread: list[dict] = field(default_factory=list)  # `{part, why}`: see records/unread.py
 
 
 _KINDS = {
@@ -131,6 +132,13 @@ def extract(name: str, data: bytes) -> Extracted:
             if ai
             else native
         )
+    if kind == "doc":
+        from qsone.records.readers import doc
+
+        word = doc.extracted(data)
+        if word is not None:
+            ai = hidden.ai_instruction_flags(word.pieces)
+            return replace(word, flags=word.flags + ai) if ai else word
     if kind in office.READ_TARGETS:
         if office.find_soffice() is None:
             return Extracted(kind, "stored", None, [], "FILE_LIBREOFFICE_MISSING")
@@ -182,41 +190,13 @@ def extract(name: str, data: bytes) -> Extracted:
     else:
         x = _text(kind, data)
     ai = hidden.ai_instruction_flags(x.pieces)
-    return (
-        Extracted(x.kind, x.status, x.pages, x.pieces, x.note, x.flags + ai, x.page_sources)
-        if ai
-        else x
-    )
+    return replace(x, flags=x.flags + ai) if ai else x
 
 
 def _drawing(name: str, data: bytes) -> Extracted:
-    from qsone.records.drawings import read_drawing, sheets_from_drawing
+    from qsone.records.readers import dwg
 
-    drawing = read_drawing(name, data)
-    kind = name.rsplit(".", 1)[-1].lower()
-    if drawing.note and not drawing.repaired:
-        return Extracted(kind, "stored", None, [], drawing.note)
-    sheets = sheets_from_drawing(drawing)
-    pieces = [
-        Piece({"sheet": t.get("layout", "Model"), "handle": t["handle"]}, t["text"])
-        for t in drawing.texts
-        if t.get("text")
-    ]
-    for insert in drawing.inserts:
-        pieces.extend(
-            Piece(
-                {
-                    "sheet": insert.get("layout", "Model"),
-                    "handle": a.get("handle") or insert["handle"],
-                },
-                a["value"],
-            )
-            for a in insert.get("attributes", [])
-            if a.get("value")
-        )
-    return Extracted(
-        kind, "partly_read" if drawing.repaired else "read", len(sheets), pieces, drawing.note
-    )
+    return dwg.extracted(name, data)
 
 
 def _reader(kind: str, data: bytes) -> Extracted:
