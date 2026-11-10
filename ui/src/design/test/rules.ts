@@ -94,7 +94,8 @@ export function physicalSides(path: string, source: string): string[] {
 
 // 3. No import from the old interface: packages, @/design, @/texts, @/next, or a relative path inside its own root.
 const IMPORT = /(?:^|[^\w$.])(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|(?:^|[^\w$.])import\s*\(?\s*["']([^"']+)["']|@import\s+(?:url\()?["']([^"']+)["']/gm;
-const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/"];
+// "@/app/App" alone: ui/src/app also holds the old interface's start screen.
+const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App"];
 
 function normalise(path: string): string {
   const out: string[] = [];

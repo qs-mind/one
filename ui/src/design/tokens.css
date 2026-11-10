@@ -9,6 +9,11 @@
 /* Only the new interface is scanned: the old screens share this Vite root. Later jobs add their folders here. */
 @source "../design";
 @source "../next";
+@source "../app/{Frame,gates}.tsx"; /* ui/src/app also holds the old start screen */
+@source "../home";
+@source "../tender";
+@source "../settings2";
+@source "../firstlaunch2";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {
