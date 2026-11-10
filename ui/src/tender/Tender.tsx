@@ -9,6 +9,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import type { Schemas } from "@/api/client";
 import { paths } from "@/app/paths";
 import type { Source } from "@/conversation/parts";
+import { SourceLinks } from "@/conversation/SourceLinks";
 import { MetaLine } from "@/design/MetaLine";
 import { Pill } from "@/design/Pill";
 import { common } from "@/texts/common";
@@ -51,7 +52,22 @@ function dateLine(row: Schemas["TenderRow"], t: Translate): string[] {
   return [date, left < 0 ? t(texts.submissionPassed) : t.plural(common.daysLeft, left)];
 }
 
-function Header({ row }: { row: Schemas["TenderRow"] }) {
+/** Where the submission date comes from (S39): the engineer's own word, or the place it was read, which opens, and
+ * the mark of a local OCR read that was not sure. */
+function DateSource({ source, onOpen }: { source: Source; onOpen: (source: Source) => void }) {
+  const t = useText();
+  if (source.kind === "engineer") return <span className="text-xs text-muted-foreground">{t(texts.submissionYours)}</span>;
+  return (
+    <>
+      <span className="text-xs">
+        <SourceLinks sources={[source]} onOpen={onOpen} />
+      </span>
+      {source.locator.ocr_low_confidence === true && <span className="text-xs text-copper">{t(texts.submissionUnsure)}</span>}
+    </>
+  );
+}
+
+function Header({ row, onOpenSource }: { row: Schemas["TenderRow"]; onOpenSource: (source: Source) => void }) {
   const t = useText();
   const name = row.name_pair ? t(row.name_pair) : row.name;
   return (
@@ -60,6 +76,7 @@ function Header({ row }: { row: Schemas["TenderRow"] }) {
         <bdi dir={textDir(name)}>{name}</bdi>
       </h1>
       <MetaLine className="text-xs text-muted-foreground" items={dateLine(row, t)} />
+      {row.submission_date && row.submission_source && <DateSource source={row.submission_source} onOpen={onOpenSource} />}
       {row.sample && <Pill>{t(common.sample)}</Pill>}
       {row.confidential && <Pill>{t(texts.confidential)}</Pill>}
     </header>
@@ -126,7 +143,7 @@ export function Tender() {
       <div className="flex flex-col md:min-h-0 md:flex-1 md:flex-row">
         <div className="flex h-[80dvh] min-w-0 flex-col gap-8 px-(--gutter) pt-7 pb-6 md:h-auto md:flex-1">
           <div className="mx-auto w-full max-w-190">
-            <Header row={row} />
+            <Header row={row} onOpenSource={openSource} />
           </div>
           <div className="mx-auto min-h-0 w-full max-w-190 flex-1">{conversation}</div>
         </div>
