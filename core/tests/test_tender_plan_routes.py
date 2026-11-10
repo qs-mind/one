@@ -144,6 +144,26 @@ def test_approving_a_plan_the_lead_wrote(client, app, pid, rec, links):
     assert (done.json()["plan"]["status"], done.json()["plan"]["version"]) == ("approved", 1)
 
 
+def test_approving_a_plan_written_after_an_earlier_brief(client, app, pid, rec, links):
+    """With a past Brief measured, the plan is priced with that measurement; approval works the
+    figures out again with the same one, so they match and the first approval goes through."""
+    due_in(rec)
+    links[:] = [link(lead=scripted(text("سؤال أولاً - عينة")))]
+    assert post(client, f"/projects/{pid}/plan/request").status_code == 202
+    ended(app, pid)
+    assert store.current(rec) is None
+    lead = scripted(step("tender_plan_write", plan_args(rec)), text("دي الخطة - عينة"))
+    links[:] = [link(lead=lead)]
+    assert post(client, f"/projects/{pid}/plan/request").status_code == 202
+    ended(app, pid)
+    proposed = store.current(rec)
+    assert proposed is not None and proposed.version == 1
+    assert store.body(rec)["measured"] is not None  # priced from the earlier Brief
+    done = post(client, f"/projects/{pid}/plan/approve", {"version": 1})
+    assert done.status_code == 200, done.text
+    assert (done.json()["plan"]["status"], done.json()["plan"]["version"]) == ("approved", 1)
+
+
 def test_the_figures_are_worked_out_again_at_approval(client, pid, rec, links):
     due_in(rec)
     store.propose(rec, draft(rec))
