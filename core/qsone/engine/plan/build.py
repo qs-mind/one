@@ -76,7 +76,8 @@ def built(
     today: date,
     change: bool,
 ) -> dict:
-    """`{"plan": {submission_date, stages, team, figures}, "requests", "refs"}` from `draft`,
+    """`{"plan": {submission_date, stages, team, figures}, "requests", "measured", "refs"}` from
+    `draft`,
     checked against the plan now (`body`). A change may not remove or alter a stage that is
     signed off (PLAN_STAGE_LOCKED); the dates of a stage that has begun are not held to today."""
     now = {} if body is None else {s["id"]: s for s in body["plan"]["stages"]}
@@ -113,7 +114,9 @@ def built(
         "team": members.members(draft.team, refs),
     }
     requests = {stage["id"]: s.requests for stage, s in zip(stages, draft.stages, strict=True)}
-    return {"plan": with_estimate(plan, draft.estimate), "requests": requests, "refs": refs}
+    measured = None if draft.measured is None else list(draft.measured)
+    plan = with_estimate(plan, draft.estimate)
+    return {"plan": plan, "requests": requests, "measured": measured, "refs": refs}
 
 
 def work(stages: list[dict], requests: dict[str, int]) -> list[model.Work]:

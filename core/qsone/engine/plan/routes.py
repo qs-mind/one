@@ -4,8 +4,9 @@ for one, approve it, sign off a stage, and answer a Suggested change.
 Every refusal is a `Refusal` (`phase1_contract.refusal`). What only the engine knows is checked
 here, before the store is asked: work running in the tender (WORK_RUNNING), and whether the
 Lead can work at all (the Model Data Sheet; its refusal is the engine's own text). The figures
-are worked out again from the sheet of this moment at approval. Once the plan or a stage is
-approved, the plan driver starts what comes next (`_driver`)."""
+are worked out again from the sheet of this moment at approval, with the requests measured
+when they were proposed: only a change of the models, prices or AI links moves them. Once the
+plan or a stage is approved, the plan driver starts what comes next (`_driver`)."""
 
 import asyncio
 import inspect
@@ -24,8 +25,9 @@ from qsone.records.project import RecordsError
 DRIVER = "qsone.engine.plan.driver"
 INSTRUCTION = (
     "The engineer asks for the tender plan. Read what the tender holds (project_map, "
-    "files_list, files_read), then propose the plan with tender_plan_write: its stages and the "
-    "team. If the submission date is missing or has passed, ask the engineer for it first."
+    "files_list, files_read), then open the plan tools (open_tools: plan) and propose the plan "
+    "with tender_plan_write: its stages and the team. If the submission date is missing or has "
+    "passed, ask the engineer for it first."
 )
 
 
@@ -61,12 +63,11 @@ def router(projects, engine) -> APIRouter:
         busy = engine.active(project_id)
         return None if busy is None else c.refusal(copy.WORK_RUNNING, brief_id=busy)
 
-    async def figures(project_id: str, stages: list[dict], requests: dict) -> model.Estimate:
-        """The estimate of `stages` now. Raises `NoAI` when the Lead cannot work."""
+    async def figures(stages: list[dict], requests: dict, measured: list | None) -> model.Estimate:
+        """The estimate of `stages` on the sheet now. Raises `NoAI` when the Lead cannot work."""
         sheet, _ = await engine.sheet()
-        book = engine.cost_book()
-        measured = None if book is None else book.tokens_per_request(project_id)
-        return model.estimate(build.work(stages, requests), sheet, measured)
+        kept = None if measured is None else tuple(measured)
+        return model.estimate(build.work(stages, requests), sheet, kept)
 
     @r.get("/projects/{project_id}/plan", response_model=c.PlanView, responses=_refusals(404, 409))
     async def get_plan(project_id: str):
@@ -118,7 +119,7 @@ def router(projects, engine) -> APIRouter:
                 return c.PlanView(plan=await asyncio.to_thread(store.current, rec))
             if (busy := running(project_id)) is not None:
                 return busy
-            now = await figures(project_id, plan["stages"], found["requests"])
+            now = await figures(plan["stages"], found["requests"], found.get("measured"))
             done = await asyncio.to_thread(
                 lambda: store.approve(rec, version=body.version, estimate=now)
             )
@@ -178,7 +179,9 @@ def router(projects, engine) -> APIRouter:
             now = None
             if body.accept and change is not None and change["id"] == body.change_id:
                 try:
-                    now = await figures(project_id, change["stages"], found["change_requests"])
+                    now = await figures(
+                        change["stages"], found["change_requests"], found.get("change_measured")
+                    )
                 except NoAI:
                     now = None  # accepting starts nothing: the figures shown stay
             done = await asyncio.to_thread(

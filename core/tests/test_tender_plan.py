@@ -2,15 +2,18 @@
 `data-plan` part and the Suggested change. Scripted models only, never a real AI. Synthetic
 «عينة» data only."""
 
+import sys
 from dataclasses import replace
 from datetime import timedelta
+from importlib.machinery import ModuleSpec
+from types import ModuleType
 
 import pytest
 from pydantic import ValidationError
 
 from qsone import copy
 from qsone.engine import costs
-from qsone.engine.plan import model, store
+from qsone.engine.plan import members, model, store
 from qsone.engine.plan import tool as plan_tool
 from qsone.engine.plan.model import PlanDraft, PlanIn
 from qsone.engine.team.common import TeamSetup
@@ -79,6 +82,17 @@ def draft(rec, **more) -> PlanDraft:
     return PlanDraft(given.submission_date.isoformat(), given.stages, given.team, found)
 
 
+def fake_module(patch, name: str, **calls) -> ModuleType:
+    """A module the plan finds by name (`find_spec`) though it is not built yet: the identities
+    job's or the plan driver's."""
+    found = ModuleType(name)
+    found.__spec__ = ModuleSpec(name, None)
+    for key, value in calls.items():
+        setattr(found, key, value)
+    patch.setitem(sys.modules, name, found)
+    return found
+
+
 def lead_ctx(rec):
     ctx = tool_ctx(rec)
     ctx.host.setup = TeamSetup(tuple(SHEET), model.picked_roles(SHEET), None)
@@ -145,6 +159,19 @@ def test_a_plan_that_fits_is_stored_as_version_one(rec):
     assert again.team[2].id == pricing.id
     with pytest.raises(ValidationError):  # the day must be a real one
         PlanIn.model_validate(plan_args(rec, stages=[stage(rec, starts="2026-02-30")]))
+
+
+def test_the_identities_job_checks_the_proposed_members(rec, monkeypatch):
+    due_in(rec)
+    given = []
+
+    def propose(project, team):
+        given.append([m.ref for m in team])
+        raise RecordsError(copy.PLAN_MEMBER_REF, status=422, field="team[0].name")
+
+    fake_module(monkeypatch, members.IDENTITY, propose=propose)
+    assert refused(rec).field == "team[0].name"
+    assert given == [["pricing-qs"]]
 
 
 async def test_plan_needs_submission_date(rec):

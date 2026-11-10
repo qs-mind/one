@@ -91,6 +91,9 @@ class PlanDraft:
     stages: list[StageIn]
     team: list[MemberIn]
     estimate: Estimate
+    # (input, output, requests) of the requests measured when it was worked out; kept, so that
+    # only the sheet moves the figures at approval
+    measured: tuple[int, int, int] | None = None
 
 
 # The estimate -----------------------------------------------------------------------------------

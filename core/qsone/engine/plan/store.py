@@ -1,9 +1,10 @@
 """The tender plan in Project Records: one plan per tender, every state of it kept.
 
 Each change appends a row to `tender_plans` holding the whole plan; the newest row is the plan
-now. A row's body is `{"plan": TenderPlan, "requests": {stage id: n}, "refs": {ref: member id},
-"change_requests": {...}, "answered": {"id", "accept"} | None}`: the plan as the contract sends
-it, with what its estimate is worked out from and what makes an answer safe to repeat.
+now. A row's body is `{"plan": TenderPlan, "requests": {stage id: n}, "measured": [in, out, n] |
+None, "refs": {ref: member id}, "change_requests", "change_measured", "answered": {"id",
+"accept"} | None}`: the plan as the contract sends it, with what its estimate (and a waiting
+change's) is worked out from and what makes an answer safe to repeat.
 
 - `version` rises when what the engineer approves changes: the plan proposed again, a Suggested
   change accepted, or an estimate that came out different at approval. A stage moving, or a
@@ -152,7 +153,12 @@ def propose(project: Records, draft: PlanDraft, *, actor: str = LEAD_ACTOR) -> c
             "change": None,
         }
         answered = None if found is None else found.get("answered")
-        new = made | {"plan": plan, "change_requests": {}, "answered": answered}
+        new = made | {
+            "plan": plan,
+            "change_requests": {},
+            "change_measured": None,
+            "answered": answered,
+        }
         return _save(conn, project, new, actor, "propose")
 
 
@@ -174,6 +180,7 @@ def suggest(
             "plan": found["plan"] | {"change": change},
             "refs": made["refs"],
             "change_requests": made["requests"],
+            "change_measured": made["measured"],
         }
         return _save(conn, project, new, actor, "suggest")
 
@@ -234,7 +241,9 @@ def answer_change(
             new = found | {
                 "plan": accepted | {"change": None},
                 "requests": found["change_requests"],
+                "measured": found.get("change_measured"),
                 "change_requests": {},
+                "change_measured": None,
                 "answered": answered,
             }
             return _save(conn, project, new, ENGINEER, "accept")

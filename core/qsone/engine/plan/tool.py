@@ -85,7 +85,9 @@ def _part(ctx: ToolContext, plan) -> None:
 def _draft(ctx: ToolContext, plan: PlanIn) -> PlanDraft:
     setup = _setup(ctx)
     found = model.estimate(model.work_of(plan.stages), list(setup.sheet), setup.measured)
-    return PlanDraft(plan.submission_date.isoformat(), plan.stages, plan.team, found)
+    return PlanDraft(
+        plan.submission_date.isoformat(), plan.stages, plan.team, found, setup.measured
+    )
 
 
 def _answer(plan, done: str) -> str:

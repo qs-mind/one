@@ -25,7 +25,7 @@ from tests.engine_fakes import scripted, text
 from tests.samples import sample_sheet
 from tests.test_engine_runner import FakeLink
 from tests.test_review import check
-from tests.test_tender_plan import CARD, draft, due_in, pair, plan_args, stage
+from tests.test_tender_plan import CARD, draft, due_in, fake_module, pair, plan_args, stage
 
 UNKNOWN = "5a" + "0" * 30
 
@@ -62,6 +62,19 @@ def rec(app, pid) -> Records:
     return app.state.projects.get(pid)
 
 
+@pytest.fixture
+def driver(monkeypatch) -> list:
+    """What the plan driver is told, from a stand-in for it (C3 builds it)."""
+    told: list = []
+    fake_module(
+        monkeypatch,
+        routes.DRIVER,
+        on_plan_approved=lambda *args: told.append(("plan", *args)),
+        on_stage_approved=lambda *args: told.append(("stage", *args)),
+    )
+    return told
+
+
 def post(client, path: str, body: dict | None = None):
     return client.post(path, json=body, headers=AUTH)
 
@@ -96,7 +109,7 @@ def test_plan_absent_for_old_project(client, app, data_dir):
     refusal(client.get(f"/projects/{UNKNOWN}/plan", headers=AUTH), 404, copy.PROJECT_NOT_FOUND)
 
 
-def test_approving_the_plan(client, pid, rec, links):
+def test_approving_the_plan(client, pid, rec, links, driver):
     path = f"/projects/{pid}/plan/approve"
     refusal(post(client, path, {"version": 1}), 404, copy.PLAN_NOT_FOUND)
     due_in(rec)
@@ -113,6 +126,22 @@ def test_approving_the_plan(client, pid, rec, links):
         True,
     )
     assert post(client, path, {"version": 1}).json() == done.json()  # a retry: the same plan
+    assert driver == [("plan", pid)]  # the retry started nothing
+
+
+def test_approving_a_plan_the_lead_wrote(client, app, pid, rec, links):
+    """The Brief that writes the plan is measured itself: the figures stay those it worked out
+    with, so the first approval goes through."""
+    due_in(rec)
+    lead = scripted(step("tender_plan_write", plan_args(rec)), text("دي الخطة - عينة"))
+    links[:] = [link(lead=lead)]
+    assert post(client, f"/projects/{pid}/plan/request").status_code == 202
+    ended(app, pid)
+    proposed = store.current(rec)
+    assert proposed is not None and proposed.version == 1
+    done = post(client, f"/projects/{pid}/plan/approve", {"version": 1})
+    assert done.status_code == 200, done.text
+    assert (done.json()["plan"]["status"], done.json()["plan"]["version"]) == ("approved", 1)
 
 
 def test_the_figures_are_worked_out_again_at_approval(client, pid, rec, links):
@@ -177,7 +206,12 @@ def test_signing_off_a_stage(client, pid, rec):
     sheet = sample_sheet(rec)
     store.set_stage_status(rec, first, "waiting_engineer", output_ids=[None, sheet])
     seen = []
-    stop = events.listen(lambda project, event: seen.append(event["type"]))
+
+    def heard(project, event) -> None:
+        with rec.read() as conn:  # sent once the write has committed, never inside it
+            seen.append((event["type"], conn.in_transaction))
+
+    stop = events.listen(heard)
     try:
         unchecked = copy.fill(
             copy.STAGE_OUTPUT_NOT_READY, output=priced["title"], reason=copy.SIGNOFF_NEEDS_CHECK
@@ -192,8 +226,56 @@ def test_signing_off_a_stage(client, pid, rec):
     assert done.status_code == 200 and done.json()["plan"]["stages"][0]["status"] == "approved"
     assert status(rec, sheet)["status"] == "signed_off"
     assert understand.facts(rec)["approved"] is True
-    assert seen == ["deliverable", "plan"]  # after the one write committed
+    assert seen == [("deliverable", False), ("plan", False)]  # after the one write committed
     assert post(client, path, {"version": 1}).json() == done.json()  # a retry: nothing more
+
+
+def test_a_stage_is_not_signed_off_while_work_runs_or_without_ai(
+    client, app, pid, rec, links, driver
+):
+    """Without AI a sign-off is refused only when another stage would start."""
+    due_in(rec)
+    mapped = {"kind": "map", "title": pair("Register")}
+    stages = [stage(rec, 0, outputs=[mapped]), stage(rec, 1, outputs=[mapped])]
+    plan = store.propose(rec, draft(rec, stages=stages))
+    store.approve(rec, version=1)
+    first, second = (s.id for s in plan.stages)
+    store.set_stage_status(rec, first, "waiting_engineer")
+    path = f"/projects/{pid}/plan/stages/{first}/approve"
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(app.state.engine, "active", lambda project_id, **_: UNKNOWN)
+        refusal(post(client, path, {"version": 1}), 409, copy.WORK_RUNNING, brief_id=UNKNOWN)
+    links.clear()
+    refusal(post(client, path, {"version": 1}), 409, copy.NO_AI, fix="ai")
+    assert store.current(rec).stages[0].status == "waiting_engineer"  # refused: nothing changed
+    links.append(link())
+    assert post(client, path, {"version": 1}).status_code == 200
+    assert post(client, path, {"version": 1}).status_code == 200  # a retry starts nothing
+    store.set_stage_status(rec, second, "waiting_engineer")
+    links.clear()
+    last = post(client, f"/projects/{pid}/plan/stages/{second}/approve", {"version": 1})
+    assert last.json()["plan"]["stages"][1]["status"] == "approved"  # no stage starts after it
+    assert driver == [("stage", pid, first), ("stage", pid, second)]
+
+
+def test_a_change_is_priced_again_when_accepted(client, pid, rec, links):
+    due_in(rec)
+    plan = store.propose(rec, draft(rec))
+    store.approve(rec, version=1)
+    later = [stage(rec, 0, id=plan.stages[0].id), stage(rec, 3, id=plan.stages[1].id)]
+    change = store.suggest(rec, draft(rec, stages=later), "ملحق - عينة").change
+    links[:] = [link(replace(CARD, price_in=Decimal("30"), price_out=Decimal("150")))]
+    path = f"/projects/{pid}/plan/change"
+    old = post(client, path, {"change_id": change.id, "accept": True})
+    refusal(old, 409, copy.PLAN_CHANGED, field="change_id")
+    again = store.current(rec)  # the change stored again under a new id, with the figures of now
+    assert (again.version, again.change.id != change.id) == (1, True)
+    assert Decimal(again.change.expected_cost_usd) == 2 * Decimal(change.expected_cost_usd)
+    accepted = post(client, path, {"change_id": again.change.id, "accept": True}).json()["plan"]
+    assert (accepted["version"], accepted["expected_cost_usd"]) == (
+        2,
+        again.change.expected_cost_usd,
+    )
 
 
 def test_answering_a_suggested_change(client, pid, rec):
