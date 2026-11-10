@@ -1,42 +1,26 @@
-// Step 3: connect AI. First the AI consent (contract Q3: inside this step, before any key is checked), then one box:
-// a pasted key is checked at once (POST /settings/ai/connect reads the provider from the key's own form) and shows
-// the provider it reached or the core's plain words. The other way is the engineer's own Claude Code. The step ends
-// "done" with either, or "skipped" with neither (Q2); there is no Check or Save button. A key ONE does not recognise
-// opens the provider's address under it (ProviderAddress).
-import { useEffect, useRef, useState } from "react";
-import { client, type Schemas } from "@/api/client";
+// Step 3: connect AI. First the AI consent (contract Q3: inside this step, before any key is checked), then the one
+// key box (KeyBox, shared with Settings). The other way is the engineer's own Claude Code. The step ends "done" with
+// either, or "skipped" with neither (Q2); there is no Check or Save button.
+import { useEffect, useState } from "react";
 import { checkClaudeCode, type Consent, findClaudeCode, getConsent, giveConsent, openPage, passStep } from "@/api/existing";
-import { Field } from "@/design/Field";
 import { Button } from "@/design/ui/button";
-import { Input } from "@/design/ui/input";
 import { Separator } from "@/design/ui/separator";
 import { firstlaunch } from "@/texts/firstlaunch";
 import type { TextPair } from "@/texts/types";
 import { useText } from "@/texts/useText";
+import { KeyBox } from "./KeyBox";
 import { StepActions, StepHead } from "./parts";
-import { ProviderAddress } from "./ProviderAddress";
 
-/** How long after the last change a typed key is checked (a paste is one change). */
-export const CHECK_MS = 300;
-
-type KeyCheck =
-  | { state: "idle" }
-  | { state: "checking" }
-  | { state: "works"; link: Schemas["AiLink"] }
-  | { state: "refused"; words: TextPair; unknown?: boolean }; // unknown: a key ONE does not recognise (422)
 type ClaudeCheck = { state: "idle" } | { state: "checking" } | { state: "works" } | { state: "refused"; words: TextPair };
 
 export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
   const t = useText();
   const [consent, setConsent] = useState<Consent>();
   const [consentFailed, setConsentFailed] = useState(false);
-  const [key, setKey] = useState("");
-  const [keyCheck, setKeyCheck] = useState<KeyCheck>({ state: "idle" });
-  const [byAddress, setByAddress] = useState(false); // the unknown key was linked by its provider's address
+  const [keyWorks, setKeyWorks] = useState(false); // the key works, or was linked by its provider's address
   const [claude, setClaude] = useState<ClaudeCheck>({ state: "idle" });
   const [ending, setEnding] = useState<"done" | "skipped">();
   const [stepFailed, setStepFailed] = useState(false);
-  const runs = useRef(0); // only the latest key's answer shows
   const agreed = consent?.at != null;
 
   useEffect(() => {
@@ -46,26 +30,6 @@ export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () =
       live = false;
     };
   }, []);
-
-  useEffect(() => {
-    const pasted = key.trim();
-    const mine = ++runs.current;
-    setByAddress(false);
-    if (pasted === "" || !agreed) return setKeyCheck({ state: "idle" });
-    setKeyCheck({ state: "checking" });
-    const timer = setTimeout(async () => {
-      let next: KeyCheck = { state: "refused", words: firstlaunch.keyNotChecked };
-      try {
-        const { data, error, response } = await client.POST("/settings/ai/connect", { body: { key: pasted } });
-        if (data) next = { state: "works", link: data };
-        else if (error && "error" in error) next = { state: "refused", words: error.error, unknown: response.status === 422 };
-      } catch {
-        // the core could not be reached: keyNotChecked
-      }
-      if (mine === runs.current) setKeyCheck(next);
-    }, CHECK_MS);
-    return () => clearTimeout(timer);
-  }, [key, agreed]);
 
   async function agree() {
     setConsentFailed(false);
@@ -92,15 +56,7 @@ export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () =
     else setStepFailed(true);
   }
 
-  const connected = keyCheck.state === "works" || byAddress || claude.state === "works";
-  const keyHelp =
-    keyCheck.state === "checking"
-      ? t(firstlaunch.keyChecking)
-      : keyCheck.state === "works"
-        ? t(firstlaunch.keyWorks, { provider: keyCheck.link.provider })
-        : agreed
-          ? undefined
-          : t(firstlaunch.keyAfterConsent);
+  const connected = keyWorks || claude.state === "works";
   const note = stepFailed ? t(firstlaunch.stepNotSaved) : connected ? null : t(firstlaunch.laterNote);
 
   return (
@@ -130,18 +86,7 @@ export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () =
       </section>
 
       <div className="flex flex-col gap-5">
-        <Field label={t(firstlaunch.keyLabel)} help={keyHelp} error={keyCheck.state === "refused" ? t(keyCheck.words) : undefined}>
-          <Input
-            type="password"
-            dir="ltr"
-            autoComplete="off"
-            spellCheck={false}
-            disabled={!agreed}
-            value={key}
-            onChange={(event) => setKey(event.target.value)}
-          />
-        </Field>
-        {keyCheck.state === "refused" && keyCheck.unknown ? <ProviderAddress key={key.trim()} apiKey={key.trim()} onLinked={setByAddress} /> : null}
+        <KeyBox agreed={agreed} lockedHelp={t(firstlaunch.keyAfterConsent)} onConnected={setKeyWorks} />
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <Separator className="flex-1" />
           <span>{t(firstlaunch.or)}</span>
