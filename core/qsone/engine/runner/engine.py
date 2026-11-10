@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from qsone import activity, copy
-from qsone.engine import cards, desks, general
+from qsone.engine import cards, desks, general, identity
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.costs import Spending
 from qsone.engine.mcp_server import McpGate
@@ -176,6 +176,7 @@ class Engine:
         listed, errors = await cards.listed(found)
         if not listed:
             raise NoAI(next(iter(errors.values()), copy.NO_AI))
+        identity.remember_sheet(listed)  # each member's model, without a call of its own
         return listed, found
 
     # Briefs ----------------------------------------------------------------------------------

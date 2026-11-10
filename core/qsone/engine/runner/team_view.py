@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from qsone import copy
+from qsone.engine import identity_live
 from qsone.engine.runner.shared import utc_now
 from qsone.engine.types import AgentSpec, Text
 
@@ -49,6 +50,7 @@ class _BriefTeamView:
             found.focus = focus
         found.at = utc_now().isoformat()
         self.engine._publish(self.place.channel, {"type": "agent", "agent": self.agent_info(found)})
+        identity_live.changed(self.engine, self.place.project_id, found.spec.id)
 
     def agent_info(self, a: _AgentState) -> dict:
         desk = None

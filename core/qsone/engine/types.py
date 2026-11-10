@@ -160,6 +160,7 @@ CardKind = Literal[
     "rows",  # Plan 5: tick the rows to keep (prices)
     "cost",  # Plan 5: a tool's own cost asked first (scanned pages read by the AI)
     "connector",  # Plan 5: add an MCP Connector
+    "keep_member",  # Phase 1: keep a member for later tenders (C5)
 ]
 
 

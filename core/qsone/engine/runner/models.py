@@ -63,7 +63,15 @@ class _BriefModels:
             role=role,
             card=self.card(choice),
             effort=effort,
+            member_id=self.member_of(run_id),
         )
+
+    def member_of(self, run_id: str) -> str | None:
+        """The run's member: its spec's id (`engine/identity.py`)."""
+        try:
+            return self.store.run(run_id)["spec"].id
+        except LookupError:
+            return None
 
     def models(self, run_id: str) -> oneshot.Models:
         """This Brief's models, for the one-shot calls of a tool in run `run_id`."""
@@ -77,6 +85,7 @@ class _BriefModels:
             project_id=self.place.project_id,
             run_id=run_id,
             work=self.engine.data_dir / WORK,
+            member_id=self.member_of(run_id),
         )
 
     def _ctx(self, run_id: str, spec: AgentSpec) -> ToolContext:

@@ -425,6 +425,7 @@ async def check_deliverable(ctx: ToolContext, deliverable_id: str) -> str:
     review = await checker.check(packet, maker["choice"], ctx.host)
     review = replace(review, round=len(earlier) + 1)
     store.save_review(draft.id, review)
+    _tally(ctx, maker["spec"].id, draft.id, 1, review.code)  # each draft is a version
     ctx.host.emit(Reviewed(ctx.brief_id, draft.id, review))
     return _json(_review_json(draft.id, review, c_rounds + (review.code == "C")))
 
@@ -463,10 +464,27 @@ async def _check_output(
         version_n=version_n,
         not_in_client=extra,
     )
+    _tally(ctx, ctx.agent.id, draft.id, version_n, review.code)  # the maker, as its model above
     ctx.host.emit(Reviewed(ctx.brief_id, draft.id, review))
     out = _review_json(draft.id, review, 0) | {"version": version_n}
     out.pop("rounds_left", None)
     return _json(out)
+
+
+def _tally(ctx: ToolContext, member_id: str, deliverable_id: str, version: int, code: str) -> None:
+    """The member's record counts the check (Phase 1, C5), in Engineer Records."""
+    from qsone.engine import identity
+
+    engineer = identity.engineer_of(ctx.host)
+    if engineer is not None:
+        identity.tally(
+            engineer,
+            member_id=member_id,
+            project_id=ctx.store.project_id,
+            deliverable_id=deliverable_id,
+            version=version,
+            code=code,
+        )
 
 
 async def _submit_for_check(ctx: ToolContext, args: CheckArgs) -> str:

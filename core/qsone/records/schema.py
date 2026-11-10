@@ -467,6 +467,25 @@ CREATE TRIGGER {_table}_no_delete BEFORE DELETE ON {_table}
  BEGIN SELECT RAISE(ABORT, 'Map records are retained'); END;
 """
 
+# The team's identities (Phase 1, C5). Engineer Records: `members` (the permanent ones),
+# `member_checks` (one Checking QS result per checked version of a member's Deliverable) and
+# `ai_costs.member_id` (the run's member; rows from before count by `role`). A project file:
+# `project_members` (this tender's members, proposed or joined).
+MEMBERS_SQL = """
+ALTER TABLE ai_costs ADD COLUMN member_id TEXT;
+CREATE INDEX ai_costs_member ON ai_costs(member_id);
+CREATE TABLE members (id TEXT PRIMARY KEY, card TEXT NOT NULL CHECK (json_valid(card)),
+  kept_at TEXT NOT NULL, kept_from TEXT);
+CREATE TABLE member_checks (member_id TEXT NOT NULL, project_id TEXT,
+  deliverable_id TEXT NOT NULL, version INTEGER NOT NULL,
+  code TEXT NOT NULL CHECK (code IN ('A', 'B', 'C')), at TEXT NOT NULL,
+  UNIQUE (deliverable_id, version));
+CREATE INDEX member_checks_member ON member_checks(member_id);
+CREATE TABLE project_members (id TEXT PRIMARY KEY, card TEXT NOT NULL CHECK (json_valid(card)),
+  kind TEXT NOT NULL CHECK (kind IN ('temporary', 'permanent')),
+  proposed INTEGER NOT NULL CHECK (proposed IN (0, 1)), joined_at TEXT NOT NULL);
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -497,4 +516,5 @@ MIGRATIONS: list[str] = [
     "reason TEXT NOT NULL, recorded_at TEXT NOT NULL);"
     "CREATE TRIGGER map_rejected_facts_no_delete BEFORE DELETE ON map_rejected_facts "
     "BEGIN SELECT RAISE(ABORT, 'Map proposals are retained'); END;",
+    MEMBERS_SQL,
 ]

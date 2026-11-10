@@ -370,10 +370,12 @@ class Spending:
         cache_write: int = 0,
         reported_usd: Decimal | None = None,
         effort: str | None = None,
+        member_id: str | None = None,
     ) -> Decimal | None:
         """Records one model response and gives its cost: the Model Data Sheet's price, or
         Claude Code's reported cost; None when the price is unknown (recorded as unknown).
-        `effort` is the one it was sent with, recorded with it."""
+        `effort` is the one it was sent with, recorded with it, and `member_id` the run's
+        member."""
         if card.on_device:
             usd, basis = Decimal(0), cards.ON_DEVICE
         elif card.subscription and reported_usd is not None:
@@ -404,6 +406,7 @@ class Spending:
             effort=effort,
             cache_read=cache_read,
             cache_write=cache_write,
+            member_id=member_id,
         )
         return usd
 
@@ -451,6 +454,7 @@ class CostedModel(WrapperModel):
         role: Role,
         card: ModelCard,
         effort: str | None = None,
+        member_id: str | None = None,
     ):
         super().__init__(wrapped)
         self.spending = spending
@@ -461,6 +465,7 @@ class CostedModel(WrapperModel):
         self.role = role
         self.card = card
         self.effort = effort  # the run's own `thinking` setting, recorded with each cost
+        self.member_id = member_id  # the run's member, recorded with each cost
 
     async def _before(self, messages, params) -> None:
         sizes = request_size.parts(messages, params)  # what this request sends, by part
@@ -482,6 +487,7 @@ class CostedModel(WrapperModel):
             cache_read=usage.cache_read_tokens,
             cache_write=usage.cache_write_tokens,
             effort=self.effort,
+            member_id=self.member_id,
         )
 
     async def request(self, messages, model_settings, model_request_parameters):

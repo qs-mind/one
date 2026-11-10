@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from starlette.responses import Response, StreamingResponse
 
 from qsone import copy, keys, keystore, settings
-from qsone.engine import cards, connectors, costs, roles
+from qsone.engine import cards, connectors, costs, identity, roles
 from qsone.engine.connectors import claude_code, standard
 from qsone.engine.types import EFFORTS, BadAnswer, ModelCard, ModelChoice, Role, Text, answer_value
 from qsone.undo import Trash
@@ -147,6 +147,7 @@ def settings_router(
     async def ai_settings() -> dict:
         present = found()
         listed, errors = await cards.listed(present)
+        identity.remember_sheet(listed)  # each member's model (engine/identity.py)
         return {
             "connectors": [_connector_json(c, errors.get(c.id)) for c in present],
             "sheet": [card_json(c) for c in listed],

@@ -96,19 +96,6 @@ def router() -> APIRouter:
     def decide(project_id: str, finding_id: str, body: c.DecideIn):
         return _stub()
 
-    # The team (C5).
-    @r.get(
-        "/projects/{project_id}/members",
-        response_model=c.TeamMembers,
-        responses=_refusals(404, 409),
-    )
-    def project_members(project_id: str):
-        return _stub()
-
-    @r.get("/team/members", response_model=c.Members, responses=_refusals(409, 503))
-    def members():
-        return _stub()
-
     # The team room (C6).
     @r.get(
         "/projects/{project_id}/room", response_model=c.RoomPage, responses=_refusals(404, 409, 422)

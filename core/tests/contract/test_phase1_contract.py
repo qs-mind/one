@@ -705,7 +705,7 @@ def test_the_enums_are_the_designs():
 def test_the_enums_the_core_already_has_are_the_cores():
     """Where the contract repeats a list the core keeps, the two say the same."""
     assert allowed(c.BriefState) == allowed(engine_types.BriefState)
-    assert allowed(c.CardKind) == (*allowed(engine_types.CardKind), "keep_member", "setting")
+    assert allowed(c.CardKind) == (*allowed(engine_types.CardKind), "setting")  # C5 added one
     assert set(allowed(c.Fix)) == set(copy.FIXES) | {"caps"}  # "caps" comes with Settings
     # The old introduction card fills a new profile: its role becomes `org_type`.
     assert allowed(c.OrgType) == allowed_in(old_card.Card, "role")
