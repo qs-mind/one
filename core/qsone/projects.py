@@ -306,7 +306,7 @@ class RenameIn(BaseModel):
 
 
 def _file(info: files.FileInfo) -> dict:
-    """FileInfo as JSON, its note turned from a copy.py name into its {en, ar} pair; `note_key`
+    """FileInfo as JSON, its note turned from a `copy` name into its {en, ar} pair; `note_key`
     keeps the name (the import report names a locked or an empty file by it); `flag_kinds` the
     kinds of its hidden-text flags (the screen tells hidden rows from orders to an AI)."""
     note = getattr(copy, info.note) if info.note else None
@@ -330,7 +330,7 @@ def _answer(info: files.FileInfo, dropped: str) -> dict:
 
 
 def _zip_note(text: dict) -> str:
-    """The copy.py name of a zip refusal, kept as the zip's note."""
+    """The `copy` name of a zip refusal, kept as the zip's note."""
     return "ZIP_TOO_BIG" if text is copy.ZIP_TOO_BIG else "ZIP_UNSAFE"
 
 

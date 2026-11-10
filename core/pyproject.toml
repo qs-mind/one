@@ -73,3 +73,8 @@ target-version = "py312"
 preview = true
 explicit-preview-rules = true
 select = ["E", "F", "I", "UP", "B", "PLW1514"]
+
+[tool.ruff.lint.per-file-ignores]
+# The texts' facade takes each area module whole (`import *`), so a new text is added in one
+# place, and keeps the old one-file module's other names on the package. Nothing else is let off.
+"qsone/copy/__init__.py" = ["F401", "F403"]

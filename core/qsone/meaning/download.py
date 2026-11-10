@@ -31,7 +31,7 @@ VERIFIED = "verified.json"
 class DownloadError(Exception):
     def __init__(self, text: dict[str, str]) -> None:
         super().__init__(text["en"])
-        self.text = text  # a copy.py pair
+        self.text = text  # a `copy` pair
 
 
 class NoSpace(DownloadError):
@@ -212,7 +212,7 @@ def download(
     """Fetches what is missing, in manifest order. `on_progress(done, total)` counts all files.
     Between retries it waits on `stop` (or calls `sleep`, for tests).
 
-    Raises `DownloadError` (a copy.py pair in `.text`; `NoSpace` for the disk) or
+    Raises `DownloadError` (a `copy` pair in `.text`; `NoSpace` for the disk) or
     `DownloadStopped`."""
     root.mkdir(parents=True, exist_ok=True)
     total = sum(spec.size for spec in specs)
