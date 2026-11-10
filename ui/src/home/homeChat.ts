@@ -4,17 +4,16 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect } from "react";
-import { api } from "@/api";
+import { chatFetch, getChatMessages, steerBrief } from "@/api/existing";
 import type { ComposerMessage, LeadActivity } from "@/conversation/Composer";
 import { briefState, isData, type DataPart, type ThreadMessage } from "@/conversation/parts";
 
 export const HOME_CHAT = "general";
 
-// Only the new message goes: the core keeps the chat's history with its Briefs. Its URLs are core routes, so they
-// go through api() too.
+// Only the new message goes: the core keeps the chat's history with its Briefs.
 const transport = new DefaultChatTransport<ThreadMessage>({
   api: "/chat",
-  fetch: (input, init) => api(String(input), init),
+  fetch: chatFetch,
   prepareSendMessagesRequest: ({ id, messages }) => ({ body: { id, messages: messages.slice(-1) } }),
 });
 
@@ -29,15 +28,12 @@ export function useHomeChat() {
 
   useEffect(() => {
     let live = true;
-    api(`/chat/${HOME_CHAT}/messages`)
-      .then((response) => (response.ok ? (response.json() as Promise<{ messages?: ThreadMessage[] }>) : undefined))
-      .then((body) => {
-        if (!live || !body?.messages) return;
-        const earlier = body.messages;
-        setMessages((now) => (now.length ? now : earlier)); // never over a message sent meanwhile
-        void resumeStream();
-      })
-      .catch(() => undefined); // the conversation starts empty
+    void getChatMessages(HOME_CHAT).then(({ data }) => {
+      if (!live || !data?.messages) return; // the conversation starts empty
+      const earlier = data.messages as ThreadMessage[];
+      setMessages((now) => (now.length ? now : earlier)); // never over a message sent meanwhile
+      void resumeStream();
+    });
     return () => {
       live = false;
     };
@@ -51,18 +47,12 @@ export function useHomeChat() {
         ? "held"
         : "idle";
 
+  // Words only: Home's box sends no files (HomeBox says so; a tender's files come in its folder).
   const send = (message: ComposerMessage) => void sendMessage({ text: message.text });
 
   async function steer(message: ComposerMessage) {
     const brief = lastBrief(messages);
-    const answer = brief
-      ? await api(`/briefs/${encodeURIComponent(brief)}/steer`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: message.text }),
-        })
-      : undefined;
-    if (answer?.status !== 202) throw new Error("not steered");
+    if (!brief || (await steerBrief(brief, message.text)).error !== undefined) throw new Error("not steered");
   }
 
   return { messages, activity, send, steer };

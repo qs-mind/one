@@ -54,6 +54,10 @@ export const home = defineTexts({
     en: "Drop the tender's whole folder: ONE makes a tender of it.",
     ar: "ارمي فولدر التندر كله: ONE هيعمل منه تندر.",
   },
+  filesNotSent: {
+    en: "Files are not sent from Home. Drop the tender's whole folder and ONE makes a tender of it.",
+    ar: "الملفات مش بتتبعت من الرئيسية. ارمي فولدر التندر كله و ONE هيعمل منه تندر.",
+  },
   making: { en: "Making the tender {name}", ar: "بيعمل التندر {name}" },
   notMade: { en: "ONE could not make this tender. Try again.", ar: "ONE معرفش يعمل التندر ده. جرّب تاني." },
 });

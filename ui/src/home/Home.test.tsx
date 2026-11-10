@@ -190,6 +190,24 @@ describe.each(DIRS)("Home (%s)", (dir) => {
     expect(calls).toEqual([]);
   });
 
+  it("pasted files stay behind: the words go, and the box says the files did not", async () => {
+    let sent: { messages?: { parts: { type: string; text?: string }[] }[] } | undefined;
+    server.use(
+      http.post("*/api/chat", async ({ request }) => {
+        sent = (await request.json()) as typeof sent;
+        return new HttpResponse(null, { status: 503 });
+      }),
+    );
+    open(dir);
+    await ready();
+    fireEvent.paste(box(), { clipboardData: { files: [new File(["x"], "BOQ.xlsx")] } });
+    expect(await screen.findByText("BOQ.xlsx")).toBeInTheDocument();
+    await userEvent.type(box(), "راجع ده{Enter}");
+    await waitFor(() => expect(sent?.messages?.[0]?.parts).toEqual([{ type: "text", text: "راجع ده" }]));
+    expect(await screen.findByText(t(home.filesNotSent))).toBeInTheDocument();
+    expect(calls.map((c) => c.path).filter((path) => path.includes("/files"))).toEqual([]);
+  });
+
   it("sends a message in the Home conversation", async () => {
     let sent: { id?: string; messages?: { parts: { text?: string }[] }[] } | undefined;
     server.use(

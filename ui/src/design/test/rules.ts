@@ -95,8 +95,8 @@ export function physicalSides(path: string, source: string): string[] {
 // 3. No import from the old interface: packages, @/design, @/texts, @/next, or a relative path inside its own root.
 const IMPORT = /(?:^|[^\w$.])(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|(?:^|[^\w$.])import\s*\(?\s*["']([^"']+)["']|@import\s+(?:url\()?["']([^"']+)["']/gm;
 // "@/app/App" and "@/app/paths" alone: ui/src/app also holds the old interface's start screen. The contract's client
-// (@/api/), the core's own routes through api() (@/api) and the live stream (@/activity) are the kept ways to the core.
-const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/app/paths", "@/firstlaunch2/", "@/engineer/", "@/conversation/", "@/home/", "@/api", "@/activity"];
+// (@/api/) and the live stream (@/activity) are the kept ways to the core.
+const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/app/paths", "@/firstlaunch2/", "@/engineer/", "@/conversation/", "@/home/", "@/api/", "@/activity"];
 
 function normalise(path: string): string {
   const out: string[] = [];

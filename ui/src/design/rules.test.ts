@@ -89,6 +89,7 @@ describe("the rules catch", () => {
     expect(oldImports(own, `import "../styles.css";`)).toHaveLength(2);
     expect(oldImports(own, `import { Button } from "@/ui/Button";`)).toHaveLength(1);
     expect(oldImports(own, `const m = await import("@/workspace/x");`)).toHaveLength(1);
+    expect(oldImports(own, `import { api } from "@/api";`)).toHaveLength(1);
     expect(oldImports("ui/src/next/main.tsx", `import x from "../design/Thing";`)).toHaveLength(1);
     expect(
       oldImports(own, `import { cn } from "cn";\nimport type { Lang } from "@/texts/types";\nimport { X } from "./ui/button";\nimport "@/design/tokens.css";`),

@@ -1,10 +1,11 @@
 // Home's one message box (U3's Composer), the Home conversation above it, and why the Lead cannot work now. A drop
 // on the box is a tender: a dropped folder becomes a new tender, which opens at once while its files go in. Loose
-// files are not a tender: the box says to drop the whole folder.
+// files are not a tender: the box says to drop the whole folder. Files pasted into the box are not sent either: the
+// words go, and the box says the files did not.
 import { type DragEvent, type Ref, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { client, type Schemas } from "@/api/client";
-import { Composer } from "@/conversation/Composer";
+import { Composer, type ComposerMessage } from "@/conversation/Composer";
 import { Thread } from "@/conversation/Thread";
 import { buttonVariants } from "@/design/ui/button";
 import { paths } from "@/app/paths";
@@ -80,6 +81,17 @@ export function HomeBox({ blocked, conversationRef }: HomeBoxProps) {
     void dropTender(entries, (id) => navigate(paths.tender(id))).then((refused) => refused && setLine(refused));
   }
 
+  /** Says when the message held files, which stay behind. */
+  const wordsOnly = (message: ComposerMessage) => setLine(message.attachments.length ? home.filesNotSent : undefined);
+  function send(message: ComposerMessage) {
+    wordsOnly(message);
+    if (message.text) chat.send(message);
+  }
+  function steer(message: ComposerMessage) {
+    wordsOnly(message);
+    return message.text ? chat.steer(message) : Promise.resolve();
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {chat.messages.length > 0 && (
@@ -99,8 +111,8 @@ export function HomeBox({ blocked, conversationRef }: HomeBoxProps) {
       {blocked && <Blocked block={blocked} />}
       <div onDropCapture={onDrop}>
         <Composer
-          onSend={chat.send}
-          onSteer={chat.steer}
+          onSend={send}
+          onSteer={steer}
           activity={chat.activity}
           disabled={blocked !== null}
           placeholder={t(home.placeholder)}
