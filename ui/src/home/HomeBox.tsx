@@ -1,7 +1,10 @@
 // Home's one message box (U3's Composer), the Home conversation above it, and why the Lead cannot work now. A drop
 // on the box is a tender: a dropped folder becomes a new tender, which opens at once while its files go in. Loose
 // files are not a tender: the box says to drop the whole folder. Files pasted into the box are not sent either: the
-// words go, and the box says the files did not.
+// words go, and the box says the files did not. In the installed app the shell takes every drop on the window and
+// sends what it found: Home listens for it while it is open.
+import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { type DragEvent, type Ref, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { client, type Schemas } from "@/api/client";
@@ -11,7 +14,7 @@ import { buttonVariants } from "@/design/ui/button";
 import { paths } from "@/app/paths";
 import { home } from "@/texts/home";
 import { useText } from "@/texts/useText";
-import { dropTender, folderOf } from "./folderDrop";
+import { type DesktopDrop, type DroppedFolder, desktopFolder, dropTender, folderOf, walkedFolder } from "./folderDrop";
 import { useHomeChat } from "./homeChat";
 
 const FIX_SECTION: Partial<Record<NonNullable<Schemas["LeadBlock"]["fix"]>, { section: string; words: Schemas["Text"] }>> = {
@@ -70,6 +73,26 @@ export function HomeBox({ blocked, conversationRef }: HomeBoxProps) {
   const leadName = useLeadName();
   const [line, setLine] = useState<Schemas["Text"]>();
 
+  /** `failed`: the shell could not read what was dropped (rather than it being loose files). */
+  function bring(dropped: DroppedFolder | null, failed = false) {
+    if (!dropped) return setLine(failed ? home.notMade : home.folderOnly);
+    setLine(undefined);
+    void dropTender(dropped, (id) => navigate(paths.tender(id))).then((refused) => refused && setLine(refused));
+  }
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let live = true;
+    const off = listen<DesktopDrop>("one-files-dropped", ({ payload }) => {
+      if (live) bring(desktopFolder(payload), payload.errors.length > 0 && payload.files.length === 0);
+    });
+    return () => {
+      live = false;
+      void off.then((stop) => stop());
+    };
+    // `bring` only reaches the router and this box's line, which stay the same while Home is open.
+  }, []);
+
   function onDrop(event: DragEvent<HTMLDivElement>) {
     if (!holdsFiles(event)) return;
     event.preventDefault();
@@ -78,7 +101,7 @@ export function HomeBox({ blocked, conversationRef }: HomeBoxProps) {
     const entries = folderOf(event.dataTransfer);
     if (!entries) return setLine(home.folderOnly);
     setLine(undefined);
-    void dropTender(entries, (id) => navigate(paths.tender(id))).then((refused) => refused && setLine(refused));
+    void walkedFolder(entries).then((dropped) => bring(dropped));
   }
 
   /** Says when the message held files, which stay behind. */
