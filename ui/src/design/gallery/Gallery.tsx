@@ -1,10 +1,12 @@
 // The design gallery (dev only, /next.html): a top bar with three switches (page, language, theme), then either
 // every component in every state, or the specimens. The switches write the address; the app's own live in Settings.
 import type { ReactNode } from "react";
+import { ConversationGallery } from "@/conversation/gallery/ConversationGallery";
 import { Pill } from "@/design/Pill";
 import { Wordmark } from "@/design/Wordmark";
 import { Button } from "@/design/ui/button";
 import { common } from "@/texts/common";
+import { conversationGallery } from "@/texts/design/conversation";
 import { foundation } from "@/texts/design/foundation";
 import { text, useText } from "@/texts/useText";
 import type { TextPair } from "@/texts/types";
@@ -70,6 +72,7 @@ export function Gallery() {
             options={[
               { value: "gallery", label: t(foundation.viewGallery) },
               { value: "specimens", label: t(foundation.viewSpecimens) },
+              { value: "conversation", label: t(conversationGallery.view) },
             ]}
           />
           <Switch
@@ -104,7 +107,9 @@ export function Gallery() {
           </div>
           <p className="max-w-155 text-lg text-muted-foreground">{t(foundation.intro)}</p>
         </div>
-        {address.view === "specimens" ? (
+        {address.view === "conversation" ? (
+          <ConversationGallery />
+        ) : address.view === "specimens" ? (
           <Specimens />
         ) : (
           <>

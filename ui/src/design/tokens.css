@@ -14,6 +14,7 @@
 @source "../tender";
 @source "../settings2";
 @source "../firstlaunch2";
+@source "../conversation";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {

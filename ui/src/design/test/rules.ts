@@ -2,10 +2,10 @@
 // Each returns a list of problems; rules.test.ts runs them over the files and over bad samples.
 
 /** Folders of the new interface. Later jobs append theirs. */
-export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/next", "ui/src/firstlaunch2", "ui/src/engineer"] as const;
+export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/next", "ui/src/firstlaunch2", "ui/src/engineer", "ui/src/conversation"] as const;
 
-/** Copied code: shadcn's components and CSS, as the CLI wrote them. */
-export const isCopied = (path: string) => path.startsWith("ui/src/design/ui/");
+/** Copied code: shadcn's components and CSS, and the ai-elements parts, as the CLIs wrote them. */
+export const isCopied = (path: string) => path.startsWith("ui/src/design/ui/") || path.startsWith("ui/src/conversation/ai/");
 const COPIED_CSS = "ui/src/design/ui/shadcn-tailwind.css";
 const TOKENS = "ui/src/design/tokens.css";
 const COPPER_HOME = "ui/src/design/now-waiting.tsx";
@@ -96,7 +96,7 @@ export function physicalSides(path: string, source: string): string[] {
 const IMPORT = /(?:^|[^\w$.])(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|(?:^|[^\w$.])import\s*\(?\s*["']([^"']+)["']|@import\s+(?:url\()?["']([^"']+)["']/gm;
 // "@/app/App" alone: ui/src/app also holds the old interface's start screen. The contract's client (@/api/) and the
 // live stream (@/activity) are the kept ways to the core.
-const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/firstlaunch2/", "@/engineer/", "@/api/", "@/activity"];
+const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/firstlaunch2/", "@/engineer/", "@/conversation/", "@/api/", "@/activity"];
 
 function normalise(path: string): string {
   const out: string[] = [];
