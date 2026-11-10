@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from qsone import copy
 from qsone.app import create_app
 from qsone.engine.plan import store
+from qsone.journey import understand
 from tests.conftest import AUTH, SECRET
 from tests.engine_fakes import scripted
 from tests.plan_driver_kit import MAP, english  # noqa: F401 - the engineer writes English
@@ -117,3 +118,23 @@ def test_a_rejected_change_is_told_to_the_running_work(client, app, monkeypatch)
     assert store.untold(rec) is None  # told: the next work is not told again
     assert post(client, path, {"change_id": change.id, "accept": False}).status_code == 200
     assert len(steered) == 1  # the same answer again tells nothing more
+
+
+def test_the_understand_brief_keeps_its_own_instruction(client, app, lead):
+    """The told line waits for ordinary work: the reading state and the card check know the
+    'I understood this' Brief by its exact instruction."""
+    pid, rec = signed_off_plan(client, app)
+    change = suggest_a_second_stage(rec)
+    assert (
+        post(
+            client, f"/projects/{pid}/plan/change", {"change_id": change.id, "accept": False}
+        ).status_code
+        == 200
+    )
+    started = client.post(f"/projects/{pid}/understand", headers=AUTH)
+    assert started.status_code == 202, started.text
+    brief = app.state.engine._briefs.get(started.json()["brief_id"])
+    waits(lambda: len(lead.instructions) >= 2, "the understand Brief's Lead")
+    assert brief.instruction == understand.INSTRUCTION
+    assert copy.PLAN_CHANGE_REJECTED_TOLD["en"] not in lead.instructions[-1]
+    assert store.untold(rec) is not None  # still owed: the next ordinary work is told

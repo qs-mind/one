@@ -31,7 +31,7 @@ from qsone.deliverables import events
 from qsone.engine.plan import claims, outputs, store
 from qsone.engine.runner import GENERAL, BriefBusy, NoAI
 from qsone.engine.store import ENGINE, UNFINISHED, Store
-from qsone.journey import setup_state
+from qsone.journey import setup_state, understand
 from qsone.records import audit
 from qsone.records.project import Records, RecordsError
 
@@ -186,9 +186,13 @@ class PlanDriver:
 
     def _tell_lead(self, rec: Records, brief_id: str) -> None:
         """Before a Brief's Lead starts: the engineer's answer to its last Suggested change,
-        when no steer told it, joins the Brief's instruction (route 12)."""
+        when no steer told it, joins the Brief's instruction (route 12). Not a mapping or an
+        "I understood this" Brief: the reading state and the card check know that one by its
+        exact instruction, so the answer waits for the next ordinary work."""
         brief = self.engine._briefs.get(brief_id)
         if brief is None or brief.mapping_files is not None:
+            return
+        if brief.instruction == understand.INSTRUCTION:
             return
         said = store.untold(rec)
         if said is not None and store.told(rec, said[0]):
