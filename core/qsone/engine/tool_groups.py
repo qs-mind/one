@@ -59,7 +59,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "client_file_read",
         "client_file_plan",
     ),
-    "more": ("note_lesson", "connector_tools", "understood"),
+    "more": ("note_lesson", "connector_tools", "understood", "settings_set"),
 }
 _GROUP_OF = {tool: group for group, tools in GROUPS.items() for tool in tools}
 

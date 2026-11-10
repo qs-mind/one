@@ -122,7 +122,14 @@ def test_every_text_the_screen_offers_a_fix_for_is_matched():
     for fix, found in copy.FIXES.items():
         for text in found:
             filled = copy.fill(
-                text, provider="Claude", model="Sample model", date="2026-11-05", other="sample-2"
+                text,
+                provider="Claude",
+                model="Sample model",
+                date="2026-11-05",
+                other="sample-2",
+                scope_name=copy.SCOPE_MONTH,  # a Spending Cap's (fix "caps")
+                spent="150",
+                cap="150",
             )
             assert copy.fix_of(text) == fix and copy.fix_of(filled) == fix
     assert copy.fix_of(copy.fill(copy.AI_FAILED, provider="Claude")) is None

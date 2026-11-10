@@ -171,30 +171,6 @@ def router() -> APIRouter:
     def retry_setup():
         return _stub()
 
-    # Settings and the AI links (C10).
-    @r.get("/settings", response_model=c.Settings, responses=_refusals())
-    def settings():
-        return _stub()
-
-    @r.patch("/settings/{key}", response_model=c.Setting, responses=_refusals(404, 422, 503))
-    def change_setting(key: str, body: c.SettingIn):
-        return _stub()
-
-    @r.post(
-        "/settings/ai/connect",
-        status_code=201,
-        response_model=c.AiLink,
-        responses={200: {"model": c.AiLink}} | _refusals(409, 422, 502, 503),
-    )
-    def connect_ai(body: c.AiConnectIn):
-        return _stub()
-
-    @r.delete(
-        "/settings/ai/links/{link_id}", response_model=c.Undoable, responses=_refusals(404, 409)
-    )
-    def disconnect_ai(link_id: str):
-        return _stub()
-
     # Try again (C3).
     @r.post(
         "/briefs/{brief_id}/retry",

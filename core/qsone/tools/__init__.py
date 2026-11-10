@@ -13,6 +13,7 @@ from qsone.tools import (  # noqa: F401 - each registers its tools
     prices,
     project_map,
     sandbox,
+    settings,
     sheet_pricing,
     web,
 )

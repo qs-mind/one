@@ -25,6 +25,7 @@ from qsone import (
     phase1_stubs,
     projects,
     settings,
+    settings_routes,
     undo,
     usage,
     workspace,
@@ -254,6 +255,7 @@ def create_app(
     app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)
     app.include_router(profile.router(engine, account))  # the engineer's profile (Phase 1)
     registry.country = lambda: profile.country(engine.engineer_records)  # contract Q14
+    app.include_router(settings_routes.router(ai_http, trash, engine))  # Phase 1: C10
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):

@@ -21,7 +21,7 @@ import pytest
 from fastapi import APIRouter
 from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from starlette.routing import compile_path
 
 from qsone import copy, phase1_openapi, phase1_stubs
@@ -354,6 +354,36 @@ def test_a_wrongly_built_request_is_refused_before_the_stub_answers(client):
     for refused in (number, third, word, extra, zero):
         assert refused.status_code == 422
         c.BodyProblem.model_validate_json(refused.text, strict=True)
+
+
+def test_the_settings_rows_answer_their_models(data_dir):
+    """Rows 21-24 are built (C10): each answers the model of its row, in strict mode. Their own
+    tests: core/tests/test_settings_registry.py and core/tests/test_ai_links.py."""
+    from tests.test_engine_connectors import providers
+
+    client = TestClient(create_app(SECRET, data_dir=data_dir, ai_http=providers()))
+    by_path = {row.path: row for row in ROWS}
+    listed = client.get("/settings", headers=AUTH)
+    assert listed.status_code == 200
+    c.Settings.model_validate_json(listed.text, strict=True)
+    patch = by_path["/settings/{key}"]
+    changed = client.patch(patch.call, json=patch.body, headers=AUTH)
+    assert changed.status_code == 200
+    TypeAdapter(c.Setting).validate_json(changed.text, strict=True)
+    unknown = client.post("/settings/ai/connect", json={"key": "sample-key"}, headers=AUTH)
+    assert unknown.status_code == 422
+    c.Refusal.model_validate_json(unknown.text, strict=True)
+    made = client.post(
+        "/settings/ai/connect", json={"key": "sk-ant-api03-" + "s" * 90}, headers=AUTH
+    )
+    assert made.status_code == 201
+    c.AiLink.model_validate_json(made.text, strict=True)
+    gone = client.delete(by_path["/settings/ai/links/{link_id}"].call, headers=AUTH)
+    assert gone.status_code == 404
+    c.Refusal.model_validate_json(gone.text, strict=True)
+    removed = client.delete("/settings/ai/links/anthropic", headers=AUTH)
+    assert removed.status_code == 200
+    c.Undoable.model_validate_json(removed.text, strict=True)
 
 
 # Nothing older is shadowed ----------------------------------------------------------------------

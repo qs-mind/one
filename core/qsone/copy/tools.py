@@ -79,6 +79,7 @@ TOOL_WORDS = {
     "save_desk": {"en": "Saving a Desk", "ar": "بيحفظ قسم"},
     "search_records": {"en": "Searching the project files", "ar": "بيدوّر في ملفات المشروع"},
     "send_message": {"en": "Sending a message to the team", "ar": "بيبعت رسالة للفريق"},
+    "settings_set": {"en": "Changing a setting", "ar": "بيغيّر إعداد"},
     "show": {"en": "Laying out a view for you", "ar": "بيجهّزلك عرض"},
     "submit_for_check": {
         "en": "Sending work to the Checking QS",

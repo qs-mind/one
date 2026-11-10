@@ -69,9 +69,16 @@ class Services:
     # (Task 6); shared by every run's copy of these services
 
     def on_device(self, rec: Records | None) -> bool:
-        """True for an On-device Project (its meta "on_device" is "1"): nothing may leave this
+        """True for an On-device Project (its meta "on_device" is "1"), and for a Confidential
+        one while the setting `ai.confidential_on_device` is on: nothing may leave this
         computer, so no web, no cloud model reading pages, no remote Connector."""
-        return rec is not None and rec.meta().get("on_device") == "1"
+        from qsone.settings_registry import confidential_on_device
+
+        if rec is None:
+            return False
+        meta = rec.meta()
+        confidential = meta.get("confidential") == "1" and confidential_on_device()
+        return meta.get("on_device") == "1" or confidential
 
     async def close(self) -> None:
         await self.http.aclose()
