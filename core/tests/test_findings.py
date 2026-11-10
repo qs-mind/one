@@ -20,7 +20,7 @@ from qsone import phase1_contract as c
 from qsone.app import create_app
 from qsone.engine import agents, costs, finding_tools, findings  # noqa: F401 - the tools
 from qsone.engine.findings_routes import router as findings_router
-from qsone.engine.team import specialist_tools
+from qsone.engine.team import messages, specialist_tools
 from qsone.engine.tools import call
 from qsone.engine.types import AgentSpec, Data
 from qsone.records import ledger
@@ -186,6 +186,9 @@ def test_raise_makes_one_decision_card(events):
             (first, {"finding_id": first}),
             (second, {"finding_id": second}),
         ]
+        lead_says = messages.page(rec, None, 50)["messages"][-1]  # the team room (C6)
+        assert (lead_says["from_id"], lead_says["to_id"]) == ("lead-qs", "engineer")
+        assert lead_says["raised"] == {"id": first, "answered": False}
         assert raise_(ctx, first) == raised  # the same call again is the same answer
         with pytest.raises(ModelRetry, match="raise each Finding once"):
             raise_(ctx, first, "رأي تاني - عينة")
@@ -227,6 +230,11 @@ def test_raise_makes_one_decision_card(events):
         ]  # fmt: skip
         brief = client.app.state.engine.active(pid)
         assert brief is not None  # the Lead's work on the decision
+        answered = [e["message"] for _, e in events if e["type"] == "room"]
+        assert [(m["id"], m["raised"]) for m in answered][:1] == [
+            (lead_says["id"], {"id": first, "answered": True})
+        ]
+        assert messages.page(rec, None, 50)["messages"][-1]["raised"]["answered"] is True
 
         assert decide(first, 0).json() == done.json()  # the same choice again
         other = decide(first, 1)

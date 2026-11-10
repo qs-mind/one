@@ -9,10 +9,13 @@ from the engineer's conversation and from the Coordination Room of older Briefs
   message) are the room's own: the screen does not draw them (the contract's Q12). They count
   the rounds of a disagreement (`objections`).
 - `raised` follows what the Lead raised to the engineer, a Finding or a card: `{id, answered}`,
-  or null for an ordinary message and again when the card was withdrawn.
+  or null for an ordinary message and again when the card was withdrawn. A withdrawn one keeps
+  its `raised_id` (with `raised_answered` null), so the redone call finds it and raises it again
+  (`redone`, `withdrawn_raise`).
 - A page is newest first, in the order the messages were written; its cursor names the oldest
   message of the page, opaquely."""
 
+import asyncio
 import base64
 import binascii
 import json
@@ -36,7 +39,7 @@ _CURSOR = "room:"
 def _message(row) -> dict:
     """A stored row as the contract's `RoomMessage`."""
     message_id, from_id, to_id, text, sources, at, raised_id, answered = row
-    raised = None if raised_id is None else {"id": raised_id, "answered": bool(answered)}
+    raised = None if answered is None else {"id": raised_id, "answered": bool(answered)}
     return {
         "id": message_id,
         "from_id": from_id,
@@ -116,29 +119,78 @@ def set_brief(rec: Records, message_id: str, brief_id: str) -> None:
         conn.execute("UPDATE room_messages SET brief_id = ? WHERE id = ?", (brief_id, message_id))
 
 
-def set_raised(rec: Records, message_id: str, raised: dict | None) -> dict:
-    """The message with `raised` as given ({id, answered} or None)."""
-    raised_id = None if raised is None else raised["id"]
-    answered = None if raised is None else int(raised["answered"])
+def set_raised(rec: Records, message_id: str, raised: dict) -> dict:
+    """The message with `raised` as given ({id, answered})."""
     with rec.write(_ACTOR) as conn:
         conn.execute(
             "UPDATE room_messages SET raised_id = ?, raised_answered = ? WHERE id = ?",
-            (raised_id, answered, message_id),
+            (raised["id"], int(raised["answered"]), message_id),
         )
         return _one(conn, message_id)
 
 
 def answered(rec: Records, raised_id: str) -> list[dict]:
     """Every message that raised `raised_id`, now answered; the ones that changed."""
+    return _waiting_now(rec, [raised_id], 1)
+
+
+def withdrawn(rec: Records, card_ids: list[str]) -> list[dict]:
+    """Every message that raised one of these cards, back to `raised` null: the cards were
+    withdrawn. The ones that changed."""
+    return _waiting_now(rec, card_ids, None)
+
+
+def _waiting_now(rec: Records, raised_ids: list[str], answered: int | None) -> list[dict]:
+    """The messages still waiting on one of `raised_ids`, with `raised_answered` set."""
+    if not raised_ids:
+        return []
+    marks = ", ".join("?" * len(raised_ids))
+    waiting = f"WHERE raised_answered = 0 AND raised_id IN ({marks})"
     with rec.write(_ACTOR) as conn:
-        rows = conn.execute(
-            "SELECT id FROM room_messages WHERE raised_id = ? AND raised_answered = 0",
-            (raised_id,),
-        ).fetchall()
-        conn.execute(
-            "UPDATE room_messages SET raised_answered = 1 WHERE raised_id = ?", (raised_id,)
-        )
+        rows = conn.execute(f"SELECT id FROM room_messages {waiting}", raised_ids).fetchall()
+        conn.execute(f"UPDATE room_messages SET raised_answered = ? {waiting}",
+                     (answered, *raised_ids))  # fmt: skip
         return [_one(conn, message_id) for (message_id,) in rows]
+
+
+def cards_withdrawn(rec: Records, card_ids: list[str]) -> None:
+    """The store withdrew these cards (a restart, a Stop, «Leave it»): their messages are back
+    to `raised` null. The room is told when this runs on the core's event loop; off it (a sync
+    route's thread) the room reads the change on its next page."""
+    changed = withdrawn(rec, card_ids)
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    publish(rec.id, changed)
+
+
+def redone(rec: Records, brief_id: str, *, from_id: str, to_id: str, text: str, kind: str):
+    """The message a redone call wrote before it was cut off: the same words in this Brief, in a
+    thread whose raise was withdrawn. None when there is none."""
+    with rec.read() as conn:
+        row = conn.execute(
+            "SELECT m.id FROM room_messages m WHERE m.brief_id = ? AND m.from_id = ?"
+            " AND m.to_id = ? AND m.text = ? AND m.kind = ? AND EXISTS (SELECT 1 FROM"
+            " room_messages w WHERE w.brief_id = m.brief_id AND w.thread = m.thread"
+            " AND w.rowid >= m.rowid AND w.raised_id IS NOT NULL AND w.raised_answered IS NULL)"
+            " ORDER BY m.rowid DESC LIMIT 1",
+            (brief_id, from_id, to_id, text, kind),
+        ).fetchone()
+        return None if row is None else _one(conn, row[0])
+
+
+def withdrawn_raise(rec: Records, brief_id: str, thread: str) -> dict | None:
+    """The Lead's message of this thread whose card was withdrawn: the redone call raises it
+    again instead of writing another."""
+    with rec.read() as conn:
+        row = conn.execute(
+            "SELECT id FROM room_messages WHERE brief_id = ? AND thread = ?"
+            " AND raised_id IS NOT NULL AND raised_answered IS NULL"
+            " ORDER BY rowid DESC LIMIT 1",
+            (brief_id, thread),
+        ).fetchone()
+        return None if row is None else _one(conn, row[0])
 
 
 def objections(rec: Records, thread: str) -> list[tuple[str, str, list]]:

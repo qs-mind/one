@@ -7,6 +7,9 @@ messages are `team.messages`; routes 17 and 18 of the contract are here.
   `raised` set to it. An objection is a round of a disagreement: after two rounds not settled,
   the next objection goes to the engineer with both views and their evidence, the same rule as
   the Checking QS's two rounds. The answer goes back to the member as its tool result.
+- After a cut-off the store withdraws the waiting card (`messages.cards_withdrawn`): the Lead's
+  message goes back to `raised` null, and the redone call reuses both messages and raises the
+  Lead's again with the new card.
 - Raising a Finding writes the Lead's message to the engineer (`finding_raised`); deciding it
   marks that message answered (`finding_decided`).
 - The engineer's message (route 18) goes to the Lead only: a steer when the Lead's work runs in
@@ -68,8 +71,9 @@ async def _raise(ctx: ToolContext, card: Card, lead_message: dict) -> str:
     _show(ctx, messages.set_raised(rec, message_id, {"id": card.id, "answered": False}))
     try:
         value = await _ask(ctx, card)
-    except BaseException:
-        _show(ctx, messages.set_raised(rec, message_id, None))
+    except BaseException:  # in this process; after a cut-off the store's withdrawal does it
+        for message in messages.withdrawn(rec, [card.id]):
+            _show(ctx, message)
         raise
     _show(ctx, messages.set_raised(rec, message_id, {"id": card.id, "answered": True}))
     return value
@@ -80,6 +84,10 @@ def _to_engineer(ctx: ToolContext, said: dict, text: str, sources: list) -> dict
     wrote it to the engineer."""
     if said["from_id"] == identity.LEAD and said["to_id"] == messages.ENGINEER:
         return said
+    thread = messages.thread_of(ctx.rec, said["id"])
+    again = messages.withdrawn_raise(ctx.rec, ctx.brief_id, thread)
+    if again is not None:  # the redone call raises the cut-off message again
+        return again
     lead = messages.write(
         ctx.rec, from_id=identity.LEAD, to_id=messages.ENGINEER, text=text, sources=sources,
         brief_id=ctx.brief_id, reply_to=said["id"],
@@ -159,7 +167,9 @@ async def member_says(ctx: ToolContext, args, message_id: str, to_id: str) -> di
     sources = messages.sources_of(rec, args.sources, args.finding_id)
     if args.money and ctx.agent.id == identity.LEAD:
         to_id = messages.ENGINEER
-    said = messages.write(
+    said = messages.redone(
+        rec, ctx.brief_id, from_id=ctx.agent.id, to_id=to_id, text=args.text, kind=args.kind
+    ) or messages.write(
         rec, from_id=ctx.agent.id, to_id=to_id, text=args.text, sources=sources,
         brief_id=ctx.brief_id, kind=args.kind, reply_to=args.reply_to, message_id=message_id,
     )  # fmt: skip

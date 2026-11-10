@@ -19,12 +19,13 @@ from qsone import activity, copy
 from qsone import phase1_contract as c
 from qsone.app import create_app
 from qsone.engine import room, stream
+from qsone.engine.store import Store
 from qsone.engine.team import messages
 from qsone.engine.tools import call
 from qsone.engine.types import AgentSpec
 from qsone.journey import setup_state
 from tests.conftest import AUTH, SECRET
-from tests.engine_fakes import OPUS, scripted, text
+from tests.engine_fakes import OPUS, FakeHost, scripted, text
 from tests.engine_fakes import call as step
 from tests.fakes_tools import tool_ctx
 from tests.test_engine_runner import (  # noqa: F401 - fixtures
@@ -98,6 +99,11 @@ def test_room_lists_team_messages_paged(events):
             bad = client.get(f"/projects/{pid}/room?cursor={cursor}", headers=AUTH)
             assert bad.status_code == 422
             assert bad.json() == {"error": copy.ROOM_CURSOR_INVALID, "field": "cursor"}
+
+        assert client.post(f"/projects/{pid}/archive", headers=AUTH).status_code == 200
+        locked = client.post(f"/projects/{pid}/room", json={"text": "سؤال - عينة"}, headers=AUTH)
+        assert (locked.status_code, locked.json()) == (423, copy.error(copy.PROJECT_ARCHIVED))
+        assert len(messages.page(rec, None, 200)["messages"]) == 120  # nothing stored
 
 
 async def test_engineer_post_goes_to_lead(make_engine, project, registry, events):
@@ -223,3 +229,52 @@ def test_disagreement_goes_to_engineer_after_two_rounds(rec, events):
 
     four = said(pricing, CONTRACTS.id, "تمام، 10% - عينة", kind="object", reply_to=three["sent"])
     assert "engineer_decides" not in four and len(contracts.host.cards) == 1  # settled: new rounds
+
+
+MONEY = "تحليل سعر بند 3/02 محتاج نسبة هالك للحديد: كام؟ - عينة"
+
+
+def raised_of(events, message_id: str) -> list:
+    return [e["message"]["raised"] for e in events if e["message"]["id"] == message_id]
+
+
+async def test_a_cut_off_raise_is_withdrawn_then_asked_again(rec, events):
+    """The app closed while the card waited: on continue the store withdraws it, the Lead's
+    message goes back to null, and the redone call raises that same message again."""
+    ctx = tool_ctx(rec, agent=PRICING)  # no answer: the card waits
+    asked = {"to": "lead", "text": MONEY, "kind": "ask", "money": True}
+    waiting = asyncio.create_task(call("send_message", asked, ctx))
+    await until(lambda: ctx.host.cards)
+    [old] = ctx.host.cards
+    lead_says, member_says = messages.page(rec, None, 50)["messages"]
+    assert lead_says["raised"] == {"id": old.id, "answered": False}
+
+    Store(rec, project_id=rec.id).withdraw_pending(ctx.brief_id)  # the continue, after a restart
+    assert messages.page(rec, None, 50)["messages"][0]["raised"] is None
+    assert raised_of(events, lead_says["id"])[-1] is None  # the room is told
+    waiting.cancel()  # the old process's call, gone
+    await asyncio.gather(waiting, return_exceptions=True)
+
+    redo = replace(ctx, host=FakeHost(ctx.brief_id, answers={"question": answer(answer="5%")}))
+    out = json.loads(await call("send_message", asked, redo))
+    assert (out["sent"], out["answer"]) == (member_says["id"], "5%")
+    [new] = redo.host.cards
+    now = messages.page(rec, None, 50)["messages"]
+    assert [m["id"] for m in now] == [lead_says["id"], member_says["id"]]  # no second message
+    assert now[0]["raised"] == {"id": new.id, "answered": True}
+    assert raised_of(events, lead_says["id"]) == [
+        None, {"id": old.id, "answered": False}, None,
+        {"id": new.id, "answered": False}, {"id": new.id, "answered": True},
+    ]  # fmt: skip
+
+
+async def test_a_stopped_raise_goes_back_to_null(rec, events):
+    ctx = tool_ctx(rec, agent=PRICING)
+    asked = {"to": "lead", "text": MONEY, "kind": "ask", "money": True}
+    waiting = asyncio.create_task(call("send_message", asked, ctx))
+    await until(lambda: ctx.host.cards)
+    waiting.cancel()  # the Stop, in this process
+    await asyncio.gather(waiting, return_exceptions=True)
+    lead_says = messages.page(rec, None, 50)["messages"][0]
+    assert lead_says["to_id"] == "engineer" and lead_says["raised"] is None
+    assert raised_of(events, lead_says["id"])[-1] is None
