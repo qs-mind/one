@@ -50,6 +50,7 @@ from qsone.engine.connectors import claude_code
 from qsone.engine.plan import driver as plan_driver
 from qsone.engine.plan import retry as retry_routes
 from qsone.engine.plan import routes as plan_routes
+from qsone.engine.plan import waiting as plan_waiting
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
 from qsone.journey import profile
@@ -290,6 +291,7 @@ def create_app(
     app.include_router(settings_routes.router(ai_http, trash, engine))  # Phase 1: C10
     app.include_router(home_routes.router(registry, engine, trash))  # Home and lessons (C7)
     app.include_router(plan_routes.router(registry, engine))  # the tender plan (Phase 1)
+    plan_waiting.install()  # Home reads the plan and its waiting items through it
     app.include_router(retry_routes.router(engine, driver))  # Try again (Phase 1, C3)
     app.include_router(findings_api.router(engine))  # Phase 1: routes 13-14 (C4)
 

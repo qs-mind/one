@@ -161,7 +161,7 @@ try {
   await step("keep the BOQ's columns", async () => {
     await app.click(waitingItem("rows"), { timeout: 90_000 });
     await app.shot("rows-waiting");
-    await app.click({ role: "button", name: /احفظ/ }, { timeout: 15_000 });
+    await app.click(button("استورد بالأعمدة دي"), { timeout: 15_000 });
     await app.waitGone(waitingItem("rows"), 30_000);
     note("the BOQ's columns were kept from the tender");
   });

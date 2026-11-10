@@ -348,3 +348,30 @@ def test_a_plan_stored_before_it_had_a_source_reads_none(rec):
     old = store.body(rec)
     del old["plan"]["submission_source"]  # rows are kept as written: one from before the field
     assert store._shown(old).submission_source is None
+
+
+# What Home and the side column read -------------------------------------------------------------
+
+
+def test_home_reads_the_plan_and_what_waits_on_it(rec):
+    from qsone import home
+    from qsone.engine.plan import waiting
+
+    waiting.install()
+    due_in(rec)
+    assert home.snapshot(rec)["plan"] is None and home.snapshot(rec)["waiting"] == []
+    plan = store.propose(rec, draft(rec))
+    snap = home.snapshot(rec)
+    assert snap["plan"]["stages"] == ["pending", "pending"]
+    assert [(i["kind"], i["id"], i["title"]) for i in snap["waiting"]] == [
+        ("plan", plan.id, copy.WAITING_PLAN)
+    ]
+    store.approve(rec, version=1)
+    first = plan.stages[0]
+    store.set_stage_status(rec, first.id, "waiting_engineer", result=pair("Done"))
+    (stage_item,) = home.snapshot(rec)["waiting"]
+    assert (stage_item["kind"], stage_item["id"]) == ("stage", first.id)
+    assert stage_item["title"] == {
+        lang: copy.WAITING_STAGE[lang].format(stage=first.title.model_dump()[lang])
+        for lang in ("en", "ar")
+    }
