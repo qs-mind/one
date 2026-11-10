@@ -33,7 +33,10 @@ describe.each(DIRS)("MemberCard (%s)", (dir) => {
 
   it("shows the Lead's whole identity and the real record of its work", async () => {
     open(dir, P2, "lead-qs");
-    expect(await screen.findByRole("heading", { level: 1, name: "Lead QS" })).toBeInTheDocument();
+    const heading = await screen.findByRole("heading", { level: 1, name: "Lead QS" });
+    // The line follows the page; only the name inside it keeps its own direction.
+    expect(heading).not.toHaveAttribute("dir");
+    expect(heading.querySelector("bdi")).toHaveAttribute("dir", "ltr");
     expect(document.querySelector('[data-place="member"]')).toHaveAttribute("data-member", "lead-qs");
     const lead = (await client.GET("/projects/{project_id}/members", { params: { path: { project_id: P2 } } })).data!.members[0]!;
     for (const pair of [lead.title, lead.speciality, lead.style, ...lead.tools.map((tool) => tool.title)]) expect(page()).toContain(text(pair, lang));

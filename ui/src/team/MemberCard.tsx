@@ -41,8 +41,8 @@ function Card({ projectId, member }: { projectId: string; member: TeamMember }) 
   return (
     <article aria-label={t(texts.cardLabel)} className="flex flex-col gap-10">
       <header className="flex flex-col gap-1">
-        <h1 dir={textDir(name)} className="text-2xl font-bold">
-          {name}
+        <h1 className="text-2xl font-bold">
+          <bdi dir={textDir(name)}>{name}</bdi>
         </h1>
         <Said text={t(member.title)} className="text-lg text-muted-foreground" />
         <MetaLine items={kind} className="text-xs text-muted-foreground" />

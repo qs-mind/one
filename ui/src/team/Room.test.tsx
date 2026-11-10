@@ -93,6 +93,23 @@ describe.each(DIRS)("Room (%s)", (dir) => {
     expect(stored.messages[0]).toMatchObject({ from_id: "engineer", to_id: "team", text: "راجعوا البند 9 تاني" });
   });
 
+  it("places the POST answer itself, with no room event behind it", async () => {
+    let posted: unknown = null;
+    server.use(
+      http.post("*/api/projects/:id/room", async ({ request }) => {
+        posted = await request.json();
+        const message: Schemas["RoomMessage"] = { id: id(7200), from_id: "engineer", to_id: "team", text: "ابدأوا بالخرسانة", sources: [], at: "2026-11-09T09:00:00.000000+00:00", raised: null };
+        return HttpResponse.json(message, { status: 201 }); // answered, but nothing published on the stream
+      }),
+    );
+    renderRoom();
+    const log = await room();
+    await waitFor(() => expect(ids(log)).toHaveLength(6));
+    await userEvent.type(screen.getByRole("textbox", { name: text(team.messageLabel, lang) }), "ابدأوا بالخرسانة{Enter}");
+    await waitFor(() => expect(ids(log).at(-1)).toBe("7200"));
+    expect(posted).toEqual({ text: "ابدأوا بالخرسانة" });
+  });
+
   it("a refused message says why and keeps the words", async () => {
     const refusal = { en: "The Lead QS cannot work now.", ar: "الـ Lead QS مش قادر يشتغل دلوقتي." };
     server.use(http.post("*/api/projects/:id/room", () => HttpResponse.json({ error: refusal }, { status: 409 })));
