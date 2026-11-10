@@ -22,14 +22,16 @@ from qsone.copy.ai import (
     NO_KEY,
 )
 from qsone.copy.journey import AI_CONSENT_NEEDED, ARCHIVE_BACKUP_FAILED, CLAUDE_CODE_NOT_FOUND
-from qsone.copy.spending import PRICE_UNKNOWN
+from qsone.copy.settings import SETTINGS_NOT_SAVED
+from qsone.copy.spending import CAP_STOPPED, CAP_TOKENS_STOPPED, PRICE_UNKNOWN
 from qsone.copy.web import WEB_NO_SEARCH, WEB_SEARCH_KEY_REFUSED, WEB_SEARCH_LIMIT
 
 # ---------------------------------------------------------------------------------------------
 # What the screen can add to a text: the action that fixes it, for the place it shows in.
 # "ai": AI settings ("Open AI settings" in the chat; nothing more in AI settings or the first
 # launch's Connect AI, where the fix is already in place). "consent": the first launch's Connect
-# AI step. "retry": the same check once more ("Try again"). "backup": the Backup panel.
+# AI step. "retry": the same check once more ("Try again"). "backup": the Backup panel. "caps":
+# Settings, Spending caps (a cap that is reached).
 # ---------------------------------------------------------------------------------------------
 FIXES = {
     "ai": (
@@ -57,8 +59,10 @@ FIXES = {
         CLAUDE_CODE_SHIM,
         CLAUDE_CODE_SIGNED_OUT,
         CLAUDE_CODE_NOT_FOUND,
+        SETTINGS_NOT_SAVED,
     ),
     "backup": (ARCHIVE_BACKUP_FAILED,),
+    "caps": (CAP_STOPPED, CAP_TOKENS_STOPPED),
 }
 
 

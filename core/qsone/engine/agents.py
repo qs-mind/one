@@ -38,6 +38,7 @@ LEAD_TOOLS = (
     "connector_tools",
     "understood",  # Plan 8: the "I understood this" card
     "show",  # decision 16.1: a view built from ONE's blocks (qsone/view.py)
+    "settings_set",  # Phase 1: settings by talking to the Lead (qsone/settings_registry.py)
 )
 CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
 
