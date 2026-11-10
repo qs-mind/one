@@ -3,11 +3,15 @@ and raises one at a time, route 14 settles it, and every member sees the team's 
 
 Scripted models and hosts only; synthetic «عينة» data only."""
 
+# ruff: noqa: F811 (the engine fixtures, imported)
+
 import asyncio
 import json
 import time
 
+import httpx
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic_ai import ModelRetry
 
@@ -15,6 +19,7 @@ from qsone import activity, copy
 from qsone import phase1_contract as c
 from qsone.app import create_app
 from qsone.engine import agents, costs, finding_tools, findings  # noqa: F401 - the tools
+from qsone.engine.findings_routes import router as findings_router
 from qsone.engine.team import specialist_tools
 from qsone.engine.tools import call
 from qsone.engine.types import AgentSpec, Data
@@ -22,9 +27,19 @@ from qsone.records import ledger
 from qsone.records.files import add_file
 from tests.conftest import AUTH, SECRET
 from tests.engine_fakes import OPUS, scripted, text
+from tests.engine_fakes import call as step
 from tests.fakes_tools import tool_ctx
 from tests.samples import sample_pdf, sample_xlsx
-from tests.test_engine_runner import FakeLink
+from tests.test_engine_runner import (  # noqa: F401 - fixtures
+    FakeLink,
+    finish,
+    links,
+    make_engine,
+    project,
+    registry,
+    started,
+    until,
+)
 
 TITLE = {"en": "Column concrete grade differs (sample)", "ar": "رتبة خرسانة الأعمدة مختلفة - عينة"}
 OPTIONS = [
@@ -163,6 +178,8 @@ def test_raise_makes_one_decision_card(events):
         queued = raise_(ctx, second)
         assert (raised["status"], raised["queued_ahead"]) == ("raised", 0)
         assert (queued["status"], queued["queued_ahead"]) == ("queued", 0)
+        said = [(e["finding"]["id"], e["finding"]["status"]) for _, e in events if "finding" in e]
+        assert said[-2:] == [(first, "raised"), (second, "queued")]  # the team sees it at once
         assert ctx.host.cards == []  # no card: raising never holds the Lead's run
         parts = [e for e in ctx.host.events if isinstance(e, Data) and e.name == "finding"]
         assert [(p.id, p.data) for p in parts] == [
@@ -223,6 +240,49 @@ def test_raise_makes_one_decision_card(events):
             archived = client.post(f"/projects/{pid}/archive", headers=AUTH)
         locked = decide(second, 0)
         assert locked.status_code == 423
+
+
+async def test_a_decision_steers_the_running_lead(make_engine, project, registry, events):
+    """Work runs in the tender: the decision is a steer into it, not a second Brief; and the
+    stored reply places the Finding again."""
+    rec = registry.get(project)
+    pdf = spec_file(rec)
+    first = json.loads(await call("record_finding", finding(pdf), tool_ctx(rec)))["finding_id"]
+    go = asyncio.Event()
+
+    def briefs() -> int:
+        with rec.read() as conn:
+            return conn.execute("SELECT count(*) FROM briefs").fetchone()[0]
+
+    async def waits(messages, info):
+        await asyncio.wait_for(go.wait(), 5)
+        return step("files_list", {})
+
+    asked = {"finding_id": first, "opinion": "C40 أأمن - عينة", "options": OPTIONS}
+    lead = scripted(step("raise_finding", asked), waits, text("تمام - عينة"))
+    engine = await started(make_engine(links(lead=lead)))
+    before = briefs()
+    brief = await engine.start_brief(project, "سعّر الخرسانة - عينة")
+    await until(lambda: lead.calls == 2)
+    said = [(e["finding"]["id"], e["finding"]["status"]) for _, e in events if "finding" in e]
+    assert said[-1] == (first, "raised")  # raise_finding in the Brief told the team
+
+    app = FastAPI()
+    app.include_router(findings_router(engine))
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://one") as client:
+        done = await client.post(f"/projects/{project}/findings/{first}/decide", json={"choice": 0})
+    assert done.status_code == 200 and done.json()["status"] == "settled"
+    assert engine.active(project) == brief
+    go.set()
+    await finish(engine, brief)
+    assert "The engineer decided the Finding" in str(lead.seen[2])
+    assert engine.active(project) is None
+
+    assert briefs() == before + 1  # the decision started no second Brief
+    [message] = [m for m in engine.chat_messages(project) if m["id"] == f"{brief}-reply"]
+    part = {"type": "data-finding", "id": first, "data": {"finding_id": first}}
+    assert part in message["parts"]
 
 
 def test_closed_without_the_engineer(rec, events):
