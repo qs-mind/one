@@ -188,7 +188,9 @@ async def test_driver_resume_no_double_start(make_engine, registry, project, dat
         await driver.resume_all()  # twice changes nothing
         await until(lambda: lead2.calls == 1 and e2.active(project) is None)
         await driver.idle()
-        second.open(project)  # it closed again when its Brief ended; the engineer opens it
+        # it closes when its Brief ends (late on a slow machine); then the engineer opens it
+        await until(lambda: not any(p["id"] == project and p["open"] for p in second.list()))
+        second.open(project)
         e2.opened(project)
         t2 = Tender(e2, second, project, propose=False, driver=driver)
         await t2.ready(1)  # the driver's own cut-off stage went on by itself, as the same Brief

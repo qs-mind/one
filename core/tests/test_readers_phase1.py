@@ -7,6 +7,7 @@ Fakes only: a fake drawing reader prints the JSON the real one would; every .doc
 by tests/doc_writer.py; every text is sample data."""
 
 import json
+import os
 import sys
 import time
 
@@ -33,13 +34,17 @@ def fake_reader(tmp_path, monkeypatch):
     def use(answer: dict, code: int = 0):
         out = tmp_path / "answer.json"
         out.write_text(json.dumps(answer, ensure_ascii=False), encoding="utf-8")
-        script = tmp_path / "reader"
-        script.write_text(
+        body = tmp_path / "reader.py"
+        body.write_text(
             f"#!{sys.executable}\nimport sys\nsys.stdin.buffer.read()\n"
             f"sys.stdout.write(open({str(out)!r}, encoding='utf-8').read())\nsys.exit({code})\n",
             encoding="utf-8",
         )
-        script.chmod(0o755)
+        body.chmod(0o755)
+        script = body
+        if os.name == "nt":  # Windows runs no shebang: a .cmd that hands the script to Python
+            script = tmp_path / "reader.cmd"
+            script.write_text(f'@"{sys.executable}" "{body}" %*\r\n', encoding="utf-8")
         monkeypatch.setenv("QSONE_DRAWINGS", str(script))
 
     return use
