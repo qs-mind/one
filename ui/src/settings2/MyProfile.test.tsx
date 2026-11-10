@@ -70,5 +70,16 @@ describe.each(DIRS)("Settings, My profile (%s)", (dir) => {
     expect(older.calls.some((call) => call.startsWith("POST /account/sign-in"))).toBe(true);
     await userEvent.click(within(account).getByRole("button", { name: say(firstlaunch.cancel) }));
     await within(account).findByRole("button", { name: say(texts.signIn) });
+    expect(older.calls.some((call) => call.startsWith("POST /account/cancel"))).toBe(true);
+  });
+
+  it("the QS Mind account: a sign-in that ends in the browser shows who is signed in", async () => {
+    openSettings(dir, "me");
+    const account = await screen.findByRole("region", { name: say(texts.account) });
+    await userEvent.click(await within(account).findByRole("button", { name: say(texts.signIn) }));
+    await within(account).findByText(say(firstlaunch.signingIn));
+    // The fake core answers the next GET /account with the finished sign-in; only the screen's own asking reaches it.
+    await within(account).findByRole("button", { name: say(texts.signOut) }, { timeout: 3000 });
+    expect(plain(account.textContent)).toContain(plain(say(firstlaunch.signedIn, { email: "engineer@example.com" })));
   });
 });

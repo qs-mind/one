@@ -121,11 +121,14 @@ describe.each(DIRS)("Settings sections (%s)", (dir) => {
     await userEvent.click(within(form).getByRole("radio", { name: say(texts.overInternet) }));
     await userEvent.type(within(form).getByLabelText(say(texts.connectorName)), "files-sample");
     await userEvent.type(within(form).getByLabelText(say(texts.connectorAddress)), "https://mcp.example.com/files");
+    await userEvent.type(within(form).getByLabelText(say(texts.connectorToken)), "token-sample");
     await userEvent.click(within(form).getByRole("button", { name: say(texts.connectorStart) }));
     await userEvent.click(await screen.findByRole("button", { name: say(texts.dontAdd) }));
-    await screen.findByRole("form", { name: say(texts.addConnector) });
+    const back = await screen.findByRole("form", { name: say(texts.addConnector) });
     expect(kept.calls).toContain(`POST /connectors/cards/${kept.card.id} {"choice":"no"}`);
     expect(kept.connectors.map((it) => it.name)).toEqual(["drive-sample"]);
+    expect(within(back).getByLabelText(say(texts.connectorName))).toHaveValue("files-sample"); // the form comes back as typed
+    expect(within(back).getByLabelText(say(texts.connectorToken))).toHaveValue(""); // but the token was sent once, not kept
   });
 
   it("Backup: the folder is saved on leaving the box; Back up now runs one", async () => {

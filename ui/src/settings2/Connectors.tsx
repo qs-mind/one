@@ -43,10 +43,10 @@ function Row({ connector, onChanged }: { connector: ConnectorRow; onChanged: () 
           render={<label />}
           leading={<Checkbox checked={connector.enabled} onCheckedChange={(on) => void turn(on)} />}
           title={connector.name}
-          meta={<MetaLine items={[<bdi key="runs" dir="ltr">{connector.runs}</bdi>, t.plural(texts.connectorTools, connector.tools)]} />}
+          meta={<MetaLine items={[<bdi key="runs" dir="ltr" className="wrap-anywhere">{connector.runs}</bdi>, t.plural(texts.connectorTools, connector.tools)]} />}
           className="flex-1"
         />
-        <Button variant="ghost" onClick={() => void remove()}>
+        <Button variant="ghost" className="shrink-0" onClick={() => void remove()}>
           {t(texts.remove)}
         </Button>
       </div>

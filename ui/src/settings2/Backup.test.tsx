@@ -55,4 +55,15 @@ describe.each(DIRS)("Settings, Backup (%s)", (dir) => {
     await waitFor(() => expect(within(restore).getByText(say(texts.restoreNone))).toBeInTheDocument());
     expect(plain(restore.textContent)).toContain(plain(say(texts.restored, { name: "Hidden sample" })));
   });
+
+  it("restoring: a tender that needs a sign-in links to My profile and offers no Restore", async () => {
+    kept.found = [{ id: "3".repeat(32), name: "Signed sample", last_backup: "2026-11-06T10:00:00.000000+00:00", needs: "sign_in" }];
+    const router = openSettings(dir, "backup");
+    const restore = await screen.findByRole("region", { name: say(texts.restore) });
+    await userEvent.type(within(restore).getByLabelText(say(texts.restoreFolder)), "/media/usb/Backups{Enter}");
+    await within(restore).findByText("Signed sample");
+    expect(within(restore).queryByRole("button", { name: say(texts.restoreIt) })).toBeNull();
+    await userEvent.click(within(restore).getByRole("link", { name: say(texts.restoreNeedsSignIn) }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/me"));
+  });
 });
