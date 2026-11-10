@@ -50,6 +50,34 @@ export const cards = defineTexts({
   raiseGo: { en: "Go on with the new caps", ar: "كمّل بالسقف الجديد" },
   answer: { en: "Your answer", ar: "ردّك" },
 
+  // A table card: prices to keep, a BOQ import's columns
+  keepColumns: { en: "Import with these columns", ar: "استورد بالأعمدة دي" },
+  checkColumns: { en: "Check the columns", ar: "راجع الأعمدة" },
+  hideColumns: { en: "Hide the columns", ar: "اخفي الأعمدة" },
+  columnMeaning: { en: "What column {letter} holds", ar: "العمود {letter} فيه إيه" },
+  tickRow: { en: "Keep row {n}", ar: "احفظ الصف {n}" },
+  sourceOf: { en: "Source of {value}", ar: "مصدر {value}" },
+
+  // A Connector being added
+  readWithoutAsking: { en: "Use its reading tools without asking me", ar: "استخدم أدوات القراية بتاعته من غير ما تسألني" },
+  readWithoutAskingHelp: {
+    en: "Only tools it marks as reading only. Once work has read outside text, ONE asks again.",
+    ar: "بس الأدوات اللي معلّم عليها إنها للقراية بس. ولما الشغل يقرا نص من برّه، ONE بيسأل تاني.",
+  },
+  useForSearch: { en: "Use for web search", ar: "استخدمه للبحث في الويب" },
+  noSearchTool: { en: "Not for web search", ar: "مش للبحث في الويب" },
+  toolReadsOnly: { en: "Reads only", ar: "قراية بس" },
+  toolActs: { en: "Can send or change things: asks you every time", ar: "يقدر يبعت أو يغيّر حاجات: بيسألك كل مرة" },
+  toolDeletes: { en: "Can delete: asks you every time", ar: "يقدر يمسح: بيسألك كل مرة" },
+  toolOpenWorld: { en: "Reaches outside services: asks you every time", ar: "بيوصل لخدمات برّه: بيسألك كل مرة" },
+
+  // A model with no known price
+  priceIn: { en: "Input, USD per million tokens", ar: "الداخل، دولار لكل مليون توكن" },
+  priceOut: { en: "Output, USD per million tokens", ar: "الخارج، دولار لكل مليون توكن" },
+  useThisPrice: { en: "Use it at this price", ar: "استخدمه بالسعر ده" },
+  priceNotSaved: { en: "The price was not saved. Try again.", ar: "السعر ماتحفظش. جرّب تاني." },
+  capsNotLoaded: { en: "The caps could not be read. Raise them in Settings.", ar: "الحدود ماتقريتش. ارفعها من الإعدادات." },
+
   // A stage's sign-off block
   stageAsks: { en: "Sign off «{stage}»", ar: "اعتمد «{stage}»" },
   gate: { en: "What you sign off", ar: "اللي بتعتمده" },
@@ -70,6 +98,10 @@ export const cards = defineTexts({
   // A message that got no answer
   workFailed: { en: "This work did not finish", ar: "الشغل ده ماخلصش" },
   noAnswer: { en: "Your message got no answer. Try again.", ar: "رسالتك ماجالهاش رد. جرّب تاني." },
+  messageNotSent: {
+    en: "Your message was not sent: other work is running and did not take it. Try again.",
+    ar: "رسالتك ماتبعتتش: فيه شغل تاني شغّال وماخدهاش. جرّب تاني.",
+  },
   filesIn: {
     en: { one: "{n} file went into the tender", other: "{n} files went into the tender" },
     ar: {

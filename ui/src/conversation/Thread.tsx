@@ -118,7 +118,7 @@ export function Thread(props: ThreadProps) {
     const pending = (part.data.status ?? "pending") === "pending" && !answered.has(id);
     if (pending && id !== openCard)
       return <Pointer>{t(conversation.queued, { title: t(part.data.title) })}</Pointer>;
-    return <CardPart id={id} card={part.data} disabled={disabled} onAnswered={(done) => setAnswered((was) => new Set(was).add(done))} />;
+    return <CardPart id={id} card={part.data} disabled={disabled} onOpenSource={onOpenSource} onAnswered={(done) => setAnswered((was) => new Set(was).add(done))} />;
   };
 
   /** A reply, in the order it came: its words, the engineer's steers and what it placed, each at its place; the

@@ -1,15 +1,12 @@
 // A card a running Brief waits on (data-card, contract 3.2), in the decision card's frame: what it asks, its words,
 // and its options, the first the dark button. An option the core marks as costing money or not to be taken back
-// (`hold`) is a press-and-hold. Questions are answered in typed fields here; a table, a Connector and a model's
-// price keep the kept card bodies (chat/parts/cardKinds), and "Raise the cap" the kept caps form. The answer goes
-// to POST /cards/{id}; once the core took it the card is one line: the answer and when.
+// (`hold`) is a press-and-hold. Questions are answered in typed fields, a table, a Connector and a model's price in
+// their own bodies (./cards), and "Raise the cap" opens the Spending caps in place. The answer goes to POST
+// /cards/{id}; once the core took it the card is one line: the answer and when.
 import { useState } from "react";
 import { Link } from "react-router";
 import { answerCard } from "@/api/existing";
 import { paths } from "@/app/paths";
-import { CapsForm } from "@/chat/parts/CapsForm";
-import { type CardAnswer, cardKinds } from "@/chat/parts/cardKinds";
-import type { CardData as KeptCard } from "@/chat/parts/types";
 import { HoldButton } from "@/design/HoldButton";
 import { MetaLine } from "@/design/MetaLine";
 import { buttonVariants } from "@/design/ui/button";
@@ -27,7 +24,11 @@ import {
   ConfirmationRequest,
   ConfirmationTitle,
 } from "./ai/confirmation";
-import type { CardData } from "./parts";
+import { ConnectorBody } from "./cards/ConnectorBody";
+import { PriceBody } from "./cards/PriceBody";
+import { RaiseCaps } from "./cards/RaiseCaps";
+import { RowsBody } from "./cards/RowsBody";
+import type { CardAnswer, CardData, Source } from "./parts";
 import { QuestionFields } from "./QuestionFields";
 
 const allow = { yes: o.allowOnce, brief: o.allowBrief, no: o.dontAllow };
@@ -66,9 +67,14 @@ type CardPartProps = {
   onAnswered?: (id: string) => void;
   /** Nothing can be pressed (an archived tender). */
   disabled?: boolean;
+  /** A table row's number opens its source in ONE's viewer. */
+  onOpenSource?: (source: Source) => void;
 };
 
-export function CardPart({ id, card, onAnswered, disabled = false }: CardPartProps) {
+/** The kinds that draw a body of their own beside the card's words. */
+const BODIES = new Set<CardData["kind"]>(["question", "rows", "connector", "price"]);
+
+export function CardPart({ id, card, onAnswered, disabled = false, onOpenSource }: CardPartProps) {
   const t = useText();
   const [sent, setSent] = useState<Sent | null>(null);
   const [sending, setSending] = useState(false);
@@ -106,7 +112,8 @@ export function CardPart({ id, card, onAnswered, disabled = false }: CardPartPro
   const title = t(card.title);
   const detail = t(card.detail);
   const fix = card.fix ? FIX[card.fix] : undefined;
-  const Kind = card.kind !== "question" && card.payload ? cardKinds[card.kind] : undefined;
+  const plain = !BODIES.has(card.kind) || (card.kind !== "question" && !card.payload);
+  const body = { card: shown, open, busy, label, onAnswer: (choice: string, extra?: CardAnswer) => void answer(choice, extra) };
   const hint = (why: "paid" | "irreversible") => t(why === "paid" ? cards.holdPaid : cards.holdIrreversible);
 
   return (
@@ -132,10 +139,10 @@ export function CardPart({ id, card, onAnswered, disabled = false }: CardPartPro
           onSend={(choice, answers) => void answer(choice, answers ? { answers } : {})}
         />
       )}
-      {Kind && (
-        <Kind card={shown as KeptCard} sending={busy} label={label} lang={t.lang} onAnswer={(choice, extra) => void answer(choice, extra)} />
-      )}
-      {!Kind && card.kind !== "question" && (
+      {!plain && card.kind === "rows" && <RowsBody {...body} onOpenSource={onOpenSource} />}
+      {!plain && card.kind === "connector" && <ConnectorBody {...body} />}
+      {!plain && card.kind === "price" && open && <PriceBody {...body} />}
+      {plain && (
         <ConfirmationActions className="mt-1">
           {card.options.map((option, at) =>
             card.hold?.options.includes(option) ? (
@@ -156,7 +163,7 @@ export function CardPart({ id, card, onAnswered, disabled = false }: CardPartPro
           )}
         </ConfirmationActions>
       )}
-      {open && raising && <CapsForm go={{ label: t(cards.raiseGo), onGo: () => void answer("raise") }} />}
+      {open && raising && <RaiseCaps busy={busy} onGo={() => void answer("raise")} />}
       {failed && (
         <p role="alert" className="text-xs font-bold">
           {failed}

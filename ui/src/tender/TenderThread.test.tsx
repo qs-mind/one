@@ -98,6 +98,34 @@ describe("the tender's conversation", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(words.en);
   });
 
+  it("steers a message that found other work running to that work, and joins it", async () => {
+    let steered: unknown = null;
+    server.use(
+      http.post("*/api/chat", () => HttpResponse.json({ brief_id: "b7" }, { status: 409 })),
+      http.post("*/api/briefs/:id/steer", async ({ params, request }) => {
+        steered = { id: params.id, body: await request.json() };
+        return new HttpResponse(null, { status: 202 });
+      }),
+    );
+    open(P1);
+    await userEvent.type(await box(), "Start with the concrete{Enter}");
+    await waitFor(() => expect(steered).toEqual({ id: "b7", body: { text: "Start with the concrete" } }));
+    // not a message of its own: it comes back as the work's steer
+    await waitFor(() => expect(screen.queryByText("Start with the concrete")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says the words were not sent when the work running refused them too", async () => {
+    server.use(
+      http.post("*/api/chat", () => HttpResponse.json({ brief_id: "b7" }, { status: 409 })),
+      http.post("*/api/briefs/:id/steer", () => HttpResponse.json({ error: { en: "x", ar: "س" } }, { status: 409 })),
+    );
+    open(P1);
+    await userEvent.type(await box(), "Start with the concrete{Enter}");
+    expect(await screen.findByRole("alert")).toHaveTextContent(text(cards.messageNotSent, "en"));
+    expect(screen.getByText("Start with the concrete")).toBeInTheDocument();
+  });
+
   it("puts files dropped on the box into the tender, then sends the words", async () => {
     server.use(
       http.post("*/api/chat", ({ request }) => {
@@ -143,9 +171,9 @@ describe("the tender's conversation", () => {
 
 describe("refusalOf", () => {
   it("reads the core's words, and a message that found other work running", () => {
-    expect(refusalOf(new Error(JSON.stringify({ en: "e", ar: "ع", fix: "ai" })))).toEqual({ words: { en: "e", ar: "ع" }, busy: false });
-    expect(refusalOf(new Error(JSON.stringify({ brief_id: "b1" })))).toEqual({ words: null, busy: true });
-    expect(refusalOf(new Error("Failed to fetch"))).toEqual({ words: null, busy: false });
+    expect(refusalOf(new Error(JSON.stringify({ en: "e", ar: "ع", fix: "ai" })))).toEqual({ words: { en: "e", ar: "ع" }, busy: null });
+    expect(refusalOf(new Error(JSON.stringify({ brief_id: "b1" })))).toEqual({ words: null, busy: "b1" });
+    expect(refusalOf(new Error("Failed to fetch"))).toEqual({ words: null, busy: null });
     expect(refusalOf(undefined)).toBeNull();
   });
 });

@@ -3,7 +3,6 @@
 // type and id is live (3.1, rule 2).
 import type { UIMessage } from "ai";
 import type { Schemas } from "@/api/client";
-import type { CardData as KeptCard } from "@/chat/parts/types";
 
 export type Text = Schemas["Text"];
 export type Source = Schemas["Source"];
@@ -16,8 +15,46 @@ export type ProgressData = { agent: Text; text: Text };
 export type BriefState = Schemas["BriefEvent"]["state"];
 /** `fix`: what the screen can offer beside a failed Brief's step. */
 export type StatusData = { state: BriefState; step: Text | null; fix?: Schemas["LeadBlock"]["fix"] };
+/** One tool of a Connector being added, with the hints its server gives (core/qsone/connectors/hub.py). */
+export type ConnectorTool = { name: string; purpose: string | null; read_only: boolean; destructive: boolean; open_world: boolean };
+/** What a card shows beyond its words, as the core sends it today (3.2): questions, a table whose rows may be ticked
+ * or whose columns' meanings are picked, a Connector's tools, a model with no known price. */
+export type CardPayload = {
+  questions?: Schemas["CardQuestion"][];
+  columns?: { key: string; label: Text }[];
+  rows?: Record<string, string>[];
+  /** The column holding each row's number, and that number's source, which opens in ONE's viewer. */
+  number_column?: string;
+  row_sources?: (Source | null)[];
+  tick?: boolean;
+  /** A BOQ import: what a sheet column may hold, the row key holding its meaning as mapped. */
+  meanings?: { key: string; label: Text }[];
+  meaning_column?: string;
+  tools?: ConnectorTool[];
+  model?: { connector: string; model: string; name: string };
+};
 /** data-card, id = the card: what a running Brief waits on (3.2), the two new kinds included. */
-export type CardData = Omit<KeptCard, "kind"> & { kind: KeptCard["kind"] | "keep_member" | "setting" };
+export type CardData = {
+  kind:
+    | "outside" | "online" | "cap" | "price" | "budget" | "fallback" | "desk" | "disagreement" | "question" | "keep"
+    | "rows" | "cost" | "connector" | "keep_member" | "setting";
+  title: Text;
+  detail: Text;
+  options: string[];
+  /** What fixes what the detail says: a place in Settings. */
+  fix?: string;
+  payload?: CardPayload;
+  status?: "pending" | "settled" | "withdrawn";
+  choice?: string | null;
+  /** Once settled: the answers by question id (or column letter), and the rows ticked, by index. */
+  answers?: Record<string, string>;
+  rows_ok?: number[];
+  /** The answers that spend money or cannot be taken back: press-and-hold, never one click. */
+  hold?: { why: "paid" | "irreversible"; options: string[] };
+  settled_at?: string;
+};
+/** What an answer carries beyond the choice (POST /cards/{id}). */
+export type CardAnswer = { answers?: Record<string, string>; rows_ok?: number[] };
 
 export type ThreadData = {
   progress: ProgressData;
