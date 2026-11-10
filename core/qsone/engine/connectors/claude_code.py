@@ -671,6 +671,7 @@ class ClaudeCodeConnector:
         self._gate = gate
         self._runs: dict[str, _Process] = {}
         self._stopping: set[str] = set()  # runs the engineer stopped
+        self._held: dict[str, list[str]] = {}  # steers for a run whose `claude` takes no input yet
 
     async def _ready(self) -> tuple[tuple[str, ...], str] | None:
         command, _ = _command(self.path, self._prefix)
@@ -719,6 +720,7 @@ class ClaudeCodeConnector:
 
     async def run(self, job: AgentJob, sink: Callable[[Event], None]) -> AgentOutcome:
         usage: dict[str, tuple[int, int]] = {}
+        self._held[job.run_id] = []
         try:
             ready = await self._ready()
             if ready is None:
@@ -755,6 +757,7 @@ class ClaudeCodeConnector:
             log.warning("Claude Code run %s refused: %s", job.run_id, refused)
             return AgentOutcome("", job.resume, "failed", (), None)
         finally:
+            self._held.pop(job.run_id, None)
             self._stopping.discard(job.run_id)
             if self._gate is not None:
                 self._gate.revoke(job.mcp_token)
@@ -863,6 +866,9 @@ class ClaudeCodeConnector:
         threading.Thread(target=_read, args=(process, lines, loop), daemon=True).start()
         try:
             running.send(first)
+            held = self._held.get(key)
+            while held:  # steered before this process took input
+                running.send(_user_line(held.pop(0)))
             verdict: Ended | None = None
             while True:
                 line = await lines.get()
@@ -973,8 +979,12 @@ class ClaudeCodeConnector:
                 log.warning("A Claude Code config file could not be removed")
 
     async def steer(self, run_id: str, text: str) -> None:
-        """One more stream-json user line. Raises `LookupError` when the run is not running."""
+        """One more stream-json user line, held until `claude` takes input when the run has begun
+        but its process has not. Raises `LookupError` when the run is not running."""
         running = self._runs.get(run_id)
+        if running is None and run_id in self._held:
+            self._held[run_id].append(text)
+            return
         if running is None or not await asyncio.to_thread(running.send, _user_line(text)):
             raise LookupError(run_id)
 

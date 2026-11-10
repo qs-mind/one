@@ -429,6 +429,28 @@ async def test_steer_writes_one_more_user_line(log, work):
         await connector.steer("run-1", "no run - sample")
 
 
+async def test_a_steer_before_the_process_takes_input_is_sent_once_it_does(log, work):
+    connector = link(["init", {"await_user": 20}, {"text": "تمام - عينة"}, "result"], log)
+    entered, go = asyncio.Event(), asyncio.Event()
+    ready = connector._ready
+
+    async def held():  # the run has begun, but `claude` is not started yet
+        entered.set()
+        await go.wait()
+        return await ready()
+
+    connector._ready = held
+    task = asyncio.create_task(connector.run(job(work), lambda e: None))
+    await asyncio.wait_for(entered.wait(), 5)
+    await connector.steer("run-1", "خلّي السعر بالجنيه - عينة")
+    go.set()
+    out = await task
+    assert out.ended == "done" and out.text == "تمام - عينة"
+    [run] = read_fake_log(log)
+    users = [line for line in run["stdin"] if line["type"] == "user"]
+    assert users[1]["message"]["content"] == [{"type": "text", "text": "خلّي السعر بالجنيه - عينة"}]
+
+
 def test_two_runs_started_at_once_get_their_own_numbers(log):
     """The fake numbers its runs with a counter, not by counting the log, so two processes
     started together each play their own run of the script."""
