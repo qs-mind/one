@@ -291,7 +291,8 @@ async def test_scenario_confidential_isolated(make_engine, registry, drivers):
 
     for place in (open_one, GENERAL):
         await finish(engine, await engine.start_brief(place, "إيه الأخبار؟ - عينة"))
-    await finish(engine, await engine.start_brief(secret, "احتفظ بمهندس التسعير - عينة"))
+    await engine.start_brief(secret, "احتفظ بمهندس التسعير - عينة")
+    await until(lambda: engine.active(secret) is None)  # no keep_member card to wait on
     seen = [str(lead.seen[n]) for n in range(lead.calls)]
     assert "مدرسة مكشوفة - عينة" in seen[0] and "مدرسة مكشوفة - عينة" in seen[1]
     assert "برج سري" not in seen[0] and "برج سري" not in seen[1]  # another tender's, Home's
