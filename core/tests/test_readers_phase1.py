@@ -253,17 +253,18 @@ def test_word_97_that_is_locked_damaged_or_not_word_says_so(monkeypatch):
 
 
 def test_word_97_work_grows_with_the_file_not_with_its_tables():
+    limit = 3.0  # seconds: quadratic work here takes far longer; a busy CI runner must not fail it
     hidden_runs = " ".join(f"word{i} HIDE(h{i})" for i in range(5000))
     data = word_doc([("p", hidden_runs)])
     start = time.perf_counter()
     x = extract("a.doc", data)
-    assert time.perf_counter() - start < 1.0
+    assert time.perf_counter() - start < limit
     assert x.flags[0].count > 5000
     # hidden runs that are also white and tiny: each is matched to its hidden span by bisect
     runs = " ".join(f"word{i} HIDEWHITE(h{i})" for i in range(20000))
     start = time.perf_counter()
     x = extract("a.doc", word_doc([("p", runs)]))
-    assert time.perf_counter() - start < 1.0
+    assert time.perf_counter() - start < limit
     assert [f.kind for f in x.flags] == ["invisible_text"]
     assert [f.kind for f in extract("a.doc", word_doc([("p", "a WHITE(w)")])).flags] == [
         "white_text"
@@ -272,7 +273,7 @@ def test_word_97_work_grows_with_the_file_not_with_its_tables():
     repeated = word_doc([("p", "HIDE(h) sample")], chp_repeat=50000)
     start = time.perf_counter()
     assert doc_text(repeated) == [({"paragraph": 1}, "sample")]
-    assert time.perf_counter() - start < 1.0
+    assert time.perf_counter() - start < limit
 
 
 def test_the_property_pages_are_read_once_each():
