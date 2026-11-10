@@ -326,6 +326,26 @@ def test_a_contract_route_is_declared_and_refuses_until_it_is_built(app, client,
         c.Refusal.model_validate_json(answer.text, strict=True)
 
 
+@pytest.mark.parametrize(
+    "row",
+    [row for row in ROWS if row.path.startswith("/setup/parts")],
+    ids=lambda row: f"{row.method} {row.path}",
+)
+def test_the_setup_routes_answer_their_model(app, client, row):
+    """Built by C8: the answer is a `SetupState` in strict mode, even before setup starts."""
+    assert not is_stub(answering(table(app), row.method, row.call))
+    answer = client.request(row.method, row.call, json=row.body, headers=AUTH)
+    assert answer.status_code == row.status
+    assert answer.headers["cache-control"] == "no-store"
+    state = row.gives.model_validate_json(answer.text, strict=True)
+    assert [part.id for part in state.parts] == [
+        "search-model",
+        "sandbox-runtime",
+        "dwg-reader",
+        "ocr",
+    ]
+
+
 def test_the_not_built_text_is_a_pair_with_no_fix_to_offer():
     assert set(copy.NOT_BUILT) == {"en", "ar"} and all(copy.NOT_BUILT.values())
     assert copy.fix_of(copy.NOT_BUILT) is None

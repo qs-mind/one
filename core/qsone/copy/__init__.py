@@ -31,6 +31,7 @@ from qsone.copy.project_map import *
 from qsone.copy.projects import *
 from qsone.copy.sandbox import *
 from qsone.copy.search import *
+from qsone.copy.setup import *
 from qsone.copy.spending import *
 from qsone.copy.team import *
 from qsone.copy.tools import *

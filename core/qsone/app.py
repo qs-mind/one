@@ -49,6 +49,9 @@ from qsone.journey import routes as journey_routes
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
 from qsone.records.project import RecordsError
+from qsone.sandbox import runtime as sandbox_runtime
+from qsone.setup import routes as setup_routes
+from qsone.setup.runner import Setup
 from qsone.tools import services as tool_services  # the package registers every Plan 5 tool
 from qsone.web import search as web_search
 
@@ -126,6 +129,7 @@ def create_app(
     meaning: Callable[[projects.Projects], Meaning] | None = None,
     ai_http: httpx2.AsyncClient | None = None,
     sleep: Callable[[float], Awaitable] | None = None,
+    setup: Setup | None = None,
 ) -> FastAPI:
     """Build the core app. Every route needs `Authorization: Bearer <secret>`.
 
@@ -137,7 +141,8 @@ def create_app(
     `<data folder>/models`); tests inject sample specs, a fake hub and test doubles. `ai_http`
     reaches the AI providers for the AI settings and the Brief Runner (default: each provider's
     own client); tests inject a fake transport. `sleep` is the Brief Runner's wait between
-    retries (default: `asyncio.sleep`).
+    retries (default: `asyncio.sleep`). `setup` fetches what ONE needs beyond the installer
+    (default: the manifest's parts); tests inject one with a fake hub.
     """
     expected = f"Bearer {secret}".encode()
     models_lister = models_lister or models.list_models
@@ -150,6 +155,7 @@ def create_app(
     folder = data_dir if data_dir is not None else projects.default_data_dir()
     registry = projects.Projects(folder)
     service = meaning(registry) if meaning else Meaning(registry, Path(folder) / "models")
+    setup = setup or Setup(Path(folder) / "models", sandbox_runtime.root())
     mcp = mcp_server.McpGate()
     connector_hub = ConnectorHub()  # the engineer's MCP Connectors (Plan 5)
     trash = undo.Trash()  # Undo instead of "are you sure?": removals wait out their window here
@@ -190,6 +196,10 @@ def create_app(
             lambda project_id, event: loop.call_soon_threadsafe(activity.publish, project_id, event)
         )
         service.start()
+        setup.on_change = lambda state: loop.call_soon_threadsafe(
+            activity.publish, "general", {"type": "setup", "setup": state}
+        )
+        setup.start()  # in its own thread: the core answers meanwhile
         mapping.completed = lambda pid, ids, **options: asyncio.run_coroutine_threadsafe(
             engine.map_project(pid, ids, **options), loop
         )
@@ -219,6 +229,7 @@ def create_app(
             sender.stop()
             account.close()  # a sign-in under way stops
         mapping.stop()
+        setup.stop()
         service.stop()
         registry.close_all()
 
@@ -231,6 +242,7 @@ def create_app(
     )
     app.state.projects = registry
     app.state.meaning = service
+    app.state.setup = setup
     app.state.mcp = mcp
     app.state.engine = engine
     app.state.connectors = connector_hub
@@ -240,6 +252,7 @@ def create_app(
     app.add_route("/mcp", mcp_server.mcp_app(mcp))  # its own run-token check, not the secret
     app.include_router(projects.router(registry, service, engine, mapping))
     app.include_router(meaning_routes.router(service))
+    app.include_router(setup_routes.router(setup))
     app.include_router(calc_routes.router(registry))
     app.include_router(deliverables_api.router(registry, trash))
     app.include_router(engine_routes.settings_router(ai_http, trash=trash))

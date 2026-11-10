@@ -199,6 +199,16 @@ def _write_verified(spec: ModelSpec, root: Path) -> None:
     os.replace(temporary, path)
 
 
+_LOCKS: dict[Path, threading.Lock] = {}
+_LOCKS_LOCK = threading.Lock()
+
+
+def _holding(path: Path) -> threading.Lock:
+    """One download per folder at a time: automatic setup and search by meaning share one."""
+    with _LOCKS_LOCK:
+        return _LOCKS.setdefault(path.resolve(), threading.Lock())
+
+
 def download(
     specs: Sequence[ModelSpec],
     root: Path,
@@ -221,20 +231,21 @@ def download(
         raise NoSpace(left + SPARE)
     done = 0  # bytes of the files already finished
     for spec in specs:
-        verified = _verified(spec, root)
-        changed = False
-        for f in spec.files:
-            path = folder(spec, root) / f.path
-            if not _checked(spec, f, root, verified):
-                changed = True
-                if _size(path) == f.size and _hash(path).hexdigest() == f.sha256:
-                    log.info("model %s: a file put in place by hand is accepted", spec.id)
-                else:
-                    path.unlink(missing_ok=True)
-                    progress = lambda n, done=done: on_progress(done + n, total)  # noqa: E731
-                    _Fetch(spec, f, path).run(client, stop, progress, retries, sleep)
-            done += f.size
-        if changed:
-            _write_verified(spec, root)
-            log.info("model %s: %d bytes in place and checked", spec.id, spec.size)
+        with _holding(folder(spec, root)):  # read again inside: another may have finished
+            verified = _verified(spec, root)
+            changed = False
+            for f in spec.files:
+                path = folder(spec, root) / f.path
+                if not _checked(spec, f, root, verified):
+                    changed = True
+                    if _size(path) == f.size and _hash(path).hexdigest() == f.sha256:
+                        log.info("model %s: a file put in place by hand is accepted", spec.id)
+                    else:
+                        path.unlink(missing_ok=True)
+                        progress = lambda n, done=done: on_progress(done + n, total)  # noqa: E731
+                        _Fetch(spec, f, path).run(client, stop, progress, retries, sleep)
+                done += f.size
+            if changed:
+                _write_verified(spec, root)
+                log.info("model %s: %d bytes in place and checked", spec.id, spec.size)
     on_progress(total, total)

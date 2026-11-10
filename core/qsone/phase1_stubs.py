@@ -171,15 +171,6 @@ def router() -> APIRouter:
     def say_in_room(project_id: str, body: c.RoomMessageIn):
         return _stub()
 
-    # Automatic setup (C8).
-    @r.get("/setup/parts", response_model=c.SetupState, responses=_refusals())
-    def setup_parts():
-        return _stub()
-
-    @r.post("/setup/parts/retry", response_model=c.SetupState, responses=_refusals())
-    def retry_setup():
-        return _stub()
-
     # Settings and the AI links (C10).
     @r.get("/settings", response_model=c.Settings, responses=_refusals())
     def settings():
