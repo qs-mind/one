@@ -3,13 +3,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { api, inInstalledApp } from "../api";
-import { systemLanguage } from "../firstlaunch/FirstLaunch";
 import { type Language, savedLanguage, t, useLanguage } from "../i18n";
-import { loadZoom } from "../ui/scale";
+import { loadLook } from "../settings/look";
 import { SLOW_MS, StartScreen } from "./StartScreen";
 
 // Set by the dev server (scripts/core-dev.ts); the installed app asks the shell, which started the core.
 const coreLog: string = import.meta.env.VITE_CORE_LOG ?? "core.log";
+
+/** The system's first language, for the start screen of a very first launch. */
+const systemLanguage = (): Language => ((navigator.languages?.[0] ?? navigator.language ?? "").toLowerCase().startsWith("ar") ? "ar" : "en");
 
 /** How long the installed app's core may take to start before the screen calls it down (core.rs: STARTING). */
 export const STARTING_MS = 60_000;
@@ -120,8 +122,8 @@ export function HealthGate({ children, logPath }: { children: ReactNode; logPath
         .then((response) => response.ok)
         .catch(() => false);
     }
-    // the engineer's zoom, before ONE opens: the screen comes at its size, never jumping to it
-    if (up) await loadZoom();
+    // the engineer's language, theme and zoom, before ONE opens: the screen comes as it was left, never jumping to it
+    if (up) await loadLook();
     clearTimeout(slow.current);
     setState(up ? "up" : "down");
   }, [logPath]);

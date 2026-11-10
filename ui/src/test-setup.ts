@@ -2,7 +2,6 @@ import "./polyfills";
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
-import { clearDrafts } from "./shell/drafts";
 import { clearClientBoqSamples } from "./workspace/clientBoqSample";
 import { resetScale } from "./ui/scale";
 
@@ -81,7 +80,6 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  clearDrafts(); // the message boxes' unsent words live for the page, as they do in the app
   clearClientBoqSamples();
   if (typeof document !== "undefined") resetScale(); // 100 %, no zoom, for the next test
   if (typeof document === "undefined") return; // a test that runs in Node, with no page

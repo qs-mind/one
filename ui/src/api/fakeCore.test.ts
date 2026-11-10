@@ -253,8 +253,8 @@ describe("the fake core's live channel", () => {
   });
 });
 
-// msw and the samples must stay out of the app: only tests may import the fake core, its samples or msw, with or
-// without the file's extension.
+// msw and the samples must stay out of the app: only tests, and the fake-core dev page (ui/src/fake, which Vite never
+// builds), may import the fake core, its samples or msw, with or without the file's extension.
 const FAKE = /["'`](?:msw(?:\/[^"'`\n]*)?|[^"'`\n]*\/(?:fakeCore\w*(?:\.tsx?)?|samples\.json))["'`]/;
 
 it("no application file imports the fake core", () => {
@@ -266,6 +266,7 @@ it("no application file imports the fake core", () => {
     });
   const importers = files(root)
     .filter((path) => /\.tsx?$/.test(path) && !/\.test\.tsx?$/.test(path) && !/fakeCore\w*\.ts$/.test(path))
+    .filter((path) => !relative(root, path).startsWith(join("fake", "")))
     .filter((path) => FAKE.test(readFileSync(path, "utf8")))
     .map((path) => relative(root, path));
   expect(importers).toEqual([]);

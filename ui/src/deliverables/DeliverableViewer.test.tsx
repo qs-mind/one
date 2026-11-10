@@ -5,12 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerHandle } from "../project/types";
-import { fill, setLanguage, texts } from "../i18n";
+import { setLanguage, texts } from "../i18n";
 import { viewerFor } from "../viewers/registry";
-import { DeliverableCard } from "./DeliverableCard";
 import { DeliverableViewer } from "./DeliverableViewer";
 import { base, change, columns, core, D, DOC, entry, fakeLive, json, letter, sheet, thread, viewRoutes } from "./fixtures";
-import { ProjectIndex } from "./ProjectIndex";
 import type { FillPlanInfo } from "./types";
 
 // jsdom has no scrolling; the grid scrolls its active cell into view.
@@ -151,41 +149,6 @@ describe("viewerFor", () => {
     render(<DeliverableViewer projectId="p1" deliverableId={DOC} mode="full" subscribe={fakeLive().subscribe} />);
     await screen.findByRole("tablist", { name: texts.reviewPanels.ar });
     expect(fetch.mock.calls.some(([u]) => String(u).includes("fill-plans"))).toBe(false);
-  });
-});
-
-describe("DeliverableCard", () => {
-  it("shows the Deliverable from the list, updates live, and Open opens it", async () => {
-    core({ [`GET ${base}/deliverables`]: () => json({ deliverables: [entry()] }) });
-    const live = fakeLive();
-    const onOpen = vi.fn();
-    const user = userEvent.setup();
-    render(<DeliverableCard projectId="p1" id={D} onOpen={onOpen} subscribe={live.subscribe} />);
-    expect(await screen.findByText("جدول الكميات - عينة")).toBeInTheDocument();
-    expect(screen.getByText(texts.deliverableNoRevision.ar)).toBeInTheDocument();
-    expect(screen.getByText(texts.sampleData.ar)).toBeInTheDocument();
-    act(() => live.emit({ type: "deliverable", deliverable: entry({ revision: 2 }) }));
-    expect(screen.getByText(fill(texts.reviewRev.ar, { n: 2 }))).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: new RegExp(texts.deliverableOpen.ar) }));
-    expect(onOpen).toHaveBeenCalledWith(D, screen.getByRole("article", { name: "جدول الكميات - عينة" })); // the card it grows from
-  });
-});
-
-describe("ProjectIndex", () => {
-  it("lists the Deliverables newest first, live, and opens one", async () => {
-    const older = entry({ id: "a", title: "خطاب - عينة", kind: "document", updated_at: "2026-11-04T09:00:00.000000+00:00" });
-    core({ [`GET ${base}/deliverables`]: () => json({ deliverables: [older, entry()] }) });
-    const live = fakeLive();
-    const onOpen = vi.fn();
-    const user = userEvent.setup();
-    render(<ProjectIndex projectId="p1" onOpen={onOpen} subscribe={live.subscribe} />);
-    await screen.findByText("خطاب - عينة");
-    const titles = () => screen.getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[0]!.textContent);
-    expect(titles()).toEqual(["جدول الكميات - عينة", "خطاب - عينة"]);
-    act(() => live.emit({ type: "deliverable", deliverable: { ...older, updated_at: "2026-11-05T10:00:00.000000+00:00" } }));
-    expect(titles()).toEqual(["خطاب - عينة", "جدول الكميات - عينة"]);
-    await user.click(screen.getByRole("button", { name: "خطاب - عينة" }));
-    expect(onOpen).toHaveBeenCalledWith("a");
   });
 });
 

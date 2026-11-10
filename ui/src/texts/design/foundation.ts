@@ -1,4 +1,4 @@
-// The design gallery's own words (dev only, served at /next.html), its state names, and the foundation samples.
+// The design gallery's own words (dev only, served at /fake.html), its state names, and the foundation samples.
 import { defineTexts } from "../types";
 
 export const foundation = defineTexts({

@@ -4,7 +4,7 @@
 // input is the X server's (xdotool). main.tsx imports it behind import.meta.env, so a production build has none of it
 // (scripts/realapp/bridge.test.mjs checks the built files).
 import { language } from "./i18n";
-import { currentZoom } from "./ui/scale";
+
 
 /** What to find: by role and accessible name, by text, by test id or by CSS; `within` narrows, `nth` picks. */
 export type Pattern = string | { re: string; flags?: string };
@@ -159,7 +159,7 @@ export function answer(op: string, query: Query | undefined): unknown {
       lang: document.documentElement.lang || language(),
       dir: document.documentElement.dir,
       document: doc?.getAttribute("aria-label") ?? null,
-      zoom: currentZoom(),
+      zoom: parseFloat(getComputedStyle(document.documentElement).fontSize) / 16,
       rootFontSize: parseFloat(getComputedStyle(document.documentElement).fontSize),
       inner: { width: window.innerWidth, height: window.innerHeight },
       dpr: window.devicePixelRatio,

@@ -1,4 +1,4 @@
-// The design gallery (dev only, /next.html): a top bar with three switches (page, language, theme), then either
+// The design gallery (dev only, /fake.html): a top bar with three switches (page, language, theme), then either
 // every component in every state, or the specimens. The switches write the address; the app's own live in Settings.
 import type { ReactNode } from "react";
 import { ConversationGallery } from "@/conversation/gallery/ConversationGallery";

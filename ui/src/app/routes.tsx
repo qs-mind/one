@@ -2,19 +2,18 @@
 // (rail and place) holds all but first launch.
 import { Navigate, type RouteObject } from "react-router";
 import { Home } from "@/home/Home";
-import { Settings } from "@/settings2/Settings";
+import { Settings } from "@/settings/Settings";
 import { Tender } from "@/tender/Tender";
 import { Frame } from "./Frame";
-import { FirstLaunchGate } from "./gates";
+import { FirstLaunchGate, WelcomePlace } from "./gates";
 import { paths, WELCOME_STEPS } from "./paths";
-import { WelcomeRoute } from "./WelcomeRoute";
 
 export const appRoutes: RouteObject[] = [
   {
     element: <FirstLaunchGate />,
     children: [
       { path: "welcome", element: <Navigate to={paths.welcome(WELCOME_STEPS[0])} replace /> },
-      { path: "welcome/:step", element: <WelcomeRoute /> },
+      { path: "welcome/:step", element: <WelcomePlace /> },
       {
         element: <Frame />,
         children: [

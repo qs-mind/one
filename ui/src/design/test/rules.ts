@@ -1,8 +1,8 @@
 // The rules every file of the new interface keeps, as pure checks on (path, source text).
 // Each returns a list of problems; rules.test.ts runs them over the files and over bad samples.
 
-/** Folders of the new interface. Later jobs append theirs. */
-export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/next", "ui/src/firstlaunch2", "ui/src/engineer", "ui/src/conversation", "ui/src/tender", "ui/src/team", "ui/src/home", "ui/src/settings2"] as const;
+/** Folders of the new interface. The fake-core dev page (ui/src/fake) is not one: it also loads the kept engines' CSS. */
+export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/firstlaunch", "ui/src/engineer", "ui/src/conversation", "ui/src/tender", "ui/src/team", "ui/src/home", "ui/src/settings"] as const;
 
 /** Copied code: shadcn's components and CSS, and the ai-elements parts, as the CLIs wrote them. */
 export const isCopied = (path: string) => path.startsWith("ui/src/design/ui/") || path.startsWith("ui/src/conversation/ai/");
@@ -92,12 +92,12 @@ export function physicalSides(path: string, source: string): string[] {
   return problems;
 }
 
-// 3. No import from the old interface: packages, @/design, @/texts, @/next, or a relative path inside its own root.
+// 3. No import from the old interface: packages, @/design, @/texts, or a relative path inside its own root.
 const IMPORT = /(?:^|[^\w$.])(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|(?:^|[^\w$.])import\s*\(?\s*["']([^"']+)["']|@import\s+(?:url\()?["']([^"']+)["']/gm;
 // "@/app/App" alone: ui/src/app also holds the old interface's start screen. The contract's client (@/api/) and the
 // live stream (@/activity) are the kept ways to the core.
-const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/firstlaunch2/", "@/engineer/", "@/conversation/", "@/api/", "@/activity",
-  "@/tender/", "@/team/", "@/home/", "@/settings2/", "@/app/paths",
+const OWN_ALIASES = ["@/design/", "@/texts/", "@/app/App", "@/firstlaunch/", "@/engineer/", "@/conversation/", "@/api/", "@/activity",
+  "@/tender/", "@/team/", "@/home/", "@/settings/", "@/app/paths", "@/app/routes",
   // the kept engines the tender's viewers wrap (U5): the sheet, document and PDF viewers, and what they read
   "@/viewers/", "@/deliverables/", "@/workspace/DocumentView", "@/workspace/documents", "@/workspace/api", "@/workspace/reveal",
   "@/project/", "@/i18n",

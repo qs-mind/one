@@ -1,320 +1,88 @@
-// Connectors (Plan 5, Task 12): the MCP servers the engineer adds, on this computer (a command) or over the internet
-// (an address). Adding one starts it to see what it can do; the core answers with a connector card, shown here on its
-// own (ConnectorCard), and the Connector is saved only after the engineer says yes. A token is sent once, kept in the
-// key store by the core, and never shown again. Self-contained: whoever opens Settings places it. Remove takes it out
-// at once, with Undo in its place for the core's window (UndoNotice), instead of asking "are you sure?".
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
-import { api } from "../api";
-import { ConnectorCard } from "../chat/parts/ConnectorCard";
-import type { CardAnswer } from "../chat/parts/cardKinds";
-import type { CardData } from "../chat/parts/types";
-import { coreLine, send } from "../core";
-import { count, fill, pick, t, type Text, texts, useLanguage } from "../i18n";
-import { UndoNotice } from "../ui/UndoNotice";
-import { WorkDots } from "../ui/WorkDots";
+// Settings, Connectors: the tools from outside ONE the team may use (GET /connectors), each on or off (saved at
+// once) and removable, with Undo in a notice for the core's window; and adding one (AddConnector).
+import { useCallback, useEffect, useState } from "react";
+import { type ConnectorRow, getConnectors, removeConnector, setConnectorOn, undo } from "@/api/settingsKept";
+import { ListRow } from "@/design/ListRow";
+import { MetaLine } from "@/design/MetaLine";
+import { notify, notifyUndo } from "@/design/notify";
+import { Button } from "@/design/ui/button";
+import { Checkbox } from "@/design/ui/checkbox";
+import { common } from "@/texts/common";
+import { settings as texts } from "@/texts/settings";
+import type { TextPair } from "@/texts/types";
+import { useText } from "@/texts/useText";
+import { AddConnector } from "./AddConnector";
 
-/** The core's answer to a removal: its Undo token and window (core/qsone/undo.py). */
-export type Removed = { undo: string; window_ms: number };
+function Row({ connector, onChanged }: { connector: ConnectorRow; onChanged: () => void }) {
+  const t = useText();
+  const [problem, setProblem] = useState<TextPair>();
 
-/** One Connector, as GET /connectors sends it (core/qsone/connectors/routes.py). */
-export type ConnectorRow = {
-  name: string;
-  transport: "stdio" | "http";
-  runs: string; // the command or the address, as the engineer wrote it
-  enabled: boolean;
-  tools: number;
-  read_without_asking: boolean;
-  search_tool: string | null;
-  token: boolean; // a token is kept in the key store
-};
-type Loaded = { state: "loading" | "failed" } | { state: "ready"; connectors: ConnectorRow[] };
-type Pending = CardData & { id: string };
-
-const field = "rounded-md border border-slate bg-paper px-3 py-2 outline-none focus:border-ink";
-const primary = "rounded-md bg-ink px-4 py-2 text-paper disabled:opacity-40";
-const cardOptions: Record<string, keyof typeof texts> = { yes: "addConnector", no: "dontAdd" };
-
-function Alert({ line }: { line: Text | undefined }) {
-  return line ? (
-    <p role="alert" className="text-copper">
-      {pick(line)}
-    </p>
-  ) : null;
-}
-
-export function Connectors({ onClose }: { onClose?: () => void }) {
-  useLanguage();
-  const title = useId();
-  const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
-  const [failed, setFailed] = useState<Text>();
-  const [added, setAdded] = useState(false);
-  // by name, each with its Undo in place; kept with its row, so a reload in the window keeps the Undo too
-  const [removed, setRemoved] = useState<Record<string, Removed & { row: ConnectorRow }>>({});
-
-  const load = useCallback(async () => {
-    const response = await api("/connectors").catch(() => undefined);
-    const body = response?.ok
-      ? ((await response.json().catch(() => undefined)) as { connectors?: ConnectorRow[] } | undefined)
-      : undefined;
-    setLoaded(body?.connectors ? { state: "ready", connectors: body.connectors } : { state: "failed" });
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function toggle(row: ConnectorRow) {
-    setFailed(undefined);
-    const url = `/connectors/${encodeURIComponent(row.name)}/enabled`;
-    const response = await send(url, "PUT", { enabled: !row.enabled });
-    if (!response?.ok) setFailed(await coreLine(response, texts.connectorNotSaved));
-    void load();
+  async function turn(on: boolean) {
+    setProblem(undefined);
+    const answer = await setConnectorOn(connector.name, on);
+    if (!answer.data) setProblem(answer.error ?? texts.notSaved);
+    onChanged();
   }
 
-  async function remove(row: ConnectorRow) {
-    setFailed(undefined);
-    const response = await send(`/connectors/${encodeURIComponent(row.name)}`, "DELETE");
-    if (!response?.ok) {
-      setFailed(await coreLine(response, texts.removeFailed));
-      return void load();
-    }
-    const undo = (await response.json().catch(() => undefined)) as Removed | undefined;
-    if (undo?.undo) setRemoved((was) => ({ ...was, [row.name]: { ...undo, row } }));
-    else void load();
-  }
-
-  /** The list, with each one removed in this window still in its place (the core has it out of use already). */
-  const shown = (listed: ConnectorRow[]) =>
-    Object.values(removed).reduce(
-      (rows, { row }) => (rows.some((r) => r.name === row.name) ? rows : [...rows, row]),
-      listed,
+  async function remove() {
+    setProblem(undefined);
+    const answer = await removeConnector(connector.name);
+    if (!answer.data) return setProblem(answer.error ?? texts.notRemoved);
+    const { undo: token } = answer.data;
+    onChanged();
+    notifyUndo(t(texts.removed, { name: connector.name }), t(common.undo), () =>
+      void undo(token).then((back) => (back ? onChanged() : notify(t(texts.notUndone)))),
     );
-
-  /** Its Undo was pressed, or its window ended: the list as the core has it now. */
-  function settled(name: string) {
-    setRemoved(({ [name]: _, ...rest }) => rest);
-    void load();
   }
 
   return (
-    <section aria-labelledby={title} className="border-b border-stone px-4 py-4">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id={title} className="font-semibold">
-            {t("connectors")}
-          </h2>
-          {onClose && (
-            <button type="button" onClick={onClose} className="text-slate hover:text-ink">
-              {t("close")}
-            </button>
-          )}
-        </div>
-        <p className="text-slate">{t("connectorsHelp")}</p>
-        {loaded.state === "loading" && <p className="text-slate">{t("connectorsLoading")}</p>}
-        {loaded.state === "failed" && (
-          <div className="flex items-center gap-3">
-            <p role="alert" className="text-copper">
-              {t("connectorsFailed")}
-            </p>
-            <button type="button" onClick={() => void load()} className="rounded-md border border-ink px-4 py-2">
-              {t("retry")}
-            </button>
-          </div>
-        )}
-        {loaded.state === "ready" &&
-          (shown(loaded.connectors).length === 0 ? (
-            <p>{t("noConnectors")}</p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {shown(loaded.connectors).map((row) =>
-                removed[row.name] ? (
-                  <li key={row.name} className="rounded-md px-3 py-2">
-                    <UndoNotice
-                      label={fill(t("removedName"), { name: row.name })}
-                      token={removed[row.name]!.undo}
-                      windowMs={removed[row.name]!.window_ms}
-                      onUndone={() => settled(row.name)}
-                      onEnd={() => settled(row.name)}
-                    />
-                  </li>
-                ) : (
-                <li key={row.name} className="flex items-center justify-between gap-4 rounded-md bg-stone px-3 py-2">
-                  <span className="flex flex-col">
-                    <span dir="auto" className="font-semibold">
-                      {row.name}
-                    </span>
-                    <span className="flex flex-wrap gap-x-2 text-slate">
-                      <span>{t(row.transport === "stdio" ? "onThisComputer" : "overInternet")}</span>
-                      <span>{count("connectorTools", row.tools)}</span>
-                      {row.token && <span>{t("connectorTokenKept")}</span>}
-                    </span>
-                    <span dir="ltr" className="text-slate">
-                      {row.runs}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-3">
-                    <label className="flex items-center gap-1">
-                      <input type="checkbox" checked={row.enabled} onChange={() => void toggle(row)} />
-                      {t("connectorSwitchedOn")}
-                    </label>
-                    <button type="button" onClick={() => void remove(row)} className="text-slate hover:text-ink">
-                      {t("remove")}
-                    </button>
-                  </span>
-                </li>
-                ),
-              )}
-            </ul>
-          ))}
-        <Alert line={failed} />
-        {added && <p className="text-slate">{t("connectorAdded")}</p>}
-        <AddConnector
-          onAdded={() => {
-            setAdded(true);
-            void load();
-          }}
-          onStarted={() => setAdded(false)}
+    <li className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <ListRow
+          frame="boxed"
+          render={<label />}
+          leading={<Checkbox checked={connector.enabled} onCheckedChange={(on) => void turn(on)} />}
+          title={connector.name}
+          meta={<MetaLine items={[<bdi key="runs" dir="ltr" className="wrap-anywhere">{connector.runs}</bdi>, t.plural(texts.connectorTools, connector.tools)]} />}
+          className="flex-1"
         />
+        <Button variant="ghost" className="shrink-0" onClick={() => void remove()}>
+          {t(texts.remove)}
+        </Button>
       </div>
-    </section>
+      {problem ? (
+        <p role="alert" className="text-xs font-bold">
+          {t(problem)}
+        </p>
+      ) : null}
+    </li>
   );
 }
 
-function AddConnector({ onAdded, onStarted }: { onAdded: () => void; onStarted: () => void }) {
-  const where = useId();
-  const [name, setName] = useState("");
-  const [transport, setTransport] = useState<"stdio" | "http">("stdio");
-  const [command, setCommand] = useState("");
-  const [url, setUrl] = useState("");
-  const [token, setToken] = useState("");
-  const [tokenEnv, setTokenEnv] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState<Text>();
-  const [card, setCard] = useState<Pending>();
+export function Connectors() {
+  const t = useText();
+  const [connectors, setConnectors] = useState<ConnectorRow[] | "failed">();
 
-  async function start(event: FormEvent) {
-    event.preventDefault();
-    onStarted();
-    setBusy(true);
-    setFailed(undefined);
-    const body = {
-      name: name.trim(),
-      transport,
-      ...(transport === "stdio" ? { command: command.trim() } : { url: url.trim() }),
-      ...(token.trim() ? { token: token.trim() } : {}),
-      ...(transport === "stdio" && tokenEnv.trim() ? { token_env: tokenEnv.trim() } : {}),
-    };
-    const response = await send("/connectors", "POST", body);
-    setToken(""); // the token is sent once and never kept on the page, whatever the answer
-    const answer = response?.ok ? ((await response.json().catch(() => undefined)) as { card?: Pending } | undefined) : undefined;
-    setBusy(false);
-    if (answer?.card) setCard({ ...answer.card, status: "pending" });
-    else setFailed(await coreLine(response, texts.connectorNotAdded));
-  }
+  const load = useCallback(async () => {
+    const answer = await getConnectors();
+    setConnectors(answer.data ? answer.data.connectors : "failed");
+  }, []);
+  useEffect(() => void load(), [load]);
 
-  async function settle(choice: string, extra: CardAnswer = {}) {
-    if (!card) return;
-    setBusy(true);
-    setFailed(undefined);
-    const body = { choice, ...(extra.answers ? { answers: extra.answers } : {}) };
-    const response = await send(`/connectors/cards/${encodeURIComponent(card.id)}`, "POST", body);
-    const answer = response?.ok
-      ? ((await response.json().catch(() => undefined)) as { connector?: unknown } | undefined)
-      : undefined;
-    setBusy(false);
-    if (!answer) {
-      setFailed(await coreLine(response, texts.connectorNotAdded));
-      if (response?.status === 404) setCard(undefined); // the card is gone: add it again
-      return;
-    }
-    setCard(undefined);
-    if (answer.connector) {
-      setName("");
-      setCommand("");
-      setUrl("");
-      setTokenEnv("");
-      onAdded();
-    }
-  }
-
-  if (card) {
-    return (
-      <div className="flex flex-col gap-2">
-        <section className="flex flex-col gap-2 rounded-md border border-copper px-3 py-2">
-          <h3 className="font-semibold">{pick(card.title)}</h3>
-          <p dir="auto">{pick(card.detail)}</p>
-          <ConnectorCard
-            card={card}
-            sending={busy}
-            onAnswer={(choice, extra) => void settle(choice, extra)}
-            label={(option) => (cardOptions[option] ? t(cardOptions[option]) : option)}
-          />
-        </section>
-        <Alert line={failed} />
-      </div>
-    );
-  }
-
-  const ready = name.trim() !== "" && (transport === "stdio" ? command.trim() : url.trim()) !== "";
+  if (connectors === undefined) return <div aria-busy="true" className="min-h-14" />;
+  if (connectors === "failed") return <p className="text-xs font-bold">{t(texts.notLoaded)}</p>;
   return (
-    <form onSubmit={start} className="flex flex-col gap-2">
-      <h3 className="font-semibold">{t("connectorAdd")}</h3>
-      <label className="flex flex-col gap-1">
-        <span>{t("connectorName")}</span>
-        <input dir="ltr" spellCheck={false} value={name} onChange={(e) => setName(e.target.value)} className={field} />
-      </label>
-      <fieldset className="flex flex-col gap-1">
-        <legend id={where}>{t("connectorWhere")}</legend>
-        <label className="flex items-center gap-2">
-          <input type="radio" name={where} checked={transport === "stdio"} onChange={() => setTransport("stdio")} />
-          {t("onThisComputer")}
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="radio" name={where} checked={transport === "http"} onChange={() => setTransport("http")} />
-          {t("overInternet")}
-        </label>
-      </fieldset>
-      {transport === "stdio" ? (
-        <label className="flex flex-col gap-1">
-          <span>{t("connectorCommand")}</span>
-          <input dir="ltr" spellCheck={false} value={command} onChange={(e) => setCommand(e.target.value)} className={field} />
-        </label>
+    <>
+      {connectors.length === 0 ? (
+        <p className="text-muted-foreground">{t(texts.noConnectors)}</p>
       ) : (
-        <label className="flex flex-col gap-1">
-          <span>{t("connectorAddress")}</span>
-          <input type="url" dir="ltr" spellCheck={false} value={url} onChange={(e) => setUrl(e.target.value)} className={field} />
-        </label>
+        <ul className="flex flex-col gap-3">
+          {connectors.map((connector) => (
+            <Row key={connector.name} connector={connector} onChanged={() => void load()} />
+          ))}
+        </ul>
       )}
-      <label className="flex flex-col gap-1">
-        <span>{t("connectorToken")}</span>
-        <input
-          type="password"
-          dir="ltr"
-          autoComplete="off"
-          spellCheck={false}
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          className={field}
-        />
-      </label>
-      {transport === "stdio" && (
-        <label className="flex flex-col gap-1">
-          <span>{t("connectorTokenEnv")}</span>
-          <input dir="ltr" spellCheck={false} value={tokenEnv} onChange={(e) => setTokenEnv(e.target.value)} className={field} />
-        </label>
-      )}
-      <div>
-        <button type="submit" disabled={busy || !ready} className={primary}>
-          {t("connectorAdd")}
-        </button>
-      </div>
-      {busy && (
-        <p role="status" className="flex items-baseline gap-2 text-slate">
-          {t("connectorChecking")}
-          <WorkDots />
-        </p>
-      )}
-      <Alert line={failed} />
-    </form>
+      <AddConnector onAdded={() => void load()} />
+    </>
   );
 }

@@ -1,4 +1,4 @@
-// The conversation parts' gallery page (dev only, /next.html#/conversation): the whole thread with its message box,
+// The conversation parts' gallery page (dev only, /fake.html#/conversation): the whole thread with its message box,
 // then each part in its states, in the language of the address. Every value is the contract's sample data.
 import { useState } from "react";
 import { Demo, State } from "@/design/gallery/parts";
