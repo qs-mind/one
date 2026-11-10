@@ -15,7 +15,7 @@ from qsone.engine.runner.shared import utc_now
 from qsone.engine.runner.truth_checks import _marked
 from qsone.engine.team import TeamSetup
 from qsone.engine.types import Data, ModelChoice, Role, TextDelta, Unsourced
-from qsone.journey import engineer
+from qsone.journey import profile
 
 
 class _BriefStages:
@@ -60,8 +60,8 @@ class _BriefStages:
         spec = general.lead_spec() if self.place.rec is None else agents.lead_spec()
         if self.mapping_files is not None:
             spec = replace(spec, name=copy.MAP_AI_LABEL, instructions="", tools=())
-        introduced = engineer.card_line(engineer.card(self.engine.engineer_records()))
-        if introduced:  # the introduction card's one line (Plan 8)
+        introduced = profile.lead_line(profile.read(self.engine.engineer_records()))
+        if introduced:  # the profile's four fields (Phase 1)
             spec = replace(spec, instructions=f"{spec.instructions}\n\n{introduced}")
         if lead is None:
             self.lead_run_id = self.store.new_run(self.brief_id, spec, picked["lead"], None)

@@ -159,6 +159,17 @@ class Account:
             except KeyringError:
                 return False
 
+    def name(self) -> str | None:
+        """The signed-in account's name, from the key store only (nothing goes out); None when
+        signed out or when the key store is down."""
+        with self._lock:
+            try:
+                loaded = self._load()
+            except KeyringError:
+                return None
+        found = loaded[1].get("name") if loaded is not None else None
+        return found if isinstance(found, str) else None
+
     # What the screen asks -------------------------------------------------------------------------
 
     def state(self) -> dict:

@@ -326,6 +326,17 @@ def test_a_contract_route_is_declared_and_refuses_until_it_is_built(app, client,
         c.Refusal.model_validate_json(answer.text, strict=True)
 
 
+@pytest.mark.parametrize(
+    "row", [row for row in ROWS if row.path == "/engineer/profile"], ids=lambda row: row.method
+)
+def test_the_profile_routes_are_built_and_answer_their_model(app, client, row):
+    """Rows 1-2 (C1): served by their own router, each answers its model in strict mode."""
+    assert not is_stub(answering(table(app), row.method, row.call))
+    answer = client.request(row.method, row.call, json=row.body, headers=AUTH)
+    assert answer.status_code == row.status and answer.headers["cache-control"] == "no-store"
+    assert row.gives.model_validate_json(answer.text, strict=True).complete is False
+
+
 def test_the_not_built_text_is_a_pair_with_no_fix_to_offer():
     assert set(copy.NOT_BUILT) == {"en", "ar"} and all(copy.NOT_BUILT.values())
     assert copy.fix_of(copy.NOT_BUILT) is None

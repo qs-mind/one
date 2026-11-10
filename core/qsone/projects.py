@@ -13,6 +13,7 @@ import logging
 import re
 import threading
 import uuid
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -52,6 +53,7 @@ class Projects:
         self._known: dict[str, dict] = {}  # id -> {"id", "name", "created_at"}, from the file
         self._lock = threading.RLock()
         self.backups: Backups | None = None  # set by the app: a copy on close, the escrow
+        self.country: Callable[[], str | None] = lambda: None  # set by the app: the profile's
 
     def _escrow(self) -> backup_keys.Escrow | None:
         return self.backups.escrow() if self.backups is not None else None
@@ -149,6 +151,9 @@ class Projects:
         meta = {"name_origin": "engineer" if explicit else "folder" if folder else "dated"}
         if not explicit and not folder:
             meta["name_pair"] = json.dumps(pair, ensure_ascii=False)
+        country = self.country()  # the price and web tools' default (contract Q14)
+        if country is not None:
+            meta["country"] = country
         try:
             rec = Records.create(self.root / project_id, name=name, actor=actor, meta=meta)
         except KeyringError:

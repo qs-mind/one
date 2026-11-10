@@ -245,12 +245,18 @@ def test_a_project_that_cannot_be_read_is_listed_with_its_reason(data_dir, memor
 def test_key_store_down_on_open(client, project, failing_keyring):
     client.post(f"/projects/{project}/close", headers=AUTH)
     r = client.post(f"/projects/{project}/open", headers=AUTH)
-    assert r.status_code == 503 and r.json() == {"error": copy.PROJECT_KEY_STORE_DOWN}
+    assert r.status_code == 503 and r.json() == {
+        "error": copy.PROJECT_KEY_STORE_DOWN,
+        "fix": "retry",
+    }
 
 
 def test_create_with_key_store_down(client, data_dir, failing_keyring):
     r = client.post("/projects", json={"name": "مدرسة - عينة"}, headers=AUTH)
-    assert r.status_code == 503 and r.json() == {"error": copy.PROJECT_KEY_STORE_DOWN}
+    assert r.status_code == 503 and r.json() == {
+        "error": copy.PROJECT_KEY_STORE_DOWN,
+        "fix": "retry",
+    }
     assert not (data_dir / "projects").exists() or not any((data_dir / "projects").iterdir())
 
 

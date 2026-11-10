@@ -22,6 +22,7 @@ from qsone.copy.ai import (
     NO_KEY,
 )
 from qsone.copy.journey import AI_CONSENT_NEEDED, ARCHIVE_BACKUP_FAILED, CLAUDE_CODE_NOT_FOUND
+from qsone.copy.projects import PROJECT_KEY_STORE_DOWN
 from qsone.copy.spending import PRICE_UNKNOWN
 from qsone.copy.web import WEB_NO_SEARCH, WEB_SEARCH_KEY_REFUSED, WEB_SEARCH_LIMIT
 
@@ -46,6 +47,7 @@ FIXES = {
     "consent": (AI_CONSENT_NEEDED,),
     "retry": (
         KEY_STORE_DOWN,
+        PROJECT_KEY_STORE_DOWN,
         NO_CONNECTION,
         CLAUDE_BUSY,
         MODELS_FAILED,

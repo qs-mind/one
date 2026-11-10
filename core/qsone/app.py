@@ -45,6 +45,7 @@ from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
+from qsone.journey import profile
 from qsone.journey import routes as journey_routes
 from qsone.meaning import routes as meaning_routes
 from qsone.meaning.service import Meaning
@@ -251,6 +252,8 @@ def create_app(
     app.include_router(backup_routes.router(backups))
     app.include_router(account_routes.router(account))
     app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)
+    app.include_router(profile.router(engine, account))  # the engineer's profile (Phase 1)
+    registry.country = lambda: profile.country(engine.engineer_records)  # contract Q14
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):

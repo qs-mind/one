@@ -43,15 +43,6 @@ def _stub() -> JSONResponse:
 def router() -> APIRouter:
     r = APIRouter()
 
-    # The engineer's profile (C1).
-    @r.get("/engineer/profile", response_model=c.Profile, responses=_refusals(409, 503))
-    def get_profile():
-        return _stub()
-
-    @r.put("/engineer/profile", response_model=c.Profile, responses=_refusals(409, 422, 503))
-    def put_profile(body: c.ProfileIn):
-        return _stub()
-
     # Lessons Learned, Home and a tender's header (C7).
     @r.get("/engineer/lessons", response_model=c.Lessons, responses=_refusals(409, 503))
     def get_lessons():
