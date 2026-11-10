@@ -9,6 +9,7 @@ Undo clears the mark. `closing.checklist` still counts a removed lesson as carri
 offered again."""
 
 import json
+from collections.abc import Collection
 
 from qsone import copy
 from qsone.records import ledger
@@ -40,8 +41,9 @@ def _lesson(found: dict, names: dict[str, str]) -> dict:
     }
 
 
-def kept(engineer: Records) -> list[dict]:
-    """The lessons that are not removed, newest first, as {"id", "fields", "at"}."""
+def kept(engineer: Records, hidden: Collection[str] = ()) -> list[dict]:
+    """The lessons that are not removed, newest first, as {"id", "fields", "at"}; none carried
+    from a project in `hidden` (a Confidential one: it may have been marked so after)."""
     with engineer.read() as conn:
         rows = conn.execute(
             "SELECT id, fields, created_at FROM items WHERE kind = ?"
@@ -49,12 +51,17 @@ def kept(engineer: Records) -> list[dict]:
             (KIND,),
         ).fetchall()
     found = [{"id": i, "fields": json.loads(f), "at": at} for i, f, at in rows]
-    return [x for x in found if not x["fields"].get(REMOVED)]
+    return [
+        x
+        for x in found
+        if not x["fields"].get(REMOVED) and x["fields"].get("from_project") not in hidden
+    ]
 
 
-def listed(engineer: Records, names: dict[str, str]) -> list[dict]:
-    """`Lesson`s as JSON, newest first. `names`: each readable project's name, by id."""
-    return [_lesson(x, names) for x in kept(engineer)]
+def listed(engineer: Records, names: dict[str, str], hidden: Collection[str] = ()) -> list[dict]:
+    """`Lesson`s as JSON, newest first. `names`: each readable project's name, by id; `hidden`:
+    the Confidential projects, whose lessons are not listed."""
+    return [_lesson(x, names) for x in kept(engineer, hidden)]
 
 
 def _current(engineer: Records, lesson_id: str) -> dict:
