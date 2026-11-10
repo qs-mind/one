@@ -109,19 +109,21 @@ describe("the first-launch gate", () => {
     scenario("profile:incomplete");
     const router = open(paths.home);
     await place("welcome");
+    await waitFor(() => expect(setupCalls).toBe(2)); // the gate's call, then the first-launch screen's own
     scenario("profile");
     await router.navigate(paths.home);
     await place("home");
     expect(where(router)).toBe(paths.home);
-    expect(setupCalls).toBe(2);
+    expect(setupCalls).toBe(3);
   });
 
   it("asks again on leaving and sends back what is still not done", async () => {
     scenario("profile:incomplete");
     const router = open(paths.home);
     await place("welcome");
+    await waitFor(() => expect(setupCalls).toBe(2)); // the gate's call, then the first-launch screen's own
     await router.navigate(paths.tender(P2));
-    await waitFor(() => expect(setupCalls).toBe(2));
+    await waitFor(() => expect(setupCalls).toBe(3));
     await place("welcome");
     expect(where(router)).toBe(paths.welcome("profile"));
   });
