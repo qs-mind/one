@@ -55,6 +55,14 @@ pub fn limit(out: &mut Value, key: &str) {
     out[flag] = json!(true);
 }
 
+/// `n` texts the reader does not emit at all (past a per-entity limit): counted as not kept.
+pub fn skip_texts(out: &mut Value, n: u64) {
+    if n > 0 {
+        out["totals"]["texts"] = json!(out["totals"]["texts"].as_u64().unwrap_or(0) + n);
+        out["limited"] = json!(true);
+    }
+}
+
 // Circular arcs are sampled only for containment; segment integrals retain their area.
 pub fn outline(out: &mut Value, mut row: Value, points: Vec<(f64, f64, f64)>) {
     if points.len() < 2 || points.len() > 4096 {
@@ -119,7 +127,7 @@ pub fn digest(doc: &CadDocument, format: &str) -> Value {
         "traversal_limited":false,"entity_kinds":{},"unread_kinds":{},"layers":[],"layouts":[],
         "texts":[],"inserts":[],"dimensions":[],"hatches":[],"closed":[],"xrefs":[],"blocks":[],
         "tables":[],"references":[],"problems":[],"totals":{},"byte_counts":{},"output_bytes":0,
-        "limited":false,"limited_geometry":false,"work":0});
+        "limited":false,"limited_geometry":false,"cut_texts":0,"work":0});
     for style in doc.text_styles.iter().take(LIMIT) {
         push(
             &mut out,

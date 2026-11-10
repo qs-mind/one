@@ -77,8 +77,10 @@ pub fn text_style(doc: &CadDocument, name: &str, row: &mut Value) {
     }
 }
 
+/// A text longer than the 8192 characters kept is cut short: counted, so the core says so.
 pub fn long(out: &mut Value, value: &str) {
     if value.chars().count() > 8192 {
+        out["cut_texts"] = json!(out["cut_texts"].as_u64().unwrap_or(0) + 1);
         out["limited"] = json!(true);
     }
 }

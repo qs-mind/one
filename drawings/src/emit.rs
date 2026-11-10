@@ -2,7 +2,7 @@
 //! blocks, tables, dimensions with the text the sheet shows, references to other files,
 //! embedded workbooks, and take-off geometry.
 
-use crate::digest::{limit, outline, push};
+use crate::digest::{limit, outline, push, skip_texts};
 use crate::embed::{hex, package_stream, stream_names};
 use crate::insert::insert;
 use crate::text::{long, mtext, place, raw, single, text_style};
@@ -129,6 +129,22 @@ pub fn emit(
             table["rows"] = json!(t.rows.len());
             table["columns"] = json!(t.columns.len());
             push(out, "tables", table);
+            let filled = |cells: &[acadrust::entities::TableCell]| {
+                let texts = cells.iter().flat_map(|c| &c.contents);
+                texts.filter(|c| !c.value.display().is_empty()).count() as u64
+            };
+            let rows_past = t
+                .rows
+                .iter()
+                .skip(4096)
+                .map(|r| filled(&r.cells))
+                .sum::<u64>();
+            let columns_past = t
+                .rows
+                .iter()
+                .take(4096)
+                .map(|r| filled(r.cells.get(1024..).unwrap_or(&[])));
+            skip_texts(out, rows_past + columns_past.sum::<u64>());
             let mut y = t.insertion_point.y;
             for (ri, r) in t.rows.iter().take(4096).enumerate() {
                 let mut x = t.insertion_point.x;
@@ -136,6 +152,7 @@ pub fn emit(
                     for content in &cell.contents {
                         let text = content.value.display();
                         if !text.is_empty() {
+                            long(out, text);
                             let mut cell_row = row.clone();
                             cell_row["kind"] = json!("TABLE");
                             cell_row["text"] = json!(mtext(text));
@@ -276,8 +293,15 @@ pub fn emit(
                 row["height"] = json!(c.text_height);
                 push(out, "texts", row.clone());
             }
+            let past = m
+                .block_attributes
+                .iter()
+                .skip(256)
+                .filter(|a| !a.text.is_empty());
+            skip_texts(out, past.count() as u64);
             for a in m.block_attributes.iter().take(256) {
                 if !a.text.is_empty() {
+                    long(out, &a.text);
                     let mut r = row.clone();
                     r["kind"] = json!("MLEADER_ATTRIBUTE");
                     r["text"] = json!(single(&a.text));
@@ -292,6 +316,7 @@ pub fn emit(
             }
         }
         EntityType::Tolerance(t) => {
+            long(out, &t.text);
             row["kind"] = json!("TOLERANCE");
             row["text"] = json!(mtext(&t.text));
             row["raw_text"] = json!(raw(&t.text));
@@ -306,6 +331,7 @@ pub fn emit(
                 None => a.tag.as_str(),
             };
             if !value.is_empty() {
+                long(out, value);
                 row["kind"] = json!(if block.is_some() {
                     "CONSTANT_ATTRIBUTE"
                 } else {

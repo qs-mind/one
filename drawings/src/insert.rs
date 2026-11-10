@@ -1,9 +1,9 @@
 //! A placed block (INSERT): its row, its attributes as texts, and the entities of its block,
 //! placed where the insert puts them, eight blocks deep at most.
 
-use crate::digest::{push, LIMIT};
+use crate::digest::{push, skip_texts, LIMIT};
 use crate::emit::emit;
-use crate::text::{place, raw, single, text_style};
+use crate::text::{long, place, raw, single, text_style};
 use acadrust::{CadDocument, EntityType};
 use serde_json::{json, Value};
 
@@ -19,9 +19,12 @@ pub fn insert(
     depth: usize,
     mut row: Value,
 ) {
-    if i.attributes.len() > 256 || i.attributes.iter().any(|a| a.value.chars().count() > 8192) {
-        out["limited"] = json!(true);
-    }
+    let past = i
+        .attributes
+        .iter()
+        .skip(256)
+        .filter(|a| !a.value.is_empty());
+    skip_texts(out, past.count() as u64);
     if depth >= 8 {
         out["traversal_limited"] = json!(true);
         out["limited"] = json!(true);
@@ -43,6 +46,7 @@ pub fn insert(
     row["attributes"] = json!(i.attributes.iter().take(256).map(|a| json!({"tag":a.tag,"value":single(&a.value),"handle":format!("{:X}",a.common.handle.value()),"x":a.insertion_point.x,"y":a.insertion_point.y})).collect::<Vec<_>>());
     for a in i.attributes.iter().take(256) {
         if !a.value.is_empty() {
+            long(out, &a.value);
             let mut attr = row.clone();
             attr.as_object_mut().unwrap().remove("attributes");
             attr["kind"] = json!("ATTRIBUTE");
