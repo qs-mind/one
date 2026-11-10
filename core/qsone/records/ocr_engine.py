@@ -16,6 +16,7 @@ from qsone.records import ocr_lines
 
 MAX_SIDE = 2000  # the detector's long side: a 1,600 px wide A4 page (the spike's held-out pages)
 MIN_SIDE = 736
+MAX_LONG = 4 * MAX_SIDE  # raising the short side never takes the long one past this
 HEIGHT = 48  # the recogniser's line height
 BATCH = 6
 
@@ -70,6 +71,8 @@ class Engine:
         ratio = min(1.0, MAX_SIDE / max(w, h))
         if min(w, h) * ratio < MIN_SIDE:
             ratio = MIN_SIDE / min(w, h)
+        # a long thin strip (a phone screenshot) would else reach gigabytes: read it smaller
+        ratio = min(ratio, MAX_LONG / max(w, h))
         dw, dh = _round32(w * ratio), _round32(h * ratio)
         small = image if (dw, dh) == (w, h) else image.resize((dw, dh), Image.BILINEAR)
         x = np.ascontiguousarray(_bgr(small).transpose(2, 0, 1)[None])
