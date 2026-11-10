@@ -78,6 +78,7 @@ def router(engine) -> APIRouter:
     )
     async def decide_finding(project_id: str, finding_id: str, body: c.DecideIn):
         from qsone.engine.runner import NoAI
+        from qsone.engine.runner.shared import kept_here
 
         try:
             rec = engine.projects.get(project_id)
@@ -90,7 +91,8 @@ def router(engine) -> APIRouter:
                     if (blocked := project_block(engine, rec)) is not None:
                         return c.refusal(blocked["reason"])
                     try:
-                        await engine.sheet()  # the Lead's work would start: can it?
+                        # the Lead's work would start: is there a model it may use here?
+                        kept_here(rec, (await engine.sheet())[0])
                     except NoAI as none:
                         return c.refusal(none.text, 409)
             settled, changed = await asyncio.to_thread(

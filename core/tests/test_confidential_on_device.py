@@ -187,3 +187,38 @@ def test_deciding_a_finding_in_a_blocked_confidential_tender_is_refused(data_dir
     assert refused.json() == {"error": copy.CONFIDENTIAL_NO_LOCAL_AI, "fix": "ai"}
     found = client.get(f"/projects/{pid}/findings", headers=AUTH).json()["findings"]
     assert found[0]["status"] == "raised"  # nothing stored
+
+
+def silent_local():
+    """The sample links plus a model server on this computer that lists no model (not running)."""
+    return [*links(), FakeLink("standard:local", "Local", "deepseek", sheet=[], on_device=True)]
+
+
+def test_the_room_refuses_when_the_link_here_lists_no_model(data_dir):
+    client = TestClient(create_app(SECRET, data_dir=data_dir, connectors=silent_local))
+    pid = new(client, "سري - عينة", secret=True)
+    settings.save(ON_DEVICE, True)
+    said = client.post(f"/projects/{pid}/room", json={"text": "سؤال - عينة"}, headers=AUTH)
+    assert said.status_code == 409 and said.json()["error"] == copy.CONFIDENTIAL_NO_LOCAL_AI
+    room = client.get(f"/projects/{pid}/room", headers=AUTH).json()["messages"]
+    assert [m for m in room if m["from_id"] == "engineer"] == []
+
+
+def test_deciding_is_refused_when_the_link_here_lists_no_model(data_dir):
+    from tests.fakes_tools import tool_ctx
+    from tests.test_findings import raise_, record, spec_file
+
+    client = TestClient(create_app(SECRET, data_dir=data_dir, connectors=silent_local))
+    pid = new(client, "سري - عينة", secret=True)
+    rec = client.app.state.projects.get(pid)
+    ctx = tool_ctx(rec)
+    first = record(ctx, spec_file(rec))
+    raise_(ctx, first)
+    settings.save(ON_DEVICE, True)
+    refused = client.post(
+        f"/projects/{pid}/findings/{first}/decide", json={"choice": 0}, headers=AUTH
+    )
+    assert refused.status_code == 409
+    assert refused.json()["error"] == copy.CONFIDENTIAL_NO_LOCAL_AI
+    found = client.get(f"/projects/{pid}/findings", headers=AUTH).json()["findings"]
+    assert found[0]["status"] == "raised"  # nothing stored

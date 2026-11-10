@@ -271,6 +271,7 @@ def router(projects, engine) -> APIRouter:
     )
     async def say_in_room(project_id: str, body: c.RoomMessageIn):
         from qsone.engine.runner import NoAI
+        from qsone.engine.runner.shared import kept_here
 
         try:
             rec = projects.get(project_id)
@@ -281,7 +282,7 @@ def router(projects, engine) -> APIRouter:
                 blocked = project_block(engine, rec)
                 if blocked is not None:
                     return c.refusal(blocked["reason"])
-                await engine.sheet()
+                kept_here(rec, (await engine.sheet())[0])  # a model the Lead may use here
             said = await asyncio.to_thread(
                 messages.write, rec, from_id=messages.ENGINEER, to_id=messages.TEAM, text=text
             )
