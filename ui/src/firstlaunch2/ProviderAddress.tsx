@@ -25,7 +25,7 @@ function hostOf(address: string): string | undefined {
 export function ProviderAddress({ apiKey, onLinked }: { apiKey: string; onLinked: (linked: boolean) => void }) {
   const t = useText();
   const [address, setAddress] = useState("");
-  const [saved, setSaved] = useState(""); // the address last sent, so leaving the box again sends nothing
+  const [saved, setSaved] = useState(""); // the address sent or kept, so leaving the box again sends nothing
   const [saving, setSaving] = useState<Saving>({ state: "idle" });
 
   async function save() {
@@ -40,6 +40,7 @@ export function ProviderAddress({ apiKey, onLinked }: { apiKey: string; onLinked
       setSaving({ state: "linked", provider: data.provider ?? host });
       return onLinked(true);
     }
+    setSaved(""); // a refused save may be tried again with the same address
     setSaving({ state: "refused", words: error ?? firstlaunch.addressNotSaved });
   }
 

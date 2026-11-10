@@ -16,6 +16,8 @@ type Older = {
   /** What GET /account answers while a sign-in waits, from the second ask on. */
   signsInAs: Account;
   claudeCode: { found: boolean; answers: boolean };
+  /** How many of the next POST /settings/ai/standard the core refuses (503, the key store is down). */
+  standardRefuses: number;
   calls: string[];
 };
 
@@ -28,6 +30,7 @@ function reset(): void {
     account: { state: "signed_out" },
     signsInAs: { state: "signed_in", email: "engineer@example.com", name: "مهندس تجريبي" },
     claudeCode: { found: true, answers: true },
+    standardRefuses: 0,
     calls: [],
   } satisfies Older);
 }
@@ -70,6 +73,11 @@ const handlers = [
   }),
   http.post("*/api/settings/ai/standard", async ({ request }) => {
     const body = (await note(request, "/settings/ai/standard")) as { name: string; base_url: string };
+    if (older.standardRefuses > 0) {
+      older.standardRefuses -= 1;
+      const words = { en: "ONE could not keep the key just now. Try again.", ar: "ONE ماقدرش يحفظ المفتاح دلوقتي. جرّب تاني." };
+      return HttpResponse.json({ error: words }, { status: 503 });
+    }
     const link = { id: "standard:sample", kind: "standard", name: body.name, provider: body.name, on_device: false, key_set: true, error: null };
     return HttpResponse.json(link, { status: 201 });
   }),

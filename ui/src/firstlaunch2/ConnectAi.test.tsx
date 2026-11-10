@@ -84,6 +84,21 @@ describe.each(DIRS)("Connect AI (%s)", (dir) => {
     expect(older.calls).toContain('PUT /setup/ai {"state":"done"}');
   });
 
+  it("after a refused save the same address can be sent again", async () => {
+    older.standardRefuses = 1;
+    open();
+    await agree();
+    await userEvent.click(keyBox());
+    await userEvent.paste("x-unknown-key");
+    const address = await screen.findByLabelText(say(firstlaunch.addressLabel));
+    await userEvent.type(address, "https://api.example.com/v1{Enter}");
+    const words = lang === "ar" ? "ONE ماقدرش يحفظ المفتاح دلوقتي. جرّب تاني." : "ONE could not keep the key just now. Try again.";
+    expect(await screen.findByText(words)).toBeInTheDocument();
+    await userEvent.type(address, "{Enter}");
+    await waitFor(() => expect(plain(document.body.textContent)).toContain(plain(say(firstlaunch.addressLinked, { provider: "api.example.com" }))));
+    expect(older.calls.filter((call) => call.startsWith("POST /settings/ai/standard"))).toHaveLength(2);
+  });
+
   it("the engineer's own Claude Code is the other way", async () => {
     const { onDone } = open();
     await agree();
