@@ -46,8 +46,9 @@ export function TenderThread({ data, actions, thread, narrow = false, onOpenSour
           <bdi dir={textDir(leadName)}>{leadName}</bdi>
         </h2>
       )}
-      {/* a choice button wraps its words rather than run past a narrow card (the shared Button does not shrink) */}
-      <div className="min-h-0 flex-1 [&_[data-decision]_button]:shrink">
+      {/* a choice button and a source link wrap their words rather than run past a narrow card (the shared
+          Button neither shrinks nor wraps) */}
+      <div className="min-h-0 flex-1 [&_[data-decision]_button]:shrink [&_button.link]:shrink [&_button.link]:text-start [&_button.link]:whitespace-normal">
         <Thread
           messages={thread.messages}
           leadName={leadName}
