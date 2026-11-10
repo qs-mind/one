@@ -6,7 +6,8 @@ import { server, startFakeCore } from "@/api/fakeCore";
 import { getThemeSetting } from "@/design/theme";
 import { resetPage, stubBrowser } from "@/design/test/harness";
 import { getLang, setLang } from "@/texts/language";
-import { loadLook } from "./look";
+import { currentScale, scaled } from "@/ui/scale";
+import { applyLook, loadLook } from "./look";
 
 startFakeCore();
 beforeEach(stubBrowser);
@@ -26,6 +27,15 @@ describe("loadLook", () => {
     expect(getLang()).toBe("en");
     expect(getThemeSetting()).toBe("dark");
     expect(document.documentElement.style.fontSize).toBe("110%");
+  });
+
+  it("the sizes kept in code (popovers, source cards) follow the zoom", async () => {
+    const { data } = await client.GET("/settings");
+    const zoom = data!.settings.find((it) => it.key === "look.zoom")!;
+    applyLook({ ...zoom, value: "1.5" } as typeof zoom);
+    expect(document.documentElement.style.fontSize).toBe("150%");
+    expect(currentScale()).toBe(1.5);
+    expect(scaled(320)).toBe(480);
   });
 
   it("keeps the system's look when the core cannot answer", async () => {

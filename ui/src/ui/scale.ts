@@ -4,11 +4,10 @@
 // scales linearly down to 80 %, by the smaller of the two, so a short window shrinks too; below that it stays at
 // 80 %. The heights are the window's, not the screen's: a maximised window on a 1080p screen is about 1009 px tall
 // (taskbar and title bar) and is 100 %; one on a 1366×768 screen (about 698 px) is at about its width's scale. Text has a floor: body text never under 12.5 px in English or 13.5 px in Arabic (its dots and marks), so
-// every text size stops shrinking at that ratio (styles.css --ui-text-floor). The engineer's own zoom (Ctrl/Cmd with
-// = - 0, or More) multiplies the window's scale, 80 % to 150 % in 10 % steps; it is kept in ONE's settings in the
-// core (GET/PUT /settings/zoom), never in web storage, and read before the screen opens (app/CoreDown.tsx).
+// every text size stops shrinking at that ratio (styles.css --ui-text-floor). The engineer's own zoom, 80 % to 150 % in
+// 10 % steps, is the setting look.zoom (Settings → Look, or Ctrl/Cmd with = - 0): kept in the core, never in web
+// storage, read before the screen opens (settings/look.ts), and in the new interface it alone sets the root size.
 import { useEffect, useSyncExternalStore } from "react";
-import { api } from "../api";
 import { send } from "../core";
 import { type Language, useLanguage } from "../i18n";
 import { isMod, isTyping } from "../project/keys";
@@ -88,24 +87,14 @@ export function installScale(): () => void {
   };
 }
 
-/** The longest ONE waits for the saved zoom before it opens at 100 %. */
-const ZOOM_WAIT_MS = 2000;
-
-/** The saved zoom, from the core; a missing, failed or late answer keeps 100 %. */
-export async function loadZoom(): Promise<void> {
-  const late = new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ZOOM_WAIT_MS));
-  const read = api("/settings/zoom")
-    .then((response) => (response.ok ? (response.json() as Promise<{ zoom?: unknown }>) : undefined))
-    .catch(() => undefined);
-  const body = await Promise.race([read, late]);
-  if (typeof body?.zoom === "number" && Number.isFinite(body.zoom)) setZoomShown(nearest(body.zoom));
-}
-
-function setZoomShown(next: number) {
-  if (next === zoom) return;
-  zoom = next;
-  applyScale();
-  for (const listener of [...listeners]) listener(); // the zoom changed even where the scale came out the same
+/** The zoom as the look.zoom setting has it (settings/look.ts): the root size, and the sizes kept in code, follow. */
+export function followZoom(next: number) {
+  const step = nearest(next);
+  document.documentElement.style.fontSize = `${Math.round(step * 100)}%`; // 1.1 is 110%, not 110.00000000000001%
+  if (step === zoom && step === scale) return;
+  zoom = step;
+  scale = step;
+  for (const listener of [...listeners]) listener();
 }
 
 let saving = false; // a save in flight
@@ -119,16 +108,16 @@ async function save(step: number) {
   while (unsaved !== undefined) {
     const next = unsaved;
     unsaved = undefined;
-    await send("/settings/zoom", "PUT", { zoom: next });
+    await send("/settings/look.zoom", "PATCH", { value: next.toFixed(1) });
   }
   saving = false;
 }
 
-/** The engineer's zoom: shown at once and kept in the core (a failed save keeps it for this session). */
+/** The engineer's zoom: shown at once and kept in the core as look.zoom (a failed save keeps it for this session). */
 export function setZoom(next: number) {
   const step = nearest(next);
   if (step === zoom) return;
-  setZoomShown(step);
+  followZoom(step);
   void save(step);
 }
 

@@ -5,7 +5,6 @@ import {
   currentScale,
   currentZoom,
   fluidScale,
-  loadZoom,
   scaled,
   setZoom,
   stepZoom,
@@ -75,13 +74,13 @@ describe("the root font-size", () => {
     expect(scaled(320)).toBe(256);
   });
 
-  it("multiplies the window's scale by the zoom", () => {
+  it("is the zoom alone in the new interface (look.zoom), and the sizes kept in code follow it", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
-    windowOf(1920, 1080);
     setZoom(1.5);
-    expect(root()).toBe("24px");
-    windowOf(1280, 720);
-    expect(root()).toBe("19.2px");
+    expect(root()).toBe("150%");
+    expect(currentScale()).toBe(1.5);
+    expect(scaled(320)).toBe(480);
+    vi.unstubAllGlobals();
   });
 });
 
@@ -103,7 +102,7 @@ describe("the engineer's zoom", () => {
   const press = (target: EventTarget, code: string, init: KeyboardEventInit = {}) =>
     target.dispatchEvent(new KeyboardEvent("keydown", { code, ctrlKey: true, bubbles: true, cancelable: true, ...init }));
 
-  it("steps with Ctrl and = (or +), - and 0, by the key's place (so the Arabic layout works), and is kept in the core", async () => {
+  it("steps with Ctrl and = (or +), - and 0, by the key's place (so the Arabic layout works), and is kept in the core as look.zoom", async () => {
     const fetch = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response("{}"));
     vi.stubGlobal("fetch", fetch);
     windowOf(1920, 1080);
@@ -113,15 +112,15 @@ describe("the engineer's zoom", () => {
     press(document.body, "Equal", { shiftKey: true }); // Ctrl and +
     press(document.body, "NumpadAdd");
     expect(currentZoom()).toBe(1.3);
-    expect(root()).toBe("20.8px");
+    expect(root()).toBe("130%");
     press(document.body, "Minus");
     expect(currentZoom()).toBe(1.2);
     press(document.body, "Digit0");
     expect(currentZoom()).toBe(1);
-    expect(root()).toBe("16px");
+    expect(root()).toBe("100%");
     // the first press's save, then only the newest: the presses came faster than the core answered
     await vi.waitFor(() => expect(savesOf(fetch)).toEqual([1.1, 1]));
-    expect(fetch.mock.calls.every(([url, init]) => url === "/api/settings/zoom" && (init as RequestInit).method === "PUT")).toBe(true);
+    expect(fetch.mock.calls.every(([url, init]) => url === "/api/settings/look.zoom" && (init as RequestInit).method === "PATCH")).toBe(true);
   });
 
   it("saves in order: one save at a time, then the newest, so an older zoom is never the one kept", async () => {
@@ -164,22 +163,6 @@ describe("the engineer's zoom", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it("comes back from the core at start; a missing or odd answer keeps 100 %", async () => {
-    windowOf(1920, 1080);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ zoom: 1.2 }))));
-    await loadZoom();
-    expect(currentZoom()).toBe(1.2);
-    expect(root()).toBe("19.2px");
-
-    setZoomQuietly(1);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
-    await loadZoom();
-    expect(currentZoom()).toBe(1);
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("down"))));
-    await loadZoom();
-    expect(currentZoom()).toBe(1);
-  });
-
   it("is never kept in web storage", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
     setZoom(1.4);
@@ -190,16 +173,9 @@ describe("the engineer's zoom", () => {
 
 /** The zooms sent to the core, in order. */
 function savesOf(fetch: { mock: { calls: [RequestInfo | URL, RequestInit?][] } }): number[] {
-  return fetch.mock.calls.map(([, init]) => (JSON.parse(String(init?.body)) as { zoom: number }).zoom);
+  return fetch.mock.calls.map(([, init]) => Number((JSON.parse(String(init?.body)) as { value: string }).value));
 }
 
-/** Back to 100 % with the save stubbed out. */
-function setZoomQuietly(zoom: number) {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
-  setZoom(zoom);
-}
-
-/** The window at this size, and the scale for it. */
 function windowOf(width: number, height: number) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
