@@ -114,7 +114,7 @@ export function Room({ projectId }: { projectId: string }) {
     void navigate(paths.doc(projectId, `file:${source.file_id}`));
   };
 
-  const name = row?.name ?? "";
+  const name = row?.name_pair ? t(row.name_pair) : (row?.name ?? "");
   return (
     <div data-place="room" className="flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
       <div className="flex min-w-0 flex-1 flex-col gap-8 px-(--gutter) pt-7 pb-8 md:min-h-0">

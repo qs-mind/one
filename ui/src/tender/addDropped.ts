@@ -5,13 +5,20 @@ import { addFile, reportFiles } from "@/api/existing";
 import type { PromptInputAttachment } from "@/conversation/ai/prompt-input";
 import { walk } from "@/home/folderDrop";
 
+type Picked = { folder: string; read: () => Promise<File> };
+
 export async function addDropped(projectId: string, dropped: readonly PromptInputAttachment[]): Promise<number | null> {
-  const picked: { folder: string; read: () => Promise<File> }[] = [];
+  const picked: Picked[] = [];
   for (const item of dropped) {
     const file = item.file;
     if (file) picked.push({ folder: "", read: async () => file });
     else if (item.entry) await walk(item.entry, "", picked).catch(() => undefined);
   }
+  return addPicked(projectId, picked);
+}
+
+/** Files already picked (a drop on the box, or the shell's drop on the window in the installed app) go in. */
+export async function addPicked(projectId: string, picked: readonly Picked[]): Promise<number | null> {
   const ids: string[] = [];
   let took = false;
   for (const { read, folder } of picked) {

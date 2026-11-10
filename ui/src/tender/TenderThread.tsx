@@ -1,7 +1,9 @@
 // The tender's conversation column: U3's thread centred at its measure, a tender with no plan yet asking for one
 // under it, and the message box. In the document view the same column is the narrow thread beside the document.
 // What the engineer drops on the box goes into the tender before the words go to the Lead.
-import { useRef } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect, useRef } from "react";
 import type { Schemas } from "@/api/client";
 import { continueBrief, leaveBrief } from "@/api/existing";
 import type { Source } from "@/conversation/parts";
@@ -12,7 +14,9 @@ import { cards } from "@/texts/cards";
 import { textDir } from "@/texts/language";
 import { tender as texts } from "@/texts/tender";
 import { useText } from "@/texts/useText";
-import { addDropped } from "./addDropped";
+import type { DesktopDrop } from "@/home/folderDrop";
+import { nativeFiles } from "@/import/native";
+import { addDropped, addPicked } from "./addDropped";
 import { NoPlan } from "./NoPlan";
 import type { TenderData, useTender } from "./useTender";
 import type { useThread } from "./useThread";
@@ -58,6 +62,22 @@ export function TenderThread({ data, actions, thread, narrow = false, onOpenSour
     }
     if (message.text.trim()) await words(message);
   }
+
+  // In the installed app the shell takes a drop on the window and sends the files it found (one-files-dropped):
+  // while the tender is open they go into it, as a drop on the box does in the browser.
+  useEffect(() => {
+    if (!isTauri() || archived) return;
+    let live = true;
+    const off = listen<DesktopDrop>("one-files-dropped", ({ payload }) => {
+      if (!live || payload.files.length === 0) return;
+      const picked = nativeFiles(payload.files).flatMap(({ folder, read }) => (read ? [{ folder, read }] : []));
+      void addPicked(projectId, picked).then((added) => notify(added === null ? t(cards.filesNotIn) : t.plural(cards.filesIn, added)));
+    });
+    return () => {
+      live = false;
+      void off.then((stop) => stop());
+    };
+  }, [projectId, archived, t]);
 
   const refusal = thread.refused ? t(thread.refused.words ?? cards.noAnswer) : null;
   return (

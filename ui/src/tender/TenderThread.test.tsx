@@ -1,7 +1,7 @@
 // The tender's conversation column on the fake core: a stage signed off from its block, a waiting item that brings
 // its place into view, a message the core refused, files dropped on the box, the box while the Lead cannot work, the
 // Lead's name before the team is read, and a plan request that got no answer.
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -16,6 +16,24 @@ import { tender as texts } from "@/texts/tender";
 import { plural, text } from "@/texts/useText";
 import { Tender } from "./Tender";
 import { refusalOf } from "./useThread";
+
+// The installed app: the shell takes a drop on the window and sends what it found (desktop/src/main.rs).
+const shell = vi.hoisted(() => ({
+  native: false,
+  dropped: [] as ((event: { payload: unknown }) => void)[],
+  invoke: vi.fn(async (_command: string, _args?: unknown) => new Uint8Array([120]).buffer),
+}));
+vi.mock("@tauri-apps/api/core", async (original) => ({
+  ...(await original<typeof import("@tauri-apps/api/core")>()),
+  isTauri: () => shell.native,
+  invoke: shell.invoke,
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: async (name: string, handler: (event: { payload: unknown }) => void) => {
+    if (name === "one-files-dropped") shell.dropped.push(handler);
+    return () => void (shell.dropped = shell.dropped.filter((one) => one !== handler));
+  },
+}));
 
 startFakeCore();
 
@@ -46,6 +64,8 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  shell.native = false;
+  shell.dropped = [];
   vi.useRealTimers();
   resetPage();
   setCurrentProject(undefined);
@@ -124,6 +144,21 @@ describe("the tender's conversation", () => {
     await userEvent.type(await box(), "Start with the concrete{Enter}");
     expect(await screen.findByRole("alert")).toHaveTextContent(text(cards.messageNotSent, "en"));
     expect(screen.getByText("Start with the concrete")).toBeInTheDocument();
+  });
+
+  it("in the installed app, files the shell took from a drop on the window go into the open tender", async () => {
+    shell.native = true;
+    open(P1);
+    await box();
+    await waitFor(() => expect(shell.dropped).toHaveLength(1));
+    const files = [
+      { path: "/t/boq.xlsx", name: "boq.xlsx", folder: "", size: 1 },
+      { path: "/t/terms.pdf", name: "terms.pdf", folder: "", size: 1 },
+    ];
+    act(() => shell.dropped[0]!({ payload: { files, errors: [] } }));
+    await waitFor(() => expect(calls).toContain(`POST /api/projects/${P1}/files/report`));
+    expect(calls).toContain(`POST /api/projects/${P1}/files`);
+    expect(shell.invoke).toHaveBeenCalledWith("folder_read", { path: "/t/boq.xlsx" });
   });
 
   it("puts files dropped on the box into the tender, then sends the words", async () => {
