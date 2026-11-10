@@ -85,44 +85,6 @@ def router() -> APIRouter:
     def tender(project_id: str):
         return _stub()
 
-    # The tender plan (C2).
-    @r.get("/projects/{project_id}/plan", response_model=c.PlanView, responses=_refusals(404, 409))
-    def get_plan(project_id: str):
-        return _stub()
-
-    @r.post(
-        "/projects/{project_id}/plan/request",
-        status_code=202,
-        response_model=c.BriefStarted,
-        responses=_refusals(404, 409, 423),
-    )
-    def request_plan(project_id: str):
-        return _stub()
-
-    @r.post(
-        "/projects/{project_id}/plan/approve",
-        response_model=c.PlanView,
-        responses=_refusals(404, 409, 422, 423),
-    )
-    def approve_plan(project_id: str, body: c.PlanApproveIn):
-        return _stub()
-
-    @r.post(
-        "/projects/{project_id}/plan/stages/{stage_id}/approve",
-        response_model=c.PlanView,
-        responses=_refusals(404, 409, 422, 423),
-    )
-    def approve_stage(project_id: str, stage_id: str, body: c.StageApproveIn):
-        return _stub()
-
-    @r.post(
-        "/projects/{project_id}/plan/change",
-        response_model=c.PlanView,
-        responses=_refusals(404, 409, 422, 423),
-    )
-    def answer_change(project_id: str, body: c.PlanChangeIn):
-        return _stub()
-
     # Findings (C4).
     @r.get(
         "/projects/{project_id}/findings", response_model=c.Findings, responses=_refusals(404, 409)

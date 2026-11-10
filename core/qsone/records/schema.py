@@ -467,6 +467,18 @@ CREATE TRIGGER {_table}_no_delete BEFORE DELETE ON {_table}
  BEGIN SELECT RAISE(ABORT, 'Map records are retained'); END;
 """
 
+# The tender plan (Phase 1, C2): every state of the plan is a new row, the newest is current. A
+# row holds the whole plan as JSON (`qsone.engine.plan.store`); rows are never changed or removed.
+TENDER_PLANS_SQL = """
+CREATE TABLE tender_plans (
+ rev INTEGER PRIMARY KEY, plan_id TEXT NOT NULL, version INTEGER NOT NULL,
+ body TEXT NOT NULL CHECK(json_valid(body)), at TEXT NOT NULL, "by" TEXT NOT NULL);
+CREATE TRIGGER tender_plans_no_update BEFORE UPDATE ON tender_plans
+ BEGIN SELECT RAISE(ABORT, 'Plan versions are retained'); END;
+CREATE TRIGGER tender_plans_no_delete BEFORE DELETE ON tender_plans
+ BEGIN SELECT RAISE(ABORT, 'Plan versions are retained'); END;
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -497,4 +509,5 @@ MIGRATIONS: list[str] = [
     "reason TEXT NOT NULL, recorded_at TEXT NOT NULL);"
     "CREATE TRIGGER map_rejected_facts_no_delete BEFORE DELETE ON map_rejected_facts "
     "BEGIN SELECT RAISE(ABORT, 'Map proposals are retained'); END;",
+    TENDER_PLANS_SQL,
 ]

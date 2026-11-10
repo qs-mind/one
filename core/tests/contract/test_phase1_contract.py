@@ -627,10 +627,14 @@ def test_the_enums_the_core_already_has_are_the_cores():
     assert tuple(c.SetupStepStates.model_fields) == setup_state.STEPS
 
 
-def test_no_plan_yet_is_a_null_inside_a_200():
+def test_no_plan_yet_is_a_null_inside_a_200(client):
     """A tender with no plan is not an error: GET /projects/{project_id}/plan answers 200 with
-    `{"plan": null}`, never a bare null and never a 404. The route is a stub until its job
-    lands, so this is asked of the model and of what the route declares."""
+    `{"plan": null}`, never a bare null and never a 404. Asked of the built route, the model and
+    what the route declares."""
+    pid = client.post("/projects", json={"name": "عينة"}, headers=AUTH).json()["id"]
+    got = client.get(f"/projects/{pid}/plan", headers=AUTH)
+    assert (got.status_code, got.json()) == (200, {"plan": None})
+    c.PlanView.model_validate_json(got.text, strict=True)
     none = c.PlanView.model_validate_json('{"plan": null}', strict=True)
     assert none.plan is None and none.model_dump(mode="json") == {"plan": None}
     with pytest.raises(ValidationError):

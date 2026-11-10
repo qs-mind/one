@@ -43,6 +43,7 @@ from qsone.engine import connectors as engine_connectors
 from qsone.engine import mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
+from qsone.engine.plan import routes as plan_routes
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
 from qsone.journey import routes as journey_routes
@@ -251,6 +252,7 @@ def create_app(
     app.include_router(backup_routes.router(backups))
     app.include_router(account_routes.router(account))
     app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)
+    app.include_router(plan_routes.router(registry, engine))  # the tender plan (Phase 1)
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):
