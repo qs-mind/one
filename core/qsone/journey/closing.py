@@ -129,7 +129,7 @@ async def propose_lessons(rec: Records, engine) -> str | None:
     if _confidential(rec):
         return None
     text = copy.LESSONS_BRIEF[setup_state.language()]
-    return await engine.start_brief(rec.id, text, instruction=INSTRUCTION)
+    return await engine.start_brief(rec.id, text, instruction=INSTRUCTION, by="one")
 
 
 def carry(rec: Records, engineer: Records, lesson_id: str, *, carry: bool) -> bool:

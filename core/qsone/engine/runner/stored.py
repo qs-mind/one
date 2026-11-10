@@ -5,10 +5,12 @@ from pydantic_ai.messages import ModelResponse, TextPart
 
 from qsone import view
 from qsone.deliverables import tools as outputs
-from qsone.engine import agents, findings, general, numbers_guard
+from qsone.engine import agents, findings, general, numbers_guard, sources_part
+from qsone.engine.plan import claims
 from qsone.engine.plan import tool as plan_tool
 from qsone.engine.runner.engine import Engine
 from qsone.engine.runner.histories import _load, _tool_results, lead_text
+from qsone.engine.runner.shared import GENERAL
 from qsone.engine.runner.truth_checks import _no_search_notice
 from qsone.engine.store import Store
 from qsone.engine.types import (
@@ -114,6 +116,10 @@ def _stored_events(
         elif status == "withdrawn" or (unfinished and status == "pending"):
             found.append(Data(brief_id, "card", card.id, {"status": "withdrawn"}))
     events += before
+    for steer in brief.get("steers") or ():  # what the engineer wrote while it ran (Phase 1)
+        events.append(
+            Data(brief_id, "steer", steer["id"], {"text": steer["text"], "at": steer["at"]})
+        )
     if reply:
         events.append(TextDelta(brief_id, reply))
     if lead is not None and lead["history"]:
@@ -157,6 +163,10 @@ def _stored_events(
         named = numbers_guard.sourced(reply, results)
         if named:
             events.append(Data(brief_id, "sourced", brief_id, {"numbers": named}))
+        rec = None if brief["chat_id"] == GENERAL else store.rec
+        found = sources_part.part(brief_id, rec, named, lead["history"] if lead else None)
+        if found is not None:  # Phase 1: data-sources, from the same two places as live
+            events.append(found)
     if brief["worklog"]:
         worklog = WorkLog.load(brief["worklog"], stopped_at=brief["updated_at"])
         worklog.ended = json.loads(brief["worklog"]).get("ended")
@@ -169,5 +179,6 @@ def _stored_events(
         if said.get("step_limit"):
             limit = {"text": said["step_limit"]}
             events.append(Data(brief_id, "notice", f"{brief_id}-step-limit", limit))
+    events += claims.stored_parts(store.rec, brief)  # Phase 1: data-stage
     events.append(Status(brief_id, brief["status"], brief["step"]))
     return events

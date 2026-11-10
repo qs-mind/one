@@ -81,15 +81,17 @@ class Store:
         selection: list[dict] | None = None,
         *,
         effort: str | None = None,
+        by: str | None = None,
     ) -> str:
         """`selection` is what the engineer selected on the canvas (Plan 7), kept with it;
-        `effort` the Lead QS's effort picked in the message box (None: the provider's own)."""
+        `effort` the Lead QS's effort picked in the message box (None: the provider's own);
+        `by` "one" when ONE started it, not the engineer's message (Phase 1)."""
         brief_id = _new_id()
         at = self.rec.clock()
         with self.rec.write(ENGINE) as c:
             c.execute(
                 "INSERT INTO briefs(id, chat_id, text, status, created_at, updated_at, selection,"
-                " effort) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?)",
+                " effort, started_by) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?)",
                 (
                     brief_id,
                     chat_id,
@@ -98,13 +100,14 @@ class Store:
                     at,
                     None if not selection else _dump(selection),
                     effort,
+                    by,
                 ),
             )
         return brief_id
 
     _BRIEF = (
         "id, chat_id, text, status, step, read_untrusted, allowed, created_at, updated_at,"
-        " selection, effort, worklog"
+        " selection, effort, worklog, started_by, steers"
     )
 
     @staticmethod
@@ -114,6 +117,7 @@ class Store:
         d["step"] = None if d["step"] is None else json.loads(d["step"])
         d["allowed"] = json.loads(d["allowed"])
         d["selection"] = None if d["selection"] is None else json.loads(d["selection"])
+        d["steers"] = json.loads(d["steers"])
         return d
 
     def brief(self, brief_id: str) -> dict:
@@ -139,6 +143,14 @@ class Store:
         not audited."""
         with self.rec.write(ENGINE) as c:
             c.execute("UPDATE briefs SET worklog = ? WHERE id = ?", (worklog, brief_id))
+
+    def add_steer(self, brief_id: str, steer: dict) -> None:
+        """What the engineer wrote while the Brief ran, `{"id", "text", "at"}` (`data-steer`)."""
+        with self.rec.write(ENGINE) as c:
+            c.execute(
+                "UPDATE briefs SET steers = json_insert(steers, '$[#]', json(?)) WHERE id = ?",
+                (_dump(steer), brief_id),
+            )
 
     def mark_untrusted(self, brief_id: str) -> None:
         with self.rec.write(ENGINE) as c:

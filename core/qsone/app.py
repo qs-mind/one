@@ -48,6 +48,8 @@ from qsone.engine import findings_routes as findings_api
 from qsone.engine import identity_routes, mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
+from qsone.engine.plan import driver as plan_driver
+from qsone.engine.plan import retry as retry_routes
 from qsone.engine.plan import routes as plan_routes
 from qsone.engine.runner import Engine
 from qsone.engine.types import ModelChoice
@@ -220,6 +222,8 @@ def create_app(
         if own_services:
             engine.services = tool_services.services_for(app.state)
         await engine.start()  # never continues a Brief by itself
+        driver.start()  # the plan driver: its own cut-off stages go on (Phase 1, C3)
+        resuming = asyncio.create_task(driver.resume_all())
         listing = asyncio.create_task(identity_routes.list_models(engine))  # members' models
         backups.start()  # every 30 minutes; closing a project also backs it up
         usage.app_start()  # queued only when the engineer said yes to Usage Stats
@@ -227,6 +231,8 @@ def create_app(
         try:
             async with mcp.running():
                 yield
+                resuming.cancel()
+                await driver.stop()  # no stage starts while the engine stops
                 await engine.shutdown()  # each Brief keeps its Checkpoint
         finally:
             if own_services:
@@ -257,6 +263,7 @@ def create_app(
     app.state.setup = setup
     app.state.mcp = mcp
     app.state.engine = engine
+    app.state.driver = driver = plan_driver.PlanDriver(engine)
     app.state.connectors = connector_hub
     app.state.trash = trash
     app.state.backups = backups
@@ -281,6 +288,7 @@ def create_app(
     app.include_router(settings_routes.router(ai_http, trash, engine))  # Phase 1: C10
     app.include_router(home_routes.router(registry, engine, trash))  # Home and lessons (C7)
     app.include_router(plan_routes.router(registry, engine))  # the tender plan (Phase 1)
+    app.include_router(retry_routes.router(engine, driver))  # Try again (Phase 1, C3)
     app.include_router(findings_api.router(engine))  # Phase 1: routes 13-14 (C4)
 
     @app.middleware("http")
@@ -289,6 +297,14 @@ def create_app(
         if engine.base_url is None:
             engine.base_url = str(request.base_url)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def ai_changed(request: Request, call_next):
+        answer = await call_next(request)
+        if request.method != "GET" and answer.status_code < 300:
+            if request.url.path.startswith(("/settings/ai", "/undo/")):
+                driver.on_ai_changed()  # a tender stage that waited for an AI goes on (C3)
+        return answer
 
     @app.exception_handler(RecordsError)
     async def records_error(request: Request, exc: RecordsError) -> JSONResponse:

@@ -95,7 +95,8 @@ def test_selection_stays_on_the_engineers_message(client, project):
     send(client, project, "راجع ده - عينة", selection=[PRICING])
     messages = client.get(f"/chat/{project}/messages", headers=AUTH).json()["messages"]
     user = messages[0]
-    assert user["role"] == "user" and user["metadata"] == {"selection": [PRICING]}
+    assert user["role"] == "user" and user["metadata"]["selection"] == [PRICING]
+    assert set(user["metadata"]) == {"selection", "at"}  # the engineer's own: no `by`
     assert user["parts"] == [{"type": "text", "text": "راجع ده - عينة"}]
 
 

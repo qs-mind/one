@@ -92,7 +92,7 @@ def router(projects, engine) -> APIRouter:
             if await asyncio.to_thread(store.current, rec) is not None:
                 raise RecordsError(copy.PLAN_EXISTS)
             text = copy.PLAN_REQUEST_BRIEF[setup_state.language()]
-            brief_id = await engine.start_brief(project_id, text, instruction=INSTRUCTION)
+            brief_id = await engine.start_brief(project_id, text, instruction=INSTRUCTION, by="one")
         except RecordsError as e:
             return _refused(e)
         except BriefBusy as busy:

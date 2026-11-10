@@ -46,7 +46,7 @@ async def _tell_lead(engine, project_id: str, finding: dict) -> None:
                 await engine.steer(busy, steer)
             else:
                 lang = setup_state.language()
-                await engine.start_brief(project_id, said[lang], instruction=steer)
+                await engine.start_brief(project_id, said[lang], instruction=steer, by="one")
             return
         except (LookupError, BriefBusy):
             continue
