@@ -253,7 +253,10 @@ describe("the fake core's live channel", () => {
   });
 });
 
-// msw and the samples must stay out of the app: only tests may import the fake core.
+// msw and the samples must stay out of the app: only tests may import the fake core, its samples or msw, with or
+// without the file's extension.
+const FAKE = /["'`](?:msw(?:\/[^"'`\n]*)?|[^"'`\n]*\/(?:fakeCore\w*(?:\.tsx?)?|samples\.json))["'`]/;
+
 it("no application file imports the fake core", () => {
   const root = join(__dirname, "..");
   const files = (dir: string): string[] =>
@@ -263,7 +266,21 @@ it("no application file imports the fake core", () => {
     });
   const importers = files(root)
     .filter((path) => /\.tsx?$/.test(path) && !/\.test\.tsx?$/.test(path) && !/fakeCore\w*\.ts$/.test(path))
-    .filter((path) => /["'`][^"'`\n]*\/fakeCore\w*["'`]/.test(readFileSync(path, "utf8")))
+    .filter((path) => FAKE.test(readFileSync(path, "utf8")))
     .map((path) => relative(root, path));
   expect(importers).toEqual([]);
+});
+
+it("the guard sees every way in", () => {
+  for (const line of [
+    'import { scenario } from "./api/fakeCore";',
+    'import { scenario } from "./api/fakeCore.ts";',
+    'export * from "../api/fakeCoreSamples";',
+    'import samples from "./api/samples.json";',
+    'import { http } from "msw";',
+    'import { setupServer } from "msw/node";',
+  ])
+    expect(FAKE.test(line), line).toBe(true);
+  for (const line of ['import { api } from "./api";', 'import { client } from "./api/client";', 'const name = "mswatch";'])
+    expect(FAKE.test(line), line).toBe(false);
 });

@@ -7,6 +7,9 @@ Rules that hold for every model here:
 - An id is 32 lower-case hex digits, except the two fixed members `lead-qs` and `checking-qs`.
 - A moment is ISO-8601 UTC written with `+00:00`; a day is `YYYY-MM-DD`.
 - Unknown is `null`, never `0` or `""`.
+
+What each route does, how it refuses and which job builds it: the contract design,
+docs/specs/2026-11-10-phase1-contract-design.md (in the private docs repository).
 """
 
 from typing import Annotated, Literal
@@ -189,7 +192,7 @@ StageStatus = Literal[
     "waiting_engineer",  # its work ended and it asks for the engineer's sign-off; nothing else
     "approved",
 ]
-# The first that holds, in this order; `working` when none does (section 1, row 7).
+# The first that holds, in this order; `working` when none does.
 TenderState = Literal[
     "archived",  # closed and read-only; never in GET /home
     "waiting",  # running work waits on a card, or nothing runs and a blocking item waits
@@ -276,7 +279,9 @@ class Home(BaseModel):
     blocked: LeadBlock | None  # why the Lead cannot start work at all now; null when it can
     last_project_id: str | None  # the tender last opened, when it is one of `tenders`
     waiting: list[WaitingItem]  # every listed tender's and the Home conversation's, oldest first
-    tenders: list[TenderRow]  # archived ones left out; the order is the core's (section 1)
+    # Archived ones left out. Not finished with a submission date, nearest first (a passed date
+    # first); then those with no date, newest first; then finished ones, latest date first.
+    tenders: list[TenderRow]
     unreadable: list[UnreadableTender]  # shown after the tenders
 
 
@@ -400,7 +405,7 @@ class TenderPlan(BaseModel):
     estimate the engineer approves with it."""
 
     id: str  # the same through every version
-    version: int  # 1, then one more each time what the engineer approves changes (section 1)
+    version: int  # 1, then one more each time what the engineer approves changes
     status: Literal["proposed", "approved"]
     submission_date: str  # the tender fact this plan was dated back from
     stages: list[Stage]
@@ -670,7 +675,7 @@ class FindingPart(BaseModel):
 
 class SourcesPart(BaseModel):
     """data-sources (id: the Brief's id): what the reply rests on, as far as the core can prove:
-    the sources of its figures, then the places the Lead read in this work (section 3.1)."""
+    the sources of its figures, then the places the Lead read in this work."""
 
     sources: list[Source]
 

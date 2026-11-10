@@ -1651,7 +1651,7 @@ export interface components {
     /**
      * SourcesPart
      * @description data-sources (id: the Brief's id): what the reply rests on, as far as the core can prove:
-     * the sources of its figures, then the places the Lead read in this work (section 3.1).
+     * the sources of its figures, then the places the Lead read in this work.
      */
     SourcesPart: {
       /** Sources */
