@@ -140,6 +140,19 @@ async def test_at_most_six_specialists(ctx):
     assert len(specialists(ctx.store, ctx.brief_id)) == MAX_SPECIALISTS
 
 
+async def test_a_joined_member_is_built_under_its_own_id(ctx):
+    from qsone.engine import identity
+    from tests.test_identity import CONTRACTS
+
+    [proposed] = identity.propose(ctx.rec, [CONTRACTS])
+    await planned(ctx)
+    assert await build(ctx, name_en="contracts qs", name_ar="x") != proposed  # not joined yet
+    identity.confirm(ctx.rec)
+    assert await build(ctx, name_en="Estimator", name_ar="مهندس العقود") == proposed
+    with pytest.raises(ModelRetry, match=f"already, as {proposed}"):
+        await build(ctx, name_en="Contracts QS", name_ar="مهندس العقود ب")
+
+
 async def test_a_replayed_build_makes_one_specialist(ctx):
     await planned(ctx)
     assert await build(ctx) == await build(ctx)

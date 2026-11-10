@@ -1,12 +1,9 @@
 """The Phase 1 contract between the core and the new screens (job J3).
 
 Every route of the contract is declared on the real app with its models, behind the launch secret
-like any other route, and answers 501 until its job builds it; no route of the contract takes a
-request an older route answers; the file the screens' types are generated from is what the core
-declares; and the models keep the contract's rules.
-
-A job that builds a route changes nothing here: 501 is asked only of the routes that
-`qsone.phase1_stubs` still serves. Synthetic «عينة» data only.
+like any other route, and served by its job's own router; no route of the contract takes a request
+an older route answers; the file the screens' types are generated from is what the core declares;
+and the models keep the contract's rules. Synthetic «عينة» data only.
 """
 
 import json
@@ -24,7 +21,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from starlette.routing import compile_path
 
-from qsone import copy, phase1_openapi, phase1_stubs
+from qsone import copy, phase1_openapi
 from qsone import phase1_contract as c
 from qsone.app import create_app
 from qsone.engine import types as engine_types
@@ -260,8 +257,7 @@ def answering(routes: list, method: str, path: str):
     return None
 
 
-def is_stub(route) -> bool:
-    return route.endpoint.__module__ == phase1_stubs.__name__
+CONTRACT_PATHS = {path for _, path in phase1_openapi.ROUTES}
 
 
 def is_model(value: object) -> bool:
@@ -303,7 +299,7 @@ def test_the_table_here_is_the_contracts():
 
 
 @pytest.mark.parametrize("row", ROWS, ids=lambda row: f"{row.method} {row.path}")
-def test_a_contract_route_is_declared_and_refuses_until_it_is_built(app, client, row):
+def test_a_contract_route_is_declared_behind_the_secret(app, client, row):
     route = answering(table(app), row.method, row.call)
     assert route is not None and route.path == row.path  # no older route takes the request
     declared = route.original_route
@@ -318,12 +314,8 @@ def test_a_contract_route_is_declared_and_refuses_until_it_is_built(app, client,
         assert (refused.status_code, refused.json()) == (401, {"detail": "Unauthorized"})
         # Never kept on disk by the webview, whoever answers under this path.
         assert refused.headers["cache-control"] == "no-store"
-
-    if is_stub(route):  # a built route has its job's own tests
-        answer = client.request(row.method, row.call, json=row.body, headers=AUTH)
-        assert (answer.status_code, answer.json()) == (501, {"error": copy.NOT_BUILT})
-        assert answer.headers["cache-control"] == "no-store"
-        c.Refusal.model_validate_json(answer.text, strict=True)
+    # Served by its job's router (each has its own tests), never by a placeholder.
+    assert route.endpoint.__module__.startswith("qsone.")
 
 
 @pytest.mark.parametrize(
@@ -331,7 +323,6 @@ def test_a_contract_route_is_declared_and_refuses_until_it_is_built(app, client,
 )
 def test_the_profile_routes_are_built_and_answer_their_model(app, client, row):
     """Rows 1-2 (C1): served by their own router, each answers its model in strict mode."""
-    assert not is_stub(answering(table(app), row.method, row.call))
     answer = client.request(row.method, row.call, json=row.body, headers=AUTH)
     assert answer.status_code == row.status and answer.headers["cache-control"] == "no-store"
     assert row.gives.model_validate_json(answer.text, strict=True).complete is False
@@ -344,7 +335,6 @@ def test_the_profile_routes_are_built_and_answer_their_model(app, client, row):
 )
 def test_the_setup_routes_answer_their_model(app, client, row):
     """Built by C8: the answer is a `SetupState` in strict mode, even before setup starts."""
-    assert not is_stub(answering(table(app), row.method, row.call))
     answer = client.request(row.method, row.call, json=row.body, headers=AUTH)
     assert answer.status_code == row.status
     assert answer.headers["cache-control"] == "no-store"
@@ -407,7 +397,6 @@ def test_try_again_answers_the_contracts_shapes(app, client):
     one, never kept on disk by the webview."""
     row = ROWS[-1]
     assert row.path == "/briefs/{brief_id}/retry"
-    assert not is_stub(answering(table(app), row.method, row.call))
     for call in (row.call, "/briefs/not-an-id/retry"):
         refused = client.request(row.method, call, headers=AUTH)
         assert (refused.status_code, refused.json()) == (404, {"error": copy.BRIEF_NOT_FOUND})
@@ -452,13 +441,8 @@ def test_the_room_routes_answer_the_contracts_shapes(data_dir):
             assert (gone.status_code, gone.json()) == (404, {"error": copy.PROJECT_NOT_FOUND})
 
 
-def test_the_not_built_text_is_a_pair_with_no_fix_to_offer():
-    assert set(copy.NOT_BUILT) == {"en", "ar"} and all(copy.NOT_BUILT.values())
-    assert copy.fix_of(copy.NOT_BUILT) is None
-
-
-def test_a_wrongly_built_request_is_refused_before_the_stub_answers(client):
-    """The stubs already check what they are sent, so a screen finds a wrong request today."""
+def test_a_wrongly_built_request_is_refused_before_the_handler_answers(client):
+    """Each route checks what it is sent, so a screen finds a wrong request at once."""
     number = client.patch("/settings/caps.month_usd", json={"value": 50}, headers=AUTH)
     third = client.post(f"/projects/{ID}/findings/{ID}/decide", json={"choice": 2}, headers=AUTH)
     word = client.post(
@@ -518,7 +502,7 @@ def test_no_two_routes_share_a_method_and_path(app):
 def test_every_older_route_is_still_answered_by_its_own_handler(app):
     """What answered a request before the contract's routes were mounted answers it now."""
     routes = table(app)
-    older = [route for route in routes if not is_stub(route)]
+    older = [route for route in routes if route.path not in CONTRACT_PATHS]
     assert len(older) > 100 and len(routes) - len(older) <= len(ROWS)
     for route in older:
         path = re.sub(r"\{[^}]+\}", "7", route.path)
@@ -526,8 +510,6 @@ def test_every_older_route_is_still_answered_by_its_own_handler(app):
             before = answering(older, method, path)
             assert before is not None, (method, route.path)
             assert answering(routes, method, path) is before, (method, route.path)
-    # The stub router is the last thing mounted: nothing after it, nothing older behind it.
-    assert [is_stub(route) for route in routes] == sorted(is_stub(route) for route in routes)
 
 
 def test_the_older_routes_beside_the_new_paths_answer_as_before(client):
@@ -556,17 +538,17 @@ def test_the_screens_openapi_file_is_a_fresh_dump():
     assert OPENAPI_FILE.read_text(encoding="utf-8") == phase1_openapi.dump()
 
 
-def test_the_file_stays_the_same_when_a_route_is_built(monkeypatch):
-    """A job that builds a route gives its handler a name and a docstring of its own. Neither is
-    in the document, so the file does not change and parallel jobs never rewrite it."""
+def test_the_file_stays_the_same_whatever_a_handler_is_called(monkeypatch):
+    """A handler's name and docstring are its job's own. Neither is in the document, so the file
+    does not change when a handler is renamed or described again."""
+    add = APIRouter.add_api_route
 
-    class Built(APIRouter):
-        def add_api_route(self, path, endpoint, **more):
-            endpoint.__name__ = f"built_{endpoint.__name__}"
-            endpoint.__doc__ = "What this handler does, in its job's own words."
-            super().add_api_route(path, endpoint, **more)
+    def renamed(self, path, endpoint, **more):
+        more["name"] = f"built_{endpoint.__name__}"
+        more["description"] = "What this handler does, in its job's own words."
+        add(self, path, endpoint, **more)
 
-    monkeypatch.setattr(phase1_stubs, "APIRouter", Built)
+    monkeypatch.setattr(APIRouter, "add_api_route", renamed)
     assert phase1_openapi.dump() == OPENAPI_FILE.read_text(encoding="utf-8")
 
 
@@ -601,7 +583,7 @@ def test_the_document_holds_the_contract_and_nothing_else():
             assert done["oneOf"] == [ref(m) for m in typing.get_args(typing.get_args(c.Setting)[0])]
         else:
             assert done == ref(row.gives)
-        # What belongs to a stub or a handler is not in the contract.
+        # What belongs to a handler is not in the contract.
         assert "501" not in operation["responses"] and "operationId" not in operation
 
 

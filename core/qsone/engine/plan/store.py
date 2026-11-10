@@ -19,7 +19,7 @@ from uuid import uuid4
 from qsone import copy
 from qsone import phase1_contract as c
 from qsone.deliverables import events
-from qsone.engine.plan import build, signoff
+from qsone.engine.plan import build, members, signoff
 from qsone.engine.plan.model import Estimate, PlanDraft, check_date
 from qsone.records import audit
 from qsone.records.project import Records, RecordsError
@@ -205,6 +205,7 @@ def approve(
             _save(conn, project, found | {"plan": again}, ENGINEER, "estimate")
         else:
             done = plan | {"status": "approved", "approved_at": project.clock()}
+            members.answered(project, accepted=True)  # one approval covers the team
             return _save(conn, project, found | {"plan": done}, ENGINEER, "approve")
     raise RecordsError(copy.PLAN_CHANGED, field="version")  # the new figures are stored
 
@@ -228,6 +229,7 @@ def answer_change(
         answered = {"id": change_id, "accept": accept}
         if not accept:
             new = found | {"plan": plan | {"change": None}, "answered": answered}
+            members.answered(project, accepted=False)
             return _save(conn, project, new, ENGINEER, "reject")
         _dated(conn, project, change["submission_date"])
         if estimate is not None and not estimate.same_figures(build.figures(change)):
@@ -246,6 +248,7 @@ def answer_change(
                 "change_measured": None,
                 "answered": answered,
             }
+            members.answered(project, accepted=True)
             return _save(conn, project, new, ENGINEER, "accept")
     raise RecordsError(copy.PLAN_CHANGED, field="change_id")  # stored again with new figures
 

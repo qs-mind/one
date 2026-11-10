@@ -8,8 +8,9 @@ real work in ONE.
   tender may bring it in by its id.
 - A project file holds its tender's members (`project_members`); Engineer Records holds the
   permanent ones (`members`), the cost book and the checks tally.
-- A run's member is its spec's id: `lead-qs`, `checking-qs`, or the member's id when the plan
-  driver builds a specialist for that member. The cost book records it with each cost.
+- A run's member is its spec's id: `lead-qs`, `checking-qs`, or the member's id when the Lead
+  builds a specialist with a joined member's name (`joined_named`, which `build_specialist`
+  asks). The cost book, the room and the live status record it under that id.
 - `record` counts from that real work: the projects with costs, the paid cost that is known (the
   Claude subscription's equivalent and unpriced use left out) and the Checking QS's results on
   the member's Deliverables. A new member has zeros.
@@ -195,6 +196,16 @@ def project_member(rec: Records, member_id: str) -> tuple[dict, str, bool] | Non
     return found[0][1:] if found else None
 
 
+def joined_named(rec: Records, name: dict) -> str | None:
+    """The id of the tender's joined member with this short name (English in any case, or
+    Arabic; the team's names are unique), or None."""
+    keys = {name["en"].casefold(), name["ar"]}
+    for member_id, card, _, proposed in _rows(rec):
+        if not proposed and keys & {card["name"]["en"].casefold(), card["name"]["ar"]}:
+            return member_id
+    return None
+
+
 def _permanent_card(engineer: Records, member_id: str) -> dict | None:
     with engineer.read() as conn:
         row = conn.execute("SELECT card FROM members WHERE id = ?", (member_id,)).fetchone()
@@ -242,9 +253,9 @@ def propose(
 ) -> list[str]:
     """Stores the members a plan or a change proposes (its whole `team`, the fixed members left
     out) and gives their ids, in order. Members who already joined stay; members proposed
-    before and not now are dropped. A draft with `member_id` brings in a member of this team or
-    a permanent one (`engineer` is needed for that). Raises `RecordsError` (422) naming the
-    field, e.g. "team[0].title.ar"."""
+    before and not now are dropped. A draft with `member_id` brings in a member of this team
+    (one only proposed takes the draft's card) or a permanent one (`engineer` is needed for
+    that). Raises `RecordsError` (422) naming the field, e.g. "team[0].title.ar"."""
     drafts = [d if isinstance(d, MemberDraft) else MemberDraft.model_validate(d) for d in drafts]
     if len(drafts) > MAX_SPECIALISTS:
         text = copy.fill(copy.IDENTITY_TOO_MANY, limit=MAX_SPECIALISTS)
@@ -259,7 +270,9 @@ def propose(
         if draft.member_id in FIXED_ROLES:
             raise RecordsError(copy.IDENTITY_FIXED_MEMBER, status=422, field=f"{at}.member_id")
         if draft.member_id in current:
-            card, kind, _ = current[draft.member_id]
+            card, kind, proposed = current[draft.member_id]
+            if proposed and draft.name is not None:  # proposed again: the same id, its new card
+                card = check_identity(draft, at)
             chosen.append((draft.member_id, card, kind))
             continue
         card = None if engineer is None else _permanent_card(engineer, draft.member_id)
@@ -279,6 +292,10 @@ def propose(
         conn.executemany("DELETE FROM project_members WHERE id = ?", [(i,) for i in dropped])
         for member_id, card, kind in chosen:
             if member_id in current:
+                conn.execute(
+                    "UPDATE project_members SET card = ? WHERE id = ? AND proposed = 1",
+                    (json.dumps(card, ensure_ascii=False), member_id),
+                )
                 continue
             conn.execute(
                 "INSERT INTO project_members(id, card, kind, proposed, joined_at)"

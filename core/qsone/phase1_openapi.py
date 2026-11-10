@@ -8,10 +8,9 @@ for that and never started: no lifespan runs, and nothing of the engineer's is r
 
 What belongs to a handler and not to the contract is left out: its name and docstring
 (`operationId`, `summary`, `description`, and the `title` FastAPI makes from the name for an
-answer that is one of several shapes) and the 501 a stub answers until its job lands. So the
-output is the same before and after a route is built, whatever its handler is called, and changes
-only when the contract does. core/tests/contract/test_phase1_contract.py keeps the file in the
-repository equal to it.
+answer that is one of several shapes). So the output is the same whatever a handler is called,
+and changes only when the contract does. core/tests/contract/test_phase1_contract.py keeps the
+file in the repository equal to it.
 """
 
 import json
@@ -73,7 +72,6 @@ def document() -> dict:
         for operation in operations.values():
             for key in ("operationId", "summary", "description"):
                 operation.pop(key, None)
-            operation["responses"].pop("501", None)
             for response in operation["responses"].values():
                 for content in response.get("content", {}).values():
                     content["schema"].pop("title", None)  # "Response 422 <handler's name> ..."

@@ -4,7 +4,9 @@ Here only the shape of a proposed member is checked (`model.check`). The members
 QS title, no personal name) come with the identities job, through `identity_check`, the one place
 that calls it."""
 
+from importlib import import_module
 from importlib.util import find_spec
+from uuid import uuid4
 
 from qsone import copy
 from qsone.engine.plan.model import CHECKER, LEAD, MemberIn
@@ -13,14 +15,30 @@ from qsone.records.project import Records
 IDENTITY = "qsone.engine.identity"
 
 
-def identity_check(project: Records, team: list[MemberIn]) -> None:
+def identity_check(project: Records, team: list[MemberIn], refs: dict[str, str]) -> list[str]:
     """The identities job's checks of the proposed members (`identity.propose(project, drafts)`,
-    raising `RecordsError`), once that module exists; nothing before."""
+    raising `RecordsError`), once that module exists, and each member's id in order: the one the
+    tender's members are stored under, so the plan's team and route 15 name the same ids. A
+    member `refs` already holds keeps its id: proposed again with its new card, or, once it
+    joined, as it is."""
     if find_spec(IDENTITY) is None:
-        return
-    from importlib import import_module
+        return [refs.get(m.ref) or uuid4().hex for m in team]
+    identity = import_module(IDENTITY)
+    drafts = []
+    for m in team:
+        draft, known = m.model_dump(exclude={"ref"}), refs.get(m.ref)
+        if known is not None and identity.project_member(project, known) is not None:
+            draft["member_id"] = known
+        drafts.append(draft)
+    return identity.propose(project, drafts)
 
-    import_module(IDENTITY).propose(project, [m.model_dump(exclude={"ref"}) for m in team])
+
+def answered(project: Records, *, accepted: bool) -> None:
+    """Inside the engineer's write on the plan or a change: its proposed members join the
+    tender, or go when the change is rejected."""
+    if find_spec(IDENTITY) is not None:
+        identity = import_module(IDENTITY)
+        (identity.confirm if accepted else identity.withdraw)(project)
 
 
 def member_tools() -> set[str]:
