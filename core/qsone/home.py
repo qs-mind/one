@@ -15,7 +15,7 @@ from collections.abc import Callable
 from qsone import copy, settings
 from qsone.engine.plan import claims
 from qsone.engine.store import UNFINISHED
-from qsone.home_block import lead_block
+from qsone.home_block import lead_block, tender_block
 from qsone.records.project import Records, RecordsError
 
 GENERAL = "general"  # the Home conversation's chat
@@ -218,7 +218,7 @@ def _row(known: dict, snap: dict, engine, blocked: dict | None) -> tuple[dict, l
         "sample": snap["sample"],
         "state": state,
         "line": line,
-        "blocked": blocked,
+        "blocked": tender_block(engine, known["confidential"], blocked),
         "stage": plan["stage"] if plan else None,
         "stages": plan["stages"] if plan else [],
         "submission_date": snap["submission_date"],

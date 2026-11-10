@@ -77,6 +77,13 @@ NO_AI = {
     ),
 }
 
+# A Confidential Project while "On this computer only" is on (`ai.confidential_on_device`), and
+# no model on this computer is connected: its Lead does not start (contract `LeadBlock`).
+CONFIDENTIAL_NO_LOCAL_AI = {
+    "en": "This Confidential Project runs only on a model on this computer, and none is connected.",
+    "ar": "المشروع السري ده بيشتغل بس على موديل على الجهاز ده، ومفيش موديل متوصل.",
+}
+
 # Model errors for any AI Connector; KEY_REFUSED and the others above stay for the Native Link,
 # whose refused key is KEY_REFUSED here too (`key_refused`).
 AI_KEY_REFUSED = {

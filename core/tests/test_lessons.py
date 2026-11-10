@@ -53,6 +53,16 @@ def test_lessons_are_listed_newest_first_with_their_tender(client):
     assert (found[0]["from_project_id"], found[0]["from_project_name"]) == (None, None)
 
 
+def test_a_confidential_tenders_lessons_are_not_listed(client):
+    pid = client.post("/projects", json={"name": "سري - عينة"}, headers=AUTH).json()["id"]
+    add(client, "Secret client's slab rate - sample.", from_project=pid)
+    kept = add(client, "Saved from Home - sample.")
+    rec = client.app.state.projects.get(pid)
+    with rec.write("engineer") as conn:
+        rec.set_meta(conn, "confidential", "1")
+    assert [x["id"] for x in listed(client)] == [kept]
+
+
 def test_a_lesson_is_edited_in_place(client):
     lesson_id = add(client, "Old words - sample.")
     answer = client.patch(

@@ -72,6 +72,22 @@ def test_kit_excludes_confidential(client):
     assert answer["summary"] is None  # nothing writes one yet, and none may name it
 
 
+def test_lessons_of_a_tender_made_confidential_stay_in_its_own_kit(client):
+    """A tender's lessons carried at close-out, and the tender marked Confidential after: they
+    are in its own kit only, never in another tender's or in Home's."""
+    secret, other = new(client, "سري - عينة"), new(client, "مكشوف - عينة")
+    lesson(client, "Secret client's slab rate - sample.", secret)
+    lesson(client, "Ask for the addendum list first - sample.", other)
+    lesson(client, "Saved from Home - sample.")
+    rec = client.app.state.projects.get(secret)
+    with rec.write("engineer") as conn:
+        rec.set_meta(conn, "confidential", "1")
+    for place in (other, None):
+        found = kit_of(client, place)
+        assert "slab rate" not in found and "addendum" in found and "Saved from Home" in found
+    assert "slab rate" in kit_of(client, secret)
+
+
 def test_kit_size(client, monkeypatch):
     """At most 2 KB for 20 tenders with long names and plans, and every tender is in it; the
     lessons that do not fit are counted, newest kept."""

@@ -46,7 +46,8 @@ def router(projects, engine, trash) -> APIRouter:
     @r.get("/engineer/lessons", response_model=c.Lessons, responses=_refusals(409, 503))
     def list_lessons():
         try:
-            return {"lessons": lessons.listed(engine.engineer_records(), names())}
+            secret = {p["id"] for p in projects.list() if p.get("confidential")}
+            return {"lessons": lessons.listed(engine.engineer_records(), names(), secret)}
         except RecordsError as e:
             return _refused(e)
 

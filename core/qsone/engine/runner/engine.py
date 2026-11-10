@@ -14,7 +14,7 @@ from qsone.engine.mcp_server import McpGate
 from qsone.engine.plan import claims
 from qsone.engine.runner.brief import _Brief, _Place
 from qsone.engine.runner.errors import BriefBusy, NoAI, _Fail
-from qsone.engine.runner.shared import GENERAL, WORK, log, utc_now
+from qsone.engine.runner.shared import GENERAL, WORK, kept_here, log, utc_now
 from qsone.engine.store import UNFINISHED, CostBook, Store
 from qsone.engine.types import BriefState, Card, Data, Effort, Event, ModelCard, ModelChoice
 from qsone.projects import Projects
@@ -49,6 +49,8 @@ class Engine:
         self.meaning = meaning
         self.services = services  # Plan 5's `tools.services.Services`, set by the app (Task 15)
         self.base_url: str | None = None  # the core's own address, for the MCP config
+        # The refused key that left no model at the last listing; forgotten when the AI changes.
+        self.key_refused: dict | None = None
         self._brief_slots = asyncio.Semaphore(max_briefs)
         self._agent_slots = asyncio.Semaphore(max_agents)
         self._briefs: dict[str, _Brief] = {}
@@ -195,6 +197,9 @@ class Engine:
         """The Model Data Sheet and the connectors. Raises `NoAI` when it is empty."""
         found = self.connectors()
         listed, errors = await cards.listed(found)
+        names = {c.id: c.name for c in found}
+        refused = [t for i, t in errors.items() if t == connectors_mod.key_refused(names[i])]
+        self.key_refused = refused[0] if refused and not listed else None  # for `LeadBlock`
         if not listed:
             raise NoAI(next(iter(errors.values()), copy.NO_AI))
         identity.remember_sheet(listed)  # each member's model, without a call of its own
@@ -285,6 +290,7 @@ class Engine:
                 raise NoAI(copy.CHAT_MODEL_GONE)
             if effort not in card.efforts:
                 effort = None
+        sheet = (kept_here(place.rec, sheet[0]), sheet[1])  # a Confidential Project's models
         brief_id = place.store.new_brief(chat_id, text, selection, effort=effort, by=by)
         self._launch(
             _Brief(

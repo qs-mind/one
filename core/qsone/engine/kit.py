@@ -5,10 +5,10 @@ country), the Lessons Learned kept in Engineer Records, newest first, and one li
 its name, stage, submission date and the items waiting in it. The rows are Home's, from what the
 core holds, so the kit opens no closed project.
 
-A Confidential Project is in its own kit only: never in another tender's or in Home's. A removed
-lesson is not in it. The whole kit is at most `LIMIT` characters, its fence included: names and
-stage titles are cut shorter while that lets more lessons in, the older lessons that still do not
-fit are left out, and the kit says how many."""
+A Confidential Project, and the lessons carried from it, are in its own kit only: never in
+another tender's or in Home's. A removed lesson is not in it. The whole kit is at most `LIMIT`
+characters, its fence included: names and stage titles are cut shorter while that lets more
+lessons in, the older lessons that still do not fit are left out, and the kit says how many."""
 
 from collections.abc import Callable
 
@@ -101,5 +101,7 @@ def text(projects, engine, project_id: str | None) -> str:
     shown = [r for r in rows if not r["confidential"] or r["project_id"] == project_id]
     profile = profile_line(engineer)
     head = [profile] if profile else []
-    kept = [_cut(x["fields"]["text"], LESSON) for x in lessons.kept(engineer)]
+    # another Confidential Project's lessons too: it may have been marked so after they were kept
+    secret = {p["id"] for p in projects.list() if p.get("confidential") and p["id"] != project_id}
+    kept = [_cut(x["fields"]["text"], LESSON) for x in lessons.kept(engineer, secret)]
     return _fit(head, shown, project_id, kept)

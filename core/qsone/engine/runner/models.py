@@ -49,6 +49,8 @@ class _BriefModels:
         connector = self.found.get(choice.connector)
         if connector is None:
             raise _Fail(copy.NO_AI)
+        if self.here_only and not self.card(choice).on_device:  # a run stored before
+            raise _Fail(copy.CONFIDENTIAL_NO_LOCAL_AI)
         try:
             model = connector.model(choice.model)
         except connectors_mod.NoKey:

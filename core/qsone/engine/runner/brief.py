@@ -119,6 +119,7 @@ class _Brief(
         self.saved_roles: set[Role] = set()  # the roles the engineer chose in Settings
         self.sheet: list[ModelCard] = []
         self.found: dict[str, Any] = {}
+        self.here_only = False  # nothing may leave this computer: on-device models only
         self._given_sheet = sheet
         self.lead_run_id: str | None = None
         self.mapping_passes = None

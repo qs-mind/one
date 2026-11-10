@@ -88,6 +88,9 @@ class UsageIn(BaseModel):
 # The engineer's own zoom (Ctrl/Cmd with = or -) over the screen's fluid scale:
 # 80 % to 150 %, in steps of 10 %.
 ZOOM_SETTING = "zoom"
+# Paths whose changes (not GET, answered 2xx) change the AI the Lead runs on: the links, the
+# Lead's model, the first launch's AI step and an Undo.
+AI_CHANGES = ("/settings/ai", "/settings/model", "/setup/ai", "/undo/")
 ZOOMS = tuple(round(0.8 + 0.1 * n, 1) for n in range(8))
 
 
@@ -301,7 +304,8 @@ def create_app(
     async def ai_changed(request: Request, call_next):
         answer = await call_next(request)
         if request.method != "GET" and answer.status_code < 300:
-            if request.url.path.startswith(("/settings/ai", "/undo/")):
+            if request.url.path.startswith(AI_CHANGES):
+                engine.key_refused = None  # unknown until the models are listed again
                 driver.on_ai_changed()  # a tender stage that waited for an AI goes on (C3)
         return answer
 

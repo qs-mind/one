@@ -33,7 +33,7 @@ from qsone.engine.team.common import _ask, _join
 from qsone.engine.team.stored import specialists
 from qsone.engine.tools import ToolContext
 from qsone.engine.types import Card, Text, read_answer
-from qsone.home_block import lead_block
+from qsone.home_block import project_block
 from qsone.journey import setup_state
 from qsone.records.project import RecordsError
 
@@ -271,6 +271,7 @@ def router(projects, engine) -> APIRouter:
     )
     async def say_in_room(project_id: str, body: c.RoomMessageIn):
         from qsone.engine.runner import NoAI
+        from qsone.engine.runner.shared import kept_here
 
         try:
             rec = projects.get(project_id)
@@ -278,10 +279,10 @@ def router(projects, engine) -> APIRouter:
                 raise RecordsError(copy.PROJECT_ARCHIVED, status=423)
             text = messages.checked_text(body.text)
             if engine.active(project_id, include_mapping=False) is None:  # work would start
-                blocked = lead_block(engine)
+                blocked = project_block(engine, rec)
                 if blocked is not None:
                     return c.refusal(blocked["reason"])
-                await engine.sheet()
+                kept_here(rec, (await engine.sheet())[0])  # a model the Lead may use here
             said = await asyncio.to_thread(
                 messages.write, rec, from_id=messages.ENGINEER, to_id=messages.TEAM, text=text
             )
