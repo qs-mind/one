@@ -54,6 +54,12 @@ def on_stage_approved(project_id: str, stage_id: str) -> None:
         _running.kick(project_id)
 
 
+def on_plan_changed(project_id: str) -> None:
+    """A Suggested change was accepted: a stage it adds, or one it frees, starts."""
+    if _running is not None:
+        _running.kick(project_id)
+
+
 # The work a stage is given ----------------------------------------------------------------------
 
 
@@ -165,6 +171,8 @@ class PlanDriver:
             return
         try:
             rec = self.engine.projects.get(chat_id)
+            if state == "queued":
+                self._tell_lead(rec, brief_id)
             if rec.archived_at is None:
                 self._decide(rec, chat_id, act=False)
             running = self.engine._briefs.get(brief_id) if state == "done" else None
@@ -175,6 +183,17 @@ class PlanDriver:
         except RecordsError:
             pass  # a project closing: its next opening puts it right
         self.kick(chat_id)
+
+    def _tell_lead(self, rec: Records, brief_id: str) -> None:
+        """Before a Brief's Lead starts: the engineer's answer to its last Suggested change,
+        when no steer told it, joins the Brief's instruction (route 12)."""
+        brief = self.engine._briefs.get(brief_id)
+        if brief is None or brief.mapping_files is not None:
+            return
+        said = store.untold(rec)
+        if said is not None and store.told(rec, said[0]):
+            line = said[1][setup_state.language()]
+            brief.instruction = "\n\n".join(p for p in (brief.instruction, line) if p)
 
     # The loop ----------------------------------------------------------------------------------
 

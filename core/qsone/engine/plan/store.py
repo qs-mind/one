@@ -3,8 +3,9 @@
 Each change appends a row to `tender_plans` holding the whole plan; the newest row is the plan
 now. A row's body is `{"plan": TenderPlan, "requests": {stage id: n}, "measured": [in, out, n] |
 None, "refs": {ref: member id}, "change_requests", "change_measured", "answered": {"id",
-"accept"} | None}`: the plan as the contract sends it, with what its estimate (and a waiting
-change's) is worked out from and what makes an answer safe to repeat.
+"accept", "told"} | None}`: the plan as the contract sends it, with what its estimate (and a
+waiting change's) is worked out from, what makes an answer safe to repeat, and whether the Lead
+was told that answer.
 
 - `version` rises when what the engineer approves changes: the plan proposed again, a Suggested
   change accepted, or an estimate that came out different at approval. A stage moving, or a
@@ -26,6 +27,7 @@ from qsone.records.project import Records, RecordsError
 
 ENGINEER = "engineer"
 LEAD_ACTOR = "lead_qs"
+ENGINE_ACTOR = "engine"
 TABLE = "tender_plans"
 STEPS = ("pending", "now", "waiting_engineer")  # what `set_stage_status` may set
 
@@ -223,10 +225,11 @@ def answer_change(
         found = _found(conn)
         plan, change = found["plan"], found["plan"]["change"]
         if change is None or change["id"] != change_id:
-            if found.get("answered") == {"id": change_id, "accept": accept}:
+            before = found.get("answered") or {}
+            if (before.get("id"), before.get("accept")) == (change_id, accept):
                 return _shown(found)
             raise RecordsError(copy.PLAN_CHANGED, field="change_id")
-        answered = {"id": change_id, "accept": accept}
+        answered = {"id": change_id, "accept": accept, "told": False}
         if not accept:
             new = found | {"plan": plan | {"change": None}, "answered": answered}
             members.answered(project, accepted=False)
@@ -251,6 +254,32 @@ def answer_change(
             members.answered(project, accepted=True)
             return _save(conn, project, new, ENGINEER, "accept")
     raise RecordsError(copy.PLAN_CHANGED, field="change_id")  # stored again with new figures
+
+
+def untold(project: Records) -> tuple[str, dict] | None:
+    """The engineer's answer to the last Suggested change while the Lead is not told it yet:
+    (the change's id, the one line {en, ar}), or None."""
+    with project.read() as conn:
+        found = _body(conn)
+    answered = None if found is None else found.get("answered")
+    if not answered or answered.get("told", True):
+        return None
+    if not answered["accept"]:
+        return answered["id"], dict(copy.PLAN_CHANGE_REJECTED_TOLD)
+    version = found["plan"]["version"]
+    return answered["id"], copy.fill(copy.PLAN_CHANGE_ACCEPTED_TOLD, version=version)
+
+
+def told(project: Records, change_id: str) -> bool:
+    """Notes that the Lead was told the answer to `change_id`. False when it was told already,
+    or another change was answered since: then nobody tells it again."""
+    with events.held(), project.write(ENGINE_ACTOR) as conn:
+        found = _body(conn)
+        answered = None if found is None else found.get("answered")
+        if not answered or answered["id"] != change_id or answered.get("told", True):
+            return False
+        _save(conn, project, found | {"answered": answered | {"told": True}}, ENGINE_ACTOR, "told")
+    return True
 
 
 def _stage_of(plan: dict, stage_id: str) -> dict:

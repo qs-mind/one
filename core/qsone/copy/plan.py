@@ -55,6 +55,21 @@ PLAN_REQUEST_BRIEF = {
     "ar": "اكتب خطة المناقصة.",
 }
 
+# The Lead is told how the engineer answered its Suggested change (route 12), in one line: a
+# steer to its running work (shown in the thread as the engineer's), else in the next work's
+# instruction.
+PLAN_CHANGE_ACCEPTED_TOLD = {
+    "en": "I accepted your suggested change to the plan. Work goes on under the plan as changed "
+    "(version {version}).",
+    "ar": "وافقت على التعديل اللي اقترحته على الخطة. الشغل يكمّل على الخطة بعد التعديل "
+    "(الإصدار {version}).",
+}
+PLAN_CHANGE_REJECTED_TOLD = {
+    "en": "I rejected your suggested change to the plan. Work goes on under the approved plan as "
+    "it was.",
+    "ar": "رفضت التعديل اللي اقترحته على الخطة. الشغل يكمّل على الخطة المعتمدة زي ما هي.",
+}
+
 # The plan tools' checks: each names the value that does not fit -------------------------------
 
 PLAN_TEXT_PAIR = {
