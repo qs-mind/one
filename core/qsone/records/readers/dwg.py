@@ -6,6 +6,7 @@ empty cell kept as an empty place), and one per dimension (the text the sheet sh
 override with `<>` as the measurement, else the measurement). Locators keep `{sheet, handle}`;
 a table row adds `row` (from 1), a dimension `kind: "DIMENSION"`, other texts their `kind`."""
 
+import json
 from pathlib import PurePath
 
 from qsone import copy
@@ -64,12 +65,17 @@ def _table_pieces(drawing) -> list[Piece]:
         cell = t.get("table_cell")
         if not cell or not isinstance(cell, list) or len(cell) != 2:
             continue
-        key = (t.get("layout", "Model"), t.get("handle"), t.get("embedded_sheet"))
+        # a table in a block comes once per insert, `context` naming the insert
+        key = (t.get("layout", "Model"), t.get("handle"), t.get("embedded_sheet"), t.get("context"))
         row = tables.setdefault(key, {}).setdefault(int(cell[0]), {})
         text = (t.get("text") or "").strip()
         row[int(cell[1])] = " ".join(filter(None, [row.get(int(cell[1])), text]))
-    pieces = []
-    for (layout, handle, sheet), rows in tables.items():
+    pieces, shown_tables = [], set()
+    for (layout, handle, sheet, _), rows in tables.items():
+        same = (layout, handle, sheet, json.dumps(rows, sort_keys=True, ensure_ascii=False))
+        if same in shown_tables:  # the same block placed again on this sheet
+            continue
+        shown_tables.add(same)
         for r in sorted(rows):
             cells = rows[r]
             shown = [cells.get(c, "") for c in range(max(cells) + 1)]
@@ -168,6 +174,12 @@ def read_report(drawing) -> list[dict]:
     )
     if other:
         parts.append(part(count(rows["objects"], other), copy.UNREAD_WHY_TOO_MANY))
+    if omitted.get("embedded"):
+        what = copy.fill(copy.UNREAD_EMBEDDED_LEFT, count=str(int(omitted["embedded"])))
+        parts.append(part(what, copy.UNREAD_WHY_TOO_MANY))
+    if isinstance(drawing.cut_texts, int) and drawing.cut_texts > 0:
+        what = copy.fill(copy.UNREAD_DRAWING_CUT, count=str(drawing.cut_texts))
+        parts.append(part(what, copy.UNREAD_WHY_CUT_SHORT))
     if drawing.traversal_limited:
         parts.append(part(copy.UNREAD_DRAWING_NESTED, copy.UNREAD_WHY_NESTED))
     skipped = int((drawing.stats or {}).get("skipped") or 0)

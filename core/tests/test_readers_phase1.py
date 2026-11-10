@@ -228,6 +228,17 @@ def test_word_97_says_what_it_did_not_read():
     assert x.pieces[0].text == "نص - عينة"
 
 
+def test_word_97_a_damaged_sheet_inside_does_not_hide_a_picture():
+    data = word_doc(
+        # two object marks: a picture kept in the text's data, and a damaged sheet
+        [("p", "مواصفات \x01\x01- عينة")],
+        objects=[{"Workbook": b"not a workbook" * 40}],
+    )
+    said = [p["part"]["en"] for p in extract("مواصفات - عينة.doc", data).unread]
+    assert "Pictures or objects inside: 1" in said
+    assert "Excel sheets inside: 1" in said
+
+
 def test_word_97_that_is_locked_damaged_or_not_word_says_so(monkeypatch):
     locked = word_doc([("p", "سري - عينة")], encrypted=True)
     assert extract("a.doc", locked).note == "FILE_LOCKED"
