@@ -29,3 +29,8 @@ export function NowWord({ className, ...props }: ComponentProps<"span">) {
 export function WaitingLabel({ className, ...props }: ComponentProps<"div">) {
   return <div className={cn("text-xs text-waiting", className)} {...props} />;
 }
+
+/** A short inline word that asks the engineer to look, such as an unsure reading's "check it". */
+export function WaitingWord({ className, ...props }: ComponentProps<"span">) {
+  return <span className={cn("text-xs text-waiting", className)} {...props} />;
+}

@@ -1,6 +1,7 @@
 // Where a submission date comes from (S39): the engineer's own word, or the place it was read, and the mark of a
 // local OCR read that was not sure. In full it is a button that opens the file at its place; compact it is plain
 // words, for a row that is itself a link (Home's tender rows), where the row opens the tender.
+import { WaitingWord } from "@/design/now-waiting";
 import type { Source } from "@/conversation/parts";
 import { SourceLinks, sourceLabel } from "@/conversation/SourceLinks";
 import { textDir } from "@/texts/language";
@@ -20,7 +21,7 @@ export function DateSource({ source, onOpen, compact = false }: DateSourceProps)
         <bdi dir={textDir(label)} title={label} className="truncate">
           {label}
         </bdi>
-        {unsure && <span className="text-copper">{t(texts.submissionUnsureShort)}</span>}
+        {unsure && <WaitingWord>{t(texts.submissionUnsureShort)}</WaitingWord>}
       </span>
     );
   }
@@ -29,7 +30,7 @@ export function DateSource({ source, onOpen, compact = false }: DateSourceProps)
       <span className="text-xs">
         <SourceLinks sources={[source]} onOpen={onOpen} />
       </span>
-      {unsure && <span className="text-xs text-copper">{t(texts.submissionUnsure)}</span>}
+      {unsure && <WaitingWord>{t(texts.submissionUnsure)}</WaitingWord>}
     </>
   );
 }
