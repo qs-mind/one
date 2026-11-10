@@ -24,7 +24,8 @@ export const SAVE_MS = 400;
 const EMPTY: ProfileForm = { first_name: "", last_name: "", position: "", company: "", org_type: "", country: "", currency: "" };
 const isField = (name: unknown): name is FieldName => (FIELDS as readonly unknown[]).includes(name);
 
-export function WhoYouAre({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+/** With no `onBack` there is no Back (someone upgrading lands on this step only). */
+export function WhoYouAre({ onBack, onNext }: { onBack?: () => void; onNext: () => void }) {
   const t = useText();
   const form = useForm<ProfileForm, unknown, ProfileValid>({
     resolver: zodResolver(profileSchema),
@@ -120,17 +121,19 @@ export function WhoYouAre({ onBack, onNext }: { onBack: () => void; onNext: () =
       <form noValidate onSubmit={(event) => void next(event)} className="flex flex-col gap-10">
         {loaded ? <ProfileFields form={form} refused={refused} /> : null}
         <StepActions note={note} strong={Boolean(unsaved) || held}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="lg"
-            onClick={() => {
-              void save(form.getValues()); // nothing typed is lost on the way back
-              onBack();
-            }}
-          >
-            {t(firstlaunch.back)}
-          </Button>
+          {onBack ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              onClick={() => {
+                void save(form.getValues()); // nothing typed is lost on the way back
+                onBack();
+              }}
+            >
+              {t(firstlaunch.back)}
+            </Button>
+          ) : null}
           <Button type="submit" size="lg" loading={busy} disabled={!loaded}>
             {t(firstlaunch.next)}
           </Button>

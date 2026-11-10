@@ -66,6 +66,12 @@ export const findClaudeCode = () => call<{ found: boolean; version: string | nul
 /** One small check through the engineer's Claude Code; one that answers is turned on by the core. */
 export const checkClaudeCode = () => call<{ ok: true }>("/settings/ai/check", "POST", { via: "claude_code" });
 
+/** A link made by the provider's address, for a key ONE does not recognise (contract routes 23-24). It saves the
+ * key; it does not check it. A bad address answers 422 with no words (`error: null`). */
+export type StandardLink = { id: string; name: string; provider: string | null; key_set: boolean };
+export const addStandard = (body: { name: string; base_url: string; key: string }) =>
+  call<StandardLink>("/settings/ai/standard", "POST", body);
+
 // Pages outside ONE ------------------------------------------------------------------------------------------------
 
 /** The terms or the privacy policy. In the installed app the core opens the browser (POST /app/open); in a plain

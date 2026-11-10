@@ -1,5 +1,5 @@
 // For tests only: the routes of today that first launch keeps using (GET /setup, the account, the AI consent, Claude
-// Code), served beside the fake core with today's shapes. NEVER import this from application code.
+// Code, a provider by its address), served beside the fake core with today's shapes. NEVER import this from application code.
 //
 // Call serveFirstLaunch() once in a test file, after startFakeCore(); `older` is what the core holds now, and a test
 // changes it to set the scene. Every call to these routes is noted in `older.calls` ("PUT /setup/ai {...}").
@@ -67,6 +67,11 @@ const handlers = [
     const body = (await note(request, "/settings/ai-consent")) as { text_version: number };
     older.consent = { at: "2026-11-10T09:00:00.000000+00:00", text_version: body.text_version };
     return HttpResponse.json({ at: older.consent.at });
+  }),
+  http.post("*/api/settings/ai/standard", async ({ request }) => {
+    const body = (await note(request, "/settings/ai/standard")) as { name: string; base_url: string };
+    const link = { id: "standard:sample", kind: "standard", name: body.name, provider: body.name, on_device: false, key_set: true, error: null };
+    return HttpResponse.json(link, { status: 201 });
   }),
   http.get("*/api/settings/claude-code", () => HttpResponse.json({ found: older.claudeCode.found, version: "2.1.0" })),
   http.post("*/api/settings/ai/check", async ({ request }) => {

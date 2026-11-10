@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scenario, startFakeCore } from "@/api/fakeCore";
 import { DIRS, renderIn, resetPage, stubBrowser } from "@/design/test/harness";
 import { common } from "@/texts/common";
+import { engineer } from "@/texts/engineer";
 import { firstlaunch } from "@/texts/firstlaunch";
 import { getLang } from "@/texts/language";
 import { text } from "@/texts/useText";
@@ -47,6 +48,22 @@ describe.each(DIRS)("Welcome (%s)", (dir) => {
     older.steps.language = "done";
     renderIn(dir, <Welcome onDone={() => {}} />);
     expect(await screen.findByRole("heading", { level: 1, name: say(firstlaunch.whoTitle) })).toBeInTheDocument();
+  });
+
+  it("someone upgrading (language and AI passed, profile incomplete) sees step 2 only, and its Next ends", async () => {
+    scenario("profile:incomplete");
+    older.steps = { ...older.steps, language: "done", ai: "done" };
+    const onDone = vi.fn();
+    renderIn(dir, <Welcome onDone={onDone} />);
+    expect(await screen.findByRole("heading", { level: 1, name: say(firstlaunch.whoTitle) })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: say(firstlaunch.back) })).toBeNull();
+    for (const pair of [engineer.first_name, engineer.last_name, engineer.position, engineer.company])
+      await userEvent.type(await screen.findByRole("textbox", { name: say(pair) }), "مهندس"); // the choices are known
+    await userEvent.click(screen.getByRole("button", { name: say(firstlaunch.next) }));
+    await waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("heading", { level: 1, name: say(firstlaunch.aiTitle) })).toBeNull();
+    expect(older.calls.some((call) => call.startsWith("PUT /setup/ai"))).toBe(false);
+    expect(older.steps.ai).toBe("done");
   });
 
   it("with a complete profile it opens on Connect AI, and ends there", async () => {

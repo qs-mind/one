@@ -65,6 +65,25 @@ describe.each(DIRS)("Connect AI (%s)", (dir) => {
     expect(screen.queryByRole("button", { name: say(firstlaunch.start) })).toBeNull();
   });
 
+  it("for a key ONE does not know, the provider's address links it with no button", async () => {
+    const { onDone } = open();
+    await agree();
+    await userEvent.click(keyBox());
+    await userEvent.paste("x-unknown-key");
+    const address = await screen.findByLabelText(say(firstlaunch.addressLabel));
+    await userEvent.type(address, "ftp://example.com");
+    await userEvent.tab();
+    expect(await screen.findByText(say(firstlaunch.addressBad))).toBeInTheDocument();
+    expect(older.calls.some((call) => call.startsWith("POST /settings/ai/standard"))).toBe(false);
+    await userEvent.clear(address);
+    await userEvent.type(address, "https://api.example.com/v1{Enter}");
+    await waitFor(() => expect(plain(document.body.textContent)).toContain(plain(say(firstlaunch.addressLinked, { provider: "api.example.com" }))));
+    expect(older.calls).toContain('POST /settings/ai/standard {"name":"api.example.com","base_url":"https://api.example.com/v1","key":"x-unknown-key"}');
+    await userEvent.click(screen.getByRole("button", { name: say(firstlaunch.start) }));
+    await waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+    expect(older.calls).toContain('PUT /setup/ai {"state":"done"}');
+  });
+
   it("the engineer's own Claude Code is the other way", async () => {
     const { onDone } = open();
     await agree();
