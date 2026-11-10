@@ -48,6 +48,7 @@ export const firstlaunch = defineTexts({
   keyAfterConsent: { en: "Agree first, then paste the key.", ar: "وافق الأول، وبعدين الصق المفتاح." },
   keyChecking: { en: "Checking the key…", ar: "جاري التحقق من المفتاح…" },
   keyWorks: { en: "Connected to {provider}. The key works.", ar: "اتوصّل بـ {provider}. المفتاح شغال." },
+  linkedAlready: { en: "An AI is connected already. You can start.", ar: "فيه ذكاء اصطناعي متوصّل خلاص. تقدر تبدأ." },
   keyNotChecked: { en: "ONE could not check the key. Try again.", ar: "ONE مقدرش يتحقق من المفتاح. جرّب تاني." },
   addressLabel: { en: "The provider's address", ar: "عنوان المزوّد" },
   addressHelp: {

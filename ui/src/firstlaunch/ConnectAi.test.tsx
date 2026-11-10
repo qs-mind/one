@@ -125,6 +125,7 @@ describe.each(DIRS)("Connect AI (%s)", (dir) => {
     older.consent = { at: "2026-11-10T09:00:00.000000+00:00", text_version: 3 };
     older.links = [{ id: "anthropic", kind: "model", name: "Claude", provider: "Anthropic", on_device: false, key_set: true, error: null }];
     const { onDone } = open();
+    expect(await screen.findByText(say(firstlaunch.linkedAlready))).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: say(firstlaunch.start) }));
     await waitFor(() => expect(onDone).toHaveBeenCalledOnce());
     expect(older.calls).toContain('PUT /setup/ai {"state":"done"}');

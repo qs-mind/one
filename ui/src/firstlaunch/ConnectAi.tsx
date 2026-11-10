@@ -64,7 +64,9 @@ export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () =
   }
 
   const connected = keyWorks || linked || claude.state === "works";
-  const note = stepFailed ? t(firstlaunch.stepNotSaved) : connected ? null : t(firstlaunch.laterNote);
+  // A link the core held when the step opened has no line of its own above, so the note says it.
+  const onlyHeld = linked && !keyWorks && claude.state !== "works";
+  const note = stepFailed ? t(firstlaunch.stepNotSaved) : onlyHeld ? t(firstlaunch.linkedAlready) : connected ? null : t(firstlaunch.laterNote);
 
   return (
     <>

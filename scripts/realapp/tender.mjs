@@ -112,7 +112,9 @@ try {
     await app.click(button("موافق")); // the AI note; the bench's own models are connected already
     await app.waitFor({ text: /^وافقت\./ });
     await app.shot("welcome-ai-agreed");
-    await app.click(button("وصّل بعدين"));
+    // the bench's own models are connected already: step 3 says so and offers Start
+    await app.waitFor({ text: "فيه ذكاء اصطناعي متوصّل خلاص. تقدر تبدأ." });
+    await app.click(button("ابدأ"));
     await placeIs("home", "Home");
     await app.shot("home-first");
     note("first launch walked to Home in Arabic, the AI note agreed");

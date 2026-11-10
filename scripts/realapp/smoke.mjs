@@ -79,7 +79,9 @@ try {
   await step("first launch: AI later, then Home", async () => {
     await app.waitFor({ role: "heading", name: "وصّل الذكاء الاصطناعي" });
     await app.shot("welcome-ai-ar");
-    await app.click(button("وصّل بعدين"));
+    // the bench's own models are connected already: step 3 says so and offers Start
+    await app.waitFor({ text: "فيه ذكاء اصطناعي متوصّل خلاص. تقدر تبدأ." });
+    await app.click(button("ابدأ"));
     await placeIs("home", "Home");
     for (const [w, h] of SIZES) {
       await app.resize(w, h);
