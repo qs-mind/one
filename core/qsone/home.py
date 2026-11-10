@@ -74,13 +74,14 @@ def _source(source: dict) -> dict:
     return empty | {"kind": "engineer", "title": "", "locator": {}, "dated": source.get("date")}
 
 
-def _submission(rec: Records) -> tuple[str | None, dict | None]:
+def submission(rec: Records) -> tuple[str | None, dict | None]:
+    """The tender's submission date and its source as a contract `Source`, or None for each."""
     from qsone.journey import understand
 
     fact = understand.facts(rec)["facts"].get("submission_date")
     if fact is None or not fact["value"]:
         return None, None
-    return fact["value"], _source(fact["source"])
+    return fact["value"], _source(fact["source"]) if fact.get("source") else None
 
 
 def _plan(found: dict | None) -> dict | None:
@@ -121,7 +122,7 @@ def snapshot(rec: Records) -> dict:
         ).fetchall()
         driven = claims.driven(conn)  # a tender stage's work resumes by itself: never listed
     cut = [(i, at) for i, at in cut if i not in driven]
-    date, source = _submission(rec)
+    date, source = submission(rec)
     durable = [item("unfinished", i, rec.id, copy.WAITING_UNFINISHED, at) for i, at in cut]
     for read in waiting_readers:
         durable += read(rec)

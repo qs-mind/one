@@ -44,7 +44,9 @@ def _shown(body: dict) -> c.TenderPlan:
     """The plan as sent: a waiting change's stages carry the plan's own status, result and
     output ids."""
     plan = json.loads(json.dumps(body["plan"]))
+    plan.setdefault("submission_source", None)  # a row written before the date had a source
     if plan["change"] is not None:
+        plan["change"].setdefault("submission_source", None)
         now = {s["id"]: s for s in plan["stages"]}
         plan["change"]["stages"] = [
             build.kept(now.get(s["id"]), s) for s in plan["change"]["stages"]
@@ -77,6 +79,13 @@ def _fact(conn) -> str | None:
         " ORDER BY created_at DESC, rowid DESC LIMIT 1"
     ).fetchone()
     return None if found is None else found[0]
+
+
+def _fact_source(project: Records) -> dict | None:
+    """The source of the tender fact `submission_date`, as TenderRow.submission_source gives it."""
+    from qsone import home  # home reads the plan through `plan_reader`: imported when used
+
+    return home.submission(project)[1]
 
 
 def submission_fact(project: Records) -> str | None:
@@ -145,7 +154,13 @@ def propose(project: Records, draft: PlanDraft, *, actor: str = LEAD_ACTOR) -> c
         if found is not None and found["plan"]["status"] == "approved":
             raise RecordsError(copy.PLAN_APPROVED)
         made = build.built(
-            project, found, draft, fact=_fact(conn), today=today(project), change=False
+            project,
+            found,
+            draft,
+            fact=_fact(conn),
+            source=_fact_source(project),
+            today=today(project),
+            change=False,
         )
         plan = made["plan"] | {
             "id": uuid4().hex if found is None else found["plan"]["id"],
@@ -175,7 +190,13 @@ def suggest(
         if found["plan"]["status"] != "approved":
             raise RecordsError(copy.PLAN_NOT_APPROVED)
         made = build.built(
-            project, found, draft, fact=_fact(conn), today=today(project), change=True
+            project,
+            found,
+            draft,
+            fact=_fact(conn),
+            source=_fact_source(project),
+            today=today(project),
+            change=True,
         )
         change = made["plan"] | {"id": uuid4().hex, "reason": reason}
         new = found | {

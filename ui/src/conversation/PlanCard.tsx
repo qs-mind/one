@@ -11,7 +11,8 @@ import { conversation } from "@/texts/conversation";
 import { formatDate } from "@/texts/format";
 import { textDir } from "@/texts/language";
 import { type Translate, useText } from "@/texts/useText";
-import type { TenderPlan } from "./parts";
+import { DateSource } from "@/tender/DateSource";
+import type { Source, TenderPlan } from "./parts";
 import { planShape } from "./plan";
 
 type PlanCardProps = {
@@ -22,6 +23,8 @@ type PlanCardProps = {
   onApprove: (version: number) => void;
   onDiscuss: () => void;
   onChange: (changeId: string, accept: boolean) => void;
+  /** Opens a submission date's source at its place (S39). */
+  onOpenSource?: (source: Source) => void;
 };
 
 const day = (value: string, t: Translate) => formatDate(new Date(`${value}T00:00:00Z`), t.lang, { day: "numeric", month: "long", timeZone: "UTC" });
@@ -45,7 +48,17 @@ function barLabel(plan: TenderPlan, t: Translate): string {
   return t(conversation.stageBar, { step, total: shape.count, name: stage.title[t.lang] });
 }
 
-export function PlanCard({ plan, version, onApprove, onDiscuss, onChange }: PlanCardProps) {
+/** Where a submission date was read, under it; nothing when the core gives no source. */
+function Dated({ source, onOpen }: { source: Source | null; onOpen?: (source: Source) => void }) {
+  if (!source) return null;
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-3" data-date-source>
+      <DateSource source={source} onOpen={onOpen} />
+    </span>
+  );
+}
+
+export function PlanCard({ plan, version, onApprove, onDiscuss, onChange, onOpenSource }: PlanCardProps) {
   const t = useText();
   if (!plan) return null;
   if (version < plan.version)
@@ -70,6 +83,7 @@ export function PlanCard({ plan, version, onApprove, onDiscuss, onChange }: Plan
           className="text-xs text-muted-foreground"
           items={[...facts(plan, t).slice(2), t(conversation.submission, { date: day(plan.submission_date, t) })]}
         />
+        <Dated source={plan.submission_source} onOpen={onOpenSource} />
         <p className="text-xs text-muted-foreground">{t(plan.cost_basis)}</p>
         {plan.status === "approved" && plan.approved_at && (
           <p className="text-xs">{t(conversation.approvedOn, { date: formatDate(new Date(plan.approved_at), t.lang) })}</p>
@@ -82,10 +96,12 @@ export function PlanCard({ plan, version, onApprove, onDiscuss, onChange }: Plan
               <dt className="text-muted-foreground">{t(conversation.changeNow)}</dt>
               <dd>
                 <MetaLine items={[...facts(plan, t), day(plan.submission_date, t)]} />
+                <Dated source={plan.submission_source} onOpen={onOpenSource} />
               </dd>
               <dt className="text-muted-foreground">{t(conversation.changeAfter)}</dt>
               <dd>
                 <MetaLine items={[...facts(change, t), day(change.submission_date, t)]} />
+                <Dated source={change.submission_source} onOpen={onOpenSource} />
               </dd>
             </dl>
           </div>

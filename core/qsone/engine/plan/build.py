@@ -73,11 +73,12 @@ def built(
     draft: PlanDraft,
     *,
     fact: str | None,
+    source: dict | None,
     today: date,
     change: bool,
 ) -> dict:
-    """`{"plan": {submission_date, stages, team, figures}, "requests", "measured", "refs"}` from
-    `draft`,
+    """`{"plan": {submission_date, submission_source, stages, team, figures}, "requests",
+    "measured", "refs"}` from `draft`, `source` being the date's (`fact`'s) source or None,
     checked against the plan now (`body`). A change may not remove or alter a stage that is
     signed off (PLAN_STAGE_LOCKED); the dates of a stage that has begun are not held to today."""
     now = {} if body is None else {s["id"]: s for s in body["plan"]["stages"]}
@@ -109,6 +110,7 @@ def built(
                 raise RecordsError(text, status=422, field="stages")
     plan = {
         "submission_date": draft.submission_date,
+        "submission_source": source,
         "stages": stages,
         "team": members.members(project, draft.team, refs, draft.engineer),
     }

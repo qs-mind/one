@@ -647,6 +647,18 @@
    "version": 1,
    "status": "proposed",
    "submission_date": "2026-11-21",
+   "submission_source": {
+    "kind": "sample",
+    "title": "تعليمات المتناقصين - عينة (sample)",
+    "file_name": "01 تعليمات المتناقصين.pdf - عينة (sample)",
+    "file_id": "5a0000000000000000000000000000f1",
+    "locator": {
+     "page": 3
+    },
+    "url": null,
+    "dated": null,
+    "quote": "آخر موعد لتقديم العطاءات 21 نوفمبر 2026 - عينة (sample)"
+   },
    "stages": [
     {
      "id": "5a000000000000000000000000001101",
@@ -1112,6 +1124,18 @@
    "version": 1,
    "status": "approved",
    "submission_date": "2026-11-14",
+   "submission_source": {
+    "kind": "sample",
+    "title": "تعليمات المتناقصين - عينة (sample)",
+    "file_name": "01 تعليمات المتناقصين.pdf - عينة (sample)",
+    "file_id": "5a0000000000000000000000000000f1",
+    "locator": {
+     "page": 2
+    },
+    "url": null,
+    "dated": null,
+    "quote": "آخر موعد لتقديم العطاءات 14 نوفمبر 2026 - عينة (sample)"
+   },
    "stages": [
     {
      "id": "5a000000000000000000000000001201",
@@ -1551,6 +1575,19 @@
     "id": "5a0000000000000000000000000000a3",
     "reason": "ملحق رقم 2 مدّ موعد التقديم إلى 16 نوفمبر، فباقترح يوم زيادة للتسعير ويوم زيادة للمراجعة - عينة (sample)",
     "submission_date": "2026-11-16",
+    "submission_source": {
+     "kind": "sample",
+     "title": "ملحق رقم 2 - عينة (sample)",
+     "file_name": "ملحق 2.pdf - عينة (sample)",
+     "file_id": "5a0000000000000000000000000000f5",
+     "locator": {
+      "page": 1,
+      "ocr_low_confidence": true
+     },
+     "url": null,
+     "dated": null,
+     "quote": "يمتد موعد التقديم إلى 16 نوفمبر 2026 - عينة (sample)"
+    },
     "stages": [
      {
       "id": "5a000000000000000000000000001201",

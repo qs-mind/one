@@ -144,6 +144,7 @@ describe("the tender plan", () => {
     const accepted = (await client.POST("/projects/{project_id}/plan/change", { ...at(P2), body: { change_id: change.id, accept: true } })).data!.plan!;
     expect(accepted).toMatchObject({ version: 2, status: "approved", submission_date: "2026-11-16", expected_cost_usd: "3.10", change: null });
     expect(accepted.stages).toEqual(change.stages);
+    expect(accepted.submission_source).toEqual(change.submission_source); // the date and where it was read
     expect(await plan(P2)).toEqual(accepted);
     const waits = await tender(P2);
     expect(waits.waiting.map((item) => item.kind)).toEqual(["decision"]); // the change left; the decision still stops work

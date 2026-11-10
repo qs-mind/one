@@ -20,6 +20,7 @@ from qsone.engine.team.common import TeamSetup
 from qsone.engine.tools import ModelRetry, call
 from qsone.engine.types import Data, ModelChoice
 from qsone.journey import understand
+from qsone.records import files
 from qsone.records.project import RecordsError
 from tests.engine_fakes import OPUS, SAMPLE_SHEET
 from tests.fakes_tools import tool_ctx
@@ -304,3 +305,46 @@ def test_a_change_keeps_progress_and_cannot_alter_a_signed_off_stage(rec):
     for moved in ((first, "now"), (second, "approved")):
         with pytest.raises(ValueError):  # signed off stays; signing off is approve_stage
             store.set_stage_status(rec, *moved)
+
+
+# The submission date's source -------------------------------------------------------------------
+
+
+def read_from(rec, value: str, file_id: str, locator: dict) -> None:
+    """The Lead reads the tender's submission date `value` in the file at `locator`."""
+    source = {"kind": "file", "file_id": file_id, "locator": locator}
+    fields = {"name": "submission_date", "value": value, "source": source}
+    with rec.write(understand.LEAD) as conn:
+        found = understand._items(conn, understand.FACT)
+        understand._put(conn, rec, found, understand.FACT, "submission_date", fields, "lead_qs")
+
+
+def test_the_plan_and_its_change_carry_the_source_of_the_date_each_was_dated_from(rec):
+    due_in(rec)
+    plan = store.propose(rec, draft(rec))
+    mine = plan.submission_source
+    assert (mine.kind, mine.dated, mine.file_id) == ("engineer", store.today(rec).isoformat(), None)
+    store.approve(rec, version=1)
+    # Addendum 2 moves the date: the change carries the place it was read, the plan keeps its own.
+    addendum = files.add_file(rec, "ملحق 2 - عينة.pdf", b"sample bytes", actor="engineer")
+    read_from(rec, day(rec, 12), addendum.id, {"page": 1, "ocr_low_confidence": True})
+    kept = [
+        stage(rec, 0, id=plan.stages[0].id),
+        stage(rec, 1, id=plan.stages[1].id, owner="pricing-qs"),
+    ]
+    shown = store.suggest(rec, draft(rec, stages=kept, due=day(rec, 12)), "عينة")
+    assert shown.submission_source == mine
+    read = shown.change.submission_source
+    assert (read.kind, read.file_id, read.file_name) == ("file", addendum.id, "ملحق 2 - عينة.pdf")
+    assert read.locator == {"page": 1, "ocr_low_confidence": True}
+    # Accepted: the plan takes the change's date and its source.
+    accepted = store.answer_change(rec, shown.change.id, True)
+    assert (accepted.submission_date, accepted.submission_source) == (day(rec, 12), read)
+
+
+def test_a_plan_stored_before_it_had_a_source_reads_none(rec):
+    due_in(rec)
+    store.propose(rec, draft(rec))
+    old = store.body(rec)
+    del old["plan"]["submission_source"]  # rows are kept as written: one from before the field
+    assert store._shown(old).submission_source is None

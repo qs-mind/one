@@ -109,8 +109,18 @@ const routes: Routes = {
       if (!plan) return refuse(404, "PLAN_NOT_FOUND");
       if (plan.change?.id !== body.change_id) return refuse(409, "PLAN_CHANGED", { field: "change_id" });
       // Accepted, the plan takes what the change says and keeps its own id, status and approval.
-      const { submission_date, stages, team, expected_cost_usd, expected_minutes, cost_basis, paid } = plan.change;
-      const accepted = { submission_date, stages, team, expected_cost_usd, expected_minutes, cost_basis, paid, version: plan.version + 1 };
+      const { submission_date, submission_source, stages, team, expected_cost_usd, expected_minutes, cost_basis, paid } = plan.change;
+      const accepted = {
+        submission_date,
+        submission_source,
+        stages,
+        team,
+        expected_cost_usd,
+        expected_minutes,
+        cost_basis,
+        paid,
+        version: plan.version + 1,
+      };
       const next: S["TenderPlan"] = { ...plan, ...(body.accept ? accepted : {}), change: null };
       data[`plan:${id}`] = { plan: next };
       settle(id, plan.id, "plan_change");

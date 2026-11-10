@@ -1347,6 +1347,7 @@ export interface components {
       stages: components["schemas"]["Stage"][];
       /** Submission Date */
       submission_date: string;
+      submission_source: components["schemas"]["Source"] | null;
       /** Team */
       team: components["schemas"]["Member"][];
     };
@@ -1821,6 +1822,7 @@ export interface components {
       status: "proposed" | "approved";
       /** Submission Date */
       submission_date: string;
+      submission_source: components["schemas"]["Source"] | null;
       /** Team */
       team: components["schemas"]["Member"][];
       /** Version */

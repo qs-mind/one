@@ -1102,6 +1102,16 @@
             "title": "Submission Date",
             "type": "string"
           },
+          "submission_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Source"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "team": {
             "items": {
               "$ref": "#/components/schemas/Member"
@@ -1114,6 +1124,7 @@
           "id",
           "reason",
           "submission_date",
+          "submission_source",
           "stages",
           "team",
           "expected_cost_usd",
@@ -2436,6 +2447,16 @@
             "title": "Submission Date",
             "type": "string"
           },
+          "submission_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Source"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "team": {
             "items": {
               "$ref": "#/components/schemas/Member"
@@ -2453,6 +2474,7 @@
           "version",
           "status",
           "submission_date",
+          "submission_source",
           "stages",
           "team",
           "expected_cost_usd",

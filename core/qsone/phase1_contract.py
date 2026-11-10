@@ -392,6 +392,7 @@ class PlanChange(BaseModel):
     id: str
     reason: str
     submission_date: str
+    submission_source: Source | None  # where the date it was dated from was read; null with none
     stages: list[Stage]
     team: list[Member]
     expected_cost_usd: str | None
@@ -408,6 +409,7 @@ class TenderPlan(BaseModel):
     version: int  # 1, then one more each time what the engineer approves changes
     status: Literal["proposed", "approved"]
     submission_date: str  # the tender fact this plan was dated back from
+    submission_source: Source | None  # that fact's source when it was dated; null with none
     stages: list[Stage]
     team: list[Member]  # the fixed members and those proposed or working; one approval covers both
     expected_cost_usd: str | None  # null when a model in the plan has no known price

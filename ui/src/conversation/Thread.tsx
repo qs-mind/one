@@ -97,7 +97,7 @@ export function Thread(props: ThreadProps) {
     );
 
   const planCard = (version: number) => (
-    <PlanCard plan={plan} version={version} onApprove={props.onApprovePlan} onDiscuss={props.onDiscussPlan} onChange={props.onPlanChange} />
+    <PlanCard plan={plan} version={version} onApprove={props.onApprovePlan} onDiscuss={props.onDiscussPlan} onChange={props.onPlanChange} onOpenSource={onOpenSource} />
   );
   const decisionCard = (id: string) => {
     const decision = decisionOf(id);

@@ -5,6 +5,7 @@ import { HOLD_MS } from "@/design/HoldButton";
 import { DIRS, hasTarget44, renderIn, resetPage, stubBrowser } from "@/design/test/harness";
 import { common } from "@/texts/common";
 import { conversation } from "@/texts/conversation";
+import { tender } from "@/texts/tender";
 import { text } from "@/texts/useText";
 import { type Decision, DecisionCard, fromFinding, oneAtATime } from "./DecisionCard";
 import { findings, paidFinding, planProposed, planWithChange, queued, raised, settled } from "./gallery/samples";
@@ -112,6 +113,24 @@ describe.each(DIRS)("PlanCard (%s)", (dir) => {
     if (planWithChange.change!.paid) await hold(accept);
     else fireEvent.click(accept);
     expect(h.onChange).toHaveBeenCalledWith(planWithChange.change!.id, true);
+  });
+
+  it("shows where each submission date was read, opening it, and marks an unsure OCR read", async () => {
+    const onOpenSource = vi.fn();
+    renderIn(dir, <PlanCard plan={planWithChange} version={planWithChange.version} {...handlers()} onOpenSource={onOpenSource} />);
+    // The plan's own date under its facts, then the change's before and after.
+    const [, now, after] = [...document.querySelectorAll<HTMLElement>("[data-date-source]")];
+    expect(now).toHaveTextContent(planWithChange.submission_source!.title);
+    expect(after).toHaveTextContent(planWithChange.change!.submission_source!.title);
+    expect(after).toHaveTextContent(text(tender.submissionUnsure, lang));
+    expect(now).not.toHaveTextContent(text(tender.submissionUnsure, lang));
+    await userEvent.click(after!.querySelector("button")!);
+    expect(onOpenSource).toHaveBeenCalledWith(planWithChange.change!.submission_source);
+  });
+
+  it("shows no date source when the core gives none", () => {
+    renderIn(dir, <PlanCard plan={{ ...planProposed, submission_source: null }} version={1} {...handlers()} />);
+    expect(document.querySelector("[data-date-source]")).toBeNull();
   });
 
   it("a part that names an older version is one line; no plan yet draws nothing", () => {
