@@ -46,6 +46,7 @@ class Drawing:
     problems: list = field(default_factory=list)
     omitted: dict = field(default_factory=dict)
     traversal_limited: bool = False
+    cut_texts: int = 0  # texts longer than the reader keeps: their start only
     totals: dict = field(default_factory=dict)
     note: str | None = None
     repaired: bool = False
@@ -701,121 +702,97 @@ def read_pdf_sheet(
 
 
 def _embedded_texts(drawing: Drawing):
-    """Read cached Excel cells from OLE storage without executing embedded code."""
-    import xlrd
-
+    """Read cached Excel cells from OLE storage without executing embedded code. OLE placements
+    often embed the same workbook many times: one with the same cells on a layout is read once."""
+    seen = set()
     for embedded in drawing.embedded:
-        if embedded.get("package_hex"):
-            _package_texts(drawing, embedded)
-            _deduplicate_cells(drawing)
-            continue
-        payload = embedded.get("compound_hex", "")
+        payload = embedded.get("package_hex") or embedded.get("compound_hex") or ""
         if not payload:
             continue
         if len(payload) > 16 * MIB:
             drawing.problems.append({"code": "embedded-workbook-too-large"})
             continue
+        read = _package_cells if embedded.get("package_hex") else _compound_cells
         try:
-            book = xlrd.open_workbook(file_contents=bytes.fromhex(payload), on_demand=True)
-            try:
-                for table in book.sheets():
-                    for ri in range(min(table.nrows, 4096)):
-                        for ci in range(min(table.ncols, 256)):
-                            cell = table.cell(ri, ci)
-                            if cell.ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
-                                continue
-                            value = str(cell.value)
-                            drawing.texts.append(
-                                {
-                                    k: v
-                                    for k, v in embedded.items()
-                                    if k not in ("compound_hex", "package_hex")
-                                }
-                                | {
-                                    "text": value,
-                                    "raw_text": value,
-                                    "table_cell": [ri, ci],
-                                    "embedded_sheet": table.name,
-                                }
-                            )
-                            if len(drawing.texts) >= 100000:
-                                drawing.problems.append({"code": "embedded-cell-limit"})
-                                return
-            finally:
-                book.release_resources()
-                _deduplicate_cells(drawing)
-        except (ValueError, xlrd.XLRDError, IndexError, TypeError):
+            cells, cut = read(bytes.fromhex(payload))
+        except _TooLarge:
+            drawing.problems.append({"code": "embedded-workbook-too-large"})
+            continue
+        except Exception:  # xlrd and openpyxl raise many kinds of error on a damaged sheet
             drawing.problems.append(
                 {"code": "embedded-workbook-unreadable", "handle": embedded.get("handle")}
             )
+            continue
+        source = {k: v for k, v in embedded.items() if k not in ("compound_hex", "package_hex")}
+        same = (source.get("layout", "Model"), tuple(cells))
+        if same in seen:
+            continue
+        seen.add(same)
+        if cut:
+            drawing.problems.append({"code": "embedded-cell-limit"})
+        for sheet, ri, ci, value in cells:
+            if len(drawing.texts) >= 100000:
+                drawing.problems.append({"code": "embedded-cell-limit"})
+                return
+            drawing.texts.append(
+                source
+                | {
+                    "text": value,
+                    "raw_text": value,
+                    "table_cell": [ri, ci],
+                    "embedded_sheet": sheet,
+                }
+            )
 
 
-def _package_texts(drawing: Drawing, embedded: dict):
+class _TooLarge(Exception):
+    pass
+
+
+def _compound_cells(data: bytes) -> tuple[list[tuple], bool]:
+    """(sheet, row, column, text) of each cell of a BIFF workbook, and whether some were cut."""
+    import xlrd
+
+    book = xlrd.open_workbook(file_contents=data, on_demand=True)
+    cells, cut = [], False
+    try:
+        for table in book.sheets():
+            cut = cut or table.nrows > 4096 or table.ncols > 256
+            for ri in range(min(table.nrows, 4096)):
+                for ci in range(min(table.ncols, 256)):
+                    cell = table.cell(ri, ci)
+                    if cell.ctype not in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+                        cells.append((table.name, ri, ci, str(cell.value)))
+    finally:
+        book.release_resources()
+    return cells, cut
+
+
+def _package_cells(data: bytes) -> tuple[list[tuple], bool]:
     import io
     import zipfile
 
     import openpyxl
 
-    payload = embedded["package_hex"]
-    if len(payload) > 16 * MIB:
-        drawing.problems.append({"code": "embedded-workbook-too-large"})
-        return
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        if sum(i.file_size for i in archive.infolist()) > 64 * MIB:
+            raise _TooLarge
+    book = openpyxl.load_workbook(
+        io.BytesIO(data), read_only=True, data_only=True, keep_links=False
+    )
+    cells, cut = [], False
     try:
-        data = bytes.fromhex(payload)
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            if sum(i.file_size for i in archive.infolist()) > 64 * MIB:
-                drawing.problems.append({"code": "embedded-workbook-too-large"})
-                return
-        book = openpyxl.load_workbook(
-            io.BytesIO(data), read_only=True, data_only=True, keep_links=False
-        )
-        try:
-            source = {k: v for k, v in embedded.items() if k not in ("compound_hex", "package_hex")}
-            for table in book:
-                for ri, row in enumerate(
-                    table.iter_rows(
-                        max_row=min(table.max_row or 4096, 4096),
-                        max_col=min(table.max_column or 256, 256),
-                        values_only=True,
-                    )
-                ):
-                    for ci, value in enumerate(row):
-                        if value is None:
-                            continue
-                        drawing.texts.append(
-                            source
-                            | {
-                                "text": str(value),
-                                "raw_text": str(value),
-                                "table_cell": [ri, ci],
-                                "embedded_sheet": table.title,
-                            }
-                        )
-                        if len(drawing.texts) >= 100000:
-                            drawing.problems.append({"code": "embedded-cell-limit"})
-                            return
-        finally:
-            book.close()
-    except (ValueError, OSError, KeyError, zipfile.BadZipFile):
-        drawing.problems.append(
-            {"code": "embedded-workbook-unreadable", "handle": embedded.get("handle")}
-        )
-
-
-def _deduplicate_cells(drawing: Drawing):
-    # OLE placements often embed the entire same workbook many times. Retain
-    # the first sourced occurrence of each identical cell/value per layout.
-    seen, rows = set(), []
-    for row in drawing.texts:
-        if "embedded_sheet" in row:
-            key = (
-                row.get("layout", "Model"),
-                row["embedded_sheet"],
-                tuple(row["table_cell"]),
-                row["text"],
+        for table in book:
+            cut = cut or (table.max_row or 0) > 4096 or (table.max_column or 0) > 256
+            rows = table.iter_rows(
+                max_row=min(table.max_row or 4096, 4096),
+                max_col=min(table.max_column or 256, 256),
+                values_only=True,
             )
-            if key in seen:
-                continue
-            seen.add(key)
-        rows.append(row)
-    drawing.texts = rows
+            for ri, row in enumerate(rows):
+                for ci, value in enumerate(row):
+                    if value is not None:
+                        cells.append((table.title, ri, ci, str(value)))
+    finally:
+        book.close()
+    return cells, cut

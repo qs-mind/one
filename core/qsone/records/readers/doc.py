@@ -99,8 +99,11 @@ def unread_parts(doc: Document, streams: ole.Streams, missed: dict[str, int]) ->
     ):
         if doc.counts[key]:
             parts.append(part(copy.fill(what, count=str(doc.counts[key])), why))
-    sheets = sum(1 for o in streams.objects if o.workbook is not None or o.package is not None)
-    pictures = max(doc.pictures() - sheets - missed["sheets"], missed["others"], 0)
+    # each sheet's mark once: read, damaged (both have bytes) or too large (no bytes)
+    sheets = sum(
+        1 for o in streams.objects if o.workbook is not None or o.package is not None or o.too_large
+    )
+    pictures = max(doc.pictures() - sheets, missed["others"], 0)
     if pictures:
         what = copy.fill(copy.UNREAD_PICTURES, count=str(pictures))
         parts.append(part(what, copy.UNREAD_WHY_PICTURES))

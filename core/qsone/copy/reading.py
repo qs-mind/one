@@ -77,6 +77,7 @@ UNREAD_DRAWING_ROWS = {
 }
 UNREAD_DRAWING_RECORDS = {"en": "Drawing records: {count}", "ar": "سجلات في الرسم: {count}"}
 UNREAD_DRAWING_REPAIRED = {"en": "Parts of the drawing: {count}", "ar": "أجزاء من الرسم: {count}"}
+UNREAD_DRAWING_CUT = {"en": "Long texts cut short: {count}", "ar": "نصوص طويلة اتقصّت: {count}"}
 UNREAD_DRAWING_NESTED = {"en": "Blocks inside blocks", "ar": "بلوكات جوه بلوكات"}
 UNREAD_DRAWING_KIND = {"en": "{kind} objects: {count}", "ar": "عناصر {kind}: {count}"}
 UNREAD_DRAWING_PROXY = {
@@ -98,6 +99,10 @@ UNREAD_PICTURES = {
 UNREAD_EMBEDDED_SHEETS = {
     "en": "Excel sheets inside: {count}",
     "ar": "شيتات Excel جوه الملف: {count}",
+}
+UNREAD_EMBEDDED_LEFT = {
+    "en": "Pictures or Excel sheets inside: {count}",
+    "ar": "صور أو شيتات Excel جوه الملف: {count}",
 }
 UNREAD_EMBEDDED_CELLS = {"en": "Cells of Excel sheets inside", "ar": "خلايا شيتات Excel اللي جوه"}
 UNREAD_DOC_END = {"en": "The end of the file", "ar": "آخر الملف"}
@@ -129,6 +134,10 @@ UNREAD_WHY_PAGES_AI = {
 UNREAD_WHY_TOO_MANY = {
     "en": "The drawing holds more than ONE's drawing reader keeps.",
     "ar": "الرسم فيه أكتر من اللي قارئ الرسومات بتاع ONE بيحتفظ بيه.",
+}
+UNREAD_WHY_CUT_SHORT = {
+    "en": "Longer than ONE's drawing reader keeps: the start of each is read.",
+    "ar": "أطول من اللي قارئ الرسومات بتاع ONE بيحتفظ بيه: أول كل واحد اتقرا.",
 }
 UNREAD_WHY_DAMAGED = {
     "en": "This part of the file is damaged; ONE read the rest.",
