@@ -5,7 +5,7 @@ from pydantic_ai.messages import ModelResponse, TextPart
 
 from qsone import view
 from qsone.deliverables import tools as outputs
-from qsone.engine import agents, general, numbers_guard
+from qsone.engine import agents, findings, general, numbers_guard
 from qsone.engine.runner.engine import Engine
 from qsone.engine.runner.histories import _load, _tool_results, lead_text
 from qsone.engine.runner.truth_checks import _no_search_notice
@@ -119,6 +119,7 @@ def _stored_events(
         returns = agents.tool_returns(lead["history"])
         events += general.stored_cards(brief_id, returns)
         events += understand.stored_cards(brief_id, returns)  # Plan 8's card
+        events += findings.stored_parts(brief_id, returns)  # Phase 1: data-finding
         events += view.stored_views(store.rec, brief_id, lead["history"])  # decision 16.1
     for run in runs:  # the Deliverable cards, from whichever agent made them (Plan 6)
         if run["history"]:

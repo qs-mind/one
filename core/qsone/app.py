@@ -40,6 +40,7 @@ from qsone.connectors.hub import ConnectorHub
 from qsone.deliverables import api as deliverables_api
 from qsone.deliverables import events as deliverable_events
 from qsone.engine import connectors as engine_connectors
+from qsone.engine import findings_routes as findings_api
 from qsone.engine import mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
@@ -251,6 +252,7 @@ def create_app(
     app.include_router(backup_routes.router(backups))
     app.include_router(account_routes.router(account))
     app.include_router(journey_routes.router(engine))  # the first launch (Plan 8)
+    app.include_router(findings_api.router(engine))  # Phase 1: routes 13-14 (C4)
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):

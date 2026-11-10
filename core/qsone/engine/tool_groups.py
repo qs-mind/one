@@ -60,6 +60,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "client_file_plan",
     ),
     "more": ("note_lesson", "connector_tools", "understood"),
+    "findings": ("record_finding", "raise_finding"),  # Phase 1 (C4)
 }
 _GROUP_OF = {tool: group for group, tools in GROUPS.items() for tool in tools}
 

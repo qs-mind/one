@@ -467,6 +467,23 @@ CREATE TRIGGER {_table}_no_delete BEFORE DELETE ON {_table}
  BEGIN SELECT RAISE(ABORT, 'Map records are retained'); END;
 """
 
+# Phase 1 (C4): a tender's Findings. One is raised at a time; a Finding is never deleted.
+FINDINGS_SQL = """
+CREATE TABLE findings (id TEXT PRIMARY KEY,
+ title TEXT NOT NULL CHECK(json_valid(title)), text TEXT NOT NULL,
+ sources TEXT NOT NULL CHECK(json_valid(sources)),
+ status TEXT NOT NULL CHECK(status IN ('open','queued','raised','settled')),
+ opinion TEXT, options TEXT CHECK(options IS NULL OR json_valid(options)),
+ chosen INTEGER CHECK(chosen IS NULL OR chosen IN (0,1)),
+ item_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(item_ids)),
+ note TEXT CHECK(note IS NULL OR json_valid(note)),
+ recorded_at TEXT NOT NULL, recorded_by TEXT NOT NULL, brief_id TEXT,
+ raised_at TEXT, settled_at TEXT);
+CREATE UNIQUE INDEX findings_one_raised ON findings(status) WHERE status = 'raised';
+CREATE TRIGGER findings_no_delete BEFORE DELETE ON findings
+ BEGIN SELECT RAISE(ABORT, 'Findings are retained'); END;
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -497,4 +514,5 @@ MIGRATIONS: list[str] = [
     "reason TEXT NOT NULL, recorded_at TEXT NOT NULL);"
     "CREATE TRIGGER map_rejected_facts_no_delete BEFORE DELETE ON map_rejected_facts "
     "BEGIN SELECT RAISE(ABORT, 'Map proposals are retained'); END;",
+    FINDINGS_SQL,
 ]

@@ -21,6 +21,7 @@ from qsone.copy.boq import *
 from qsone.copy.calc import *
 from qsone.copy.connectors import *
 from qsone.copy.deliverables import *
+from qsone.copy.findings import *
 from qsone.copy.fixes import *
 from qsone.copy.fixes import _FIX_SHAPES, _shape  # `import *` leaves a `_name` out
 from qsone.copy.journey import *

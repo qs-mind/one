@@ -38,12 +38,15 @@ LEAD_TOOLS = (
     "connector_tools",
     "understood",  # Plan 8: the "I understood this" card
     "show",  # decision 16.1: a view built from ONE's blocks (qsone/view.py)
+    "record_finding",  # Phase 1 (C4): engine/findings.py
+    "raise_finding",
 )
 CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
 
 
 def _registered(names: tuple[str, ...]) -> tuple[str, ...]:
     import qsone.tools  # noqa: F401 - registers every Plan 5 tool; it imports the engine
+    from qsone.engine import finding_tools  # noqa: F401 - registers the Finding tools
 
     return tuple(name for name in names if name in REGISTRY)
 

@@ -326,6 +326,25 @@ def test_a_contract_route_is_declared_and_refuses_until_it_is_built(app, client,
         c.Refusal.model_validate_json(answer.text, strict=True)
 
 
+def test_the_findings_routes_answer_the_contracts_shapes(data_dir):
+    """Routes 13 and 14 are built (C4; their behaviour is core/tests/test_findings.py)."""
+    with TestClient(create_app(SECRET, data_dir=data_dir)) as client:
+        pid = client.post("/projects", json={"name": "مناقصة - عينة"}, headers=AUTH).json()["id"]
+        listed = client.get(f"/projects/{pid}/findings", headers=AUTH)
+        assert (listed.status_code, listed.json()) == (200, {"findings": []})
+        c.Findings.model_validate_json(listed.text, strict=True)
+        decide = {"choice": 0}
+        for path, text in (
+            (f"/projects/{pid}/findings/{ID}/decide", copy.FINDING_NOT_FOUND),
+            (f"/projects/{ID}/findings/{ID}/decide", copy.PROJECT_NOT_FOUND),
+            (f"/projects/{ID}/findings", copy.PROJECT_NOT_FOUND),
+        ):
+            method = "POST" if path.endswith("decide") else "GET"
+            refused = client.request(method, path, json=decide, headers=AUTH)
+            assert (refused.status_code, refused.json()) == (404, {"error": text})
+            c.Refusal.model_validate_json(refused.text, strict=True)
+
+
 def test_the_not_built_text_is_a_pair_with_no_fix_to_offer():
     assert set(copy.NOT_BUILT) == {"en", "ar"} and all(copy.NOT_BUILT.values())
     assert copy.fix_of(copy.NOT_BUILT) is None
