@@ -1,9 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { P2, server, startFakeCore } from "@/api/fakeCore";
+import { listening, P2, publish, server, startFakeCore } from "@/api/fakeCore";
 import { paths } from "@/app/paths";
 import type { DeliverableInfo, Explained, SheetView } from "@/deliverables/types";
 import { renderIn, resetPage, stubBrowser } from "@/design/test/harness";
@@ -101,6 +101,19 @@ describe("what opens beside the thread", () => {
     await screen.findByRole("region", { name: "Open document" });
     await waitFor(() => expect(document.querySelector('[data-region="document"]')?.textContent).not.toBe(""));
     expect(screen.queryByText("Open a project or create one first")).toBeNull();
+  });
+
+  it("lists a Deliverable the team writes while the tender is open, with no reload", async () => {
+    let held = [info];
+    server.use(http.get("*/api/projects/:id/deliverables", () => HttpResponse.json({ deliverables: held })));
+    open(paths.tender(P2));
+    const list = within(await screen.findByRole("region", { name: "Documents" }));
+    await list.findByRole("link", { name: info.title });
+    await waitFor(() => expect(listening(P2)).toBeGreaterThan(0));
+    const fresh = { ...info, id: "e".repeat(32), title: "تحليل الأسعار - عينة" } as DeliverableInfo;
+    held = [info, fresh];
+    act(() => publish(P2, { type: "deliverable", deliverable: fresh }));
+    expect(await list.findByRole("link", { name: fresh.title })).toHaveAttribute("href", paths.doc(P2, `deliverable:${fresh.id}`));
   });
 
   it("opens a source of the thread as its file beside the thread", async () => {
