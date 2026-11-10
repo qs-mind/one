@@ -8,8 +8,9 @@ real work in ONE.
   tender may bring it in by its id.
 - A project file holds its tender's members (`project_members`); Engineer Records holds the
   permanent ones (`members`), the cost book and the checks tally.
-- A run's member is its spec's id: `lead-qs`, `checking-qs`, or the member's id when the plan
-  driver builds a specialist for that member. The cost book records it with each cost.
+- A run's member is its spec's id: `lead-qs`, `checking-qs`, or the member's id when the Lead
+  builds a specialist with a joined member's name (`joined_named`, which `build_specialist`
+  asks). The cost book, the room and the live status record it under that id.
 - `record` counts from that real work: the projects with costs, the paid cost that is known (the
   Claude subscription's equivalent and unpriced use left out) and the Checking QS's results on
   the member's Deliverables. A new member has zeros.
@@ -193,6 +194,16 @@ def project_member(rec: Records, member_id: str) -> tuple[dict, str, bool] | Non
     """(card, kind, proposed) of one member of the tender, or None."""
     found = [row for row in _rows(rec) if row[0] == member_id]
     return found[0][1:] if found else None
+
+
+def joined_named(rec: Records, name: dict) -> str | None:
+    """The id of the tender's joined member with this short name (English in any case, or
+    Arabic; the team's names are unique), or None."""
+    keys = {name["en"].casefold(), name["ar"]}
+    for member_id, card, _, proposed in _rows(rec):
+        if not proposed and keys & {card["name"]["en"].casefold(), card["name"]["ar"]}:
+            return member_id
+    return None
 
 
 def _permanent_card(engineer: Records, member_id: str) -> dict | None:

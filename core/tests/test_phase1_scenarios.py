@@ -47,12 +47,15 @@ pytestmark = pytest.mark.anyio
 
 CONTRACTS = member(
     ref="contracts-qs",
-    name=pair("Contracts QS"),
+    name={"en": "Contracts QS", "ar": "مهندس العقود"},
     title={"en": "Contracts Quantity Surveyor (sample)", "ar": "مهندس كميات العقود (عينة)"},
     speciality={"en": "Contract conditions agent (sample)", "ar": "وكيل شروط العقد (عينة)"},
     tools=["search_records", "send_message"],
 )
-PRICING = member(tools=["search_records", "send_message"])  # ref "pricing-qs"
+PRICING = member(  # ref "pricing-qs"
+    name={"en": "Pricing QS", "ar": "مهندس التسعير"}, tools=["search_records", "send_message"]
+)
+# The Lead builds the plan's members by their names, so their work is the members' own.
 BUILD_CONTRACTS = TAKE_OFF | {"name_en": "Contracts QS", "name_ar": "مهندس العقود"}
 BUILD_PRICING = TAKE_OFF | {"name_en": "Pricing QS", "name_ar": "مهندس التسعير"}
 BOQ = {"kind": "deliverable", "title": {"en": "Priced BOQ (sample)", "ar": "جدول - عينة"}}
@@ -217,13 +220,18 @@ async def test_scenario_tender_day(make_engine, registry, project, drivers):
     assert [p for _, _, _, p in identity._rows(rec)] == [False, False]  # the team joined
     await t.ready(1)
     first = t.claim(1)["brief_id"]
-    by_name = {s.name["en"]: s.id for s in specialists(store_of(engine, project), first)}
+    built = [s.id for s in specialists(store_of(engine, project), first)]
+    assert built == team[2:]  # the Brief's specialists are the tender's members
     said_in_room = [(m["from_id"], m["to_id"], m["text"]) for m in day.room()]
     assert said_in_room == [
         (team[0], "engineer", finding["text"]),  # the raised Finding
-        (by_name["Contracts QS"], by_name["Pricing QS"], "المحتجز 10% مش 5% - عينة"),
-        (by_name["Pricing QS"], by_name["Contracts QS"], "تمام، 10% - عينة"),
-    ]  # settled in the room: nothing went up to the engineer
+        (team[2], team[3], "المحتجز 10% مش 5% - عينة"),
+        (team[3], team[2], "تمام، 10% - عينة"),
+    ]
+    with rec.read() as conn:
+        kinds = conn.execute("SELECT kind, thread FROM room_messages ORDER BY rowid").fetchall()
+    assert [k for k, _ in kinds] == ["say", "object", "resolve"] and kinds[1][1] == kinds[2][1]
+    assert messages.objections(rec, kinds[1][1]) == []  # settled in the room, nothing went up
     with rec.read() as conn:
         assert conn.execute("SELECT count(*) FROM approvals").fetchone() == (0,)
     assert t.stage(2).status == "pending" and specialist.calls == 4
@@ -269,6 +277,8 @@ async def test_scenario_tender_day(make_engine, registry, project, drivers):
     kept = identity.permanent(engine.engineer_records())
     assert [(m.id, m.kind) for m in kept[2:]] == [(team[3], "permanent")]
     assert [k for _, _, k, _ in identity._rows(rec)] == ["temporary", "permanent"]
+    worked = identity.record(engine.engineer_records(), team[3])
+    assert worked.tenders == 1  # the kept member is the one whose work the cost book holds
     assert lead.calls == 17 and specialist.calls == 6
     await day.http.aclose()
 
