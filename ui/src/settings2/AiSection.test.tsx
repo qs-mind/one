@@ -17,6 +17,7 @@ serveFirstLaunch();
 serveSettings();
 beforeEach(() => {
   stubBrowser();
+  Element.prototype.setPointerCapture ??= () => {}; // jsdom lacks it; the notice's button calls it on press
   older.consent = { at: "2026-11-01T09:00:00.000000+00:00", text_version: 3 };
 });
 afterEach(() => {
@@ -24,6 +25,7 @@ afterEach(() => {
   resetPage();
 });
 
+const UNDO = "5a" + "d0".padStart(30, "0"); // the fake core's Undo token (api/fakeCore.ts)
 const plain = (value: string | null | undefined) => (value ?? "").replace(/[⁦⁨⁩]/g, "");
 
 describe.each(DIRS)("Settings, AI (%s)", (dir) => {
@@ -66,11 +68,42 @@ describe.each(DIRS)("Settings, AI (%s)", (dir) => {
     await userEvent.click(box);
     await userEvent.paste("sk-ant-sample-key"); // the fake core links it, so it can be disconnected
     await waitFor(() => expect(plain(document.body.textContent)).toContain(plain(say(firstlaunch.keyWorks, { provider: "Anthropic" }))));
+    const linked = kept.ai.connectors;
     kept.ai.connectors = []; // what GET /settings/ai answers once the link is out
+    kept.undo.set(UNDO, () => (kept.ai.connectors = linked)); // the fake core's Undo token for the link
     await userEvent.click(within(providers).getByRole("button", { name: say(texts.disconnect) }));
     await waitFor(() => expect(plain(document.body.textContent)).toContain(plain(say(texts.disconnected, { name: "Claude (sample)" }))));
-    expect(screen.getByRole("button", { name: say(common.undo) })).toBeInTheDocument();
     await waitFor(() => expect(within(providers).getByText(say(texts.noProvider))).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: say(common.undo) }));
+    await within(providers).findByText("Claude (sample)");
+    expect(kept.calls).toContain(`POST /undo/${UNDO}`);
+  });
+
+  it("my own Claude Code is switched off at once", async () => {
+    kept.ai.connectors.push({ id: "claude-code", kind: "agent", name: "Claude Code", provider: "Anthropic", on_device: false, key_set: false, error: null });
+    openSettings(dir, "ai");
+    const row = await screen.findByRole("checkbox", { name: new RegExp(say(texts.claudeCode)) });
+    expect(row).toBeChecked();
+    await userEvent.click(row);
+    await waitFor(() => expect(row).not.toBeChecked());
+    expect(kept.calls).toContain('PUT /settings/ai/claude-code {"path":null,"on":false}');
+  });
+
+  it("a price ONE does not know is saved once both are in, and a number that is not exact is refused", async () => {
+    Object.assign(kept.ai.sheet[1]!, { price_in: null, price_out: null });
+    openSettings(dir, "ai");
+    const prices = await screen.findByRole("region", { name: say(texts.prices) });
+    expect(within(prices).getByText("Claude small (sample)")).toBeInTheDocument();
+    const [input, output] = [within(prices).getByLabelText(say(texts.priceIn)), within(prices).getByLabelText(say(texts.priceOut))];
+    await userEvent.type(input, "0.8");
+    await userEvent.tab();
+    expect(kept.calls.some((call) => call.startsWith("PUT /settings/ai/prices"))).toBe(false); // the output price is not in yet
+    await userEvent.type(output, "abc{Enter}");
+    await within(prices).findByText(say({ en: "Write the number exactly.", ar: "اكتب الرقم بالظبط." }));
+    await userEvent.clear(output);
+    await userEvent.type(output, "4{Enter}");
+    await waitFor(() => expect(screen.queryByRole("region", { name: say(texts.prices) })).toBeNull());
+    expect(kept.calls).toContain('PUT /settings/ai/prices {"connector":"anthropic","model":"claude-sample-small","in":"0.8","out":"4"}');
   });
 
   it("choosing my own models shows a model for each role, saved when one is chosen", async () => {

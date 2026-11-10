@@ -1,5 +1,5 @@
 // Settings, Connectors: the tools from outside ONE the team may use (GET /connectors), each on or off (saved at
-// once) and removable, with Undo in a notice for the core's window.
+// once) and removable, with Undo in a notice for the core's window; and adding one (AddConnector).
 import { useCallback, useEffect, useState } from "react";
 import { type ConnectorRow, getConnectors, removeConnector, setConnectorOn, undo } from "@/api/settingsKept";
 import { ListRow } from "@/design/ListRow";
@@ -11,6 +11,7 @@ import { common } from "@/texts/common";
 import { settings as texts } from "@/texts/settings";
 import type { TextPair } from "@/texts/types";
 import { useText } from "@/texts/useText";
+import { AddConnector } from "./AddConnector";
 
 function Row({ connector, onChanged }: { connector: ConnectorRow; onChanged: () => void }) {
   const t = useText();
@@ -70,12 +71,18 @@ export function Connectors() {
 
   if (connectors === undefined) return <div aria-busy="true" className="min-h-14" />;
   if (connectors === "failed") return <p className="text-xs font-bold">{t(texts.notLoaded)}</p>;
-  if (connectors.length === 0) return <p className="text-muted-foreground">{t(texts.noConnectors)}</p>;
   return (
-    <ul className="flex flex-col gap-3">
-      {connectors.map((connector) => (
-        <Row key={connector.name} connector={connector} onChanged={() => void load()} />
-      ))}
-    </ul>
+    <>
+      {connectors.length === 0 ? (
+        <p className="text-muted-foreground">{t(texts.noConnectors)}</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {connectors.map((connector) => (
+            <Row key={connector.name} connector={connector} onChanged={() => void load()} />
+          ))}
+        </ul>
+      )}
+      <AddConnector onAdded={() => void load()} />
+    </>
   );
 }

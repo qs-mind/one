@@ -48,6 +48,16 @@ export const settings = defineTexts({
   fromTender: { en: "From {tender}", ar: "من {tender}" },
   lessonRemoved: { en: "The lesson was removed.", ar: "الدرس اتشال." },
 
+  // My profile: the QS Mind account.
+  account: { en: "QS Mind account", ar: "حساب QS Mind" },
+  accountWhy: {
+    en: "It keeps your Backup key, so a new computer gets your tenders back. It is free, and you can do without it.",
+    ar: "بيحفظ مفتاح النسخ الاحتياطي، فأي جهاز جديد يرجّع عطاءاتك. ببلاش، وتقدر تستغنى عنه.",
+  },
+  signIn: { en: "Sign in with QS Mind", ar: "ادخل بحساب QS Mind" },
+  signOut: { en: "Sign out", ar: "اخرج من الحساب" },
+  notSignedOut: { en: "ONE could not sign you out. Try again.", ar: "ONE مقدرش يخرجك من الحساب. جرّب تاني." },
+
   // AI.
   connect: { en: "Connect a provider", ar: "وصّل مزود" },
   keyLocked: {
@@ -74,6 +84,13 @@ export const settings = defineTexts({
   searchNone: { en: "No web search yet. Paste a key to add it.", ar: "لسه مفيش بحث على النت. الصق مفتاح علشان تضيفه." },
   searchKept: { en: "Your own key is kept. Paste another to change it.", ar: "مفتاحك محفوظ. الصق مفتاح تاني علشان تغيره." },
   searchSaving: { en: "Keeping the key…", ar: "جاري حفظ المفتاح…" },
+  prices: { en: "Prices ONE does not know", ar: "أسعار ONE مش عارفها" },
+  pricesHelp: {
+    en: "Write each price as the provider lists it. ONE saves it when both are in and you leave the box.",
+    ar: "اكتب كل سعر زي ما المزود كاتبه. ONE هيحفظه أول ما تكتب الاتنين وتسيب الخانة.",
+  },
+  priceIn: { en: "Input, USD per million tokens", ar: "الداخل، دولار لكل مليون توكن" },
+  priceOut: { en: "Output, USD per million tokens", ar: "الخارج، دولار لكل مليون توكن" },
 
   // Team.
   noMembers: { en: "No member stays with you yet.", ar: "لسه مفيش عضو بيفضل معاك." },
@@ -105,6 +122,34 @@ export const settings = defineTexts({
   },
   removed: { en: "{name} was removed.", ar: "اتشال {name}." },
   notRemoved: { en: "ONE could not remove it. Try again.", ar: "ONE مقدرش يشيله. جرّب تاني." },
+  addConnector: { en: "Add a connector", ar: "ضيف موصل" },
+  connectorName: { en: "Name (small English letters, digits and dashes)", ar: "الاسم (حروف إنجليزي صغيرة وأرقام وشرط)" },
+  connectorWhere: { en: "Where it runs", ar: "بيشتغل فين" },
+  onThisComputer: { en: "On this computer", ar: "على الجهاز ده" },
+  overInternet: { en: "Over the internet", ar: "على النت" },
+  connectorCommand: { en: "The command that runs it", ar: "الأمر اللي بيشغله" },
+  connectorAddress: { en: "Its address (https://)", ar: "العنوان بتاعه (https://)" },
+  connectorToken: {
+    en: "Token (optional; kept in this computer's key store and never shown again)",
+    ar: "التوكن (اختياري؛ بيتحفظ في مخزن المفاتيح على الجهاز ده ومش بيظهر تاني)",
+  },
+  connectorStart: { en: "See what it can do", ar: "شوف يقدر يعمل إيه" },
+  connectorChecking: { en: "Starting the connector to see what it can do…", ar: "بنشغل الموصل علشان نشوف يقدر يعمل إيه…" },
+  connectorNotAdded: { en: "The connector was not added. Try again.", ar: "الموصل ماتضافش. جرّب تاني." },
+  connectorAdded: { en: "{name} was added.", ar: "اتضاف {name}." },
+  addIt: { en: "Add it", ar: "ضيفه" },
+  dontAdd: { en: "Don't add it", ar: "ماتضيفوش" },
+  readWithoutAsking: { en: "Use its reading tools without asking me", ar: "استخدم أدوات القراية بتاعته من غير ما تسألني" },
+  readWithoutAskingHelp: {
+    en: "Only the tools it marks as reading only. Once a piece of work has read outside text, ONE asks again.",
+    ar: "بس الأدوات اللي معلّم عليها إنها للقراية بس. ولما الشغلانة تقرا نص من بره، ONE بيسأل تاني.",
+  },
+  useForSearch: { en: "Use for web search", ar: "استخدمه للبحث على النت" },
+  noSearchTool: { en: "Not for web search", ar: "مش للبحث على النت" },
+  toolReadsOnly: { en: "Reads only", ar: "قراية بس" },
+  toolActs: { en: "Can send or change things: asks you every time", ar: "يقدر يبعت أو يغير حاجات: بيسألك كل مرة" },
+  toolDeletes: { en: "Can delete: asks you every time", ar: "يقدر يمسح: بيسألك كل مرة" },
+  toolOpenWorld: { en: "Reaches outside services: asks you every time", ar: "بيوصل لخدمات بره: بيسألك كل مرة" },
 
   // Backup.
   folder: { en: "Backup folder", ar: "فولدر النسخ الاحتياطي" },
@@ -119,6 +164,38 @@ export const settings = defineTexts({
   backUpNow: { en: "Back up now", ar: "اعمل نسخة دلوقتي" },
   backedUp: { en: "Backed up.", ar: "اتعملت النسخة." },
   notBackedUp: { en: "ONE could not back up. Try again.", ar: "ONE مقدرش يعمل النسخة. جرّب تاني." },
+  backupKey: { en: "Backup key", ar: "مفتاح النسخ الاحتياطي" },
+  keyLocal: { en: "On this computer", ar: "على الجهاز ده" },
+  keyInAccount: { en: "In your QS Mind account", ar: "في حساب QS Mind بتاعك" },
+  keyCodeSaved: { en: "Recovery code saved", ar: "كود الاسترجاع محفوظ" },
+  yes: { en: "yes", ar: "أيوه" },
+  no: { en: "no", ar: "لأ" },
+  keyNoAccount: {
+    en: "Without an account, a recovery code is the only way to restore your backups on another computer.",
+    ar: "من غير حساب، كود الاسترجاع هو الطريقة الوحيدة ترجّع بيها نسخك على جهاز تاني.",
+  },
+  makeCode: { en: "Make a recovery code", ar: "اعمل كود استرجاع" },
+  codeTitle: { en: "Your recovery code", ar: "كود الاسترجاع بتاعك" },
+  codeOnce: {
+    en: "It is shown only once. Write it down or keep it somewhere safe: without it, this backup cannot be opened on another computer.",
+    ar: "بيظهر مرة واحدة بس. اكتبه أو احفظه في مكان أمان: من غيره، النسخة دي مش هتتفتح على جهاز تاني.",
+  },
+  copy: { en: "Copy", ar: "انسخ" },
+  copied: { en: "Copied.", ar: "اتنسخ." },
+  codeLastGroup: { en: "To confirm you saved it, type its last group of five", ar: "علشان تأكد إنك حفظته، اكتب آخر مجموعة من الخمسة" },
+  checking: { en: "Checking…", ar: "جاري التأكد…" },
+  restore: { en: "Restore from a backup", ar: "استرجاع من نسخة احتياطية" },
+  restoreFolder: { en: "The backup folder to restore from", ar: "فولدر النسخة اللي هترجّع منها" },
+  restoreFolderHelp: { en: "Write the folder's full path. ONE looks in it when you leave the box.", ar: "اكتب مسار الفولدر كامل. ONE هيدور فيه أول ما تسيب الخانة." },
+  restoreNone: { en: "No backups were found in this folder.", ar: "مالقيناش نسخ في الفولدر ده." },
+  restoreHiddenName: { en: "A tender (its name shows once it opens)", ar: "عطاء (اسمه هيظهر لما يتفتح)" },
+  restoreNeedsSignIn: { en: "Sign in from My profile to restore this one.", ar: "ادخل بحسابك من ملفي علشان ترجّع ده." },
+  restoreNeedsBackupCode: { en: "Needs your Backup key's recovery code.", ar: "محتاج كود الاسترجاع بتاع مفتاح النسخ الاحتياطي." },
+  restoreNeedsProjectCode: { en: "Confidential: needs its own recovery code.", ar: "سري: محتاج كود الاسترجاع بتاعه." },
+  restoreCode: { en: "Recovery code", ar: "كود الاسترجاع" },
+  restoreIt: { en: "Restore", ar: "رجّعه" },
+  restored: { en: "{name} is back.", ar: "{name} رجع." },
+  notRestored: { en: "It was not restored. Try again.", ar: "مارجعش. جرّب تاني." },
 
   // Privacy.
   agreedOn: { en: "You agreed on {date}.", ar: "وافقت يوم {date}." },

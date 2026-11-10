@@ -1,5 +1,6 @@
 // Settings, Backup: the folder backups go to (saved when the engineer leaves the box, or chosen with the system's
-// folder picker in the installed app), when the last backup was made, and "Back up now".
+// folder picker in the installed app), when the last backup was made, "Back up now", the Backup key (BackupKey) and
+// restoring from a backup folder (Restore).
 import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useState } from "react";
@@ -11,6 +12,8 @@ import { formatDate } from "@/texts/format";
 import { settings as texts } from "@/texts/settings";
 import type { TextPair } from "@/texts/types";
 import { useText } from "@/texts/useText";
+import { BackupKey } from "./BackupKey";
+import { Restore } from "./Restore";
 
 type Line = { words: TextPair; strong?: boolean } | undefined;
 
@@ -100,6 +103,8 @@ export function Backup() {
           </p>
         </div>
       </section>
+      <BackupKey state={state} onChanged={() => void load()} />
+      <Restore onChanged={() => void load()} />
     </>
   );
 }

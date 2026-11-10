@@ -11,5 +11,5 @@ export function applyLook(setting: Setting): void {
   else if (setting.key === "look.theme" && typeof setting.value === "string" && THEMES.includes(setting.value))
     setTheme(setting.value as ThemeSetting);
   else if (setting.key === "look.zoom" && typeof setting.value === "string" && Number(setting.value) > 0)
-    document.documentElement.style.fontSize = `${Number(setting.value) * 100}%`;
+    document.documentElement.style.fontSize = `${Math.round(Number(setting.value) * 100)}%`; // 1.1 is 110%, not 110.00000000000001%
 }

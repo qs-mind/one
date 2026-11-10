@@ -96,6 +96,38 @@ describe.each(DIRS)("Settings sections (%s)", (dir) => {
     await screen.findByRole("checkbox", { name: /drive-sample/ });
   });
 
+  it("Connectors: one is added after the engineer sees what it can do, with the answers to its questions", async () => {
+    openSettings(dir, "connectors");
+    const form = await screen.findByRole("form", { name: say(texts.addConnector) });
+    const start = within(form).getByRole("button", { name: say(texts.connectorStart) });
+    expect(start).toBeDisabled();
+    await userEvent.type(within(form).getByLabelText(say(texts.connectorName)), "files-sample");
+    await userEvent.type(within(form).getByLabelText(say(texts.connectorCommand)), "files-sample --serve");
+    await userEvent.type(within(form).getByLabelText(say(texts.connectorToken)), "token-sample");
+    await userEvent.click(start);
+    const ask = await screen.findByRole("region", { name: say(kept.card.title) });
+    expect(kept.calls).toContain('POST /connectors {"name":"files-sample","transport":"stdio","command":"files-sample --serve","token":"token-sample"}');
+    expect(within(ask).getByText(say(texts.toolReadsOnly))).toBeInTheDocument();
+    await userEvent.click(within(ask).getByRole("checkbox", { name: new RegExp(say(texts.readWithoutAsking)) }));
+    await userEvent.click(within(ask).getByRole("button", { name: say(texts.addIt) }));
+    await screen.findByRole("checkbox", { name: /files-sample/ });
+    expect(kept.calls).toContain(`POST /connectors/cards/${kept.card.id} {"choice":"yes","answers":{"read_without_asking":"yes","search":"none"}}`);
+    expect(document.body.textContent).not.toContain("token-sample");
+  });
+
+  it("Connectors: Don't add it saves nothing", async () => {
+    openSettings(dir, "connectors");
+    const form = await screen.findByRole("form", { name: say(texts.addConnector) });
+    await userEvent.click(within(form).getByRole("radio", { name: say(texts.overInternet) }));
+    await userEvent.type(within(form).getByLabelText(say(texts.connectorName)), "files-sample");
+    await userEvent.type(within(form).getByLabelText(say(texts.connectorAddress)), "https://mcp.example.com/files");
+    await userEvent.click(within(form).getByRole("button", { name: say(texts.connectorStart) }));
+    await userEvent.click(await screen.findByRole("button", { name: say(texts.dontAdd) }));
+    await screen.findByRole("form", { name: say(texts.addConnector) });
+    expect(kept.calls).toContain(`POST /connectors/cards/${kept.card.id} {"choice":"no"}`);
+    expect(kept.connectors.map((it) => it.name)).toEqual(["drive-sample"]);
+  });
+
   it("Backup: the folder is saved on leaving the box; Back up now runs one", async () => {
     openSettings(dir, "backup");
     const folder = await screen.findByLabelText(say(texts.folder));

@@ -99,6 +99,14 @@ describe.each(DIRS)("Settings (%s)", (dir) => {
     await waitFor(() => expect(getLang()).toBe("ar"));
   });
 
+  it("the zoom takes effect on the page as soon as it is stored", async () => {
+    openSettings(dir, "look");
+    const zoom = await screen.findByLabelText(say({ en: "Zoom", ar: "التكبير" }));
+    await userEvent.clear(zoom);
+    await userEvent.type(zoom, "1.1{Enter}");
+    await waitFor(() => expect(document.documentElement.style.fontSize).toBe("110%"));
+  });
+
   it("a setting the Lead changes by talking shows at once", async () => {
     openSettings(dir, "caps");
     const day = await screen.findByLabelText(say({ en: "One day", ar: "اليوم" }));

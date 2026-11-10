@@ -1,6 +1,6 @@
 // My profile: the seven fields first launch asked (the shared schema and fields, @/engineer/profile and U7's
 // ProfileFields), saved as the engineer types (PUT /engineer/profile, a moment after the last key), and under them
-// what the Lead QS learned about the engineer's work (Lessons).
+// the QS Mind account (Account) and what the Lead QS learned about the engineer's work (Lessons).
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -11,6 +11,7 @@ import { engineer } from "@/texts/engineer";
 import { settings as texts } from "@/texts/settings";
 import type { TextPair } from "@/texts/types";
 import { useText } from "@/texts/useText";
+import { Account } from "./Account";
 import { Lessons } from "./Lessons";
 
 /** How long after the last key the profile is saved. */
@@ -89,6 +90,7 @@ export function MyProfile() {
       ) : (
         <p className="text-xs font-bold">{t(texts.notLoaded)}</p>
       )}
+      <Account />
       <Lessons />
     </>
   );
