@@ -42,6 +42,8 @@ LEAD_TOOLS = (
     "keep_member",  # Phase 1: keep a member for later tenders (engine/team/keep.py)
     "tender_plan_write",  # Phase 1: the tender plan (engine/plan)
     "tender_plan_change",
+    "record_finding",  # Phase 1 (C4): engine/findings.py
+    "raise_finding",
 )
 CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
 
@@ -49,6 +51,7 @@ CHECKER_TOOLS = ("files_list", "files_read", "sandbox_rerun")
 def _registered(names: tuple[str, ...]) -> tuple[str, ...]:
     import qsone.engine.plan.tool  # noqa: F401 - registers the tender plan's tools
     import qsone.tools  # noqa: F401 - registers every Plan 5 tool; it imports the engine
+    from qsone.engine import finding_tools  # noqa: F401 - registers the Finding tools
 
     return tuple(name for name in names if name in REGISTRY)
 

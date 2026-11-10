@@ -111,7 +111,16 @@ async def _search(ctx: ToolContext, args: SearchArgs) -> str:
         }
         for where, h in flat
     ]
-    return _json({"mode": found[0][1].mode, "hits": hits})
+    out = {"mode": found[0][1].mode, "hits": hits}
+    if "project" in places and ctx.rec is not None:  # the team's Findings are its shared memory
+        from qsone.engine import findings
+
+        shared = await asyncio.to_thread(
+            findings.matching, ctx.rec, [args.query, *args.also], args.k
+        )
+        if shared:
+            out["findings"] = shared
+    return _json(out)
 
 
 class ChunkArgs(_Args):

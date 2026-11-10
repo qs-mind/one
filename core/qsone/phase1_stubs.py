@@ -43,21 +43,6 @@ def _stub() -> JSONResponse:
 def router() -> APIRouter:
     r = APIRouter()
 
-    # Findings (C4).
-    @r.get(
-        "/projects/{project_id}/findings", response_model=c.Findings, responses=_refusals(404, 409)
-    )
-    def findings(project_id: str):
-        return _stub()
-
-    @r.post(
-        "/projects/{project_id}/findings/{finding_id}/decide",
-        response_model=c.Finding,
-        responses=_refusals(404, 409, 422, 423),
-    )
-    def decide(project_id: str, finding_id: str, body: c.DecideIn):
-        return _stub()
-
     # The team room (C6).
     @r.get(
         "/projects/{project_id}/room", response_model=c.RoomPage, responses=_refusals(404, 409, 422)
