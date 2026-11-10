@@ -1,8 +1,9 @@
 """What a stage's work made (contract S55): the ids of its outputs and its one-line `result`, which
 the plan driver writes when the stage's latest Brief ends done, so route 11 can sign it off.
 
-- A `deliverable` output is a Deliverable one of the stage's Briefs made (any attempt): the one
-  whose title is the output's, else the next one made in order.
+- A `deliverable` output is a Deliverable one of the stage's Briefs made (any attempt, and the
+  tender's other work since its first, `claims.worked`): the one whose title is the output's,
+  else the next one made in order.
 - A `file` output is a file added to the tender since the stage's first Brief (made by ONE or
   brought by the engineer): the one named as the output, else the next one added.
 - `map` and `summary` have no id. An id found once is kept."""
@@ -55,7 +56,7 @@ def ids(conn, rec: Records, stage: c.Stage) -> list[str | None]:
     attempts = claims.every(conn, stage.id)
     if not attempts:
         return [o.id for o in stage.outputs]
-    made = _made(rec, [brief_id for brief_id, _ in attempts])
+    made = _made(rec, claims.worked(conn, stage.id))
     titles = dict(
         conn.execute(
             "SELECT id, title FROM deliverables WHERE id IN (SELECT value FROM json_each(?))",

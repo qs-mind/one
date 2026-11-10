@@ -39,6 +39,21 @@ def every(conn, stage_id: str) -> list[tuple[str, str]]:
     return [(brief_id, at) for brief_id, at in found.fetchall()]
 
 
+def worked(conn, stage_id: str) -> list[str]:
+    """Every Brief whose work counts for the stage, in order: its attempts, and the tender's
+    other Briefs since its first (a Finding's decision, "I have notes", the engineer's own)."""
+    attempts = every(conn, stage_id)
+    if not attempts:
+        return []
+    found = conn.execute(
+        f"SELECT b.id FROM briefs b WHERE b.id IN (SELECT brief_id FROM {TABLE} WHERE stage_id = ?)"
+        f" OR (b.created_at >= ? AND NOT EXISTS (SELECT 1 FROM {TABLE} k WHERE k.brief_id = b.id))"
+        " ORDER BY b.created_at, b.rowid",
+        (stage_id, attempts[0][1]),
+    )
+    return [r[0] for r in found.fetchall()]
+
+
 def stage_of(conn, brief_id: str) -> str | None:
     """The stage whose work the Brief is, or None for any other Brief."""
     found = conn.execute(f"SELECT stage_id FROM {TABLE} WHERE brief_id = ?", (brief_id,))
@@ -70,10 +85,28 @@ def stage_part(brief_id: str, stage_id: str) -> Data:
     return Data(brief_id, "stage", stage_id, {"stage_id": stage_id})
 
 
-def stored_parts(rec: Records, brief: dict) -> list[Data]:
-    """The `data-stage` part of a stored stage Brief that ended done, as it was sent live."""
+def ended(rec: Records, brief: dict) -> str | None:
+    """The stage a Brief that ended done ends again, or None: its own stage for a stage's
+    Brief; for any other, the stage that waits for its sign-off when the Brief came after
+    that stage's first Brief (its work counts for it, `worked`)."""
+    from qsone.engine.plan import store
+
     if brief["status"] != "done":
-        return []
+        return None
     with rec.read() as conn:
         stage_id = stage_of(conn, brief["id"])
+    if stage_id is not None:
+        return stage_id
+    plan = store.current(rec)
+    waiting = [] if plan is None else [s for s in plan.stages if s.status == "waiting_engineer"]
+    if not waiting:
+        return None
+    with rec.read() as conn:
+        attempts = every(conn, waiting[0].id)
+    return waiting[0].id if attempts and brief["created_at"] >= attempts[0][1] else None
+
+
+def stored_parts(rec: Records, brief: dict) -> list[Data]:
+    """The `data-stage` part of a stored Brief that ended a stage, as it was sent live."""
+    stage_id = ended(rec, brief)
     return [] if stage_id is None else [stage_part(brief["id"], stage_id)]

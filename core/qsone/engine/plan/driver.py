@@ -10,9 +10,12 @@ next start, because the tables say what is due.
 - A stage's Brief row and its claim are written in one transaction, then launched with no
   await between (`Engine.launch`): a stage never starts twice.
 - `pending` -> `now` (claimed and launched) -> `waiting_engineer` (its latest Brief ended
-  `done` and no Finding is raised or queued; its output ids and `result` written, `outputs`)
-  -> `approved` (route 11). A card, a cap pause, cut
-  short, stopped, failed or no AI all leave the stage `now`: the tender row says why.
+  `done`, no Finding is raised or queued and no work runs in the tender; its output ids and
+  `result` written, `outputs`)
+  -> `approved` (route 11). The tender's work that follows a stage's Brief (a Finding's
+  decision, "I have notes") counts for the open stage, and its done reply ends the stage again
+  (`claims.worked`, `claims.ended`). A card, a cap pause, cut short, stopped, failed or no AI
+  all leave the stage `now`: the tender row says why.
 - The work stops only where its Brief asks the engineer (a card: missing information, money,
   anything leaving the machine) and at the stage's end; caps, Stop, steer and Continue are the
   runner's, as for any Brief. A stopped or failed stage goes on by route 25 (`retry`).
@@ -34,6 +37,7 @@ from qsone.records.project import Records, RecordsError
 
 log = logging.getLogger(__name__)
 DUE = "due"  # `_decide` without acting: a stage Brief would be launched now
+ENDED = ("done", "stopped", "failed")
 _running: "PlanDriver | None" = None  # the app's driver, while it runs
 
 
@@ -165,8 +169,7 @@ class PlanDriver:
                 self._decide(rec, chat_id, act=False)
             running = self.engine._briefs.get(brief_id) if state == "done" else None
             if running is not None:
-                with rec.read() as conn:
-                    stage_id = claims.stage_of(conn, brief_id)
+                stage_id = claims.ended(rec, Store(rec, project_id=chat_id).brief(brief_id))
                 if stage_id is not None:
                     running.emit(claims.stage_part(brief_id, stage_id))
         except RecordsError:
@@ -245,6 +248,8 @@ class PlanDriver:
             if claim["status"] == "done":
                 made = outputs.ids(conn, rec, stage)
                 status = "now" if _deciding(conn) else "waiting_engineer"
+                if status != "now" and self._working(project_id):
+                    status = stage.status  # it waits for the work that follows to end
                 self._move(rec, stage, status, made=made)
                 return None
             self._move(rec, stage, "now")
@@ -253,6 +258,14 @@ class PlanDriver:
             if busy is not None or (claim["began"] and not starting):
                 return None  # cut short while ONE ran: Continue, or the next start
             return claim["brief_id"] if act else DUE
+
+    def _working(self, project_id: str) -> bool:
+        """Work runs in the tender: a Brief that has not ended (one that just ended is still in
+        memory while its watchers are told)."""
+        return any(
+            b.chat_id == project_id and not b.finished and b.state not in ENDED
+            for b in self.engine._briefs.values()
+        )
 
     def _claim(
         self, conn, rec: Records, plan, stage, attempt: int, *, text=None, actor=ENGINE
