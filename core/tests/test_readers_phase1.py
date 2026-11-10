@@ -316,3 +316,34 @@ async def test_the_lead_reads_what_was_not_read_at_the_end(rec, partly_read_dwg)
     assert lines[-2] == f"not read: 3 texts: {copy.UNREAD_WHY_TOO_MANY['en']}"
     listed = await call("files_list", {}, ctx)
     assert f"  not read: 3 texts: {copy.UNREAD_WHY_TOO_MANY['en']}" in listed
+
+
+def test_picture_text_is_read(rec, monkeypatch, tmp_path):
+    """A picture dropped into the project is read by the text reader for pictures when it is
+    added: the map worker runs ONE's own pipeline on scripted detector and recogniser sessions,
+    keeps each word with its box, and the words can be searched. Nothing is spent."""
+    from qsone.records import search
+    from qsone.records.mapping import store, worker
+    from tests import ocr_fakes
+
+    recogniser = ocr_fakes.FakeRecogniser(["sample site notice concrete works"])
+    ocr_fakes.install(monkeypatch, tmp_path, recogniser=recogniser)
+    image = ocr_fakes.picture(400, 200)
+    info = files.add_file(rec, "site photo.png", image, actor="engineer")
+    current = worker.FilePass()
+    while worker.step(rec, original=current):
+        pass
+    row = store.detail(rec, info.id)
+    assert row["local_state"] == "done" and row["ocr_done_pages"] == [1]
+    with rec.read() as conn:
+        chunks = [
+            (json.loads(loc), text)
+            for loc, text in conn.execute(
+                "SELECT locator, text FROM chunks WHERE file_id=? ORDER BY seq", (info.id,)
+            )
+        ]
+        assert unread.parts_of(conn, files.file_info(rec, info.id)) == []
+    assert [t for _, t in chunks] == ["sample", "site", "notice", "concrete", "works"]
+    assert all(loc["read_by"] == "ppocr-v5" and len(loc["box"]) == 4 for loc, _ in chunks)
+    assert recogniser.calls  # read by the recogniser, not by a stand-in for the whole page
+    assert any(h.file_id == info.id for h in search.search(rec, "concrete").hits)

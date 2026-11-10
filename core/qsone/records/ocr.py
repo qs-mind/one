@@ -1,139 +1,48 @@
-"""Local word OCR, using the external Apache-2.0 Tesseract program.
+"""Reading text in pictures on this computer: PP-OCRv5's mobile detector and Arabic recogniser
+(Apache-2.0) on the onnxruntime ONE ships, run by ONE's own numpy and Pillow pipeline
+(`ocr_engine`, `ocr_lines`; decisions §17.19). The model files are setup's part "ocr".
 
-Page images stay in memory. Missing languages use ONE's verified model downloader.
-"""
+Until that part is in place, or where onnxruntime has no wheel (Intel Macs, macOS 13), `ready()`
+is false and scanned pages go to the engineer's AI page reader only.
 
-import csv
+A local reading is for search and locating only: its numbers are unchecked observations. Before
+one is cited, imported or priced, the AI or the engineer reads it (`wants_ai` sends number pages
+and weak pages on; `source_evidence` refuses a page that only a local reader read). Readings made
+by the old Tesseract driver (`read_by` "tesseract") are kept and read as local readings.
+
+Page images stay in memory. Importing this module loads no model runtime."""
+
+import importlib.util
 import io
-import math
-import os
 import re
-import shutil
 import struct
-import subprocess
-import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from qsone import settings
-from qsone.meaning import download
-from qsone.meaning.manifest import ModelFile, ModelSpec
+READ_BY = "ppocr-v5"
+LOCAL_READERS = frozenset({"tesseract", READ_BY})
+MIN_CONFIDENCE = 60  # a word under this is marked `ocr_low_confidence`
+# Routing (the spike's thresholds, from 19 pages): a weak page, then a number page.
+WEAK_MEAN = 88
+WEAK_SHARE = 0.08  # of words under MIN_CONFIDENCE
+WEAK_WORDS = 5  # boxes found but fewer words read
+NUMBERS = 8
+DIGIT_SHARE = 0.03
+TURNS = (180, 90, 270)  # tried in turn while a page reads weak
+THREADS = 4
 
-# Policy threshold, not a calibrated probability: any uncertain word requires review.
-MIN_CONFIDENCE = 60
-_MODEL_LOCK = threading.Lock()
-
-
-class TessdataSpec(ModelSpec):
-    def url(self, f: ModelFile) -> str:
-        return f"https://raw.githubusercontent.com/{self.repo}/{self.revision}/{f.path}"
-
-
-# Official tessdata_fast 4.1.0 (Apache-2.0). Sizes corroborated by Gentoo's
-# app-text/tessdata_fast/Manifest; English SHA-256 by Homebrew's tesseract formula;
-# Arabic SHA-256 by lm-kit/tessdata-fast's LFS pointer;
-# the live download must match this digest.
-MODELS = TessdataSpec(
-    id="tessdata-fast",
-    repo="tesseract-ocr/tessdata_fast",
-    revision="4.1.0",
-    files=(
-        ModelFile(
-            "ara.traineddata",
-            1432056,
-            "e3206d3dc87fd50c24a0fb9f01838615911d25168f4e64415244b67d2bb3e729",
-        ),
-        ModelFile(
-            "eng.traineddata",
-            4113088,
-            "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
-        ),
-    ),
-    licence="Apache-2.0",
-    dims=0,
-    ram_bytes=0,
-)
-
-
-def ensure_models() -> Path:
-    root = settings.data_dir() / "models"
-    with _MODEL_LOCK:
-        if not download.installed((MODELS,), root):
-            with download.default_client() as client:
-                download.download((MODELS,), root, client=client, stop=threading.Event())
-    return download.folder(MODELS, root)
-
-
-def model_folder() -> Path:
-    return download.folder(MODELS, settings.data_dir() / "models")
-
-
-def system_folders(executable: str) -> list[Path]:
-    # Ask the installed binary for its compiled-in folder, ignoring the user's override.
-    env = {k: v for k, v in os.environ.items() if k != "TESSDATA_PREFIX"}
-    try:
-        result = subprocess.run(
-            [executable, "--list-langs"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=True,
-            env=env,
-        )
-        match = re.search(r'List of available languages in "([^"]+)"', result.stdout)
-        if match:
-            return [Path(match[1])]
-    except (OSError, subprocess.SubprocessError):
-        pass
-    return [
-        Path(executable).parent / "tessdata",
-        Path("/usr/share/tessdata"),
-        Path("/usr/share/tesseract-ocr/5/tessdata"),
-        Path("/usr/local/share/tessdata"),
-        Path("/opt/homebrew/share/tessdata"),
-    ]
-
-
-def find_languages(executable: str) -> tuple[Path, str] | None:
-    folders = []
-    if prefix := os.environ.get("TESSDATA_PREFIX"):
-        folders.append(Path(prefix))
-    folders.append(model_folder())
-    system = system_folders(executable)
-    folders.extend(system)
-    for folder in folders:
-        if all((folder / f"{lang}.traineddata").is_file() for lang in ("ara", "eng")):
-            return folder, "ara+eng"
-    try:
-        return ensure_models(), "ara+eng"
-    except (download.DownloadError, OSError):
-        # Offline or no space: keep reading English with installed system data.
-        english = next((p for p in system if (p / "eng.traineddata").is_file()), None)
-        return (english, "eng") if english is not None else None
-
-
-def find_tesseract() -> str | None:
-    found = shutil.which("tesseract")
-    if found:
-        return found
-    candidates = [
-        Path("/opt/homebrew/bin/tesseract"),
-        Path("/usr/local/bin/tesseract"),
-        Path("/opt/local/bin/tesseract"),
-    ]
-    for name in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
-        if base := os.environ.get(name):
-            candidates.append(Path(base) / "Tesseract-OCR" / "tesseract.exe")
-            candidates.append(Path(base) / "Programs" / "Tesseract-OCR" / "tesseract.exe")
-    return next((str(p) for p in candidates if p.is_file() and os.access(p, os.X_OK)), None)
+_LOCK = threading.Lock()  # one page at a time: about 750 MB at peak beside the search model
+_loaded: tuple[Path, object] | None = None
+_NUMBER = re.compile(r"[0-9٠-٩۰-۹]")
+_MARKED = re.compile(r"[0-9٠-٩۰-۹][.,٫٬][0-9٠-٩۰-۹]")
 
 
 @dataclass(frozen=True)
 class Word:
     text: str
-    box: list[float]
-    confidence: float
+    box: list[float]  # x0, y0, x1, y1 in PDF points (or image pixels) from the top left
+    confidence: float  # 0..100
     line: tuple[int, int, int] = (0, 0, 0)  # block, paragraph, line within this page
 
 
@@ -141,12 +50,16 @@ class Word:
 class Page:
     words: list[Word]
     low_confidence: bool
+    boxes: int = 0  # text boxes the detector found
+    turned: int = 0  # degrees the picture was turned to read it
 
-    def pieces(self, page: int):
+    def pieces(self, page: int, read_by: str = READ_BY):
         from qsone.records.extract import Piece
 
-        common = {"page": page, "read_by": "tesseract"}
-        # TSV already supplies reading order. Each citable piece owns exactly one box.
+        common = {"page": page, "read_by": read_by}
+        if reason := wants_ai(self):
+            common["wants_ai"] = reason
+        # Each citable piece owns exactly one box, in reading order.
         pieces = [
             Piece(
                 common
@@ -168,59 +81,143 @@ def png_size(png: bytes) -> tuple[int, int]:
     return struct.unpack(">II", png[16:24])
 
 
-def parse_tsv(tsv: str, *, pixels: tuple[int, int], points: tuple[float, float]) -> Page:
-    sx, sy = points[0] / pixels[0], points[1] / pixels[1]
-    words = []
-    for row in csv.DictReader(io.StringIO(tsv), delimiter="\t", quoting=csv.QUOTE_NONE):
-        if row["level"] != "5" or not row["text"].strip():
-            continue
-        x, y, w, h = (int(row[k]) for k in ("left", "top", "width", "height"))
-        confidence = float(row["conf"])
-        if not math.isfinite(confidence) or not 0 <= confidence <= 100:
-            raise ValueError("invalid OCR confidence")
-        if not (0 <= x < x + w <= pixels[0] and 0 <= y < y + h <= pixels[1]):
-            raise ValueError("invalid OCR box")
-        line = tuple(int(row[k]) for k in ("block_num", "par_num", "line_num"))
-        words.append(
-            Word(row["text"], [x * sx, y * sy, (x + w) * sx, (y + h) * sy], confidence, line)
-        )
-    return Page(words, not words or any(w.confidence < MIN_CONFIDENCE for w in words))
+def available() -> bool:
+    """onnxruntime is on this computer (no wheel for Intel Macs or macOS 13)."""
+    return importlib.util.find_spec("onnxruntime") is not None
 
 
-def read_image(
-    png: bytes,
-    *,
-    points: tuple[float, float],
-    executable: str,
-    tessdata: Path,
-    languages: str = "ara+eng",
-) -> Page:
-    # Set the TSV variable directly: our model folder needs no installed configs/tsv file.
-    command = [
-        executable,
-        "stdin",
-        "stdout",
-        "--tessdata-dir",
-        str(tessdata),
-        "-l",
-        languages,
-        "--oem",
-        "1",
-        "-c",
-        "tessedit_create_tsv=1",
-    ]
-    try:
-        result = subprocess.run(command, input=png, capture_output=True, timeout=120, check=True)
-    except subprocess.CalledProcessError as error:
-        # Only an explicit stdin-read failure permits the brief's temporary-image exception.
-        message = (error.stderr or b"").lower()
-        if b"stdin" not in message or not any(
-            phrase in message for phrase in (b"cannot read", b"failed to read", b"cannot open")
-        ):
-            raise
-        with tempfile.TemporaryDirectory(prefix="one-ocr-") as temporary:
-            path = Path(temporary) / "page.png"
-            path.write_bytes(png)
-            command[1] = str(path)
-            result = subprocess.run(command, capture_output=True, timeout=120, check=True)
-    return parse_tsv(result.stdout.decode("utf-8"), pixels=png_size(png), points=points)
+def folder() -> Path | None:
+    """The model files, when setup has them in place."""
+    from qsone.setup import runner
+
+    return runner.part_path("ocr")
+
+
+def ready() -> bool:
+    return available() and folder() is not None
+
+
+def is_local(locator: dict) -> bool:
+    return locator.get("read_by") in LOCAL_READERS
+
+
+def _mean(page: Page) -> float:
+    return sum(w.confidence for w in page.words) / len(page.words) if page.words else 0.0
+
+
+def weak(page: Page) -> bool:
+    """Handwriting, stamps, drawings, bad or turned scans: too unsure for search."""
+    if not page.words:
+        return page.boxes > 0
+    low = sum(w.confidence < MIN_CONFIDENCE for w in page.words) / len(page.words)
+    return (
+        _mean(page) < WEAK_MEAN
+        or low >= WEAK_SHARE
+        or (page.boxes > 0 and len(page.words) < WEAK_WORDS)
+    )
+
+
+def wants_ai(page: Page) -> str | None:
+    """Why a locally read page goes on to the engineer's AI page reader: "weak", "numbers" (a
+    BOQ, a price list, a table: 8 numbers or more, digits 3% of its characters, or any decimal
+    or thousands mark read locally), or None for clean prose that stays local."""
+    if weak(page):
+        return "weak"
+    text = "".join(w.text for w in page.words)
+    numbers = [w.text for w in page.words if _NUMBER.search(w.text)]
+    digits = len(_NUMBER.findall(text))
+    if (
+        len(numbers) >= NUMBERS
+        or (text and digits / len(text) >= DIGIT_SHARE)
+        or any(_MARKED.search(n) for n in numbers)
+    ):
+        return "numbers"
+    return None
+
+
+def preferred(chunks: list[tuple[dict, str]]) -> list[tuple[dict, str]]:
+    """One reading per page: where the AI read a page that a local reader read too, the AI's."""
+    by_ai = {loc.get("page") for loc, _ in chunks if loc.get("read_by") and not is_local(loc)}
+    return [(loc, t) for loc, t in chunks if not (is_local(loc) and loc.get("page") in by_ai)]
+
+
+def _engine():
+    global _loaded
+    where = folder()
+    if where is None or not available():
+        raise FileNotFoundError("the text reader for pictures is not in place")
+    if _loaded is None or _loaded[0] != where:
+        from qsone.records.ocr_engine import Engine
+
+        _loaded = (where, Engine.load(where, THREADS))
+    return _loaded[1]
+
+
+def _picture(png: bytes):
+    from PIL import Image
+
+    with Image.open(io.BytesIO(png)) as image:
+        return image.convert("RGB")
+
+
+def _turned(image, turned: int):
+    from PIL import Image
+
+    turn = {180: Image.Transpose.ROTATE_180, 90: Image.Transpose.ROTATE_90}
+    return image.transpose(turn.get(turned, Image.Transpose.ROTATE_270))
+
+
+def _back(box: list[float], turned: int, size: tuple[int, int]) -> list[float]:
+    """A box read on the picture turned by `turned` degrees (counter-clockwise), on the
+    picture as it is (`size`)."""
+    w, h = size
+    a, b, c, d = box
+    if turned == 180:
+        return [w - c, h - d, w - a, h - b]
+    if turned == 90:
+        return [w - d, a, w - b, c]
+    if turned == 270:
+        return [b, h - c, d, h - a]
+    return box
+
+
+def _page(lines, boxes: int, turned: int, size, scale) -> Page:
+    sx, sy = scale
+    found = []
+    for n, line in enumerate(lines, 1):
+        for word in line.words:
+            x0, y0, x1, y1 = _back(word.box, turned, size)
+            box = [round(x0 * sx, 2), round(y0 * sy, 2), round(x1 * sx, 2), round(y1 * sy, 2)]
+            found.append(Word(word.text, box, round(word.confidence * 100, 1), (1, 1, n)))
+    page = Page(found, False, boxes, turned)
+    return Page(found, weak(page) or not found, boxes, turned)
+
+
+def read_image(png: bytes, *, points: tuple[float, float]) -> Page:
+    """Reads a page picture; boxes in `points` (the page's size in PDF points, or the picture's
+    in pixels). A page that reads weak is read again turned 180°, 90° and 270°, and the reading
+    with the best mean confidence is kept. Raises FileNotFoundError when `ready()` is false."""
+    image = _picture(png)
+    size = image.size
+    scale = (points[0] / size[0], points[1] / size[1])
+    with _LOCK:
+        engine = _engine()
+        best = _page(*engine.read(image), 0, size, scale)
+        for turned in TURNS:
+            if not weak(best):
+                break
+            again = _page(*engine.read(_turned(image, turned)), turned, size, scale)
+            if _mean(again) > _mean(best):
+                best = again
+    return best
+
+
+def read_crop(png: bytes, *, points: tuple[float, float]) -> Page:
+    """A small crop (one number, one stamp line) read by the recogniser alone."""
+    image = _picture(png)
+    scale = (points[0] / image.size[0], points[1] / image.size[1])
+    with _LOCK:
+        words = _engine().read_line(image)
+    from qsone.records.ocr_lines import Line
+
+    return _page([Line([], words)], 1, 0, image.size, scale)

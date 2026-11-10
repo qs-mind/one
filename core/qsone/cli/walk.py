@@ -16,6 +16,7 @@ from qsone import copy
 from qsone.cli.session import ROOT
 from qsone.cli.texts import TEXT, CliError
 from qsone.engine.truth import citations, has_json, promise
+from qsone.records.ocr import LOCAL_READERS
 
 
 class Budget:
@@ -116,13 +117,15 @@ def capability(commands, name):
 
         return find_soffice() is not None
     if name == "ocr:ara":
-        from qsone.meaning.download import installed
-        from qsone.records.ocr import MODELS, find_tesseract
+        from qsone.records.ocr import available
+        from qsone.setup.manifest import OCR
+        from qsone.setup.runner import Setup
 
         data = commands.saved.get("data_dir")
         if data is None:
             raise CliError("walk")  # An attached core's model directory is unknown.
-        return bool(find_tesseract()) and installed((MODELS,), Path(data) / "models")
+        setup = Setup(Path(data) / "models", Path(data) / "sandbox", parts=(OCR,))
+        return available() and setup.part_path("ocr") is not None
     raise CliError("walk")
 
 
@@ -177,7 +180,7 @@ class Walk:
         if name == "ocr_boxes":
             pieces = [p for p in self.observed.get("pieces", []) if p.get("text", "").strip()]
             return bool(pieces) and all(
-                (p.get("locator") or {}).get("read_by") == "tesseract"
+                (p.get("locator") or {}).get("read_by") in LOCAL_READERS
                 and len((p.get("locator") or {}).get("box", [])) == 4
                 for p in pieces
             )

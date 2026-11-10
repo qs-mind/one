@@ -70,8 +70,11 @@ def sheets(data, *, ocr_words=None):
     previous = None
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages:
+            read_by = None  # a page read from its picture on this computer: numbers unchecked
             if not page.chars and ocr_words:
-                page.objects["char"] = _ocr_chars(page, ocr_words.get(page.page_number, []))
+                found = ocr_words.get(page.page_number, [])
+                page.objects["char"] = _ocr_chars(page, found)
+                read_by = next((w["read_by"] for w in found if w.get("read_by")), None)
             if not page.chars:
                 missing.append(page.page_number)
                 previous = None
@@ -127,9 +130,10 @@ def sheets(data, *, ocr_words=None):
                         )
                         if len(matches) == 1:
                             box = matches[0]
-                        candidate.cells.setdefault(r, {})[c] = Cell(
-                            text, None, {"page": page.page_number, "box": list(box)}
-                        )
+                        where = {"page": page.page_number, "box": list(box)}
+                        if read_by:
+                            where["read_by"] = read_by
+                        candidate.cells.setdefault(r, {})[c] = Cell(text, None, where)
                 header, columns = guess(candidate, candidate.last_row)
                 if borderless and not columns:
                     continue  # prose aligned by chance is not a BOQ
@@ -217,5 +221,7 @@ def read_stored(rec, file_id, name):
     for locator, text in rows:
         locator = json.loads(locator)
         if locator.get("read_by") and "box" in locator and text.strip():
-            words.setdefault(locator["page"], []).append({"text": text, "box": locator["box"]})
+            words.setdefault(locator["page"], []).append(
+                {"text": text, "box": locator["box"], "read_by": locator["read_by"]}
+            )
     return read(read_original(rec, file_id), name, ocr_words=words)

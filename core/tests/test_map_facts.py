@@ -685,11 +685,7 @@ def test_picture_renders_evidence_region_with_stub_ocr(rec, monkeypatch, tmp_pat
     f = files.add_file(
         rec, "sample.pdf", sample_pdf([["Validity 01 days", "Unrelated 500"]]), actor="engineer"
     )
-    for language in ("ara", "eng"):
-        (tmp_path / f"{language}.traineddata").write_bytes(b"sample")
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "sample-tesseract")
-    monkeypatch.setattr(ocr, "model_folder", lambda: tmp_path)
-    monkeypatch.setattr(ocr, "system_folders", lambda _: [])
+    monkeypatch.setattr(ocr, "ready", lambda: True)
     images = []
 
     def read(png, **kwargs):
@@ -699,7 +695,7 @@ def test_picture_renders_evidence_region_with_stub_ocr(rec, monkeypatch, tmp_pat
         images.append(png)
         return ocr.Page([ocr.Word("٩٠", [], 95)], False)
 
-    monkeypatch.setattr(ocr, "read_image", read)
+    monkeypatch.setattr(ocr, "read_crop", read)
     result = picture.check(rec, f.id, {"page": 1}, "Validity 01 days", "01 days")
     assert images and result["value"] == "01 days"
     assert picture.check(rec, f.id, {"page": 1}, "Missing 01", "01") is None

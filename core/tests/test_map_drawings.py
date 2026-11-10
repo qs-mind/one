@@ -33,12 +33,10 @@ def test_dwg_fixture_in_map(rec):
 
 
 def test_scanned_drawing_uses_stored_words(rec, monkeypatch):
-    from pathlib import Path
 
     from qsone.records import ocr
 
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "find_languages", lambda *a: (Path("/fake"), "ara+eng"))
+    monkeypatch.setattr(ocr, "ready", lambda: True)
     monkeypatch.setattr(
         ocr,
         "read_image",

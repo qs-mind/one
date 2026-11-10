@@ -12,7 +12,7 @@ from typing import Literal
 from pydantic import Field
 
 from qsone import copy
-from qsone.engine import truth
+from qsone.engine import numbers_guard, truth
 from qsone.engine.tools import ModelRetry, ToolContext
 from qsone.engine.tools_records.shared import (
     _DATE,
@@ -25,7 +25,7 @@ from qsone.engine.tools_records.shared import (
     _json,
     _target,
 )
-from qsone.records import boq, ledger
+from qsone.records import boq, ledger, ocr
 from qsone.records.project import Records, RecordsError
 
 # Writing to the Source Ledger ------------------------------------------------------------------
@@ -162,6 +162,51 @@ def _inside(conn, file_id: str, pages: int | None, place: dict) -> None:
         raise _no_evidence("locator")
 
 
+def _read_here_only(conn, file_id: str, place: dict) -> bool:
+    """A page that only ONE's local text reader read, or a word of it the AI has not read: its
+    numbers are unchecked observations, never evidence by themselves (decisions §17.19)."""
+    if "page" not in place:
+        return False
+    readers = {
+        by
+        for (by,) in conn.execute(
+            "SELECT DISTINCT json_extract(locator, '$.read_by') FROM chunks"
+            " WHERE file_id = ? AND json_extract(locator, '$.page') = ?",
+            (file_id, place["page"]),
+        )
+    }
+    if place.get("read_by") in ocr.LOCAL_READERS:
+        return not any(by is not None and by not in ocr.LOCAL_READERS for by in readers)
+    return bool(readers) and readers <= ocr.LOCAL_READERS
+
+
+def _local_differs(conn, file_id: str, place: dict) -> bool:
+    """A locally read word (a box with a local `read_by`) whose numbers the AI's reading of the
+    same page does not have: the AI read the page, but not this number (§17.19)."""
+    if place.get("read_by") not in ocr.LOCAL_READERS:
+        return False
+    rows = conn.execute(
+        "SELECT locator, text FROM chunks"
+        " WHERE file_id = ? AND json_extract(locator, '$.page') = ?",
+        (file_id, place["page"]),
+    ).fetchall()
+    x0, y0, x1, y1 = place.get("box") or (0, 0, math.inf, math.inf)
+    here, theirs = [], []
+    for locator, text in rows:
+        loc = json.loads(locator)
+        if not loc.get("read_by"):
+            continue
+        if not ocr.is_local(loc):
+            theirs.append(text)
+        elif loc["read_by"] == place["read_by"] and len(box := loc.get("box") or []) == 4:
+            mid_x, mid_y = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+            if x0 - 1 <= mid_x <= x1 + 1 and y0 - 1 <= mid_y <= y1 + 1:
+                here.append(text)
+    if not here:
+        return True  # no word read here at that place: nothing the AI could have agreed with
+    return not numbers_guard.known_values(here) <= numbers_guard.known_values(theirs)
+
+
 def _made_by_a_script(conn, file_id: str) -> bool:
     """A file a Sandbox script wrote (and nobody had before): what it holds was computed."""
     return (
@@ -189,6 +234,10 @@ def _file_source(conn, args: SourceArgs) -> dict:
     if not place:
         raise _no_evidence("locator")
     _inside(conn, args.file_id, pages, place)
+    if _read_here_only(conn, args.file_id, place):
+        raise RecordsError(copy.SOURCE_READ_LOCALLY, status=422, field="locator")
+    if _local_differs(conn, args.file_id, place):
+        raise RecordsError(copy.SOURCE_LOCAL_DIFFERS, status=422, field="locator")
     if args.dated is not None:
         dated, how = args.dated, "document"
     elif UNDATED_FILES == "received":

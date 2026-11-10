@@ -1,7 +1,6 @@
 """Generated sample photos and plans; no private tender inputs."""
 
 import io
-from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -47,8 +46,7 @@ def sample_plan(*, prose=False, clustered=False):
 def test_photo_is_read_and_has_preview(rec, monkeypatch, extension):
     out = io.BytesIO()
     Image.new("RGB", (120, 80), "white").save(out, format=extension.upper())
-    monkeypatch.setattr(ocr, "find_tesseract", lambda: "fake")
-    monkeypatch.setattr(ocr, "find_languages", lambda *a: (Path("/fake"), "ara+eng"))
+    monkeypatch.setattr(ocr, "ready", lambda: True)
     monkeypatch.setattr(
         ocr,
         "read_image",

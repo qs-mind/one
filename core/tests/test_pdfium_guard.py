@@ -55,14 +55,14 @@ def test_real_paths_eight_threads_twenty_rounds(rec):
         list(pool.map(run, range(8)))
 
 
-def test_ocr_releases_pdfium_before_tesseract(monkeypatch):
+def test_ocr_releases_pdfium_before_reading(monkeypatch):
     from qsone.records import ocr
     from qsone.records.pdfium_guard import PDFIUM
     from qsone.tools.files import _local_page
     from tests.samples import sample_pdf
 
     def read_image(png, **kwargs):
-        # A second thread can acquire the lock while Tesseract is running.
+        # A second thread can acquire the lock while the page is being read.
         def acquire():
             taken = PDFIUM.acquire(timeout=1)
             if taken:
@@ -75,4 +75,4 @@ def test_ocr_releases_pdfium_before_tesseract(monkeypatch):
         return "sample OCR"
 
     monkeypatch.setattr(ocr, "read_image", read_image)
-    assert _local_page(sample_pdf([["Sample"]]), "pdf", 1, "fake", None, "eng") == "sample OCR"
+    assert _local_page(sample_pdf([["Sample"]]), "pdf", 1) == "sample OCR"

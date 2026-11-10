@@ -7,12 +7,12 @@
   line or a paragraph), as the JSON locator `add_source` takes with the file id, so the agent
   cites it and never asks the engineer for an id. It is file text: fenced as data, and it marks
   the Brief. Its hidden-text flags come with it, labelled as hidden, never silently trusted.
-- With `ocr=true`, Tesseract first reads page images locally, retaining each word and its box.
-  Low-confidence pages explicitly require Lead QS review. Language models download on first
-  need through the checked model downloader. If unavailable, the engineer's own AI remains
-  the fallback, with its existing Spending Caps, approval and On-device restrictions.
-  Images stay in memory; only an explicit Tesseract stdin-read failure permits a temporary
-  image, deleted immediately after that attempt.
+- With `ocr=true`, ONE's own text reader for pictures (`records.ocr`) first reads page images on
+  this computer, keeping each word and its box. Number pages and weak pages, and every page
+  while that reader is not in place, go on to the engineer's own AI page reader, with its
+  Spending Caps, approval and On-device restrictions; both readings are kept and the AI's is the
+  one shown. A number only read locally is unchecked until the AI or the engineer reads it.
+  Images stay in memory.
 
 Importing this module registers the tools. No PydanticAI here."""
 
@@ -71,7 +71,7 @@ _FLAG_WORDS = {
     "hidden_element": "hidden: a hidden page element",
     "ai_instruction": "looks like an order to an AI",
 }
-_OCR_HOW = "call files_read with ocr=true; Tesseract reads locally, with your AI as fallback."
+_OCR_HOW = "call files_read with ocr=true; ONE reads it on this computer, then your AI."
 
 
 def _json(value) -> str:
@@ -242,8 +242,8 @@ _READ_EXAMPLE = {"file_id": "<file id>", "pages": "3-5"}
 _READ_DOC = f"""Read file text with locators; file_id from a list/search. pages: "3", "3-5"
 or [3, 4] for PDF/images (default first {PAGES_WINDOW}); sheet/rows "1-200" for Excel;
 CSV rows are physical start lines, including quoted newlines. Omit for other files.
-part continues long text; result gives next call. ocr=true: local Tesseract, AI fallback,
-retaining text/boxes. picture=true: inspect the page picture with the connected AI's vision,
+part continues long text; result gives next call. ocr=true: read here, AI for number/weak
+pages; local numbers unchecked. picture=true: inspect the page picture with the AI's vision,
 even if a text layer exists; returns unchecked observations with read_by, not replacement text.
 For drawings read project_map sheets/counts too; confirm scale/dimensions and cite regions.
 Cite exact file_id/locator with add_source. Hidden text is flagged.
@@ -408,7 +408,7 @@ def _chunks(rec: Records, info: FileInfo, sel: _Selection) -> list[tuple[dict, s
             rows = conn.execute(
                 "SELECT locator, text FROM chunks WHERE file_id = ? ORDER BY seq", (info.id,)
             )
-        chunks = [(json.loads(locator), text) for locator, text in rows]
+        chunks = ocr.preferred([(json.loads(locator), text) for locator, text in rows])
     return _template_blanks(rec, info, chunks)
 
 
@@ -576,6 +576,9 @@ def _render(rec: Records, info: FileInfo, args: ReadArgs, sel: _Selection, notes
     uncertain = sorted({loc["page"] for loc, _ in chunks if loc.get("ocr_low_confidence")})
     if uncertain:
         notes.append(f"{_ranges(uncertain)}: {copy.OCR_LOW_CONFIDENCE['en']}")
+    local = sorted({loc["page"] for loc, _ in chunks if ocr.is_local(loc)})
+    if local:
+        notes.append(copy.fill(copy.OCR_NUMBERS_UNCHECKED, pages=_ranges(local))["en"])
     parts = _parts(_lines(chunks))
     if sel.sheet is not None and args.part > 1:
         raise _retry("part", "a sheet goes on by rows: give the rows the last result named.")
@@ -669,9 +672,12 @@ def _jpeg_png(data: bytes) -> bytes:
     return render.page_png(out.getvalue(), 1, min(width, PAGE_WIDTH))
 
 
-def _image(kind: str, data: bytes, page: int) -> bytes:
+def _image(kind: str, data: bytes, page: int, pixels: int | None = None) -> bytes:
+    """A page's picture: `pixels` wide when given, else at 300 dpi within 40 million pixels."""
     with _OCR_IMAGES, PDFIUM:
-        if kind == "pdf":
+        if kind != "pdf":
+            return render.image_png(data)
+        if pixels is None:
             with pdfium.PdfDocument(data) as doc:
                 pdf_page = doc[page - 1]
                 try:
@@ -682,8 +688,7 @@ def _image(kind: str, data: bytes, page: int) -> bytes:
             pixels = max(1, math.floor(width * scale))
             while pixels * math.ceil(height * pixels / width) > 40_000_000:
                 pixels -= 1
-            return render.page_png(data, page, pixels)
-        return render.image_png(data)
+        return render.page_png(data, page, pixels)
 
 
 async def _ask_cost(ctx: ToolContext, info: FileInfo, reader, pages: list[int]) -> None:
@@ -711,8 +716,9 @@ async def _ask_cost(ctx: ToolContext, info: FileInfo, reader, pages: list[int]) 
         raise Denied("files_read")
 
 
-def _local_page(data: bytes, kind: str, page: int, executable: str, tessdata, languages):
-    png = _image(kind, data, page)
+def _local_page(data: bytes, kind: str, page: int):
+    """A page read on this computer, its picture at PAGE_WIDTH as the text reader was tuned."""
+    png = _image(kind, data, page, PAGE_WIDTH)
     with _OCR_IMAGES, PDFIUM:
         if kind == "pdf":
             doc = pdfium.PdfDocument(data)
@@ -726,70 +732,72 @@ def _local_page(data: bytes, kind: str, page: int, executable: str, tessdata, la
                 doc.close()
         else:
             points = ocr.png_size(png)
-    return ocr.read_image(
-        png, points=points, executable=executable, tessdata=tessdata, languages=languages
-    )
+    return ocr.read_image(png, points=points)
 
 
 async def _ocr(ctx: ToolContext, rec: Records, info: FileInfo, sel: _Selection) -> str | list:
-    """Reads the selection's pages that have no text from their image. Returns notes for the
-    result, or a whole `not done` result."""
+    """Reads the selection's pages that have no text from their image: on this computer first,
+    then with the engineer's AI the pages the local reading sends on (`ocr.wants_ai`) and those
+    it could not read. Returns notes for the result, or a whole `not done` result."""
     if info.kind not in _PAGED:
         raise _retry(
             "ocr", f"only PDF pages and images are read from their image, not {info.kind}."
         )
     with rec.read() as conn:
         done = files.read_pages(conn, info.id)
+        wanting = files.pages_wanting_ai(conn, info.id)
     missing = [p for p in sel.pages if p not in done]
-    if not missing:
+    unchecked = [p for p in sel.pages if p in wanting]
+    if not missing and not unchecked:
         return []
-    if info.kind == "webp":
+    if info.kind == "webp" and missing:
         return cite.not_done(copy.OCR_IMAGE_KIND)
-    notes = []
-    executable = ocr.find_tesseract()
-    if executable is None:
-        notes.append(copy.OCR_TESSERACT_MISSING["en"])
-    else:
-        try:
-            found = await asyncio.to_thread(ocr.find_languages, executable)
-            if found is None:
-                raise FileNotFoundError("No local English OCR language data")
-            tessdata, languages = found
-            if languages == "eng":
-                notes.append(
-                    copy.fill(copy.OCR_ARABIC_MISSING, folder=str(ocr.model_folder()))["en"]
+    notes, unread = [], []
+    if missing and not ocr.ready():
+        why = copy.OCR_LOCAL_NOT_READY if ocr.available() else copy.SETUP_OCR_NOT_HERE
+        notes.append(why["en"])
+        unread = missing
+    elif missing:
+        data = await asyncio.to_thread(files.read_original, rec, info.id)
+        for page in missing:
+            try:
+                got = await asyncio.to_thread(_local_page, data, info.kind, page)
+                await asyncio.to_thread(
+                    files.add_ocr_pages,
+                    rec,
+                    info.id,
+                    {page: got.pieces(page)},
+                    read_by=ocr.READ_BY,
+                    actor=_actor(ctx),
                 )
-            data = await asyncio.to_thread(files.read_original, rec, info.id)
-            pending = []
-            for page in missing:
-                try:
-                    got = await asyncio.to_thread(
-                        _local_page, data, info.kind, page, executable, tessdata, languages
-                    )
-                    await asyncio.to_thread(
-                        files.add_ocr_pages,
-                        rec,
-                        info.id,
-                        {page: got.pieces(page)},
-                        read_by="tesseract",
-                        actor=_actor(ctx),
-                    )
-                except Exception as error:
-                    log.warning("local OCR page %d failed (%s)", page, type(error).__name__)
-                    pending.append(page)
-            missing = pending
-            if not missing:
-                return notes
-        except Exception as error:
-            log.warning("local OCR setup failed (%s)", type(error).__name__)
-        notes.append(copy.OCR_TESSERACT_FAILED["en"])
+            except Exception as error:
+                log.warning("local OCR page %d failed (%s)", page, type(error).__name__)
+                unread.append(page)
+                continue
+            if ocr.wants_ai(got):
+                unchecked.append(page)
+        if unread:
+            notes.append(copy.OCR_LOCAL_FAILED["en"])
+    missing = sorted({*unread, *unchecked})
+    if not missing:
+        return notes
     reader = None if ctx.services is None else ctx.services.transcriber
+    why = None
     if reader is None:
-        return cite.not_done(copy.OCR_NEEDS_MODEL) + "\n" + "\n".join(notes)
-    if ctx.services.on_device(ctx.rec) and not reader.on_device:
-        return cite.not_done(copy.ON_DEVICE_NO_ONLINE) + "\n" + "\n".join(notes)
+        why = copy.OCR_NEEDS_MODEL
+    elif ctx.services.on_device(ctx.rec) and not reader.on_device:
+        why = copy.ON_DEVICE_NO_ONLINE
+    if why is not None:  # the local readings stand, their numbers unchecked
+        if unread:
+            return cite.not_done(why) + "\n" + "\n".join(notes)
+        return [*notes, why["en"]]
     if len(missing) > oneshot.ASK_ABOVE_PAGES:
-        await _ask_cost(ctx, info, reader, missing)
+        try:
+            await _ask_cost(ctx, info, reader, missing)
+        except Denied:
+            if unread:
+                raise
+            return notes
     data = await asyncio.to_thread(files.read_original, rec, info.id)
 
     async def one(page: int, png: bytes | BaseException):

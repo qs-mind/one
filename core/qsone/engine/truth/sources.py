@@ -4,7 +4,7 @@ import json
 import re
 
 from qsone.engine import numbers_guard
-from qsone.records import boq
+from qsone.records import boq, ocr
 
 # Sources: is the number where its source says? ------------------------------------------------
 
@@ -24,10 +24,11 @@ def texts_at(conn, file_id: str, locator: dict) -> list[str] | None:
         place["sheet"] = matched
     where = " AND ".join(f"json_extract(locator, '$.{k}') = ?" for k in place)
     rows = conn.execute(
-        f"SELECT text FROM chunks WHERE file_id = ? AND {where} ORDER BY id",
+        f"SELECT locator, text FROM chunks WHERE file_id = ? AND {where} ORDER BY id",
         (file_id, *place.values()),
     ).fetchall()
-    return [t for (t,) in rows]
+    # A page the AI read as well as a local reader: the AI's reading is the one checked (§17.19).
+    return [t for _, t in ocr.preferred([(json.loads(loc), t) for loc, t in rows])]
 
 
 def file_text(conn, file_id: str) -> str:

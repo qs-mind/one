@@ -122,6 +122,10 @@ UNREAD_WHY_PAGES = {
     "en": "They are scanned: they have no text. ONE reads them from their pictures when asked.",
     "ar": "متصورة سكانر: مفيهاش نص. ONE بيقراها من صورها لما تطلب.",
 }
+UNREAD_WHY_PAGES_AI = {
+    "en": "They are scanned: they have no text. Your AI reads them from their pictures when asked.",
+    "ar": "متصورة سكانر: مفيهاش نص. نموذجك هو اللي بيقراها من صورها لما تطلب.",
+}
 UNREAD_WHY_TOO_MANY = {
     "en": "The drawing holds more than ONE's drawing reader keeps.",
     "ar": "الرسم فيه أكتر من اللي قارئ الرسومات بتاع ONE بيحتفظ بيه.",

@@ -22,8 +22,8 @@ pytestmark = pytest.mark.anyio
 
 @pytest.fixture(autouse=True)
 def no_local_ocr(monkeypatch):
-    # These tests exercise the established AI fallback; never download language models.
-    monkeypatch.setattr(files_tools.ocr, "find_tesseract", lambda: None)
+    # These tests exercise the AI page reader: the text reader for pictures is not in place.
+    monkeypatch.setattr(files_tools.ocr, "ready", lambda: False)
 
 
 def ctx_for(rec, *, transcriber=None, answers=None, on_device=False, agent=None):

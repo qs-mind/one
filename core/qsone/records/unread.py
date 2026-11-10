@@ -50,9 +50,10 @@ def parts_of(conn, info) -> list[dict]:
         done = read_pages(conn, info.id)
         missing = [n for n in range(1, info.pages + 1) if n not in done]
         if missing:
-            pages = part(
-                copy.fill(copy.UNREAD_PAGES, pages=_ranges(missing)), copy.UNREAD_WHY_PAGES
-            )
+            from qsone.records import ocr
+
+            why = copy.UNREAD_WHY_PAGES if ocr.ready() else copy.UNREAD_WHY_PAGES_AI
+            pages = part(copy.fill(copy.UNREAD_PAGES, pages=_ranges(missing)), why)
             parts.insert(0, pages)
         return parts
     if found is None and info.status in ("stored", "unreadable"):
