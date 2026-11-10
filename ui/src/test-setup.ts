@@ -1,9 +1,12 @@
 import "./polyfills";
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 import { clearClientBoqSamples } from "./workspace/clientBoqSample";
 import { resetScale } from "./ui/scale";
+
+// findBy and waitFor wait up to 1 s by default: a busy CI runner took longer and failed correct tests (10 Nov).
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom has no layout. The viewers (Plan 6) size themselves from their container, so grid containers (role="grid")
 // get a fixed size; React Flow (Plan 7) measures its pane and nodes, so an element with an inline width and height
