@@ -101,6 +101,9 @@ const OWN_ALIASES = ["@/design/", "@/texts/", "@/app/App", "@/firstlaunch/", "@/
   // the kept engines the tender's viewers wrap (U5): the sheet, document and PDF viewers, and what they read
   "@/viewers/", "@/deliverables/", "@/workspace/DocumentView", "@/workspace/documents", "@/workspace/api", "@/workspace/reveal",
   "@/project/", "@/i18n",
+  // the kept card bodies a thread draws inside its own card frame (tables, Connectors, a model's price, the caps form),
+  // which the kept DocumentView draws too
+  "@/chat/parts/types", "@/chat/parts/cardKinds", "@/chat/parts/CapsForm",
   // the kept current project, which the tender place sets when it opens the tender in the core (U5)
   "@/records/project"];
 

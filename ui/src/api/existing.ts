@@ -138,5 +138,13 @@ export const getChatMessages = (chat: string) => call<{ messages?: unknown[] }>(
 /** What the engineer writes to a Brief that runs, or waits on a card (answers 202). */
 export const steerBrief = (brief: string, text: string) => call<unknown>(`/briefs/${encodeURIComponent(brief)}/steer`, "POST", { text });
 
+/** The engineer's answer to a card a running Brief waits on (answers 204). */
+export const answerCard = (card: string, body: { choice: string; answers?: Record<string, string>; rows_ok?: number[] }) =>
+  call<unknown>(`/cards/${encodeURIComponent(card)}`, "POST", body);
+
+/** Work that was cut off: going on from its last Checkpoint, or leaving it (it is not offered again). */
+export const continueBrief = (brief: string) => call<unknown>(`/briefs/${encodeURIComponent(brief)}/continue`, "POST");
+export const leaveBrief = (brief: string) => call<unknown>(`/briefs/${encodeURIComponent(brief)}/leave`, "POST");
+
 /** The chat stream's fetch (POST /chat): its URLs are core routes, so they leave through api() too. */
 export const chatFetch = (input: RequestInfo | URL, init?: RequestInit) => api(String(input), init);

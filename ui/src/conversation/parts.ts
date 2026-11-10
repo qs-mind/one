@@ -3,6 +3,7 @@
 // type and id is live (3.1, rule 2).
 import type { UIMessage } from "ai";
 import type { Schemas } from "@/api/client";
+import type { CardData as KeptCard } from "@/chat/parts/types";
 
 export type Text = Schemas["Text"];
 export type Source = Schemas["Source"];
@@ -13,7 +14,10 @@ export type Finding = Schemas["Finding"];
 export type ProgressData = { agent: Text; text: Text };
 /** data-status, id = the Brief. */
 export type BriefState = Schemas["BriefEvent"]["state"];
-export type StatusData = { state: BriefState; step: Text | null };
+/** `fix`: what the screen can offer beside a failed Brief's step. */
+export type StatusData = { state: BriefState; step: Text | null; fix?: Schemas["LeadBlock"]["fix"] };
+/** data-card, id = the card: what a running Brief waits on (3.2), the two new kinds included. */
+export type CardData = Omit<KeptCard, "kind"> & { kind: KeptCard["kind"] | "keep_member" | "setting" };
 
 export type ThreadData = {
   progress: ProgressData;
@@ -22,6 +26,9 @@ export type ThreadData = {
   finding: Schemas["FindingPart"];
   sources: Schemas["SourcesPart"];
   steer: Schemas["SteerPart"];
+  stage: Schemas["StagePart"];
+  card: CardData;
+  room: Schemas["RoomMessage"];
 };
 
 export type ThreadMessage = UIMessage<Partial<Schemas["StoredMessageMark"]>, ThreadData>;
@@ -43,7 +50,7 @@ export function livePlaces(messages: readonly ThreadMessage[]): Map<string, stri
   const last = new Map<string, string>();
   for (const message of messages)
     message.parts.forEach((part, index) => {
-      if (part.type === "data-plan" || part.type === "data-finding") last.set(keyOf(part), `${message.id}:${index}`);
+      if (part.type === "data-plan" || part.type === "data-finding" || part.type === "data-stage") last.set(keyOf(part), `${message.id}:${index}`);
     });
   return last;
 }
@@ -67,4 +74,31 @@ export function liveProgress(messages: readonly ThreadMessage[]): ProgressData |
   const reply = messages.findLast((message) => message.role === "assistant");
   const progress = reply?.parts.findLast((part) => isData(part, "progress")) as DataPart<"progress"> | undefined;
   return progress?.data ?? null;
+}
+
+/** The newest reply's Brief when it ended `failed`: its status part, for the step and the fix to show. */
+export function failedBrief(messages: readonly ThreadMessage[]): DataPart<"status"> | null {
+  const reply = messages.findLast((message) => message.role === "assistant");
+  const status = reply?.parts.findLast((part) => isData(part, "status")) as DataPart<"status"> | undefined;
+  return status?.data.state === "failed" ? status : null;
+}
+
+/** Every card the thread holds, in order, by its id (the stream replaces a card in place). */
+export const cardsOf = (messages: readonly ThreadMessage[]): { id: string; data: CardData }[] =>
+  messages.flatMap((m) => m.parts.flatMap((p) => (isData(p, "card") && p.id ? [{ id: p.id, data: (p as DataPart<"card">).data }] : [])));
+
+/** The work log of the newest reply, in the order it came: each worker's step (ended once a newer step came, or the
+ * work ended) and what the team said to each other meanwhile. */
+export type WorkEntry = { step: ProgressData & { done: boolean } } | { room: Schemas["RoomMessage"] };
+
+export function workLog(messages: readonly ThreadMessage[]): WorkEntry[] {
+  const reply = messages.findLast((message) => message.role === "assistant");
+  const parts = reply?.parts ?? [];
+  const running = briefState(messages) !== null;
+  const last = parts.findLastIndex((part) => isData(part, "progress"));
+  return parts.flatMap((part, at): WorkEntry[] => {
+    if (isData(part, "progress")) return [{ step: { ...(part as DataPart<"progress">).data, done: !running || at < last } }];
+    if (isData(part, "room")) return [{ room: (part as DataPart<"room">).data }];
+    return [];
+  });
 }

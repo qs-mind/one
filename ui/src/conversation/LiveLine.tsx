@@ -7,13 +7,16 @@ import { StatusDot } from "@/design/StatusDot";
 import { Button } from "@/design/ui/button";
 import { Popover, PopoverContent, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/design/ui/popover";
 import { ScrollArea } from "@/design/ui/scroll-area";
+import { cards } from "@/texts/cards";
 import { conversation } from "@/texts/conversation";
+import { textDir } from "@/texts/language";
 import { useText } from "@/texts/useText";
 import { Task, TaskContent, TaskItem, TaskTrigger } from "./ai/task";
 import type { ProgressData, Text } from "./parts";
 
-/** One step of the work log: who, what, and whether it has ended. */
-export type LogStep = { agent: Text; text: Text; done: boolean };
+/** One step of the work log: who, what, and whether it has ended. A team message has its own words (`said`), as the
+ * member wrote them, and whom it went to. */
+export type LogStep = { agent: Text; text?: Text; done: boolean; said?: string; to?: Text };
 
 /** Steps in a row by the same worker, under that worker's name. */
 function groups(log: readonly LogStep[]): { agent: Text; steps: LogStep[] }[] {
@@ -77,7 +80,14 @@ export function LiveLine({ progress, log = [] }: LiveLineProps) {
                           ) : (
                             <CircleIcon aria-label={t(conversation.stepRunning)} className="mt-1 size-4 shrink-0" />
                           )}
-                          <span>{t(step.text)}</span>
+                          {step.said === undefined ? (
+                            <span>{step.text ? t(step.text) : null}</span>
+                          ) : (
+                            <span className="flex flex-col">
+                              {step.to && <span className="text-xs text-muted-foreground">{t(cards.roomTo, { name: t(step.to) })}</span>}
+                              <span dir={textDir(step.said)}>{step.said}</span>
+                            </span>
+                          )}
                         </TaskItem>
                       ))}
                     </TaskContent>

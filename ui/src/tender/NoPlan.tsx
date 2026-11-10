@@ -20,7 +20,8 @@ export function NoPlan({ onRequest, blocked }: NoPlanProps) {
   const [asked, setAsked] = useState<"no" | "asking" | "yes">("no");
   const ask = async () => {
     setAsked("asking");
-    const refused = await onRequest().catch(() => null);
+    // a request that got no answer did not reach the Lead: the button stays
+    const refused = await onRequest().catch(() => texts.failed);
     setAsked(refused ? "no" : "yes");
     if (refused) notify(t(refused));
   };
