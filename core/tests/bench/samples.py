@@ -143,6 +143,26 @@ def write_old(root: Path) -> Path:
     return folder
 
 
+# The real-window tender walk's folder (scripts/realapp/tender.mjs): a small BOQ and the conditions.
+WALK_NAME = "مناقصة عينة - مشي النافذة"
+WALK_CONDITIONS_NAME = "الشروط - عينة اختبار.pdf"
+WALK_CONDITIONS = (
+    ("شروط المناقصة - عينة اختبار، مش مناقصة حقيقية", "المحتجز 5% من كل مستخلص - عينة"),
+    ("مدة سريان العطاء 90 يوم - عينة",),
+)
+
+
+def write_walk(root: Path) -> Path:
+    from tests.samples import sample_pdf
+
+    folder = root / WALK_NAME
+    folder.mkdir(parents=True, exist_ok=True)
+    write_boq(folder / BOQ_NAME)
+    pages = [[_visual(line) for line in lines] for lines in WALK_CONDITIONS]
+    (folder / WALK_CONDITIONS_NAME).write_bytes(sample_pdf(pages))
+    return folder
+
+
 def write_cli_samples(folder: Path) -> None:
     """Small job-specific inputs. Every value is sample data, never a tender copy."""
     import typst

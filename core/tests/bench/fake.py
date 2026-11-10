@@ -6,7 +6,8 @@ scenario is chosen by a keyword in the Brief: "bench:chat", "bench:question", "b
 "bench:deliverable", "bench:team", "bench:view" (a view of the first item's numbers),
 "bench:workspace" (the workspace screens: one rate priced from the supplier's quote, the bid
 letter, then one decision left waiting for the engineer); the Briefs
-One starts itself (a tender folder's "I understood this", a project's lessons) have their own;
+One starts itself (a tender folder's "I understood this", a project's lessons) have their own,
+as do the tender day's (`tender.py`: the plan, a stage's work, a setting asked for);
 anything else is the full tender walk-through.
 Each step is tried once: a tool that refuses is noted in core.log and the brain moves on, so it
 never loops. Every text it writes says it is a bench reply, and it writes no number of its own.
@@ -88,6 +89,7 @@ class Seen:
     model: str = ""  # the model it runs as, from One's own instructions
     offered: set[str] = field(default_factory=set)  # the tools sent with this request
     effort: str | None = None  # the `thinking` setting One sent, if any
+    due: str = ""  # this tender's submission date, as ONE's kit gives the Lead
 
 
 def _text(content) -> str:
@@ -128,6 +130,8 @@ def read(messages: list, info: AgentInfo) -> Seen:
                 log.warning("bench: %s refused %s: %s", part.tool_name, step, _text(part.content))
     found = _KEYWORD.search(brief)
     scenario = found.group(1) if found and found.group(1) in SCENARIOS else "full"
+    if found is None:  # the tender day's: the plan, a stage's work, a setting (tender.py)
+        scenario = tender.scenario(brief) or scenario
     if brief in copy.UNDERSTAND_BRIEF.values():  # the Brief a tender folder's import starts
         scenario = "understand"
     elif brief in copy.LESSONS_BRIEF.values():  # the one closing a project starts
@@ -142,6 +146,7 @@ def read(messages: list, info: AgentInfo) -> Seen:
     seen.model = model.group(1) if model else ""
     seen.offered = offered
     seen.effort = effort if isinstance(effort, str) else None
+    seen.due = tender.due(info.instructions or "")
     return seen
 
 
@@ -1260,3 +1265,6 @@ ROLES = {
     "specialist": ModelChoice("bench", "bench-specialist"),
     "quick": ModelChoice("bench", "bench-specialist"),
 }
+
+
+from tests.bench import tender  # noqa: E402 - registers the tender day's scenarios, using the above
