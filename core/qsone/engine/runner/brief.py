@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from qsone import copy, usage
 from qsone.engine.costs import CallRefused, CapReached
-from qsone.engine.runner.errors import _Fail
+from qsone.engine.runner.errors import NoAI, _Fail
 from qsone.engine.runner.events import _BriefEvents
 from qsone.engine.runner.failures import _BriefFailures
 from qsone.engine.runner.lead import _BriefLead
@@ -194,6 +194,9 @@ class _Brief(
         except RecordsError as failed:
             log.warning("brief %s: records error", self.brief_id)
             self.set_state("failed", failed.text)
+        except NoAI as none:  # a stored Brief launched with no AI linked: plain words, no crash
+            self._withdraw()
+            self.set_state("failed", none.text)
         except Exception as error:
             log.exception("brief %s failed", self.brief_id)
             usage.crash(error)  # a bug in One: its class and line, never the message

@@ -428,7 +428,7 @@ async def start(rec: Records, engine) -> str:
     """Starts the Brief in the project's chat, in the engineer's language; returns its id.
     Raises what `Engine.start_brief` raises (BriefBusy, NoAI, RecordsError)."""
     text = copy.UNDERSTAND_BRIEF[setup_state.language()]
-    brief_id = await engine.start_brief(rec.id, text, instruction=INSTRUCTION)
+    brief_id = await engine.start_brief(rec.id, text, instruction=INSTRUCTION, by="one")
     await asyncio.to_thread(project_new_once, rec)
     return brief_id
 

@@ -63,14 +63,4 @@ def router() -> APIRouter:
     def say_in_room(project_id: str, body: c.RoomMessageIn):
         return _stub()
 
-    # Try again (C3).
-    @r.post(
-        "/briefs/{brief_id}/retry",
-        status_code=202,
-        response_model=c.BriefStarted,
-        responses=_refusals(404, 409, 423),
-    )
-    def retry_brief(brief_id: str):
-        return _stub()
-
     return r

@@ -401,6 +401,19 @@ def test_the_findings_routes_answer_the_contracts_shapes(data_dir):
             c.Refusal.model_validate_json(refused.text, strict=True)
 
 
+def test_try_again_answers_the_contracts_shapes(app, client):
+    """Route 25 is built (C3; its behaviour is core/tests/test_plan_driver_cases.py): a Brief it
+    cannot find is a 404 Refusal, never kept on disk by the webview."""
+    row = ROWS[-1]
+    assert row.path == "/briefs/{brief_id}/retry"
+    assert not is_stub(answering(table(app), row.method, row.call))
+    for call in (row.call, "/briefs/not-an-id/retry"):
+        refused = client.request(row.method, call, headers=AUTH)
+        assert (refused.status_code, refused.json()) == (404, {"error": copy.BRIEF_NOT_FOUND})
+        assert refused.headers["cache-control"] == "no-store"
+        c.Refusal.model_validate_json(refused.text, strict=True)
+
+
 def test_the_not_built_text_is_a_pair_with_no_fix_to_offer():
     assert set(copy.NOT_BUILT) == {"en", "ar"} and all(copy.NOT_BUILT.values())
     assert copy.fix_of(copy.NOT_BUILT) is None

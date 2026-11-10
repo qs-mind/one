@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from qsone import activity, copy
 from qsone.engine import cards, desks, general, identity
@@ -14,7 +15,7 @@ from qsone.engine.runner.brief import _Brief, _Place
 from qsone.engine.runner.errors import BriefBusy, NoAI, _Fail
 from qsone.engine.runner.shared import GENERAL, WORK, log, utc_now
 from qsone.engine.store import UNFINISHED, CostBook, Store
-from qsone.engine.types import Card, Effort, Event, ModelCard, ModelChoice
+from qsone.engine.types import BriefState, Card, Data, Effort, Event, ModelCard, ModelChoice
 from qsone.projects import Projects
 from qsone.records.project import Records, RecordsError
 
@@ -55,6 +56,10 @@ class Engine:
         self._ended_unseen: dict[str, dict] = {}  # chat id: its last Brief, done or failed, unseen
         self._close_after: set[str] = set()  # projects to close when their Brief ends
         self._general: Records | None = None
+        # Told of every Brief's state, on the event loop: (chat id, Brief id, state). Never in
+        # the tests' crash mode. The plan driver is one (Phase 1, C3).
+        self.watchers: list[Callable[[str, str, BriefState], None]] = []
+        self.on_open: list[Callable[[str], None]] = []  # told when a project is opened again
         self.book: CostBook
         self.spending: Spending
 
@@ -152,11 +157,26 @@ class Engine:
     def _publish(self, channel: str, event: dict) -> None:
         activity.publish(channel, event)
 
+    def changed(self, brief: _Brief, state: BriefState) -> None:
+        """A Brief's state changed: the tender's `brief` event, then the watchers."""
+        if brief.place.project_id is not None:
+            event = {"type": "brief", "brief_id": brief.brief_id, "state": state}
+            self._publish(brief.place.channel, event)
+        self._tell(brief.chat_id, brief.brief_id, state)
+
+    def _tell(self, chat_id: str, brief_id: str, state: BriefState) -> None:
+        for watch in tuple(self.watchers):
+            try:
+                watch(chat_id, brief_id, state)
+            except Exception:  # a watcher's fault never fails the Brief
+                log.exception("a watcher failed on brief %s", brief_id)
+
     def _ended(self, brief: _Brief) -> None:
         self._briefs.pop(brief.brief_id, None)
         self._outputs[brief.brief_id] = brief.output
         if brief.cancel_mode == "crash":
             return
+        self._tell(brief.chat_id, brief.brief_id, brief.state)  # it has left memory now
         if brief.state in ("done", "failed"):
             self._ended_unseen[brief.chat_id] = _chat_activity(brief, brief.state)
         else:  # stopped by the engineer, or paused with the core: nothing to tell
@@ -223,7 +243,7 @@ class Engine:
                 "anchor": {"project_map_files": file_ids},
             }
         ]
-        bid = place.store.new_brief(project_id, copy.MAP_AI_LABEL["en"], selection)
+        bid = place.store.new_brief(project_id, copy.MAP_AI_LABEL["en"], selection, by="one")
         from qsone.records.mapping.facts import mapping_passes
 
         brief = _Brief(self, place, place.store.brief(bid), sheet=sheet)
@@ -241,13 +261,15 @@ class Engine:
         selection: list[dict] | None = None,
         lead: ModelChoice | None = None,
         effort: Effort | None = None,
+        by: str | None = None,
     ) -> str:
         """Starts a Brief in the chat (a project id or "general"), under the caps. `selection`
         is what the engineer selected on the canvas (`engine.selection.read`). `lead` and
         `effort` are the Lead QS's model and effort picked in the message box; without them the
         Lead runs on its role's model at its provider's own effort. An effort the model does not
-        accept is dropped. Raises `BriefBusy`, `NoAI` (also for a `lead` no longer on the Model
-        Data Sheet) and `RecordsError`."""
+        accept is dropped. `by` is "one" for work ONE starts, not the engineer's message. Raises
+        `BriefBusy`, `NoAI` (also for a `lead` no longer on the Model Data Sheet) and
+        `RecordsError`."""
         place = self._place(chat_id)
         busy = self.active(chat_id, include_mapping=False)
         if busy is not None:
@@ -262,7 +284,7 @@ class Engine:
                 raise NoAI(copy.CHAT_MODEL_GONE)
             if effort not in card.efforts:
                 effort = None
-        brief_id = place.store.new_brief(chat_id, text, selection, effort=effort)
+        brief_id = place.store.new_brief(chat_id, text, selection, effort=effort, by=by)
         self._launch(
             _Brief(
                 self,
@@ -336,6 +358,10 @@ class Engine:
                 brief.steering.append(text)
         else:
             brief.steering.append(text)
+        steer = {"id": uuid4().hex, "text": text, "at": brief._now()}
+        if brief.cancel_mode != "crash":
+            brief.store.add_steer(brief_id, steer)
+        brief.emit(Data(brief_id, "steer", steer["id"], {"text": text, "at": steer["at"]}))
         log.info("brief %s steered", brief_id)
 
     async def answer(self, card_id: str, choice: str) -> None:
@@ -402,6 +428,26 @@ class Engine:
             return
         raise LookupError(brief_id)
 
+    def launch(self, chat_id: str, brief_id: str) -> None:
+        """Runs a stored, unfinished Brief of the chat from its last Checkpoint, from that one
+        place only (the plan driver; `continue_brief` looks in every project). No await: the
+        caller decides and launches in one step. Raises `BriefBusy`, `LookupError` and
+        `RecordsError`."""
+        if brief_id in self._briefs:
+            return
+        place = self._place(chat_id)
+        brief = place.store.brief(brief_id)
+        if brief["status"] not in UNFINISHED or brief["chat_id"] != chat_id:
+            raise LookupError(brief_id)
+        busy = self.active(chat_id)
+        if busy is not None:
+            raise BriefBusy(busy)
+        place.store.withdraw_pending(brief_id)
+        runner = _Brief(self, place, brief)
+        runner.log += _stored_events(place.store, brief, self)
+        self._launch(runner)
+        log.info("brief %s launched", brief_id)
+
     def leave_brief(self, brief_id: str) -> None:
         """The engineer chose not to continue an unfinished Brief: it ends as stopped, its
         waiting cards withdrawn, so it is never offered again. Raises `BriefBusy` while it
@@ -418,6 +464,7 @@ class Engine:
             place.store.withdraw_pending(brief_id)
             place.store.set_status(brief_id, "stopped", copy.STOPPED)
             log.info("brief %s left", brief_id)
+            self._tell(brief["chat_id"], brief_id, "stopped")
             return
         raise LookupError(brief_id)
 
@@ -443,11 +490,14 @@ class Engine:
                 "id": question_id(brief_id),
                 "role": "user",
                 "parts": [{"type": "text", "text": brief["text"]}],
+                "metadata": {"at": brief["created_at"]},  # StoredMessageMark (Phase 1)
             }
+            if brief["started_by"] is not None:
+                question["metadata"]["by"] = brief["started_by"]
             if brief["selection"] and not any(
                 "project_map_files" in (i.get("anchor") or {}) for i in brief["selection"]
             ):  # the chip on the engineer's message (Plan 7)
-                question["metadata"] = {"selection": brief["selection"]}
+                question["metadata"]["selection"] = brief["selection"]
             messages.append(question)
             running = self._briefs.get(brief_id)
             if running is not None:
@@ -456,7 +506,8 @@ class Engine:
                 waiting = brief["status"] in UNFINISHED
                 events = _stored_events(place.store, brief, self, unfinished=waiting)
                 parts = message_parts(events, with_status=not waiting)
-            messages.append({"id": reply_id(brief_id), "role": "assistant", "parts": parts})
+            reply = {"id": reply_id(brief_id), "role": "assistant", "parts": parts}
+            messages.append(reply | {"metadata": {"at": brief["updated_at"]}})
         if place.rec is not None:  # what ONE found in each drop of files, in its place in time
             messages = _with_reports(messages, place.rec)
         return messages
@@ -515,6 +566,11 @@ class Engine:
     def opened(self, project_id: str) -> None:
         """The project was opened again: it stays open after its Brief ends."""
         self._close_after.discard(project_id)
+        for told in tuple(self.on_open):
+            try:
+                told(project_id)
+            except Exception:  # never fails the opening
+                log.exception("a project-opened listener failed")
 
     def _close(self, project_id: str) -> None:
         try:

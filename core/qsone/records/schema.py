@@ -515,6 +515,22 @@ CREATE TRIGGER findings_no_delete BEFORE DELETE ON findings
  BEGIN SELECT RAISE(ABORT, 'Findings are retained'); END;
 """
 
+# Phase 1 (C3): the plan driver's claims, one Brief per stage and attempt, written with the
+# Brief's row in one transaction so no stage starts twice; who started a Brief ('one', or NULL
+# for the engineer's own message); and what the engineer wrote while it ran.
+PLAN_DRIVER_SQL = """
+CREATE TABLE tender_stage_briefs (stage_id TEXT NOT NULL,
+  attempt INTEGER NOT NULL CHECK (attempt >= 1),
+  brief_id TEXT NOT NULL UNIQUE REFERENCES briefs(id),
+  created_at TEXT NOT NULL, PRIMARY KEY (stage_id, attempt));
+CREATE TRIGGER tender_stage_briefs_no_update BEFORE UPDATE ON tender_stage_briefs
+  BEGIN SELECT RAISE(ABORT, 'A stage''s Brief is never changed'); END;
+CREATE TRIGGER tender_stage_briefs_no_delete BEFORE DELETE ON tender_stage_briefs
+  BEGIN SELECT RAISE(ABORT, 'A stage''s Brief is never deleted'); END;
+ALTER TABLE briefs ADD COLUMN started_by TEXT CHECK (started_by IS NULL OR started_by = 'one');
+ALTER TABLE briefs ADD COLUMN steers TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(steers));
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -548,4 +564,5 @@ MIGRATIONS: list[str] = [
     MEMBERS_SQL,
     TENDER_PLANS_SQL,
     FINDINGS_SQL,
+    PLAN_DRIVER_SQL,
 ]

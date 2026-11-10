@@ -77,4 +77,6 @@ class _BriefEvents:
         if state in ("done", "failed", "stopped"):
             self.worklog.end(self._now())
             self._worklog_changed()
+        if self.cancel_mode != "crash":  # a power cut tells no one
+            self.engine.changed(self, state)  # before the Status, so a part it adds comes first
         self.emit(Status(self.brief_id, state, self.step))
