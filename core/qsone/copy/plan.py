@@ -112,6 +112,12 @@ PLAN_MEMBER_REF = {
     "en": "Team member {n} has a ref that is taken or not allowed: «{ref}».",
     "ar": "عضو الفريق {n} ليه اسم مختصر مستخدم أو مش مسموح: «{ref}».",
 }
+PLAN_MEMBER_PERMANENT = {
+    "en": "Team member {n}, «{name}», is a permanent member: bring it in with member_id "
+    "«{member_id}» and its ref, without a card.",
+    "ar": "عضو الفريق {n}، «{name}»، عضو دائم في فريقك: هاته بـ member_id «{member_id}» "
+    "واسمه المختصر، من غير بطاقة.",
+}
 PLAN_MEMBER_TOOL = {
     "en": "Team member {n} cannot be given the tool «{tool}».",
     "ar": "عضو الفريق {n} مينفعش ياخد الأداة «{tool}».",

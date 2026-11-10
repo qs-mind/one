@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from qsone import copy
 from qsone import phase1_contract as c
-from qsone.engine.plan import build, model, store
+from qsone.engine.plan import build, members, model, store
 from qsone.journey import setup_state
 from qsone.records.project import RecordsError
 
@@ -93,7 +93,9 @@ def router(projects, engine) -> APIRouter:
             if await asyncio.to_thread(store.current, rec) is not None:
                 raise RecordsError(copy.PLAN_EXISTS)
             text = copy.PLAN_REQUEST_BRIEF[setup_state.language()]
-            brief_id = await engine.start_brief(project_id, text, instruction=INSTRUCTION, by="one")
+            kept = members.permanent_line(engine.engineer_records())
+            told = f"{INSTRUCTION}\n\n{kept}" if kept else INSTRUCTION
+            brief_id = await engine.start_brief(project_id, text, instruction=told, by="one")
         except RecordsError as e:
             return _refused(e)
         except BriefBusy as busy:

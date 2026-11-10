@@ -165,7 +165,7 @@ def test_the_identities_job_checks_the_proposed_members(rec, monkeypatch):
     due_in(rec)
     given = []
 
-    def propose(project, team):
+    def propose(project, team, **_):
         given.append([m["name"]["en"] for m in team])
         raise RecordsError(copy.PLAN_MEMBER_REF, status=422, field="team[0].name")
 

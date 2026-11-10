@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from qsone import copy
 from qsone.engine import costs, roles
 from qsone.engine.types import ModelCard, ModelChoice, Role, Text
-from qsone.records.project import RecordsError
+from qsone.records.project import Records, RecordsError
 
 LEAD = "lead-qs"
 CHECKER = "checking-qs"
@@ -58,10 +58,12 @@ class StageIn(_Args):
 
 class MemberIn(_Args):
     ref: str = Field(min_length=1, max_length=40)  # how the stages name it, e.g. "pricing-qs"
-    name: TextIn  # the short name in lists, e.g. "Pricing QS"
-    title: TextIn  # its QS title
-    speciality: TextIn
-    style: TextIn  # working style and voice
+    member_id: str | None = Field(None, max_length=64)  # a kept member, with its own card
+    # A new member's card, every field in both languages; a kept member has none of these.
+    name: TextIn | None = None  # the short name in lists, e.g. "Pricing QS"
+    title: TextIn | None = None  # its QS title
+    speciality: TextIn | None = None
+    style: TextIn | None = None  # working style and voice
     tools: list[str] = Field(default_factory=list, max_length=40)
 
 
@@ -94,6 +96,7 @@ class PlanDraft:
     # (input, output, requests) of the requests measured when it was worked out; kept, so that
     # only the sheet moves the figures at approval
     measured: tuple[int, int, int] | None = None
+    engineer: Records | None = None  # Engineer Records, where the kept members are
 
 
 # The estimate -----------------------------------------------------------------------------------
@@ -175,8 +178,10 @@ def _check_team(team: list[MemberIn], allowed_tools: set[str]) -> None:
         if not _REF.match(member.ref) or member.ref in FIXED or member.ref in refs:
             raise _bad(copy.PLAN_MEMBER_REF, f"{where}.ref", n=n + 1, ref=member.ref)
         refs.add(member.ref)
+        if member.member_id is not None:
+            continue  # a kept member comes with its own card (`members.identity_check`)
         for name in ("name", "title", "speciality", "style"):
-            _pair(getattr(member, name), f"{where}.{name}")
+            _pair(getattr(member, name) or TextIn(), f"{where}.{name}")
         for tool in member.tools:
             if tool not in allowed_tools:
                 raise _bad(copy.PLAN_MEMBER_TOOL, f"{where}.tools", n=n + 1, tool=tool)
