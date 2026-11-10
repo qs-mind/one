@@ -96,7 +96,7 @@ def built(
         locked=begun if change else frozenset(),
     )
     refs = dict({} if body is None else body["refs"])
-    ids = members.identity_check(project, draft.team, refs)
+    ids = members.identity_check(project, draft.team, refs, draft.engineer)
     refs |= {member.ref: i for member, i in zip(draft.team, ids, strict=True)}
     ids = {**{fixed: fixed for fixed in model.FIXED}, **refs}
     stages = [kept(now.get(s.id) if s.id else None, _stage(s, ids)) for s in draft.stages]
@@ -110,7 +110,7 @@ def built(
     plan = {
         "submission_date": draft.submission_date,
         "stages": stages,
-        "team": members.members(draft.team, refs),
+        "team": members.members(project, draft.team, refs, draft.engineer),
     }
     requests = {stage["id"]: s.requests for stage, s in zip(stages, draft.stages, strict=True)}
     measured = None if draft.measured is None else list(draft.measured)

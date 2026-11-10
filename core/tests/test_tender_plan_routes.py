@@ -71,6 +71,7 @@ def driver(monkeypatch) -> list:
         routes.DRIVER,
         on_plan_approved=lambda *args: told.append(("plan", *args)),
         on_stage_approved=lambda *args: told.append(("stage", *args)),
+        on_plan_changed=lambda *args: told.append(("change", *args)),
     )
     return told
 
@@ -298,7 +299,7 @@ def test_a_change_is_priced_again_when_accepted(client, pid, rec, links):
     )
 
 
-def test_answering_a_suggested_change(client, pid, rec):
+def test_answering_a_suggested_change(client, pid, rec, driver):
     due_in(rec)
     plan = store.propose(rec, draft(rec))
     store.approve(rec, version=1)
@@ -319,6 +320,7 @@ def test_answering_a_suggested_change(client, pid, rec):
     refusal(late, 409, copy.PLAN_NEEDS_SUBMISSION_DATE, field="submission_date")
     rejected = post(client, path, {"change_id": again.id, "accept": False}).json()["plan"]
     assert (rejected["version"], rejected["change"]) == (2, None)
+    assert driver == [("change", pid), ("change", pid)]  # each accept that went through
 
 
 async def test_a_scripted_lead_writes_the_plan(data_dir, fake_sleep, fake_clock):

@@ -101,14 +101,17 @@ def specialist_tools() -> list[str]:
     return sorted(n for n, t in REGISTRY.items() if "specialist" in t.roles and not t.lead_only)
 
 
-def _member_of(ctx: ToolContext, name: Text) -> str | None:
-    """The tender's joined member this specialist is, by its name, so its work counts as that
-    member's (route 15's id); a specialist with any other name is new to this Brief."""
+def _member_of(ctx: ToolContext, name: Text) -> tuple[str, dict] | None:
+    """The tender's joined member this specialist is, by its name (unique in the team), and its
+    approved card, so its work counts as that member's (route 15's id) with the card's tools and
+    tier; a specialist with any other name is new to this Brief."""
     if ctx.rec is None:
         return None
     from qsone.engine import identity  # it imports the team package
 
-    return identity.joined_named(ctx.rec, name)
+    member_id = identity.joined_named(ctx.rec, name)
+    found = None if member_id is None else identity.project_member(ctx.rec, member_id)
+    return None if found is None else (member_id, found[0])
 
 
 def _build(
@@ -158,12 +161,15 @@ def _build(
             f"{tool}: a Brief has at most {MAX_SPECIALISTS} specialists, and this one has "
             f"{len(team)}: {names}. Give the work to one of them with delegate."
         )
-    member_id = _member_of(ctx, name)
+    member = _member_of(ctx, name)
+    member_id = None if member is None else member[0]
     if member_id is not None and any(s.id == member_id for s in team):
         raise ModelRetry(
             f"{tool}: {name['en']} is built in this Brief already, as {member_id}. Give it the "
             "work with delegate."
         )
+    if member is not None:  # the card the engineer approved, not what the Lead asked now
+        tools, tier = list(member[1]["tools"]), member[1].get("tier", tier)
     spec = AgentSpec(
         id=member_id or uuid4().hex,
         name=name,
@@ -188,9 +194,13 @@ async def _build_specialist(ctx: ToolContext, args: SpecialistArgs) -> str:
         tools=args.tools,
         tier=args.tier,
     )
-    return _json(
-        {"specialist_id": spec.id, "name": spec.name, "tier": spec.tier, "tools": spec.tools}
-    )
+    built = {"specialist_id": spec.id, "name": spec.name, "tier": spec.tier, "tools": spec.tools}
+    if (list(spec.tools), spec.tier) != (list(dict.fromkeys(args.tools)), args.tier):
+        built["note"] = (
+            f"{args.name_en} is a member of this tender's team: it works with the tools and tier "
+            "of its approved card, listed here."
+        )
+    return _json(built)
 
 
 # delegate -------------------------------------------------------------------------------------

@@ -10,27 +10,72 @@ from uuid import uuid4
 
 from qsone import copy
 from qsone.engine.plan.model import CHECKER, LEAD, MemberIn
-from qsone.records.project import Records
+from qsone.records.project import Records, RecordsError
 
 IDENTITY = "qsone.engine.identity"
 
 
-def identity_check(project: Records, team: list[MemberIn], refs: dict[str, str]) -> list[str]:
-    """The identities job's checks of the proposed members (`identity.propose(project, drafts)`,
-    raising `RecordsError`), once that module exists, and each member's id in order: the one the
+def identity_check(
+    project: Records, team: list[MemberIn], refs: dict[str, str], engineer: Records | None = None
+) -> list[str]:
+    """The identities job's checks of the proposed members (`identity.propose`, raising
+    `RecordsError`), once that module exists, and each member's id in order: the one the
     tender's members are stored under, so the plan's team and route 15 name the same ids. A
     member `refs` already holds keeps its id: proposed again with its new card, or, once it
-    joined, as it is."""
+    joined, as it is. A member with `member_id` is a permanent one from `engineer`; a new card
+    with a permanent member's name is refused with that member's id."""
     if find_spec(IDENTITY) is None:
         return [refs.get(m.ref) or uuid4().hex for m in team]
     identity = import_module(IDENTITY)
+    kept = _kept(identity, engineer)
     drafts = []
-    for m in team:
+    for n, m in enumerate(team):
         draft, known = m.model_dump(exclude={"ref"}), refs.get(m.ref)
-        if known is not None and identity.project_member(project, known) is not None:
-            draft["member_id"] = known
+        if m.member_id is None and known is not None:
+            if identity.project_member(project, known) is not None:
+                draft["member_id"] = known
+        if draft["member_id"] is None and m.name is not None:
+            _not_kept(kept, m.name, n)
         drafts.append(draft)
-    return identity.propose(project, drafts)
+    return identity.propose(project, drafts, engineer=engineer)
+
+
+def _kept(identity, engineer: Records | None) -> list:
+    """The permanent members in Engineer Records (Settings → Team), oldest first."""
+    if engineer is None:
+        return []
+    return [m for m in identity.permanent(engineer) if m.kind == "permanent"]
+
+
+def _not_kept(kept: list, name, n: int) -> None:
+    keys = {name.en.casefold(), name.ar}
+    for found in kept:
+        if keys & {found.name.en.casefold(), found.name.ar}:
+            text = copy.fill(
+                copy.PLAN_MEMBER_PERMANENT,
+                n=n + 1,
+                name=found.name.model_dump(),
+                member_id=found.id,
+            )
+            raise RecordsError(text, status=422, field=f"team[{n}].name")
+
+
+def permanent_line(engineer: Records | None) -> str:
+    """For the Lead that writes a plan: the permanent members it may bring in by member_id."""
+    if engineer is None or find_spec(IDENTITY) is None:
+        return ""
+    kept = _kept(import_module(IDENTITY), engineer)
+    if not kept:
+        return ""
+    listed = "; ".join(
+        f"{m.id}: {m.name.en} / {m.name.ar}, {m.title.en}, tools "
+        + ", ".join(t.name for t in m.tools)
+        for m in kept
+    )
+    return (
+        "The engineer's permanent members, kept from earlier tenders. To bring one into the team, "
+        f"give its member_id and a ref, without a card: {listed}."
+    )
 
 
 def answered(project: Records, *, accepted: bool) -> None:
@@ -83,22 +128,30 @@ def _fixed() -> list[dict]:
     return found
 
 
-def members(team: list[MemberIn], refs: dict[str, str]) -> list[dict]:
-    """The plan's team: the Lead, the Checking QS, then the proposed members in order. A new
-    member is temporary, with no model listed yet and a record of zeros."""
-    proposed = [
-        {
-            "id": refs[m.ref],
-            "role": "specialist",
-            "kind": "temporary",
-            "name": {"en": m.name.en, "ar": m.name.ar},
-            "title": {"en": m.title.en, "ar": m.title.ar},
-            "speciality": {"en": m.speciality.en, "ar": m.speciality.ar},
-            "style": {"en": m.style.en, "ar": m.style.ar},
-            "model": None,
-            "tools": _tools(m.tools),
-            "record": _record(),
-        }
-        for m in team
-    ]
+def members(
+    project: Records, team: list[MemberIn], refs: dict[str, str], engineer: Records | None = None
+) -> list[dict]:
+    """The plan's team: the Lead, the Checking QS, then the proposed members in order, each with
+    the card it is stored under (a permanent member's own) and its record (zeros for a new
+    one); no model is listed yet."""
+    identity = import_module(IDENTITY) if find_spec(IDENTITY) is not None else None
+    proposed = []
+    for m in team:
+        member_id = refs[m.ref]
+        stored = None if identity is None else identity.project_member(project, member_id)
+        card, kind = (stored[0], stored[1]) if stored else (m.model_dump(), "temporary")
+        record = _record()
+        if engineer is not None and identity is not None:
+            record = identity.record(engineer, member_id).model_dump(mode="json")
+        proposed.append(
+            {
+                "id": member_id,
+                "role": "specialist",
+                "kind": kind,
+                **{k: dict(card[k]) for k in ("name", "title", "speciality", "style")},
+                "model": None,
+                "tools": _tools(card["tools"]),
+                "record": record,
+            }
+        )
     return [*_fixed(), *proposed]

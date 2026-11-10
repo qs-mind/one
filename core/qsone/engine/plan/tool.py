@@ -64,7 +64,9 @@ title); engineer_supplies for a stage ONE cannot do alone (what the engineer bri
 requests, about how many model requests its work needs. A stage already in the plan keeps \
 its id.
 - team: the members you propose beside the Lead and the Checking QS, each with a ref the \
-stages use, a short name, a QS title, speciality and style in both languages, and its tools.
+stages use, a short name, a QS title, speciality and style in both languages, and its tools. \
+A permanent member kept from an earlier tender comes with its member_id and a ref only: its \
+own card and tools go with it.
 ONE shows the plan with its cost and time; the engineer approves it or discusses it. Calling \
 again proposes the next version. After approval, use {CHANGE}.
 Example:
@@ -85,8 +87,15 @@ def _part(ctx: ToolContext, plan) -> None:
 def _draft(ctx: ToolContext, plan: PlanIn) -> PlanDraft:
     setup = _setup(ctx)
     found = model.estimate(model.work_of(plan.stages), list(setup.sheet), setup.measured)
+    from qsone.engine import identity  # it imports the team package
+
     return PlanDraft(
-        plan.submission_date.isoformat(), plan.stages, plan.team, found, setup.measured
+        plan.submission_date.isoformat(),
+        plan.stages,
+        plan.team,
+        found,
+        setup.measured,
+        identity.engineer_of(ctx.host),
     )
 
 

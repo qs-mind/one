@@ -1,8 +1,9 @@
 """Try again (row 25 of the Phase 1 contract): `POST /briefs/{brief_id}/retry` starts the work of
 a Brief that ended `failed` or `stopped` again, as a new Brief in the same conversation with the
 same words, started by ONE. A stage's work stays that stage's work: its retry is the stage's
-next attempt (`PlanDriver.retry`), so the driver never has two. Only the last Brief of a
-conversation is retried, and never while work runs there. `continue` is unchanged: it goes on
+next attempt (`PlanDriver.retry`), so the driver never has two: it is retried while it is the
+stage's latest attempt, whatever ran in the chat since. Any other Brief only while it is the
+last of its conversation; never while work runs there. `continue` is unchanged: it goes on
 from the Checkpoint of work that was cut off."""
 
 import asyncio
@@ -61,17 +62,19 @@ def router(engine, driver) -> APIRouter:
     async def retry_brief(brief_id: str):
         try:
             found = await asyncio.to_thread(_find, engine, brief_id)
-            if found is None or not found[3] or found[2]["status"] not in ("failed", "stopped"):
+            if found is None or found[2]["status"] not in ("failed", "stopped"):
                 return c.refusal(copy.BRIEF_NOT_FOUND, 404)
-            rec, chat_id, brief, _ = found
+            rec, chat_id, brief, last = found
+            with rec.read() as conn:
+                stage_id = claims.stage_of(conn, brief_id)
+            if stage_id is None and not last:  # a stage's: its latest attempt (`driver.retry`)
+                return c.refusal(copy.BRIEF_NOT_FOUND, 404)
             if rec.archived_at is not None:
                 return c.refusal(copy.PROJECT_ARCHIVED, 423)
             if (busy := engine.active(chat_id)) is not None:
                 return c.refusal(copy.WORK_RUNNING, brief_id=busy)
             if (blocked := lead_block(engine)) is not None:
                 return c.refusal(blocked["reason"])
-            with rec.read() as conn:
-                stage_id = claims.stage_of(conn, brief_id)
             if stage_id is not None:
                 new = await driver.retry(chat_id, stage_id, brief_id)
             else:

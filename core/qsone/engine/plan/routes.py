@@ -6,7 +6,8 @@ here, before the store is asked: work running in the tender (WORK_RUNNING), and 
 Lead can work at all (the Model Data Sheet; its refusal is the engine's own text). The figures
 are worked out again from the sheet of this moment at approval, with the requests measured
 when they were proposed: only a change of the models, prices or AI links moves them. Once the
-plan or a stage is approved, the plan driver starts what comes next (`_driver`)."""
+plan or a stage is approved, or a change accepted, the plan driver starts what comes next
+(`_driver`). The Lead is told the answer to its Suggested change in one line."""
 
 import asyncio
 import inspect
@@ -18,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from qsone import copy
 from qsone import phase1_contract as c
-from qsone.engine.plan import build, model, store
+from qsone.engine.plan import build, members, model, store
 from qsone.journey import setup_state
 from qsone.records.project import RecordsError
 
@@ -92,7 +93,9 @@ def router(projects, engine) -> APIRouter:
             if await asyncio.to_thread(store.current, rec) is not None:
                 raise RecordsError(copy.PLAN_EXISTS)
             text = copy.PLAN_REQUEST_BRIEF[setup_state.language()]
-            brief_id = await engine.start_brief(project_id, text, instruction=INSTRUCTION, by="one")
+            kept = members.permanent_line(engine.engineer_records())
+            told = f"{INSTRUCTION}\n\n{kept}" if kept else INSTRUCTION
+            brief_id = await engine.start_brief(project_id, text, instruction=told, by="one")
         except RecordsError as e:
             return _refused(e)
         except BriefBusy as busy:
@@ -178,17 +181,32 @@ def router(projects, engine) -> APIRouter:
             change = found["plan"]["change"]
             now = None
             if body.accept and change is not None and change["id"] == body.change_id:
-                try:
-                    now = await figures(
-                        change["stages"], found["change_requests"], found.get("change_measured")
-                    )
-                except NoAI:
-                    now = None  # accepting starts nothing: the figures shown stay
+                now = await figures(  # the figures of now, so the Lead must be able to work
+                    change["stages"], found["change_requests"], found.get("change_measured")
+                )
             done = await asyncio.to_thread(
                 lambda: store.answer_change(rec, body.change_id, body.accept, estimate=now)
             )
         except RecordsError as e:
             return _refused(e)
+        except NoAI as none:
+            return c.refusal(none.text)
+        await tell_running(project_id, rec)
+        if body.accept:
+            await _driver("on_plan_changed", project_id)  # a stage it adds or frees starts
         return c.PlanView(plan=done)
+
+    async def tell_running(project_id: str, rec) -> None:
+        """The answer, as a steer to the Lead's running work. With none running, the plan
+        driver puts it in the next work's instruction."""
+        said = await asyncio.to_thread(store.untold, rec)
+        busy = engine.active(project_id, include_mapping=False)
+        if said is None or busy is None:
+            return
+        try:
+            await engine.steer(busy, said[1][setup_state.language()])
+        except LookupError:
+            return  # it ended meanwhile: the next work is told
+        await asyncio.to_thread(store.told, rec, said[0])
 
     return r
