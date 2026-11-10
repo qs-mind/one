@@ -37,7 +37,7 @@ def fake_reader(tmp_path, monkeypatch):
         body = tmp_path / "reader.py"
         body.write_text(
             f"#!{sys.executable}\nimport sys\nsys.stdin.buffer.read()\n"
-            f"sys.stdout.write(open({str(out)!r}, encoding='utf-8').read())\nsys.exit({code})\n",
+            f"sys.stdout.buffer.write(open({str(out)!r}, 'rb').read())\nsys.exit({code})\n",
             encoding="utf-8",
         )
         body.chmod(0o755)
