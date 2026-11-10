@@ -73,6 +73,8 @@ TOOL_WORDS = {
         "ar": "بيقرا جزء من ملفات المشروع",
     },
     "recalculate": {"en": "Recalculating numbers", "ar": "بيعيد حساب الأرقام"},
+    "raise_finding": {"en": "Raising a Finding to you", "ar": "بيرفع لك ملاحظة"},
+    "record_finding": {"en": "Recording a Finding", "ar": "بيسجّل ملاحظة"},
     "record_number": {"en": "Recording a number", "ar": "بيسجّل رقم"},
     "sandbox_rerun": {"en": "Running a script again", "ar": "بيشغّل سكريبت تاني"},
     "sandbox_run": {"en": "Running a script", "ar": "بيشغّل سكريبت"},

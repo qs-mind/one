@@ -33,5 +33,3 @@ FINDING_DECIDED = {
     "en": "My decision on «{title}»: {option}",
     "ar": "قراري في «{title}»: {option}",
 }
-TOOL_RECORD_FINDING = {"en": "Recording a Finding", "ar": "بيسجّل ملاحظة"}
-TOOL_RAISE_FINDING = {"en": "Raising a Finding to you", "ar": "بيرفع لك ملاحظة"}
