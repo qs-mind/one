@@ -15,6 +15,7 @@
 @source "../settings2";
 @source "../firstlaunch2";
 @source "../conversation";
+@source "../team";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {
