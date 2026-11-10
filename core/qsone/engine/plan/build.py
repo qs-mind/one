@@ -95,10 +95,9 @@ def built(
         allowed_tools=members.member_tools(),
         locked=begun if change else frozenset(),
     )
-    members.identity_check(project, draft.team)
     refs = dict({} if body is None else body["refs"])
-    for member in draft.team:
-        refs.setdefault(member.ref, uuid4().hex)
+    ids = members.identity_check(project, draft.team, refs)
+    refs |= {member.ref: i for member, i in zip(draft.team, ids, strict=True)}
     ids = {**{fixed: fixed for fixed in model.FIXED}, **refs}
     stages = [kept(now.get(s.id) if s.id else None, _stage(s, ids)) for s in draft.stages]
     if change:
