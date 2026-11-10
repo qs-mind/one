@@ -89,11 +89,13 @@ export const conversation = defineTexts({
   placeholder: { en: "Write to the Lead QS", ar: "اكتب للـ Lead QS" },
   folder: { en: "Folder {name}", ar: "فولدر {name}" },
   remove: { en: "Remove {name}", ar: "شيل {name}" },
-  queuedTitle: { en: "Waiting to send", ar: "مستنية تتبعت" },
+  steeringTitle: { en: "Going to the Lead QS", ar: "رايحة للـ Lead QS" },
   whileWorking: {
-    en: "The Lead QS is working. Your message goes when this step ends.",
-    ar: "الـ Lead QS شغّال. رسالتك هتتبعت لما الخطوة دي تخلص.",
+    en: "The Lead QS is working. Your message goes now and steers this work.",
+    ar: "الـ Lead QS شغّال. رسالتك هتوصله دلوقتي وهيوجّه بيها الشغل ده.",
   },
   whileHeld: { en: "The Lead QS reads this after your choice.", ar: "الـ Lead QS هيقرا ده بعد اختيارك." },
-  removeQueued: { en: "Take this message back", ar: "اسحب الرسالة دي" },
+  steerFailed: { en: "Not sent. The Lead QS has not read it.", ar: "متبعتتش. الـ Lead QS ماقراهاش." },
+  steerAgain: { en: "Send again", ar: "ابعت تاني" },
+  dropSteer: { en: "Drop this message", ar: "شيل الرسالة دي" },
 });

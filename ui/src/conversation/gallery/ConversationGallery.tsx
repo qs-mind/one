@@ -43,7 +43,7 @@ function LiveThread() {
           }
         />
       </div>
-      <Composer onSend={send} />
+      <Composer onSend={send} onSteer={async (m) => send(m)} />
     </div>
   );
 }
@@ -54,6 +54,7 @@ export function ConversationGallery() {
   const decision = (finding: Finding) => fromFinding(finding, t.lang)!;
   const card = (d: Decision) => <DecisionCard decision={d} asker={lead} onChoose={(c) => notify(t(g.sent, { text: d.options[c] }))} />;
   const sent = ({ text }: ComposerMessage) => notify(t(g.sent, { text }));
+  const steered = async (message: ComposerMessage) => sent(message);
   return (
     <div className="flex flex-col gap-18">
       <p className="max-w-155 text-lg text-muted-foreground">{t(g.intro)}</p>
@@ -97,13 +98,13 @@ export function ConversationGallery() {
       </Demo>
       <Demo id="composer" title="Composer">
         <State name={t(g.idle)} className="flex w-full max-w-(--measure) flex-col gap-2">
-          <Composer onSend={sent} />
+          <Composer onSend={sent} onSteer={steered} />
         </State>
         <State name={t(g.working)} className="flex w-full max-w-(--measure) flex-col gap-2">
-          <Composer onSend={sent} activity="working" />
+          <Composer onSend={sent} onSteer={steered} activity="working" />
         </State>
         <State name={t(g.held)} className="flex w-full max-w-(--measure) flex-col gap-2">
-          <Composer onSend={sent} activity="held" />
+          <Composer onSend={sent} onSteer={steered} activity="held" />
         </State>
       </Demo>
     </div>

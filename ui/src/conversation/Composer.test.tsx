@@ -1,12 +1,11 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppProviders } from "@/design/AppProviders";
 import { DIRS, renderIn, resetPage, stubBrowser } from "@/design/test/harness";
 import { common } from "@/texts/common";
 import { conversation } from "@/texts/conversation";
 import { text } from "@/texts/useText";
-import { Composer, type LeadActivity } from "./Composer";
+import { Composer, type ComposerMessage } from "./Composer";
 
 beforeEach(stubBrowser);
 afterEach(resetPage);
@@ -30,7 +29,7 @@ describe.each(DIRS)("Composer (%s)", (dir) => {
 
   it("sends on Enter, breaks a line on Shift+Enter, and sends nothing empty", async () => {
     const send = vi.fn();
-    renderIn(dir, <Composer onSend={send} />);
+    renderIn(dir, <Composer onSend={send} onSteer={vi.fn()} />);
     await userEvent.type(field(), "{Enter}");
     expect(send).not.toHaveBeenCalled();
     await userEvent.type(field(), "one{Shift>}{Enter}{/Shift}two{Enter}");
@@ -40,7 +39,7 @@ describe.each(DIRS)("Composer (%s)", (dir) => {
 
   it("takes dropped files and folders as chips, shows the drop state, and sends them", async () => {
     const send = vi.fn();
-    const { container } = renderIn(dir, <Composer onSend={send} />);
+    const { container } = renderIn(dir, <Composer onSend={send} onSteer={vi.fn()} />);
     const form = container.querySelector("form")!;
     const file = new File(["x"], "04 BOQ.xlsx");
     fireEvent.dragOver(form, { dataTransfer: { types: ["Files"] } });
@@ -55,32 +54,45 @@ describe.each(DIRS)("Composer (%s)", (dir) => {
     expect(send).toHaveBeenCalledWith({ text: "", attachments: [expect.objectContaining({ name: "04 BOQ.xlsx", kind: "file", file })] });
   });
 
-  it("queues while the Lead works and sends the queue, in order, when the work stops", async () => {
+  it("steers the running work at once, shows the message until /steer answers, and sends nothing to /chat", async () => {
     const send = vi.fn();
-    const ui = (activity: LeadActivity) => (
-      <AppProviders>
-        <Composer onSend={send} activity={activity} />
-      </AppProviders>
-    );
-    const { rerender } = renderIn(dir, <Composer onSend={send} activity="working" />);
+    const answers: Array<{ ok: () => void }> = [];
+    const steer = vi.fn((_: ComposerMessage) => new Promise<void>((ok) => answers.push({ ok })));
+    renderIn(dir, <Composer onSend={send} onSteer={steer} activity="working" />);
     expect(screen.getByText(text(conversation.whileWorking, lang))).toBeInTheDocument();
     await userEvent.type(field(), "first{Enter}");
     await userEvent.type(field(), "second{Enter}");
-    await userEvent.type(field(), "third{Enter}");
+    expect(steer.mock.calls.map(([m]) => m.text)).toEqual(["first", "second"]);
     expect(send).not.toHaveBeenCalled();
-    const queue = screen.getByRole("region", { name: text(conversation.queuedTitle, lang) });
-    expect(queue).toHaveTextContent("first");
-    await userEvent.click(screen.getAllByRole("button", { name: text(conversation.removeQueued, lang) })[1]!);
-    act(() => rerender(ui("idle")));
-    expect(send.mock.calls.map(([m]) => m.text)).toEqual(["first", "third"]);
-    expect(screen.queryByRole("region", { name: text(conversation.queuedTitle, lang) })).not.toBeInTheDocument();
+    const region = () => screen.queryByRole("region", { name: text(conversation.steeringTitle, lang) });
+    expect(region()).toHaveTextContent("first");
+    answers[0]!.ok();
+    await vi.waitFor(() => expect(region()).not.toHaveTextContent("first"));
+    expect(region()).toHaveTextContent("second");
+    answers[1]!.ok();
+    await vi.waitFor(() => expect(region()).not.toBeInTheDocument());
   });
 
-  it("sends at once while a card holds the work, and says the Lead reads it after the choice", async () => {
+  it("keeps a steer that failed, and sends it again or drops it", async () => {
+    const steer = vi.fn().mockRejectedValueOnce(new Error("409")).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("409"));
+    renderIn(dir, <Composer onSend={vi.fn()} onSteer={steer} activity="working" />);
+    await userEvent.type(field(), "first{Enter}");
+    expect(await screen.findByText(text(conversation.steerFailed, lang))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: text(conversation.steerAgain, lang) }));
+    expect(steer).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(screen.queryByText("first")).not.toBeInTheDocument());
+    await userEvent.type(field(), "second{Enter}");
+    await userEvent.click(await screen.findByRole("button", { name: text(conversation.dropSteer, lang) }));
+    expect(screen.queryByText("second")).not.toBeInTheDocument();
+  });
+
+  it("steers at once while a card holds the work, and says the Lead reads it after the choice", async () => {
     const send = vi.fn();
-    renderIn(dir, <Composer onSend={send} activity="held" />);
+    const steer = vi.fn().mockResolvedValue(undefined);
+    renderIn(dir, <Composer onSend={send} onSteer={steer} activity="held" />);
     expect(screen.getByText(text(conversation.whileHeld, lang))).toBeInTheDocument();
     await userEvent.type(field(), "now{Enter}");
-    expect(send).toHaveBeenCalledWith({ text: "now", attachments: [] });
+    expect(steer).toHaveBeenCalledWith({ text: "now", attachments: [] });
+    expect(send).not.toHaveBeenCalled();
   });
 });
