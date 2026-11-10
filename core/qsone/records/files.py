@@ -263,9 +263,13 @@ def _readings(conn, file_id: str) -> dict[int, set]:
     return found
 
 
+def _read_by_ai(readers: set) -> bool:
+    return any(by is not None and by not in LOCAL_READERS for by in readers)
+
+
 def pages_wanting_ai(conn, file_id: str) -> set[int]:
-    """Pages only a local reader read that it sent on to the AI page reader (`ocr.wants_ai`):
-    not read by the AI yet, and with no text layer (where an AI reading is never stored)."""
+    """Pages a local reader read that it sent on to the AI page reader (`ocr.wants_ai`) and the
+    AI has not read yet, a sparse text layer beside them or not."""
     marked = {
         int(page)
         for (page,) in conn.execute(
@@ -275,7 +279,7 @@ def pages_wanting_ai(conn, file_id: str) -> set[int]:
         )
     }
     readings = _readings(conn, file_id)
-    return {n for n in marked if readings[n] <= LOCAL_READERS}
+    return {n for n in marked if not _read_by_ai(readings[n])}
 
 
 def _extraction_meta(rec, conn, file_id, extracted):
@@ -393,9 +397,10 @@ def add_ocr_pages(
         done = read_pages(conn, file_id)
         already = done
         if read_by not in LOCAL_READERS:
-            # The AI reads beside a local reading, never over a text layer or another AI's.
+            # The AI reads beside a local reading (and a sparse text layer under it), never over
+            # a text layer alone or another AI's reading.
             readings = _readings(conn, file_id)
-            already = {n for n, by in readings.items() if not by <= LOCAL_READERS}
+            already = {n for n, by in readings.items() if _read_by_ai(by) or not by - {None}}
         elif include_text_pages:
             # Sparse text layers can still be scanned pages. Append OCR words while
             # retaining original text and never duplicating a completed OCR page.

@@ -27,8 +27,9 @@ def texts_at(conn, file_id: str, locator: dict) -> list[str] | None:
         f"SELECT locator, text FROM chunks WHERE file_id = ? AND {where} ORDER BY id",
         (file_id, *place.values()),
     ).fetchall()
-    # A page the AI read as well as a local reader: the AI's reading is the one checked (§17.19).
-    return [t for _, t in ocr.preferred([(json.loads(loc), t) for loc, t in rows])]
+    # A word this computer read is never checked against (§17.19): where the AI read the page
+    # too, its reading is; beside a sparse text layer, the text layer alone is.
+    return [t for loc, t in rows if not ocr.is_local(json.loads(loc))]
 
 
 def file_text(conn, file_id: str) -> str:
