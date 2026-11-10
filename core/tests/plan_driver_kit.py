@@ -26,7 +26,16 @@ class Tender:
     """A sample tender with a proposed plan of `n` stages, and the driver on an engine."""
 
     def __init__(
-        self, engine, projects, project_id, *, n=3, supplies=None, propose=True, driver=None
+        self,
+        engine,
+        projects,
+        project_id,
+        *,
+        n=3,
+        supplies=None,
+        propose=True,
+        driver=None,
+        outputs=MAP,
     ):
         self.engine, self.project = engine, project_id
         self.rec = projects.get(project_id)
@@ -34,7 +43,7 @@ class Tender:
         if propose:
             due_in(self.rec)
             stages = [
-                stage(self.rec, i, title=pair(f"Stage {i + 1}"), outputs=MAP) for i in range(n)
+                stage(self.rec, i, title=pair(f"Stage {i + 1}"), outputs=outputs) for i in range(n)
             ]
             if supplies is not None:
                 stages[0]["engineer_supplies"] = supplies
@@ -103,8 +112,8 @@ async def drivers():
 
 @pytest.fixture
 def tender(make_engine, registry, project, drivers):  # noqa: F811
-    async def make(lead, **options) -> Tender:
-        engine = await started(make_engine(links(lead=lead)))
+    async def make(lead, checker=None, **options) -> Tender:
+        engine = await started(make_engine(links(lead=lead, checker=checker)))
         found = Tender(engine, registry, project, **options)
         drivers.append(found.driver)
         return found

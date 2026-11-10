@@ -10,7 +10,8 @@ next start, because the tables say what is due.
 - A stage's Brief row and its claim are written in one transaction, then launched with no
   await between (`Engine.launch`): a stage never starts twice.
 - `pending` -> `now` (claimed and launched) -> `waiting_engineer` (its latest Brief ended
-  `done` and no Finding is raised or queued) -> `approved` (route 11). A card, a cap pause, cut
+  `done` and no Finding is raised or queued; its output ids and `result` written, `outputs`)
+  -> `approved` (route 11). A card, a cap pause, cut
   short, stopped, failed or no AI all leave the stage `now`: the tender row says why.
 - The work stops only where its Brief asks the engineer (a card: missing information, money,
   anything leaving the machine) and at the stage's end; caps, Stop, steer and Continue are the
@@ -24,7 +25,7 @@ import logging
 from qsone import copy
 from qsone import phase1_contract as c
 from qsone.deliverables import events
-from qsone.engine.plan import claims, store
+from qsone.engine.plan import claims, outputs, store
 from qsone.engine.runner import GENERAL, BriefBusy, NoAI
 from qsone.engine.store import ENGINE, UNFINISHED, Store
 from qsone.journey import setup_state
@@ -58,14 +59,14 @@ def stage_brief_text(plan: c.TenderPlan, stage: c.Stage, lang: str) -> str:
     Brief's stored text, so a continued Brief is told its stage again."""
     owner = next((m.name.model_dump() for m in plan.team if m.id == stage.owner_member_id), None)
     titles = [o.title.model_dump() for o in stage.outputs] or [copy.STAGE_NO_OUTPUTS]
-    outputs = {k: copy.STAGE_JOIN[k].join(t[k] for t in titles) for k in ("en", "ar")}
+    listed = {k: copy.STAGE_JOIN[k].join(t[k] for t in titles) for k in ("en", "ar")}
     text = copy.fill(
         copy.STAGE_BRIEF,
         n=plan.stages.index(stage) + 1,
         total=len(plan.stages),
         title=stage.title.model_dump(),
         owner=owner or stage.owner_member_id,
-        outputs=outputs,
+        outputs=listed,
         gate=stage.gate.model_dump(),
     )[lang]
     if stage.engineer_supplies is not None:
@@ -129,25 +130,29 @@ class PlanDriver:
 
     # Events in: each only schedules an `advance`; safe from any thread, safe twice -------------
 
-    def kick(self, project_id: str, *, starting: bool = False) -> None:
+    def _soon(self, work) -> None:
         loop = self._loop
-        if loop is None or self._stopped or project_id == GENERAL:
+        if loop is None or self._stopped:
             return
 
         def go() -> None:
-            task = loop.create_task(self.advance(project_id, starting=starting))
+            task = loop.create_task(work())
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
 
         loop.call_soon_threadsafe(go)
 
+    def kick(self, project_id: str, *, starting: bool = False) -> None:
+        if project_id != GENERAL:
+            self._soon(lambda: self.advance(project_id, starting=starting))
+
     def on_project_opened(self, project_id: str) -> None:
         self.kick(project_id, starting=True)
 
     def on_ai_changed(self) -> None:
-        """An AI was linked, or the internet came back: what waited for it goes on."""
-        for project_id, _ in self.engine.projects.opened():
-            self.kick(project_id, starting=True)
+        """The AI links changed (the app tells it after each change in the AI settings): what
+        waited for an AI goes on, in a closed tender too, as at start-up."""
+        self._soon(self.resume_all)
 
     def on_brief(self, chat_id: str, brief_id: str, state: str) -> None:
         """The runner's watcher, inside the Brief's task: the stage's status in line at once,
@@ -238,7 +243,9 @@ class PlanDriver:
                 self._move(rec, stage, "now")
                 return brief_id
             if claim["status"] == "done":
-                self._move(rec, stage, "now" if _deciding(conn) else "waiting_engineer")
+                made = outputs.ids(conn, rec, stage)
+                status = "now" if _deciding(conn) else "waiting_engineer"
+                self._move(rec, stage, status, made=made)
                 return None
             self._move(rec, stage, "now")
             if claim["status"] not in UNFINISHED or claim["brief_id"] in self.engine._briefs:
@@ -268,9 +275,20 @@ class PlanDriver:
         )
         return brief_id
 
-    def _move(self, rec: Records, stage: c.Stage, status: str) -> None:
-        if stage.status != status:
-            store.set_stage_status(rec, stage.id, status, actor=ENGINE)
+    def _move(
+        self, rec: Records, stage: c.Stage, status: str, *, made: list[str | None] | None = None
+    ) -> None:
+        """The stage's status; with `made` (its work ended), its output ids and `result` too."""
+        if made is None:
+            if stage.status != status:
+                store.set_stage_status(rec, stage.id, status, actor=ENGINE)
+            return
+        result = outputs.result(stage, made)
+        before = (stage.status, [o.id for o in stage.outputs], stage.result)
+        if before != (status, made, c.Text.model_validate(result)):
+            store.set_stage_status(
+                rec, stage.id, status, result=result, output_ids=made, actor=ENGINE
+            )
 
     def _due_closed(self, project_id: str) -> bool:
         """For a closed tender, on its own handle: is a stage due to start or to continue, or

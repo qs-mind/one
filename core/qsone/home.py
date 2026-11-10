@@ -13,6 +13,7 @@ import json
 from collections.abc import Callable
 
 from qsone import copy, settings
+from qsone.engine.plan import claims
 from qsone.engine.store import UNFINISHED
 from qsone.home_block import lead_block
 from qsone.records.project import Records, RecordsError
@@ -118,6 +119,8 @@ def snapshot(rec: Records) -> dict:
             " ORDER BY created_at, rowid",
             (rec.id, *UNFINISHED),
         ).fetchall()
+        driven = claims.driven(conn)  # a tender stage's work resumes by itself: never listed
+    cut = [(i, at) for i, at in cut if i not in driven]
     date, source = _submission(rec)
     durable = [item("unfinished", i, rec.id, copy.WAITING_UNFINISHED, at) for i, at in cut]
     for read in waiting_readers:

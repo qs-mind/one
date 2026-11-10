@@ -205,9 +205,31 @@ async def test_try_again_on_the_engineers_own_failed_work(tender):  # noqa: F811
         again = await http.post(f"/briefs/{mine}/retry")
         assert again.status_code == 202, again.text
         new = again.json()["brief_id"]
-        busy = await http.post(f"/briefs/{new}/retry")
-    assert busy.status_code in (404, 409)
+        busy = await http.post(f"/briefs/{new}/retry")  # it runs: nothing to try again
+    assert (busy.status_code, busy.json()) == (404, {"error": copy.BRIEF_NOT_FOUND})
     await until(lambda: t.engine.active(t.project) is None)
     question = t.engine.chat_messages(t.project)[2]
     assert question["metadata"]["by"] == "one"
     assert question["parts"][0]["text"] == "Price the BOQ (sample)"
+
+
+async def test_try_again_refuses_what_it_must(tender, monkeypatch):  # noqa: F811
+    """Only the last Brief of its chat; never in an archived tender; never while the Lead cannot
+    work. Each refusal starts nothing."""
+    t = await tender(scripted(said("تمام - عينة")))
+    older = t.store.new_brief(t.project, "Price the BOQ (sample)")
+    t.store.set_status(older, "failed")
+    last = t.store.new_brief(t.project, "Check the rates (sample)")
+    t.store.set_status(last, "stopped")
+    async with client(t) as http:
+        refused = await http.post(f"/briefs/{older}/retry")  # not the chat's last Brief
+        assert (refused.status_code, refused.json()) == (404, {"error": copy.BRIEF_NOT_FOUND})
+        with monkeypatch.context() as patch:
+            patch.setattr(setup_state, "consent", lambda: None)
+            blocked = await http.post(f"/briefs/{last}/retry")
+        assert blocked.status_code == 409
+        assert blocked.json() == copy.error(copy.AI_CONSENT_NEEDED)
+        closing.archive(t.rec, None)
+        archived = await http.post(f"/briefs/{last}/retry")
+        assert (archived.status_code, archived.json()) == (423, copy.error(copy.PROJECT_ARCHIVED))
+    assert t.engine.active(t.project) is None and t.briefs() == (2, [0, 0, 0])

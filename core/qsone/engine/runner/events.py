@@ -2,6 +2,8 @@ import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import replace
 
+from qsone import copy
+from qsone.engine.plan import claims
 from qsone.engine.runner.shared import log
 from qsone.engine.types import (
     BriefState,
@@ -13,6 +15,7 @@ from qsone.engine.types import (
     Text,
     TextDelta,
 )
+from qsone.records.project import RecordsError
 
 
 class _BriefEvents:
@@ -29,7 +32,7 @@ class _BriefEvents:
 
     def emit(self, event: Event) -> None:
         if isinstance(event, Progress) and event.lang is None:
-            event = replace(event, lang=self.lang)
+            event = replace(event, lang=self.lang, text=self._in_stage(event.text))
         if isinstance(event, Progress | Settled) and event.at is None:
             event = replace(event, at=self._now())
         if isinstance(event, TextDelta):
@@ -43,6 +46,20 @@ class _BriefEvents:
             self.worklog.add(event, event.at)
             self._worklog_changed()
         self._notify()
+
+    def _in_stage(self, text: Text) -> Text:
+        """A tender stage's work says which stage of how many in its live line (Phase 1)."""
+        if not hasattr(self, "_stage_place"):
+            self._stage_place = None
+            if self.place.rec is not None and self.mapping_files is None:
+                try:
+                    self._stage_place = claims.place(self.place.rec, self.brief_id)
+                except RecordsError:
+                    pass  # only words: the line goes without the stage
+        if self._stage_place is None:
+            return text
+        n, total = self._stage_place
+        return copy.fill(copy.STAGE_PROGRESS, n=n, total=total, text=text)
 
     def _worklog_changed(self) -> None:
         """Saves the work log and sends it whole (`data-worklog`, id: the Brief)."""

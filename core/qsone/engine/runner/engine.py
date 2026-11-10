@@ -11,6 +11,7 @@ from qsone.engine import cards, desks, general, identity
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.costs import Spending
 from qsone.engine.mcp_server import McpGate
+from qsone.engine.plan import claims
 from qsone.engine.runner.brief import _Brief, _Place
 from qsone.engine.runner.errors import BriefBusy, NoAI, _Fail
 from qsone.engine.runner.shared import GENERAL, WORK, log, utc_now
@@ -385,15 +386,20 @@ class Engine:
         return None
 
     def unfinished(self) -> list[dict]:
-        """Every unfinished Brief that is not running now, in every project and General."""
+        """Every unfinished Brief that is not running now, in every project and General; a
+        tender stage's work is never one (the plan driver resumes it)."""
         found = []
         for place in self._places():
             try:
                 briefs = place.store.unfinished()
             except RecordsError:
                 continue  # a project closed while it was read (a project switch): asked again later
+            driven = set()
+            if place.rec is not None and briefs:
+                with place.rec.read() as conn:
+                    driven = claims.driven(conn)
             for b in briefs:
-                if b["id"] in self._briefs:
+                if b["id"] in self._briefs or b["id"] in driven:  # a stage resumes by itself
                     continue
                 found.append(
                     {

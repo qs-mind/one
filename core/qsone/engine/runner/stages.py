@@ -8,7 +8,17 @@ from pydantic_ai import ModelRetry
 
 from qsone import copy, usage
 from qsone.deliverables import tools as outputs
-from qsone.engine import agents, checker, general, kit, numbers_guard, roles, team, truth
+from qsone.engine import (
+    agents,
+    checker,
+    general,
+    kit,
+    numbers_guard,
+    roles,
+    sources_part,
+    team,
+    truth,
+)
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.runner.histories import _tool_results
 from qsone.engine.runner.shared import utc_now
@@ -96,6 +106,11 @@ class _BriefStages:
             named = numbers_guard.sourced(output, results)
             if named:  # decision 16.3: each opens into its ledger number's source card
                 self.emit(Data(self.brief_id, "sourced", self.brief_id, {"numbers": named}))
+            history = self.store.run(self.lead_run_id)["history"] if self.lead_run_id else None
+            rec = self.place.rec
+            found = await asyncio.to_thread(sources_part.part, self.brief_id, rec, named, history)
+            if found is not None:  # Phase 1: the row of source links under the reply
+                self.emit(found)
             await self._facts(output)
         drafts = self.store.unchecked(self.brief_id)
         if self.place.rec is not None:  # Plan 6: the Deliverables this Brief made or changed

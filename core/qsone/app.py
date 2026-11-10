@@ -298,6 +298,14 @@ def create_app(
             engine.base_url = str(request.base_url)
         return await call_next(request)
 
+    @app.middleware("http")
+    async def ai_changed(request: Request, call_next):
+        answer = await call_next(request)
+        if request.method != "GET" and answer.status_code < 300:
+            if request.url.path.startswith(("/settings/ai", "/undo/")):
+                driver.on_ai_changed()  # a tender stage that waited for an AI goes on (C3)
+        return answer
+
     @app.exception_handler(RecordsError)
     async def records_error(request: Request, exc: RecordsError) -> JSONResponse:
         return JSONResponse(copy.error(exc.text), status_code=exc.status)

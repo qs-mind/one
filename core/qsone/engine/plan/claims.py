@@ -30,11 +30,38 @@ def add(conn, stage_id: str, attempt: int, brief_id: str, at: str) -> None:
     conn.execute(f"INSERT INTO {TABLE} VALUES (?, ?, ?, ?)", (stage_id, attempt, brief_id, at))
 
 
+def every(conn, stage_id: str) -> list[tuple[str, str]]:
+    """(Brief id, when claimed) of each of the stage's attempts, first first."""
+    found = conn.execute(
+        f"SELECT brief_id, created_at FROM {TABLE} WHERE stage_id = ? ORDER BY attempt",
+        (stage_id,),
+    )
+    return [(brief_id, at) for brief_id, at in found.fetchall()]
+
+
 def stage_of(conn, brief_id: str) -> str | None:
     """The stage whose work the Brief is, or None for any other Brief."""
     found = conn.execute(f"SELECT stage_id FROM {TABLE} WHERE brief_id = ?", (brief_id,))
     row = found.fetchone()
     return None if row is None else row[0]
+
+
+def place(rec: Records, brief_id: str) -> tuple[int, int] | None:
+    """(n, total): the stage of the current plan whose work the Brief is, or None."""
+    from qsone.engine.plan import store  # the plan's store reads the runner's tables too
+
+    with rec.read() as conn:
+        stage_id = stage_of(conn, brief_id)
+    plan = None if stage_id is None else store.current(rec)
+    found = [s.id for s in plan.stages] if plan is not None else []
+    return (found.index(stage_id) + 1, len(found)) if stage_id in found else None
+
+
+def driven(conn) -> set[str]:
+    """Every Brief that is a stage's work; none while a file older than the driver is brought
+    up to date."""
+    known = conn.execute("SELECT 1 FROM sqlite_master WHERE name = ?", (TABLE,)).fetchone()
+    return set() if known is None else {r[0] for r in conn.execute(f"SELECT brief_id FROM {TABLE}")}
 
 
 def stage_part(brief_id: str, stage_id: str) -> Data:
