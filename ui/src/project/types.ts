@@ -102,9 +102,10 @@ export type ProjectStatus = {
 export type SelectionItem = { kind: FrameKind | "agent"; id: string; title: string; anchor?: Anchor; label?: string };
 
 /** A text piece One read from a file, with where it is (sheet, row, page). */
-// PDF points, origin top-left; page is one-based. Shared with PDF import and OCR.
+// PDF points, origin top-left; page is one-based. Shared with PDF import and OCR. A place may say true or false
+// (`ocr_low_confidence`), as the core has always sent it.
 export type SourceLocator = {
-  [key: string]: string | number | [number, number, number, number] | undefined;
+  [key: string]: boolean | string | number | [number, number, number, number] | undefined;
   page?: string | number;
   sheet?: string | number;
   row?: string | number;

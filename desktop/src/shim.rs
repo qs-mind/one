@@ -16,8 +16,8 @@ use tauri::{AppHandle, Manager};
 
 use crate::core::{self, CoreState, Phase, Target};
 
-/// The core's own routes: the first part of every path the page may reach (Plans 1–8).
-const PREFIXES: [&str; 16] = [
+/// The core's own routes: the first part of every path the page may reach (Plans 1–8, then Phase 1's contract).
+const PREFIXES: [&str; 19] = [
     "health",
     "about",
     "app",
@@ -34,6 +34,9 @@ const PREFIXES: [&str; 16] = [
     "connectors",
     "costs",
     "meaning",
+    "home",
+    "team",
+    "undo",
 ];
 
 /// Headers that belong to the page or to the hop, never to the call: the core gets the shell's own.
@@ -455,6 +458,12 @@ mod tests {
             "/projects/p1/files?name=v1..2.pdf",
             "/meaning/status",
             "/chat/c1/stream",
+            "/home",
+            "/team/members",
+            "/undo/t1",
+            "/undo/t1/pause",
+            "/settings/caps.brief_usd",
+            "/settings/ai/links/standard:abc",
         ] {
             assert!(allowed(ok), "{ok}");
         }
@@ -468,6 +477,11 @@ mod tests {
             "/chat\r\nHost: x",
             "/admin",
             "/chatter",
+            "/homes",
+            "/teams",
+            "/undone",
+            "/Home",
+            "/settings/caps..brief_usd",
             "/projects/%2e%2e/x",
             "/projects\\x",
             "/chat x",

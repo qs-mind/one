@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc",
+    "contract": "node scripts/python.mjs -m qsone.phase1_openapi > ui/src/api/openapi.json && openapi-typescript ui/src/api/openapi.json -o ui/src/api/contract.ts",
     "test:ui": "vitest run",
     "test:e2e": "playwright test --project=chromium --project=webkit",
     "perf:workspace": "playwright test --project=perf",
@@ -44,6 +45,7 @@
     "@tauri-apps/plugin-dialog": "2.8.4",
     "ai": "6.0.322",
     "cmdk": "1.1.1",
+    "openapi-fetch": "0.16.0",
     "platejs": "53.5.2",
     "react": "19.3.1",
     "react-data-grid": "7.0.0-beta.63",
@@ -64,9 +66,16 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.2.1",
     "jsdom": "30.1.3",
+    "msw": "3.0.4",
+    "openapi-typescript": "6.7.6",
     "tailwindcss": "4.3.4",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.1.0"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "undici": "6.29.1"
+    }
   }
 }

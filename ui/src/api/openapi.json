@@ -1,0 +1,4416 @@
+{
+  "components": {
+    "schemas": {
+      "AiConnectIn": {
+        "additionalProperties": false,
+        "description": "POST /settings/ai/connect: the key as it was pasted. The provider is read from the\nkey's own form and from nothing else.",
+        "properties": {
+          "key": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "AiConnectIn",
+        "type": "object"
+      },
+      "AiLink": {
+        "description": "A provider connected with a pasted key. The key itself is never in any answer.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "provider"
+        ],
+        "title": "AiLink",
+        "type": "object"
+      },
+      "BodyProblem": {
+        "description": "A body the screen built wrongly (a missing key, a wrong JSON type, an unknown key).\nNever something the engineer typed: those come back as a `Refusal` with words.",
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/BodyProblemItem"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "BodyProblem",
+        "type": "object"
+      },
+      "BodyProblemItem": {
+        "description": "One place where a body does not fit, as FastAPI says it: where and why.",
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "BodyProblemItem",
+        "type": "object"
+      },
+      "BriefEvent": {
+        "description": "`brief`: a Brief in this tender's chat started or changed state.",
+        "properties": {
+          "brief_id": {
+            "title": "Brief Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "waiting_engineer",
+              "waiting_connection",
+              "paused_cap",
+              "stopped",
+              "done",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "type": {
+            "const": "brief",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "brief_id",
+          "state"
+        ],
+        "title": "BriefEvent",
+        "type": "object"
+      },
+      "BriefStarted": {
+        "description": "Work was started for the Lead: the new Brief's id. Its reply arrives on the chat\nstream, and a `brief` event says when its state changes.",
+        "properties": {
+          "brief_id": {
+            "title": "Brief Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brief_id"
+        ],
+        "title": "BriefStarted",
+        "type": "object"
+      },
+      "CardQuestion": {
+        "description": "One question in `payload.questions` of a `question` card.",
+        "properties": {
+          "free_text": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Free Text"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "text",
+                  "number",
+                  "money",
+                  "date"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Kind"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Options"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "CardQuestion",
+        "type": "object"
+      },
+      "ChoiceSetting": {
+        "description": "A setting that takes one of a few values.",
+        "properties": {
+          "at_recommended": {
+            "title": "At Recommended",
+            "type": "boolean"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/SettingChoice"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "control": {
+            "const": "choice",
+            "title": "Control",
+            "type": "string"
+          },
+          "help": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "string"
+          },
+          "section": {
+            "enum": [
+              "ai",
+              "caps",
+              "privacy",
+              "look"
+            ],
+            "title": "Section",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "section",
+          "title",
+          "help",
+          "at_recommended",
+          "control",
+          "value",
+          "recommended",
+          "choices"
+        ],
+        "title": "ChoiceSetting",
+        "type": "object"
+      },
+      "DecideIn": {
+        "additionalProperties": false,
+        "description": "POST /projects/{project_id}/findings/{finding_id}/decide: which of the two options the\nengineer takes.",
+        "properties": {
+          "choice": {
+            "enum": [
+              0,
+              1
+            ],
+            "title": "Choice",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "choice"
+        ],
+        "title": "DecideIn",
+        "type": "object"
+      },
+      "Finding": {
+        "description": "A conflict or risk a member found in the tender, with where it was read. Once the\nLead raises it, it is a decision: the Lead's opinion and two options for the engineer.",
+        "properties": {
+          "chosen": {
+            "anyOf": [
+              {
+                "enum": [
+                  0,
+                  1
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Item Ids",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "opinion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opinion"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "$ref": "#/components/schemas/Text"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Text"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled At"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "queued",
+              "raised",
+              "settled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "text",
+          "sources",
+          "status",
+          "opinion",
+          "options",
+          "chosen",
+          "item_ids",
+          "note",
+          "settled_at"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
+      "FindingEvent": {
+        "description": "`finding`: a Finding was recorded, queued, raised or settled, or its note changed.\nThe screen replaces it by id, or adds it at the end.",
+        "properties": {
+          "finding": {
+            "$ref": "#/components/schemas/Finding"
+          },
+          "type": {
+            "const": "finding",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "finding"
+        ],
+        "title": "FindingEvent",
+        "type": "object"
+      },
+      "FindingPart": {
+        "description": "data-finding (id: the Finding's id): the Lead raised this Finding here.",
+        "properties": {
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_id"
+        ],
+        "title": "FindingPart",
+        "type": "object"
+      },
+      "Findings": {
+        "description": "GET /projects/{project_id}/findings: every Finding of the tender.",
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "findings"
+        ],
+        "title": "Findings",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Home": {
+        "description": "GET /home: everything the frame and the Home place show. It never refuses: what\ncannot be read is said inside the answer.",
+        "properties": {
+          "blocked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Project Id"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tenders": {
+            "items": {
+              "$ref": "#/components/schemas/TenderRow"
+            },
+            "title": "Tenders",
+            "type": "array"
+          },
+          "unreadable": {
+            "items": {
+              "$ref": "#/components/schemas/UnreadableTender"
+            },
+            "title": "Unreadable",
+            "type": "array"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/WaitingItem"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "summary",
+          "blocked",
+          "last_project_id",
+          "waiting",
+          "tenders",
+          "unreadable"
+        ],
+        "title": "Home",
+        "type": "object"
+      },
+      "HomeEvent": {
+        "description": "`home`: something GET /home answers has changed.",
+        "properties": {
+          "type": {
+            "const": "home",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "HomeEvent",
+        "type": "object"
+      },
+      "HomeSummary": {
+        "description": "The Lead's words about the tenders it may speak of, and when it wrote them.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "covers": {
+            "title": "Covers",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "at",
+          "covers"
+        ],
+        "title": "HomeSummary",
+        "type": "object"
+      },
+      "KeepMemberCard": {
+        "description": "`payload` of a `keep_member` card.",
+        "properties": {
+          "member_id": {
+            "title": "Member Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "member_id"
+        ],
+        "title": "KeepMemberCard",
+        "type": "object"
+      },
+      "LeadBlock": {
+        "description": "Why the Lead cannot start work now. For every tender: no AI is connected; the provider\nrefused the key when ONE last listed its models; the AI consent is not given; the day's or\nthe month's Spending Cap is reached; Engineer Records cannot be opened. For one tender: it is\na Confidential Project, `ai.confidential_on_device` is on and no model on this computer is\nconnected. No network is not known before work starts: it shows as `offline`.",
+        "properties": {
+          "fix": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ai",
+                  "search",
+                  "consent",
+                  "retry",
+                  "backup",
+                  "caps"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fix"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "reason",
+          "fix"
+        ],
+        "title": "LeadBlock",
+        "type": "object"
+      },
+      "Lesson": {
+        "description": "One Lesson Learned the Lead keeps about the engineer, in Engineer Records.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "from_project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Project Id"
+          },
+          "from_project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Project Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "from_project_id",
+          "from_project_name",
+          "at"
+        ],
+        "title": "Lesson",
+        "type": "object"
+      },
+      "LessonIn": {
+        "additionalProperties": false,
+        "description": "PATCH /engineer/lessons/{lesson_id}: the lesson's new words.",
+        "properties": {
+          "text": {
+            "maxLength": 20000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "LessonIn",
+        "type": "object"
+      },
+      "Lessons": {
+        "description": "GET /engineer/lessons: every Lesson Learned that was not removed.",
+        "properties": {
+          "lessons": {
+            "items": {
+              "$ref": "#/components/schemas/Lesson"
+            },
+            "title": "Lessons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lessons"
+        ],
+        "title": "Lessons",
+        "type": "object"
+      },
+      "LessonsEvent": {
+        "description": "`lessons`: a lesson was saved, changed, removed or put back.",
+        "properties": {
+          "type": {
+            "const": "lessons",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "LessonsEvent",
+        "type": "object"
+      },
+      "Member": {
+        "description": "A team member's identity card and record: the Lead QS, the Checking QS or a\nspecialist. Every list carries the whole member, so no route gives one alone.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "fixed",
+              "temporary",
+              "permanent"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "record": {
+            "$ref": "#/components/schemas/MemberRecord"
+          },
+          "role": {
+            "enum": [
+              "lead",
+              "checker",
+              "specialist"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "speciality": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "style": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/MemberTool"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "kind",
+          "name",
+          "title",
+          "speciality",
+          "style",
+          "model",
+          "tools",
+          "record"
+        ],
+        "title": "Member",
+        "type": "object"
+      },
+      "MemberEvent": {
+        "description": "`member`: a member joined or became permanent, or its `state` or `doing` changed.",
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/TeamMember"
+          },
+          "type": {
+            "const": "member",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "member"
+        ],
+        "title": "MemberEvent",
+        "type": "object"
+      },
+      "MemberModel": {
+        "description": "The AI model a member works with now.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "on_device": {
+            "title": "On Device",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "provider",
+          "on_device"
+        ],
+        "title": "MemberModel",
+        "type": "object"
+      },
+      "MemberRecord": {
+        "description": "Counted from the member's real work in ONE; zeros for a new member.",
+        "properties": {
+          "checks_passed": {
+            "title": "Checks Passed",
+            "type": "integer"
+          },
+          "checks_total": {
+            "title": "Checks Total",
+            "type": "integer"
+          },
+          "cost_usd": {
+            "title": "Cost Usd",
+            "type": "string"
+          },
+          "tenders": {
+            "title": "Tenders",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tenders",
+          "checks_passed",
+          "checks_total",
+          "cost_usd"
+        ],
+        "title": "MemberRecord",
+        "type": "object"
+      },
+      "MemberTool": {
+        "description": "A tool a member may use, with the label the screen shows for it.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "name",
+          "title"
+        ],
+        "title": "MemberTool",
+        "type": "object"
+      },
+      "Members": {
+        "description": "GET /team/members: the team that stays from tender to tender, for Settings.",
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members"
+        ],
+        "title": "Members",
+        "type": "object"
+      },
+      "MoneySetting": {
+        "description": "A setting that is an amount of money, as exact decimal text.",
+        "properties": {
+          "at_recommended": {
+            "title": "At Recommended",
+            "type": "boolean"
+          },
+          "control": {
+            "const": "money",
+            "title": "Control",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "help": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "string"
+          },
+          "section": {
+            "enum": [
+              "ai",
+              "caps",
+              "privacy",
+              "look"
+            ],
+            "title": "Section",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "section",
+          "title",
+          "help",
+          "at_recommended",
+          "control",
+          "value",
+          "recommended",
+          "currency"
+        ],
+        "title": "MoneySetting",
+        "type": "object"
+      },
+      "NumberSetting": {
+        "description": "A setting that is a number within limits, as exact decimal text.",
+        "properties": {
+          "at_recommended": {
+            "title": "At Recommended",
+            "type": "boolean"
+          },
+          "control": {
+            "const": "number",
+            "title": "Control",
+            "type": "string"
+          },
+          "help": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "max": {
+            "title": "Max",
+            "type": "string"
+          },
+          "min": {
+            "title": "Min",
+            "type": "string"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "string"
+          },
+          "section": {
+            "enum": [
+              "ai",
+              "caps",
+              "privacy",
+              "look"
+            ],
+            "title": "Section",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "section",
+          "title",
+          "help",
+          "at_recommended",
+          "control",
+          "value",
+          "recommended",
+          "min",
+          "max",
+          "step"
+        ],
+        "title": "NumberSetting",
+        "type": "object"
+      },
+      "PlanApproveIn": {
+        "additionalProperties": false,
+        "description": "POST /projects/{project_id}/plan/approve: approves the plan and its team as shown.",
+        "properties": {
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "PlanApproveIn",
+        "type": "object"
+      },
+      "PlanChange": {
+        "description": "A Suggested change to an approved plan: the plan as it would be. It is accepted or\nrejected with POST /projects/{project_id}/plan/change. `stages[*].status`, `result` and\noutput ids are always the current plan's.",
+        "properties": {
+          "cost_basis": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "expected_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Cost Usd"
+          },
+          "expected_minutes": {
+            "title": "Expected Minutes",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "paid": {
+            "title": "Paid",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/Stage"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "submission_date": {
+            "title": "Submission Date",
+            "type": "string"
+          },
+          "team": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "title": "Team",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "submission_date",
+          "stages",
+          "team",
+          "expected_cost_usd",
+          "expected_minutes",
+          "cost_basis",
+          "paid"
+        ],
+        "title": "PlanChange",
+        "type": "object"
+      },
+      "PlanChangeIn": {
+        "additionalProperties": false,
+        "description": "POST /projects/{project_id}/plan/change: accepts or rejects the Suggested change that\nis on screen.",
+        "properties": {
+          "accept": {
+            "title": "Accept",
+            "type": "boolean"
+          },
+          "change_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Change Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "change_id",
+          "accept"
+        ],
+        "title": "PlanChangeIn",
+        "type": "object"
+      },
+      "PlanEvent": {
+        "description": "`plan`: the plan was proposed, approved or changed, a stage moved, or a Suggested\nchange came or went. The screen replaces its plan and reloads the members.",
+        "properties": {
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenderPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "const": "plan",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan",
+          "type"
+        ],
+        "title": "PlanEvent",
+        "type": "object"
+      },
+      "PlanPart": {
+        "description": "data-plan (id: the plan's id): the Lead proposed this version, or a change to it, here.",
+        "properties": {
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plan_id",
+          "version"
+        ],
+        "title": "PlanPart",
+        "type": "object"
+      },
+      "PlanView": {
+        "description": "The one body the plan travels in: the GET, the three POSTs and the `plan` event.",
+        "properties": {
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenderPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "title": "PlanView",
+        "type": "object"
+      },
+      "Profile": {
+        "description": "GET and PUT /engineer/profile: what the engineer told ONE about themselves, as stored\nin Engineer Records.",
+        "properties": {
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "enum": [
+                  "EG",
+                  "SA",
+                  "AE",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "org_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "contractor",
+                  "consultant",
+                  "owner",
+                  "procurement"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Type"
+          },
+          "position": {
+            "title": "Position",
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "position",
+          "company",
+          "org_type",
+          "country",
+          "currency",
+          "complete"
+        ],
+        "title": "Profile",
+        "type": "object"
+      },
+      "ProfileIn": {
+        "additionalProperties": false,
+        "description": "PUT /engineer/profile: the seven fields as they stand. A half-filled profile is saved.\nThe handler checks each value and refuses with words (PROFILE_BAD_VALUE): a name longer\nthan 80 characters, a position or company longer than 120, a currency that is not three\ncapitals. The bounds here only stop a runaway body.",
+        "properties": {
+          "company": {
+            "maxLength": 1000,
+            "title": "Company",
+            "type": "string"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "enum": [
+                  "EG",
+                  "SA",
+                  "AE",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "first_name": {
+            "maxLength": 1000,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 1000,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "org_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "contractor",
+                  "consultant",
+                  "owner",
+                  "procurement"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Org Type"
+          },
+          "position": {
+            "maxLength": 1000,
+            "title": "Position",
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "position",
+          "company",
+          "org_type",
+          "country",
+          "currency"
+        ],
+        "title": "ProfileIn",
+        "type": "object"
+      },
+      "Refusal": {
+        "description": "Every refused request of a contract route. `error` is always a pair, never a string.",
+        "properties": {
+          "brief_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brief Id"
+          },
+          "error": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "example": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "fix": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ai",
+                  "search",
+                  "consent",
+                  "retry",
+                  "backup",
+                  "caps"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fix"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "Refusal",
+        "type": "object"
+      },
+      "RoomEvent": {
+        "description": "`room`: a message was written in the team room, or its `raised` changed.",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/RoomMessage"
+          },
+          "type": {
+            "const": "room",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "RoomEvent",
+        "type": "object"
+      },
+      "RoomMessage": {
+        "description": "One message in a tender's team room. It also travels as the `data-room` part of the\nreply it was written in.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "from_id": {
+            "title": "From Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "raised": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoomRaise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "to_id": {
+            "title": "To Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "from_id",
+          "to_id",
+          "text",
+          "sources",
+          "at",
+          "raised"
+        ],
+        "title": "RoomMessage",
+        "type": "object"
+      },
+      "RoomMessageIn": {
+        "additionalProperties": false,
+        "description": "POST /projects/{project_id}/room: what the engineer writes to the team.",
+        "properties": {
+          "text": {
+            "maxLength": 200000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "RoomMessageIn",
+        "type": "object"
+      },
+      "RoomPage": {
+        "description": "GET /projects/{project_id}/room: one page of the team room.",
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/RoomMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "messages",
+          "next_cursor"
+        ],
+        "title": "RoomPage",
+        "type": "object"
+      },
+      "RoomRaise": {
+        "description": "What a raised message became in the engineer's conversation: a Finding (`id` is the\nFinding's) or a card (`id` is the card's). It is the id of that part and of its waiting item.",
+        "properties": {
+          "answered": {
+            "title": "Answered",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "answered"
+        ],
+        "title": "RoomRaise",
+        "type": "object"
+      },
+      "SettingChoice": {
+        "description": "One value a choice setting can take, with its label.",
+        "properties": {
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "title"
+        ],
+        "title": "SettingChoice",
+        "type": "object"
+      },
+      "SettingEvent": {
+        "description": "`setting`: a setting changed, by the screen or by the Lead.",
+        "properties": {
+          "setting": {
+            "discriminator": {
+              "mapping": {
+                "choice": "#/components/schemas/ChoiceSetting",
+                "money": "#/components/schemas/MoneySetting",
+                "number": "#/components/schemas/NumberSetting",
+                "toggle": "#/components/schemas/ToggleSetting"
+              },
+              "propertyName": "control"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ToggleSetting"
+              },
+              {
+                "$ref": "#/components/schemas/ChoiceSetting"
+              },
+              {
+                "$ref": "#/components/schemas/MoneySetting"
+              },
+              {
+                "$ref": "#/components/schemas/NumberSetting"
+              }
+            ],
+            "title": "Setting"
+          },
+          "type": {
+            "const": "setting",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "setting"
+        ],
+        "title": "SettingEvent",
+        "type": "object"
+      },
+      "SettingIn": {
+        "additionalProperties": false,
+        "description": "PATCH /settings/{key}. A toggle takes true or false; every other control takes text\n(a choice's value, or an exact decimal). To put a setting back, send its `recommended`.",
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "SettingIn",
+        "type": "object"
+      },
+      "Settings": {
+        "description": "GET /settings: every setting the screens draw from data. The profile, the AI links,\nthe Connectors, the Backup and the team have their own routes.",
+        "properties": {
+          "settings": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "choice": "#/components/schemas/ChoiceSetting",
+                  "money": "#/components/schemas/MoneySetting",
+                  "number": "#/components/schemas/NumberSetting",
+                  "toggle": "#/components/schemas/ToggleSetting"
+                },
+                "propertyName": "control"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ToggleSetting"
+                },
+                {
+                  "$ref": "#/components/schemas/ChoiceSetting"
+                },
+                {
+                  "$ref": "#/components/schemas/MoneySetting"
+                },
+                {
+                  "$ref": "#/components/schemas/NumberSetting"
+                }
+              ]
+            },
+            "title": "Settings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "settings"
+        ],
+        "title": "Settings",
+        "type": "object"
+      },
+      "SetupEvent": {
+        "description": "`setup`: a part's state or bytes changed.",
+        "properties": {
+          "setup": {
+            "$ref": "#/components/schemas/SetupState"
+          },
+          "type": {
+            "const": "setup",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "setup"
+        ],
+        "title": "SetupEvent",
+        "type": "object"
+      },
+      "SetupPart": {
+        "description": "One part ONE needs beyond the installer, and how far its download is.",
+        "properties": {
+          "affects": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "done_bytes": {
+            "title": "Done Bytes",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "present",
+              "queued",
+              "downloading",
+              "waiting_network",
+              "failed",
+              "unavailable"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "state",
+          "done_bytes",
+          "total_bytes",
+          "affects",
+          "reason"
+        ],
+        "title": "SetupPart",
+        "type": "object"
+      },
+      "SetupState": {
+        "description": "GET /setup/parts, POST /setup/parts/retry and the `setup` event: the Automatic setup.",
+        "properties": {
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/SetupPart"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ready",
+          "parts"
+        ],
+        "title": "SetupState",
+        "type": "object"
+      },
+      "SetupStepStates": {
+        "description": "Each first-launch step: how it was passed, or null when it was not yet.",
+        "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "enum": [
+                  "done",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          },
+          "ai": {
+            "anyOf": [
+              {
+                "enum": [
+                  "done",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "enum": [
+                  "done",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "enum": [
+                  "done",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "enum": [
+                  "done",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage"
+          }
+        },
+        "required": [
+          "language",
+          "account",
+          "ai",
+          "card",
+          "usage"
+        ],
+        "title": "SetupStepStates",
+        "type": "object"
+      },
+      "SetupSteps": {
+        "description": "The answer GET /setup and PUT /setup/{step} already give, typed for the new gate.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "steps": {
+            "$ref": "#/components/schemas/SetupStepStates"
+          }
+        },
+        "required": [
+          "done",
+          "steps"
+        ],
+        "title": "SetupSteps",
+        "type": "object"
+      },
+      "Source": {
+        "description": "Where a fact comes from: the source the Sheet, the view and the source card already read\n(`Source` in ui/src/deliverables/types.ts). `kind` is the ledger's own word and the list is\nopen: an agent's word for a place in a file (\"boq\", \"quote\"), \"file\" for a tender fact, or\nONE's \"calculation\", \"engineer\", \"chat\", \"web\", \"prices\", \"sample\". Only \"sample\" has a rule\n(the sample pill); a kind the screen does not know is drawn as a plain titled source.",
+        "properties": {
+          "dated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dated"
+          },
+          "file_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Id"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Name"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "locator": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "maxItems": 4,
+                  "minItems": 4,
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "type": "array"
+                }
+              ]
+            },
+            "title": "Locator",
+            "type": "object"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "locator"
+        ],
+        "title": "Source",
+        "type": "object"
+      },
+      "SourcesPart": {
+        "description": "data-sources (id: the Brief's id): what the reply rests on, as far as the core can prove:\nthe sources of its figures, then the places the Lead read in this work (section 3.1).",
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
+        ],
+        "title": "SourcesPart",
+        "type": "object"
+      },
+      "Stage": {
+        "description": "One stage of a tender plan: who owns it, its days, what it hands over and what the\nengineer signs off at its end.",
+        "properties": {
+          "ends": {
+            "title": "Ends",
+            "type": "string"
+          },
+          "engineer_supplies": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gate": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/StageOutput"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "owner_member_id": {
+            "title": "Owner Member Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "starts": {
+            "title": "Starts",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "now",
+              "waiting_engineer",
+              "approved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "owner_member_id",
+          "engineer_supplies",
+          "starts",
+          "ends",
+          "status",
+          "result",
+          "outputs",
+          "gate"
+        ],
+        "title": "Stage",
+        "type": "object"
+      },
+      "StageApproveIn": {
+        "additionalProperties": false,
+        "description": "POST /projects/{project_id}/plan/stages/{stage_id}/approve: signs off a stage of the\nplan as shown. A sign-off cannot be undone.",
+        "properties": {
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "StageApproveIn",
+        "type": "object"
+      },
+      "StageOutput": {
+        "description": "Something a stage hands over: a Deliverable, a file, the Project Map or the tender\nsummary.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "kind": {
+            "enum": [
+              "deliverable",
+              "file",
+              "map",
+              "summary"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "id"
+        ],
+        "title": "StageOutput",
+        "type": "object"
+      },
+      "StagePart": {
+        "description": "data-stage (id: the stage's id): this reply ends the stage and asks for its sign-off.",
+        "properties": {
+          "stage_id": {
+            "title": "Stage Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage_id"
+        ],
+        "title": "StagePart",
+        "type": "object"
+      },
+      "SteerPart": {
+        "description": "data-steer (id: a new id): what the engineer wrote while this work ran.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "at"
+        ],
+        "title": "SteerPart",
+        "type": "object"
+      },
+      "StoredMessageMark": {
+        "description": "The keys this contract adds to `metadata` of a message in GET /chat/{chat_id}/messages.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "const": "one",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "By"
+          }
+        },
+        "required": [
+          "at"
+        ],
+        "title": "StoredMessageMark",
+        "type": "object"
+      },
+      "TeamMember": {
+        "description": "A member as one tender sees it.",
+        "properties": {
+          "doing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "fixed",
+              "temporary",
+              "permanent"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemberModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "proposed": {
+            "title": "Proposed",
+            "type": "boolean"
+          },
+          "record": {
+            "$ref": "#/components/schemas/MemberRecord"
+          },
+          "role": {
+            "enum": [
+              "lead",
+              "checker",
+              "specialist"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "speciality": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "state": {
+            "enum": [
+              "working",
+              "waiting",
+              "idle",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "style": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/MemberTool"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "kind",
+          "name",
+          "title",
+          "speciality",
+          "style",
+          "model",
+          "tools",
+          "record",
+          "state",
+          "doing",
+          "proposed"
+        ],
+        "title": "TeamMember",
+        "type": "object"
+      },
+      "TeamMembers": {
+        "description": "GET /projects/{project_id}/members: the team of one tender.",
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/TeamMember"
+            },
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members"
+        ],
+        "title": "TeamMembers",
+        "type": "object"
+      },
+      "TenderEvent": {
+        "description": "`tender`: the tender's row, or what waits in it, changed. Replaces both.",
+        "properties": {
+          "tender": {
+            "$ref": "#/components/schemas/TenderRow"
+          },
+          "type": {
+            "const": "tender",
+            "title": "Type",
+            "type": "string"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/WaitingItem"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tender",
+          "waiting",
+          "type"
+        ],
+        "title": "TenderEvent",
+        "type": "object"
+      },
+      "TenderPlan": {
+        "description": "A tender's plan: the stages dated back from the submission date, the team, and the\nestimate the engineer approves with it.",
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cost_basis": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "expected_cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Cost Usd"
+          },
+          "expected_minutes": {
+            "title": "Expected Minutes",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "paid": {
+            "title": "Paid",
+            "type": "boolean"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/Stage"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "approved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "submission_date": {
+            "title": "Submission Date",
+            "type": "string"
+          },
+          "team": {
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            },
+            "title": "Team",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "status",
+          "submission_date",
+          "stages",
+          "team",
+          "expected_cost_usd",
+          "expected_minutes",
+          "cost_basis",
+          "paid",
+          "approved_at",
+          "change"
+        ],
+        "title": "TenderPlan",
+        "type": "object"
+      },
+      "TenderRow": {
+        "description": "One tender in a line: the row Home lists and the header its own place draws.\nThe core remembers it for a closed project, so reading it opens nothing.",
+        "properties": {
+          "blocked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidential": {
+            "title": "Confidential",
+            "type": "boolean"
+          },
+          "files_read": {
+            "title": "Files Read",
+            "type": "integer"
+          },
+          "files_total": {
+            "title": "Files Total",
+            "type": "integer"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "name_pair": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "sample": {
+            "title": "Sample",
+            "type": "boolean"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Text"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stages": {
+            "items": {
+              "enum": [
+                "pending",
+                "now",
+                "waiting_engineer",
+                "approved"
+              ],
+              "type": "string"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "archived",
+              "waiting",
+              "paused",
+              "offline",
+              "reading",
+              "working",
+              "finished",
+              "failed",
+              "stopped",
+              "no_plan"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "submission_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Date"
+          },
+          "submission_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Source"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "waiting": {
+            "title": "Waiting",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "name_pair",
+          "confidential",
+          "sample",
+          "state",
+          "line",
+          "blocked",
+          "stage",
+          "stages",
+          "submission_date",
+          "submission_source",
+          "waiting",
+          "files_read",
+          "files_total"
+        ],
+        "title": "TenderRow",
+        "type": "object"
+      },
+      "TenderView": {
+        "description": "GET /projects/{project_id}/tender, and the `tender` event: a tender's header and what\nwaits for the engineer in it.",
+        "properties": {
+          "tender": {
+            "$ref": "#/components/schemas/TenderRow"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/WaitingItem"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tender",
+          "waiting"
+        ],
+        "title": "TenderView",
+        "type": "object"
+      },
+      "Text": {
+        "description": "ONE's own words, or a short name an agent wrote for the screen, in both languages.\nNeither side is ever empty: where nothing is known the pair itself is `null`.",
+        "properties": {
+          "ar": {
+            "minLength": 1,
+            "title": "Ar",
+            "type": "string"
+          },
+          "en": {
+            "minLength": 1,
+            "title": "En",
+            "type": "string"
+          }
+        },
+        "required": [
+          "en",
+          "ar"
+        ],
+        "title": "Text",
+        "type": "object"
+      },
+      "ToggleSetting": {
+        "description": "A setting that is on or off.",
+        "properties": {
+          "at_recommended": {
+            "title": "At Recommended",
+            "type": "boolean"
+          },
+          "control": {
+            "const": "toggle",
+            "title": "Control",
+            "type": "string"
+          },
+          "help": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "section": {
+            "enum": [
+              "ai",
+              "caps",
+              "privacy",
+              "look"
+            ],
+            "title": "Section",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "value": {
+            "title": "Value",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "section",
+          "title",
+          "help",
+          "at_recommended",
+          "control",
+          "value",
+          "recommended"
+        ],
+        "title": "ToggleSetting",
+        "type": "object"
+      },
+      "Undoable": {
+        "description": "A removal that can be taken back with POST /undo/{undo} for `window_ms`.",
+        "properties": {
+          "undo": {
+            "title": "Undo",
+            "type": "string"
+          },
+          "window_ms": {
+            "title": "Window Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "undo",
+          "window_ms"
+        ],
+        "title": "Undoable",
+        "type": "object"
+      },
+      "UnreadPart": {
+        "description": "One part of a file ONE could not read (added to a file's JSON as `unread`).",
+        "properties": {
+          "part": {
+            "$ref": "#/components/schemas/Text"
+          },
+          "why": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "part",
+          "why"
+        ],
+        "title": "UnreadPart",
+        "type": "object"
+      },
+      "UnreadableTender": {
+        "description": "A project whose Project Records cannot be opened: nothing else about it is known.",
+        "properties": {
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "project_id",
+          "reason"
+        ],
+        "title": "UnreadableTender",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WaitingItem": {
+        "description": "One thing the engineer must answer, and the id of the part that shows it in that\nconversation. By kind, `id` is: \"plan\" and \"plan_change\" the plan's id (its last `data-plan`\npart); \"stage\" the stage's id (`data-stage`); \"decision\" the Finding's id (`data-finding`);\n\"unfinished\" the Brief's id (its reply is \"<id>-reply\"); any card kind the card's id\n(`data-card`).",
+        "properties": {
+          "blocking": {
+            "title": "Blocking",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "plan",
+                  "stage",
+                  "plan_change",
+                  "decision",
+                  "unfinished"
+                ],
+                "type": "string"
+              },
+              {
+                "enum": [
+                  "outside",
+                  "online",
+                  "cap",
+                  "price",
+                  "budget",
+                  "fallback",
+                  "desk",
+                  "disagreement",
+                  "question",
+                  "keep",
+                  "rows",
+                  "cost",
+                  "connector",
+                  "keep_member",
+                  "setting"
+                ],
+                "type": "string"
+              }
+            ],
+            "title": "Kind"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "since": {
+            "title": "Since",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "title": {
+            "$ref": "#/components/schemas/Text"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "project_id",
+          "title",
+          "text",
+          "since",
+          "blocking"
+        ],
+        "title": "WaitingItem",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "QS Mind ONE: the Phase 1 contract",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/briefs/{brief_id}/retry": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "brief_id",
+            "required": true,
+            "schema": {
+              "title": "Brief Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Locked"
+          }
+        }
+      }
+    },
+    "/engineer/lessons": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lessons"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/engineer/lessons/{lesson_id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Undoable"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      },
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LessonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lesson"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/engineer/profile": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/home": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Home"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/findings": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Findings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/findings/{finding_id}/decide": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finding"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Locked"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/members": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamMembers"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/plan": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/plan/approve": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanApproveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Locked"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/plan/change": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanChangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Locked"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/plan/request": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Locked"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/plan/stages/{stage_id}/approve": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "stage_id",
+            "required": true,
+            "schema": {
+              "title": "Stage Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageApproveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Locked"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/room": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        }
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomMessage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Locked"
+          }
+        }
+      }
+    },
+    "/projects/{project_id}/tender": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenderView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/settings": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/settings/ai/connect": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConnectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiLink"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiLink"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/settings/ai/links/{link_id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Undoable"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        }
+      }
+    },
+    "/settings/{key}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "discriminator": {
+                    "mapping": {
+                      "choice": "#/components/schemas/ChoiceSetting",
+                      "money": "#/components/schemas/MoneySetting",
+                      "number": "#/components/schemas/NumberSetting",
+                      "toggle": "#/components/schemas/ToggleSetting"
+                    },
+                    "propertyName": "control"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ToggleSetting"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ChoiceSetting"
+                    },
+                    {
+                      "$ref": "#/components/schemas/MoneySetting"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NumberSetting"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Refusal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BodyProblem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/setup/parts": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/setup/parts/retry": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/team/members": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Members"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refusal"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    }
+  }
+}

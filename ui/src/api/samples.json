@@ -1,0 +1,3850 @@
+{
+ "profile": {
+  "first_name": "مهندس - عينة (sample)",
+  "last_name": "تجريبي - عينة (sample)",
+  "position": "مدير المكتب الفني - عينة (sample)",
+  "company": "شركة مقاولات - عينة (sample)",
+  "org_type": "contractor",
+  "country": "EG",
+  "currency": "EGP",
+  "complete": true
+ },
+ "profile:incomplete": {
+  "first_name": "",
+  "last_name": "",
+  "position": "",
+  "company": "",
+  "org_type": "contractor",
+  "country": "EG",
+  "currency": "EGP",
+  "complete": false
+ },
+ "lessons": {
+  "lessons": [
+   {
+    "id": "5a000000000000000000000000006002",
+    "text": "هامش الربح المعتاد عنده 12% في المباني التعليمية - عينة (sample)",
+    "from_project_id": null,
+    "from_project_name": null,
+    "at": "2026-11-08T09:30:00.000000+00:00"
+   },
+   {
+    "id": "5a000000000000000000000000006001",
+    "text": "بيقيس الخرسانة بالمتر المكعب هندسي من غير خصم الحديد - عينة (sample)",
+    "from_project_id": "5a000000000000000000000000000004",
+    "from_project_name": "مخزن تبريد - عينة (sample)",
+    "at": "2026-11-05T12:00:00.000000+00:00"
+   }
+  ]
+ },
+ "home": {
+  "summary": {
+   "text": "3 حاجات مستنية ردّك في عطاءين: خطة «مجمع مدارس»، وقرار وتعديل خطة في «برج إداري» اللي تقديمه بعد 7 أيام. «مشروع 2026-11-09» لسه بيتقري، و«مخزن تبريد» خلص - عينة (sample)",
+   "at": "2026-11-09T08:31:00.000000+00:00",
+   "covers": 4
+  },
+  "blocked": null,
+  "last_project_id": "5a000000000000000000000000000002",
+  "waiting": [
+   {
+    "id": "5a0000000000000000000000000000a2",
+    "kind": "plan_change",
+    "project_id": "5a000000000000000000000000000002",
+    "title": {
+     "en": "The Lead QS suggests a change to the plan",
+     "ar": "Lead QS بيقترح تعديل في الخطة"
+    },
+    "text": null,
+    "since": "2026-11-09T07:20:00.000000+00:00",
+    "blocking": false
+   },
+   {
+    "id": "5a0000000000000000000000000000a1",
+    "kind": "plan",
+    "project_id": "5a000000000000000000000000000001",
+    "title": {
+     "en": "Approve the tender plan",
+     "ar": "اعتمد خطة العطاء"
+    },
+    "text": null,
+    "since": "2026-11-09T07:40:00.000000+00:00",
+    "blocking": true
+   },
+   {
+    "id": "5a000000000000000000000000009002",
+    "kind": "decision",
+    "project_id": "5a000000000000000000000000000002",
+    "title": {
+     "en": "Roof insulation has no quantity (sample)",
+     "ar": "عزل الأسطح مالوش كمية - عينة"
+    },
+    "text": null,
+    "since": "2026-11-09T08:15:00.000000+00:00",
+    "blocking": true
+   },
+   {
+    "id": "5a0000000000000000000000000000b2",
+    "kind": "question",
+    "project_id": "5a000000000000000000000000000003",
+    "title": {
+     "en": "Lead QS asks",
+     "ar": "Lead QS بيسأل"
+    },
+    "text": "مستندات العطاء مفيهاش تاريخ تقديم. إمتى آخر موعد لتقديم العطاء؟ - عينة (sample)",
+    "since": "2026-11-09T08:30:00.000000+00:00",
+    "blocking": true
+   }
+  ],
+  "tenders": [
+   {
+    "project_id": "5a000000000000000000000000000002",
+    "name": "برج إداري - عينة (sample)",
+    "name_pair": null,
+    "confidential": false,
+    "sample": true,
+    "state": "waiting",
+    "line": {
+     "en": "Waiting for your decision: Roof insulation has no quantity (sample)",
+     "ar": "مستني قرارك: عزل الأسطح مالوش كمية - عينة"
+    },
+    "blocked": null,
+    "stage": {
+     "en": "Pricing the BOQ (sample)",
+     "ar": "تسعير جدول الكميات - عينة"
+    },
+    "stages": [
+     "approved",
+     "approved",
+     "approved",
+     "now",
+     "pending",
+     "pending"
+    ],
+    "submission_date": "2026-11-16",
+    "submission_source": {
+     "kind": "sample",
+     "title": "ملحق رقم 2 - عينة (sample)",
+     "file_name": "ملحق 2.pdf - عينة (sample)",
+     "file_id": "5a0000000000000000000000000000f5",
+     "locator": {
+      "page": 1,
+      "ocr_low_confidence": true
+     },
+     "url": null,
+     "dated": null,
+     "quote": "يمتد موعد التقديم إلى 16 نوفمبر 2026 - عينة (sample)"
+    },
+    "waiting": 2,
+    "files_read": 22,
+    "files_total": 22
+   },
+   {
+    "project_id": "5a000000000000000000000000000001",
+    "name": "مجمع مدارس - عينة (sample)",
+    "name_pair": null,
+    "confidential": false,
+    "sample": true,
+    "state": "waiting",
+    "line": {
+     "en": "Waiting for your approval of the plan",
+     "ar": "مستني اعتمادك للخطة"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [
+     "pending",
+     "pending",
+     "pending",
+     "pending",
+     "pending",
+     "pending",
+     "pending"
+    ],
+    "submission_date": "2026-11-21",
+    "submission_source": {
+     "kind": "sample",
+     "title": "تعليمات المتناقصين - عينة (sample)",
+     "file_name": "01 تعليمات المتناقصين.pdf - عينة (sample)",
+     "file_id": "5a0000000000000000000000000000f1",
+     "locator": {
+      "page": 3
+     },
+     "url": null,
+     "dated": null,
+     "quote": "آخر موعد لتقديم العطاءات 21 نوفمبر 2026 - عينة (sample)"
+    },
+    "waiting": 1,
+    "files_read": 14,
+    "files_total": 14
+   },
+   {
+    "project_id": "5a000000000000000000000000000005",
+    "name": "Project 2026-11-09",
+    "name_pair": {
+     "en": "Project 2026-11-09",
+     "ar": "مشروع 2026-11-09"
+    },
+    "confidential": false,
+    "sample": true,
+    "state": "reading",
+    "line": {
+     "en": "Reading file 10 of 23",
+     "ar": "بيقرا الملف 10 من 23"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [],
+    "submission_date": null,
+    "submission_source": null,
+    "waiting": 0,
+    "files_read": 9,
+    "files_total": 23
+   },
+   {
+    "project_id": "5a000000000000000000000000000003",
+    "name": "فيلا سكنية - عينة (sample)",
+    "name_pair": null,
+    "confidential": true,
+    "sample": true,
+    "state": "waiting",
+    "line": {
+     "en": "waiting for your answer: Lead QS asks",
+     "ar": "مستني ردّك: Lead QS بيسأل"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [],
+    "submission_date": null,
+    "submission_source": null,
+    "waiting": 1,
+    "files_read": 6,
+    "files_total": 6
+   },
+   {
+    "project_id": "5a000000000000000000000000000004",
+    "name": "مخزن تبريد - عينة (sample)",
+    "name_pair": null,
+    "confidential": false,
+    "sample": true,
+    "state": "finished",
+    "line": {
+     "en": "Every stage is approved",
+     "ar": "كل المراحل اتعتمدت"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [
+     "approved",
+     "approved",
+     "approved",
+     "approved",
+     "approved"
+    ],
+    "submission_date": "2026-11-05",
+    "submission_source": {
+     "kind": "sample",
+     "title": "تعليمات المتناقصين - عينة (sample)",
+     "file_name": "01 تعليمات المتناقصين.pdf - عينة (sample)",
+     "file_id": "5a0000000000000000000000000000f1",
+     "locator": {
+      "page": 2
+     },
+     "url": null,
+     "dated": null,
+     "quote": "آخر موعد لتقديم العطاءات 5 نوفمبر 2026 - عينة (sample)"
+    },
+    "waiting": 0,
+    "files_read": 9,
+    "files_total": 9
+   }
+  ],
+  "unreadable": [
+   {
+    "project_id": "5a000000000000000000000000000006",
+    "reason": {
+     "en": "The project's key is not in the system key store, so it cannot be opened.",
+     "ar": "مفتاح المشروع مش موجود في مخزن المفاتيح في الجهاز، فمش هينفع يتفتح."
+    }
+   }
+  ]
+ },
+ "home:empty": {
+  "summary": null,
+  "blocked": null,
+  "last_project_id": null,
+  "waiting": [],
+  "tenders": [],
+  "unreadable": []
+ },
+ "home:no_ai": {
+  "summary": null,
+  "blocked": {
+   "reason": {
+    "en": "No AI is connected yet. Connect a Claude key, another AI provider or your own Claude Code, then try again.",
+    "ar": "لسه مفيش ذكاء اصطناعي متوصّل. وصّل مفتاح Claude، أو مزوّد تاني، أو Claude Code بتاعك، وبعدين جرّب تاني."
+   },
+   "fix": "ai"
+  },
+  "last_project_id": null,
+  "waiting": [],
+  "tenders": [],
+  "unreadable": []
+ },
+ "home:cut_off": {
+  "summary": null,
+  "blocked": null,
+  "last_project_id": "5a000000000000000000000000000002",
+  "waiting": [
+   {
+    "id": "5a0000000000000000000000000000a2",
+    "kind": "plan_change",
+    "project_id": "5a000000000000000000000000000002",
+    "title": {
+     "en": "The Lead QS suggests a change to the plan",
+     "ar": "Lead QS بيقترح تعديل في الخطة"
+    },
+    "text": null,
+    "since": "2026-11-09T07:20:00.000000+00:00",
+    "blocking": false
+   },
+   {
+    "id": "5a0000000000000000000000000000a1",
+    "kind": "plan",
+    "project_id": "5a000000000000000000000000000001",
+    "title": {
+     "en": "Approve the tender plan",
+     "ar": "اعتمد خطة العطاء"
+    },
+    "text": null,
+    "since": "2026-11-09T07:40:00.000000+00:00",
+    "blocking": true
+   },
+   {
+    "id": "5a000000000000000000000000009002",
+    "kind": "decision",
+    "project_id": "5a000000000000000000000000000002",
+    "title": {
+     "en": "Roof insulation has no quantity (sample)",
+     "ar": "عزل الأسطح مالوش كمية - عينة"
+    },
+    "text": null,
+    "since": "2026-11-09T08:15:00.000000+00:00",
+    "blocking": true
+   },
+   {
+    "id": "5a0000000000000000000000000000b2",
+    "kind": "question",
+    "project_id": "5a000000000000000000000000000003",
+    "title": {
+     "en": "Lead QS asks",
+     "ar": "Lead QS بيسأل"
+    },
+    "text": "مستندات العطاء مفيهاش تاريخ تقديم. إمتى آخر موعد لتقديم العطاء؟ - عينة (sample)",
+    "since": "2026-11-09T08:30:00.000000+00:00",
+    "blocking": true
+   },
+   {
+    "id": "5a0000000000000000000000000000b6",
+    "kind": "unfinished",
+    "project_id": null,
+    "title": {
+     "en": "Work in the Home conversation was cut off",
+     "ar": "الشغل في محادثة الرئيسية اتقطع"
+    },
+    "text": null,
+    "since": "2026-11-09T08:40:00.000000+00:00",
+    "blocking": true
+   }
+  ],
+  "tenders": [
+   {
+    "project_id": "5a000000000000000000000000000002",
+    "name": "برج إداري - عينة (sample)",
+    "name_pair": null,
+    "confidential": false,
+    "sample": true,
+    "state": "waiting",
+    "line": {
+     "en": "Waiting for your decision: Roof insulation has no quantity (sample)",
+     "ar": "مستني قرارك: عزل الأسطح مالوش كمية - عينة"
+    },
+    "blocked": null,
+    "stage": {
+     "en": "Pricing the BOQ (sample)",
+     "ar": "تسعير جدول الكميات - عينة"
+    },
+    "stages": [
+     "approved",
+     "approved",
+     "approved",
+     "now",
+     "pending",
+     "pending"
+    ],
+    "submission_date": "2026-11-16",
+    "submission_source": {
+     "kind": "sample",
+     "title": "ملحق رقم 2 - عينة (sample)",
+     "file_name": "ملحق 2.pdf - عينة (sample)",
+     "file_id": "5a0000000000000000000000000000f5",
+     "locator": {
+      "page": 1,
+      "ocr_low_confidence": true
+     },
+     "url": null,
+     "dated": null,
+     "quote": "يمتد موعد التقديم إلى 16 نوفمبر 2026 - عينة (sample)"
+    },
+    "waiting": 2,
+    "files_read": 22,
+    "files_total": 22
+   },
+   {
+    "project_id": "5a000000000000000000000000000001",
+    "name": "مجمع مدارس - عينة (sample)",
+    "name_pair": null,
+    "confidential": false,
+    "sample": true,
+    "state": "waiting",
+    "line": {
+     "en": "Waiting for your approval of the plan",
+     "ar": "مستني اعتمادك للخطة"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [
+     "pending",
+     "pending",
+     "pending",
+     "pending",
+     "pending",
+     "pending",
+     "pending"
+    ],
+    "submission_date": "2026-11-21",
+    "submission_source": {
+     "kind": "sample",
+     "title": "تعليمات المتناقصين - عينة (sample)",
+     "file_name": "01 تعليمات المتناقصين.pdf - عينة (sample)",
+     "file_id": "5a0000000000000000000000000000f1",
+     "locator": {
+      "page": 3
+     },
+     "url": null,
+     "dated": null,
+     "quote": "آخر موعد لتقديم العطاءات 21 نوفمبر 2026 - عينة (sample)"
+    },
+    "waiting": 1,
+    "files_read": 14,
+    "files_total": 14
+   },
+   {
+    "project_id": "5a000000000000000000000000000005",
+    "name": "Project 2026-11-09",
+    "name_pair": {
+     "en": "Project 2026-11-09",
+     "ar": "مشروع 2026-11-09"
+    },
+    "confidential": false,
+    "sample": true,
+    "state": "reading",
+    "line": {
+     "en": "Reading file 10 of 23",
+     "ar": "بيقرا الملف 10 من 23"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [],
+    "submission_date": null,
+    "submission_source": null,
+    "waiting": 0,
+    "files_read": 9,
+    "files_total": 23
+   },
+   {
+    "project_id": "5a000000000000000000000000000003",
+    "name": "فيلا سكنية - عينة (sample)",
+    "name_pair": null,
+    "confidential": true,
+    "sample": true,
+    "state": "waiting",
+    "line": {
+     "en": "waiting for your answer: Lead QS asks",
+     "ar": "مستني ردّك: Lead QS بيسأل"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [],
+    "submission_date": null,
+    "submission_source": null,
+    "waiting": 1,
+    "files_read": 6,
+    "files_total": 6
+   },
+   {
+    "project_id": "5a000000000000000000000000000004",
+    "name": "مخزن تبريد - عينة (sample)",
+    "name_pair": null,
+    "confidential": false,
+    "sample": true,
+    "state": "finished",
+    "line": {
+     "en": "Every stage is approved",
+     "ar": "كل المراحل اتعتمدت"
+    },
+    "blocked": null,
+    "stage": null,
+    "stages": [
+     "approved",
+     "approved",
+     "approved",
+     "approved",
+     "approved"
+    ],
+    "submission_date": "2026-11-05",
+    "submission_source": {
+     "kind": "sample",
+     "title": "تعليمات المتناقصين - عينة (sample)",
+     "file_name": "01 تعليمات المتناقصين.pdf - عينة (sample)",
+     "file_id": "5a0000000000000000000000000000f1",
+     "locator": {
+      "page": 2
+     },
+     "url": null,
+     "dated": null,
+     "quote": "آخر موعد لتقديم العطاءات 5 نوفمبر 2026 - عينة (sample)"
+    },
+    "waiting": 0,
+    "files_read": 9,
+    "files_total": 9
+   }
+  ],
+  "unreadable": [
+   {
+    "project_id": "5a000000000000000000000000000006",
+    "reason": {
+     "en": "The project's key is not in the system key store, so it cannot be opened.",
+     "ar": "مفتاح المشروع مش موجود في مخزن المفاتيح في الجهاز، فمش هينفع يتفتح."
+    }
+   }
+  ]
+ },
+ "tender:5a000000000000000000000000000002": {
+  "tender": {
+   "project_id": "5a000000000000000000000000000002",
+   "name": "برج إداري - عينة (sample)",
+   "name_pair": null,
+   "confidential": false,
+   "sample": true,
+   "state": "waiting",
+   "line": {
+    "en": "Waiting for your decision: Roof insulation has no quantity (sample)",
+    "ar": "مستني قرارك: عزل الأسطح مالوش كمية - عينة"
+   },
+   "blocked": null,
+   "stage": {
+    "en": "Pricing the BOQ (sample)",
+    "ar": "تسعير جدول الكميات - عينة"
+   },
+   "stages": [
+    "approved",
+    "approved",
+    "approved",
+    "now",
+    "pending",
+    "pending"
+   ],
+   "submission_date": "2026-11-16",
+   "submission_source": {
+    "kind": "sample",
+    "title": "ملحق رقم 2 - عينة (sample)",
+    "file_name": "ملحق 2.pdf - عينة (sample)",
+    "file_id": "5a0000000000000000000000000000f5",
+    "locator": {
+     "page": 1,
+     "ocr_low_confidence": true
+    },
+    "url": null,
+    "dated": null,
+    "quote": "يمتد موعد التقديم إلى 16 نوفمبر 2026 - عينة (sample)"
+   },
+   "waiting": 2,
+   "files_read": 22,
+   "files_total": 22
+  },
+  "waiting": [
+   {
+    "id": "5a0000000000000000000000000000a2",
+    "kind": "plan_change",
+    "project_id": "5a000000000000000000000000000002",
+    "title": {
+     "en": "The Lead QS suggests a change to the plan",
+     "ar": "Lead QS بيقترح تعديل في الخطة"
+    },
+    "text": null,
+    "since": "2026-11-09T07:20:00.000000+00:00",
+    "blocking": false
+   },
+   {
+    "id": "5a000000000000000000000000009002",
+    "kind": "decision",
+    "project_id": "5a000000000000000000000000000002",
+    "title": {
+     "en": "Roof insulation has no quantity (sample)",
+     "ar": "عزل الأسطح مالوش كمية - عينة"
+    },
+    "text": null,
+    "since": "2026-11-09T08:15:00.000000+00:00",
+    "blocking": true
+   }
+  ]
+ },
+ "tender:5a000000000000000000000000000003:blocked": {
+  "tender": {
+   "project_id": "5a000000000000000000000000000003",
+   "name": "فيلا سكنية - عينة (sample)",
+   "name_pair": null,
+   "confidential": true,
+   "sample": true,
+   "state": "waiting",
+   "line": {
+    "en": "waiting for your answer: Lead QS asks",
+    "ar": "مستني ردّك: Lead QS بيسأل"
+   },
+   "blocked": {
+    "reason": {
+     "en": "This Confidential Project runs only on a model on this computer, and none is connected.",
+     "ar": "المشروع السري ده بيشتغل بس على موديل على الجهاز ده، ومفيش موديل متوصل."
+    },
+    "fix": "ai"
+   },
+   "stage": null,
+   "stages": [],
+   "submission_date": null,
+   "submission_source": null,
+   "waiting": 1,
+   "files_read": 6,
+   "files_total": 6
+  },
+  "waiting": [
+   {
+    "id": "5a0000000000000000000000000000b2",
+    "kind": "question",
+    "project_id": "5a000000000000000000000000000003",
+    "title": {
+     "en": "Lead QS asks",
+     "ar": "Lead QS بيسأل"
+    },
+    "text": "مستندات العطاء مفيهاش تاريخ تقديم. إمتى آخر موعد لتقديم العطاء؟ - عينة (sample)",
+    "since": "2026-11-09T08:30:00.000000+00:00",
+    "blocking": true
+   }
+  ]
+ },
+ "plan:5a000000000000000000000000000001": {
+  "plan": {
+   "id": "5a0000000000000000000000000000a1",
+   "version": 1,
+   "status": "proposed",
+   "submission_date": "2026-11-21",
+   "stages": [
+    {
+     "id": "5a000000000000000000000000001101",
+     "title": {
+      "en": "Tender summary and document register (sample)",
+      "ar": "ملخص العطاء وسجل المستندات - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": null,
+     "starts": "2026-11-09",
+     "ends": "2026-11-09",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "summary",
+       "title": {
+        "en": "Tender summary (sample)",
+        "ar": "ملخص العطاء - عينة"
+       },
+       "id": null
+      },
+      {
+       "kind": "map",
+       "title": {
+        "en": "Project Map (sample)",
+        "ar": "خريطة المشروع - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You confirm the tender summary (sample)",
+      "ar": "تأكيدك لملخص العطاء - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001102",
+     "title": {
+      "en": "Queries and conflicts (sample)",
+      "ar": "الاستفسارات والتعارضات - عينة"
+     },
+     "owner_member_id": "5a0000000000000000000000000000c1",
+     "engineer_supplies": null,
+     "starts": "2026-11-10",
+     "ends": "2026-11-10",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Query list (sample)",
+        "ar": "قائمة الاستفسارات - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You approve the queries before they go out (sample)",
+      "ar": "اعتمادك للاستفسارات قبل ما تتبعت - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001103",
+     "title": {
+      "en": "Quantities (sample)",
+      "ar": "الكميات - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": {
+      "en": "The quantities of the 9 items marked «to measure» (sample)",
+      "ar": "كميات الـ 9 بنود المعلّمة «للقياس» - عينة"
+     },
+     "starts": "2026-11-11",
+     "ends": "2026-11-12",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Items that need quantities (sample)",
+        "ar": "البنود اللي محتاجة كميات - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You confirm the quantities (sample)",
+      "ar": "تأكيدك للكميات - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001104",
+     "title": {
+      "en": "Supplier quotes (sample)",
+      "ar": "عروض الموردين - عينة"
+     },
+     "owner_member_id": "5a0000000000000000000000000000c3",
+     "engineer_supplies": {
+      "en": "Supplier quotes for the 6 listed materials (sample)",
+      "ar": "عروض الموردين للـ 6 خامات المذكورة - عينة"
+     },
+     "starts": "2026-11-13",
+     "ends": "2026-11-14",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Quote request (sample)",
+        "ar": "طلب عروض الأسعار - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You choose the quotes to use (sample)",
+      "ar": "اختيارك للعروض اللي هنشتغل بيها - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001105",
+     "title": {
+      "en": "Pricing the BOQ (sample)",
+      "ar": "تسعير جدول الكميات - عينة"
+     },
+     "owner_member_id": "5a0000000000000000000000000000c3",
+     "engineer_supplies": null,
+     "starts": "2026-11-15",
+     "ends": "2026-11-18",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Priced BOQ (sample)",
+        "ar": "جدول الكميات المسعّر - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You sign off the priced BOQ (sample)",
+      "ar": "اعتمادك لجدول الكميات المسعّر - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001106",
+     "title": {
+      "en": "Review and final figures (sample)",
+      "ar": "المراجعة والأرقام النهائية - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": null,
+     "starts": "2026-11-19",
+     "ends": "2026-11-19",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Final figures (sample)",
+        "ar": "الأرقام النهائية - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You approve the final price (sample)",
+      "ar": "اعتمادك للسعر النهائي - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001107",
+     "title": {
+      "en": "Submission pack (sample)",
+      "ar": "ملف التقديم - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": null,
+     "starts": "2026-11-20",
+     "ends": "2026-11-20",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Submission pack (sample)",
+        "ar": "ملف التقديم - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You sign off the pack (sample)",
+      "ar": "اعتمادك لملف التقديم - عينة"
+     }
+    }
+   ],
+   "team": [
+    {
+     "id": "lead-qs",
+     "role": "lead",
+     "kind": "fixed",
+     "name": {
+      "en": "Lead QS",
+      "ar": "Lead QS"
+     },
+     "title": {
+      "en": "Senior quantity surveyor",
+      "ar": "مهندس كميات أول"
+     },
+     "speciality": {
+      "en": "Tender lead and planning agent",
+      "ar": "وكيل قيادة وتخطيط العطاء"
+     },
+     "style": {
+      "en": "Plans first, writes short, raises one decision at a time.",
+      "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+     },
+     "model": {
+      "name": "Claude (sample)",
+      "provider": "Anthropic",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      },
+      {
+       "name": "tender_plan_write",
+       "title": {
+        "en": "Write the tender plan",
+        "ar": "كتابة خطة العطاء"
+       }
+      },
+      {
+       "name": "record_finding",
+       "title": {
+        "en": "Record a Finding",
+        "ar": "تسجيل ملاحظة"
+       }
+      },
+      {
+       "name": "raise_finding",
+       "title": {
+        "en": "Raise a Finding to the engineer",
+        "ar": "رفع ملاحظة للمهندس"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 5,
+      "checks_passed": 4,
+      "checks_total": 5,
+      "cost_usd": "6.85"
+     }
+    },
+    {
+     "id": "checking-qs",
+     "role": "checker",
+     "kind": "fixed",
+     "name": {
+      "en": "Checking QS",
+      "ar": "Checking QS"
+     },
+     "title": {
+      "en": "Reviewing quantity surveyor",
+      "ar": "مهندس كميات للمراجعة"
+     },
+     "speciality": {
+      "en": "Blind checking agent",
+      "ar": "وكيل المراجعة المستقلة"
+     },
+     "style": {
+      "en": "Reads only, checks every number against its source, answers with a code.",
+      "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+     },
+     "model": {
+      "name": "DeepSeek (sample)",
+      "provider": "DeepSeek",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 2,
+      "checks_passed": 0,
+      "checks_total": 0,
+      "cost_usd": "0.92"
+     }
+    },
+    {
+     "id": "5a0000000000000000000000000000c1",
+     "role": "specialist",
+     "kind": "permanent",
+     "name": {
+      "en": "Contracts QS (sample)",
+      "ar": "مهندس العقود - عينة"
+     },
+     "title": {
+      "en": "Contracts quantity surveyor (sample)",
+      "ar": "مهندس كميات للعقود - عينة"
+     },
+     "speciality": {
+      "en": "Contract conditions reading agent (sample)",
+      "ar": "وكيل قراءة شروط العقد - عينة"
+     },
+     "style": {
+      "en": "Quotes the clause, then says what it costs. (sample)",
+      "ar": "بينقل نص البند، وبعدين يقول تأثيره على السعر. - عينة"
+     },
+     "model": {
+      "name": "Claude (sample)",
+      "provider": "Anthropic",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      },
+      {
+       "name": "record_finding",
+       "title": {
+        "en": "Record a Finding",
+        "ar": "تسجيل ملاحظة"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 2,
+      "checks_passed": 3,
+      "checks_total": 3,
+      "cost_usd": "1.37"
+     }
+    },
+    {
+     "id": "5a0000000000000000000000000000c3",
+     "role": "specialist",
+     "kind": "temporary",
+     "name": {
+      "en": "Pricing QS (sample)",
+      "ar": "مهندس التسعير - عينة"
+     },
+     "title": {
+      "en": "Pricing quantity surveyor (sample)",
+      "ar": "مهندس كميات للتسعير - عينة"
+     },
+     "speciality": {
+      "en": "Rate build-up agent (sample)",
+      "ar": "وكيل تحليل الأسعار - عينة"
+     },
+     "style": {
+      "en": "Builds every rate from sourced parts and shows the sum. (sample)",
+      "ar": "بيبني كل سعر من أجزاء ليها مصدر وبيوضّح المجموع. - عينة"
+     },
+     "model": {
+      "name": "Claude (sample)",
+      "provider": "Anthropic",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      },
+      {
+       "name": "prices_lookup",
+       "title": {
+        "en": "Look up market prices",
+        "ar": "البحث عن أسعار السوق"
+       }
+      },
+      {
+       "name": "calculate",
+       "title": {
+        "en": "Calculate with the Calc Engine",
+        "ar": "الحساب بمحرك الحسابات"
+       }
+      },
+      {
+       "name": "record_finding",
+       "title": {
+        "en": "Record a Finding",
+        "ar": "تسجيل ملاحظة"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 0,
+      "checks_passed": 0,
+      "checks_total": 0,
+      "cost_usd": "0"
+     }
+    }
+   ],
+   "expected_cost_usd": "2.40",
+   "expected_minutes": 54,
+   "cost_basis": {
+    "en": "assumed until measured: 20,000 tokens in and 1,500 out per request",
+    "ar": "تقدير لحد ما يتقاس: 20,000 توكن داخل و1,500 خارج لكل طلب"
+   },
+   "paid": true,
+   "approved_at": null,
+   "change": null
+  }
+ },
+ "plan:5a000000000000000000000000000002": {
+  "plan": {
+   "id": "5a0000000000000000000000000000a2",
+   "version": 1,
+   "status": "approved",
+   "submission_date": "2026-11-14",
+   "stages": [
+    {
+     "id": "5a000000000000000000000000001201",
+     "title": {
+      "en": "Tender summary and document register (sample)",
+      "ar": "ملخص العطاء وسجل المستندات - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": null,
+     "starts": "2026-11-03",
+     "ends": "2026-11-03",
+     "status": "approved",
+     "result": {
+      "en": "22 files read (sample)",
+      "ar": "اتقرا 22 ملف - عينة"
+     },
+     "outputs": [
+      {
+       "kind": "summary",
+       "title": {
+        "en": "Tender summary (sample)",
+        "ar": "ملخص العطاء - عينة"
+       },
+       "id": null
+      },
+      {
+       "kind": "map",
+       "title": {
+        "en": "Project Map (sample)",
+        "ar": "خريطة المشروع - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You confirm the tender summary (sample)",
+      "ar": "تأكيدك لملخص العطاء - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001202",
+     "title": {
+      "en": "Queries and conflicts (sample)",
+      "ar": "الاستفسارات والتعارضات - عينة"
+     },
+     "owner_member_id": "5a0000000000000000000000000000c1",
+     "engineer_supplies": null,
+     "starts": "2026-11-04",
+     "ends": "2026-11-05",
+     "status": "approved",
+     "result": {
+      "en": "4 queries (sample)",
+      "ar": "4 استفسارات - عينة"
+     },
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Query list (sample)",
+        "ar": "قائمة الاستفسارات - عينة"
+       },
+       "id": "5a0000000000000000000000000000d2"
+      }
+     ],
+     "gate": {
+      "en": "You approve the queries before they go out (sample)",
+      "ar": "اعتمادك للاستفسارات قبل ما تتبعت - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001203",
+     "title": {
+      "en": "Quantities (sample)",
+      "ar": "الكميات - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": {
+      "en": "The quantities of the 5 items marked «to measure» (sample)",
+      "ar": "كميات الـ 5 بنود المعلّمة «للقياس» - عينة"
+     },
+     "starts": "2026-11-06",
+     "ends": "2026-11-08",
+     "status": "approved",
+     "result": {
+      "en": "37 items have quantities (sample)",
+      "ar": "37 بند ليهم كميات - عينة"
+     },
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Items that need quantities (sample)",
+        "ar": "البنود اللي محتاجة كميات - عينة"
+       },
+       "id": "5a0000000000000000000000000000d3"
+      }
+     ],
+     "gate": {
+      "en": "You confirm the quantities (sample)",
+      "ar": "تأكيدك للكميات - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001204",
+     "title": {
+      "en": "Pricing the BOQ (sample)",
+      "ar": "تسعير جدول الكميات - عينة"
+     },
+     "owner_member_id": "5a0000000000000000000000000000c2",
+     "engineer_supplies": null,
+     "starts": "2026-11-09",
+     "ends": "2026-11-11",
+     "status": "now",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Priced BOQ (sample)",
+        "ar": "جدول الكميات المسعّر - عينة"
+       },
+       "id": "5a0000000000000000000000000000d1"
+      }
+     ],
+     "gate": {
+      "en": "You sign off the priced BOQ (sample)",
+      "ar": "اعتمادك لجدول الكميات المسعّر - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001205",
+     "title": {
+      "en": "Review and final figures (sample)",
+      "ar": "المراجعة والأرقام النهائية - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": null,
+     "starts": "2026-11-12",
+     "ends": "2026-11-12",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Final figures (sample)",
+        "ar": "الأرقام النهائية - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You approve the final price (sample)",
+      "ar": "اعتمادك للسعر النهائي - عينة"
+     }
+    },
+    {
+     "id": "5a000000000000000000000000001206",
+     "title": {
+      "en": "Submission pack (sample)",
+      "ar": "ملف التقديم - عينة"
+     },
+     "owner_member_id": "lead-qs",
+     "engineer_supplies": null,
+     "starts": "2026-11-13",
+     "ends": "2026-11-13",
+     "status": "pending",
+     "result": null,
+     "outputs": [
+      {
+       "kind": "deliverable",
+       "title": {
+        "en": "Submission pack (sample)",
+        "ar": "ملف التقديم - عينة"
+       },
+       "id": null
+      }
+     ],
+     "gate": {
+      "en": "You sign off the pack (sample)",
+      "ar": "اعتمادك لملف التقديم - عينة"
+     }
+    }
+   ],
+   "team": [
+    {
+     "id": "lead-qs",
+     "role": "lead",
+     "kind": "fixed",
+     "name": {
+      "en": "Lead QS",
+      "ar": "Lead QS"
+     },
+     "title": {
+      "en": "Senior quantity surveyor",
+      "ar": "مهندس كميات أول"
+     },
+     "speciality": {
+      "en": "Tender lead and planning agent",
+      "ar": "وكيل قيادة وتخطيط العطاء"
+     },
+     "style": {
+      "en": "Plans first, writes short, raises one decision at a time.",
+      "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+     },
+     "model": {
+      "name": "Claude (sample)",
+      "provider": "Anthropic",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      },
+      {
+       "name": "tender_plan_write",
+       "title": {
+        "en": "Write the tender plan",
+        "ar": "كتابة خطة العطاء"
+       }
+      },
+      {
+       "name": "record_finding",
+       "title": {
+        "en": "Record a Finding",
+        "ar": "تسجيل ملاحظة"
+       }
+      },
+      {
+       "name": "raise_finding",
+       "title": {
+        "en": "Raise a Finding to the engineer",
+        "ar": "رفع ملاحظة للمهندس"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 5,
+      "checks_passed": 4,
+      "checks_total": 5,
+      "cost_usd": "6.85"
+     }
+    },
+    {
+     "id": "checking-qs",
+     "role": "checker",
+     "kind": "fixed",
+     "name": {
+      "en": "Checking QS",
+      "ar": "Checking QS"
+     },
+     "title": {
+      "en": "Reviewing quantity surveyor",
+      "ar": "مهندس كميات للمراجعة"
+     },
+     "speciality": {
+      "en": "Blind checking agent",
+      "ar": "وكيل المراجعة المستقلة"
+     },
+     "style": {
+      "en": "Reads only, checks every number against its source, answers with a code.",
+      "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+     },
+     "model": {
+      "name": "DeepSeek (sample)",
+      "provider": "DeepSeek",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 2,
+      "checks_passed": 0,
+      "checks_total": 0,
+      "cost_usd": "0.92"
+     }
+    },
+    {
+     "id": "5a0000000000000000000000000000c1",
+     "role": "specialist",
+     "kind": "permanent",
+     "name": {
+      "en": "Contracts QS (sample)",
+      "ar": "مهندس العقود - عينة"
+     },
+     "title": {
+      "en": "Contracts quantity surveyor (sample)",
+      "ar": "مهندس كميات للعقود - عينة"
+     },
+     "speciality": {
+      "en": "Contract conditions reading agent (sample)",
+      "ar": "وكيل قراءة شروط العقد - عينة"
+     },
+     "style": {
+      "en": "Quotes the clause, then says what it costs. (sample)",
+      "ar": "بينقل نص البند، وبعدين يقول تأثيره على السعر. - عينة"
+     },
+     "model": {
+      "name": "Claude (sample)",
+      "provider": "Anthropic",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      },
+      {
+       "name": "record_finding",
+       "title": {
+        "en": "Record a Finding",
+        "ar": "تسجيل ملاحظة"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 2,
+      "checks_passed": 3,
+      "checks_total": 3,
+      "cost_usd": "1.37"
+     }
+    },
+    {
+     "id": "5a0000000000000000000000000000c2",
+     "role": "specialist",
+     "kind": "temporary",
+     "name": {
+      "en": "Pricing QS (sample)",
+      "ar": "مهندس التسعير - عينة"
+     },
+     "title": {
+      "en": "Pricing quantity surveyor (sample)",
+      "ar": "مهندس كميات للتسعير - عينة"
+     },
+     "speciality": {
+      "en": "Rate build-up agent (sample)",
+      "ar": "وكيل تحليل الأسعار - عينة"
+     },
+     "style": {
+      "en": "Builds every rate from sourced parts and shows the sum. (sample)",
+      "ar": "بيبني كل سعر من أجزاء ليها مصدر وبيوضّح المجموع. - عينة"
+     },
+     "model": {
+      "name": "Claude (sample)",
+      "provider": "Anthropic",
+      "on_device": false
+     },
+     "tools": [
+      {
+       "name": "files_read",
+       "title": {
+        "en": "Read the tender files",
+        "ar": "قراءة ملفات العطاء"
+       }
+      },
+      {
+       "name": "search_records",
+       "title": {
+        "en": "Search the project records",
+        "ar": "البحث في سجلات المشروع"
+       }
+      },
+      {
+       "name": "prices_lookup",
+       "title": {
+        "en": "Look up market prices",
+        "ar": "البحث عن أسعار السوق"
+       }
+      },
+      {
+       "name": "calculate",
+       "title": {
+        "en": "Calculate with the Calc Engine",
+        "ar": "الحساب بمحرك الحسابات"
+       }
+      },
+      {
+       "name": "record_finding",
+       "title": {
+        "en": "Record a Finding",
+        "ar": "تسجيل ملاحظة"
+       }
+      }
+     ],
+     "record": {
+      "tenders": 1,
+      "checks_passed": 1,
+      "checks_total": 2,
+      "cost_usd": "0.58"
+     }
+    }
+   ],
+   "expected_cost_usd": "2.90",
+   "expected_minutes": 62,
+   "cost_basis": {
+    "en": "measured from 18 past requests in this project",
+    "ar": "محسوب من 18 طلب فات في المشروع ده"
+   },
+   "paid": true,
+   "approved_at": "2026-11-03T09:10:00.000000+00:00",
+   "change": {
+    "id": "5a0000000000000000000000000000a3",
+    "reason": "ملحق رقم 2 مدّ موعد التقديم إلى 16 نوفمبر، فباقترح يوم زيادة للتسعير ويوم زيادة للمراجعة - عينة (sample)",
+    "submission_date": "2026-11-16",
+    "stages": [
+     {
+      "id": "5a000000000000000000000000001201",
+      "title": {
+       "en": "Tender summary and document register (sample)",
+       "ar": "ملخص العطاء وسجل المستندات - عينة"
+      },
+      "owner_member_id": "lead-qs",
+      "engineer_supplies": null,
+      "starts": "2026-11-03",
+      "ends": "2026-11-03",
+      "status": "approved",
+      "result": {
+       "en": "22 files read (sample)",
+       "ar": "اتقرا 22 ملف - عينة"
+      },
+      "outputs": [
+       {
+        "kind": "summary",
+        "title": {
+         "en": "Tender summary (sample)",
+         "ar": "ملخص العطاء - عينة"
+        },
+        "id": null
+       },
+       {
+        "kind": "map",
+        "title": {
+         "en": "Project Map (sample)",
+         "ar": "خريطة المشروع - عينة"
+        },
+        "id": null
+       }
+      ],
+      "gate": {
+       "en": "You confirm the tender summary (sample)",
+       "ar": "تأكيدك لملخص العطاء - عينة"
+      }
+     },
+     {
+      "id": "5a000000000000000000000000001202",
+      "title": {
+       "en": "Queries and conflicts (sample)",
+       "ar": "الاستفسارات والتعارضات - عينة"
+      },
+      "owner_member_id": "5a0000000000000000000000000000c1",
+      "engineer_supplies": null,
+      "starts": "2026-11-04",
+      "ends": "2026-11-05",
+      "status": "approved",
+      "result": {
+       "en": "4 queries (sample)",
+       "ar": "4 استفسارات - عينة"
+      },
+      "outputs": [
+       {
+        "kind": "deliverable",
+        "title": {
+         "en": "Query list (sample)",
+         "ar": "قائمة الاستفسارات - عينة"
+        },
+        "id": "5a0000000000000000000000000000d2"
+       }
+      ],
+      "gate": {
+       "en": "You approve the queries before they go out (sample)",
+       "ar": "اعتمادك للاستفسارات قبل ما تتبعت - عينة"
+      }
+     },
+     {
+      "id": "5a000000000000000000000000001203",
+      "title": {
+       "en": "Quantities (sample)",
+       "ar": "الكميات - عينة"
+      },
+      "owner_member_id": "lead-qs",
+      "engineer_supplies": {
+       "en": "The quantities of the 5 items marked «to measure» (sample)",
+       "ar": "كميات الـ 5 بنود المعلّمة «للقياس» - عينة"
+      },
+      "starts": "2026-11-06",
+      "ends": "2026-11-08",
+      "status": "approved",
+      "result": {
+       "en": "37 items have quantities (sample)",
+       "ar": "37 بند ليهم كميات - عينة"
+      },
+      "outputs": [
+       {
+        "kind": "deliverable",
+        "title": {
+         "en": "Items that need quantities (sample)",
+         "ar": "البنود اللي محتاجة كميات - عينة"
+        },
+        "id": "5a0000000000000000000000000000d3"
+       }
+      ],
+      "gate": {
+       "en": "You confirm the quantities (sample)",
+       "ar": "تأكيدك للكميات - عينة"
+      }
+     },
+     {
+      "id": "5a000000000000000000000000001204",
+      "title": {
+       "en": "Pricing the BOQ (sample)",
+       "ar": "تسعير جدول الكميات - عينة"
+      },
+      "owner_member_id": "5a0000000000000000000000000000c2",
+      "engineer_supplies": null,
+      "starts": "2026-11-09",
+      "ends": "2026-11-12",
+      "status": "now",
+      "result": null,
+      "outputs": [
+       {
+        "kind": "deliverable",
+        "title": {
+         "en": "Priced BOQ (sample)",
+         "ar": "جدول الكميات المسعّر - عينة"
+        },
+        "id": "5a0000000000000000000000000000d1"
+       }
+      ],
+      "gate": {
+       "en": "You sign off the priced BOQ (sample)",
+       "ar": "اعتمادك لجدول الكميات المسعّر - عينة"
+      }
+     },
+     {
+      "id": "5a000000000000000000000000001205",
+      "title": {
+       "en": "Review and final figures (sample)",
+       "ar": "المراجعة والأرقام النهائية - عينة"
+      },
+      "owner_member_id": "lead-qs",
+      "engineer_supplies": null,
+      "starts": "2026-11-13",
+      "ends": "2026-11-14",
+      "status": "pending",
+      "result": null,
+      "outputs": [
+       {
+        "kind": "deliverable",
+        "title": {
+         "en": "Final figures (sample)",
+         "ar": "الأرقام النهائية - عينة"
+        },
+        "id": null
+       }
+      ],
+      "gate": {
+       "en": "You approve the final price (sample)",
+       "ar": "اعتمادك للسعر النهائي - عينة"
+      }
+     },
+     {
+      "id": "5a000000000000000000000000001206",
+      "title": {
+       "en": "Submission pack (sample)",
+       "ar": "ملف التقديم - عينة"
+      },
+      "owner_member_id": "lead-qs",
+      "engineer_supplies": null,
+      "starts": "2026-11-15",
+      "ends": "2026-11-15",
+      "status": "pending",
+      "result": null,
+      "outputs": [
+       {
+        "kind": "deliverable",
+        "title": {
+         "en": "Submission pack (sample)",
+         "ar": "ملف التقديم - عينة"
+        },
+        "id": null
+       }
+      ],
+      "gate": {
+       "en": "You sign off the pack (sample)",
+       "ar": "اعتمادك لملف التقديم - عينة"
+      }
+     }
+    ],
+    "team": [
+     {
+      "id": "lead-qs",
+      "role": "lead",
+      "kind": "fixed",
+      "name": {
+       "en": "Lead QS",
+       "ar": "Lead QS"
+      },
+      "title": {
+       "en": "Senior quantity surveyor",
+       "ar": "مهندس كميات أول"
+      },
+      "speciality": {
+       "en": "Tender lead and planning agent",
+       "ar": "وكيل قيادة وتخطيط العطاء"
+      },
+      "style": {
+       "en": "Plans first, writes short, raises one decision at a time.",
+       "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+      },
+      "model": {
+       "name": "Claude (sample)",
+       "provider": "Anthropic",
+       "on_device": false
+      },
+      "tools": [
+       {
+        "name": "files_read",
+        "title": {
+         "en": "Read the tender files",
+         "ar": "قراءة ملفات العطاء"
+        }
+       },
+       {
+        "name": "search_records",
+        "title": {
+         "en": "Search the project records",
+         "ar": "البحث في سجلات المشروع"
+        }
+       },
+       {
+        "name": "tender_plan_write",
+        "title": {
+         "en": "Write the tender plan",
+         "ar": "كتابة خطة العطاء"
+        }
+       },
+       {
+        "name": "record_finding",
+        "title": {
+         "en": "Record a Finding",
+         "ar": "تسجيل ملاحظة"
+        }
+       },
+       {
+        "name": "raise_finding",
+        "title": {
+         "en": "Raise a Finding to the engineer",
+         "ar": "رفع ملاحظة للمهندس"
+        }
+       }
+      ],
+      "record": {
+       "tenders": 5,
+       "checks_passed": 4,
+       "checks_total": 5,
+       "cost_usd": "6.85"
+      }
+     },
+     {
+      "id": "checking-qs",
+      "role": "checker",
+      "kind": "fixed",
+      "name": {
+       "en": "Checking QS",
+       "ar": "Checking QS"
+      },
+      "title": {
+       "en": "Reviewing quantity surveyor",
+       "ar": "مهندس كميات للمراجعة"
+      },
+      "speciality": {
+       "en": "Blind checking agent",
+       "ar": "وكيل المراجعة المستقلة"
+      },
+      "style": {
+       "en": "Reads only, checks every number against its source, answers with a code.",
+       "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+      },
+      "model": {
+       "name": "DeepSeek (sample)",
+       "provider": "DeepSeek",
+       "on_device": false
+      },
+      "tools": [
+       {
+        "name": "files_read",
+        "title": {
+         "en": "Read the tender files",
+         "ar": "قراءة ملفات العطاء"
+        }
+       },
+       {
+        "name": "search_records",
+        "title": {
+         "en": "Search the project records",
+         "ar": "البحث في سجلات المشروع"
+        }
+       }
+      ],
+      "record": {
+       "tenders": 2,
+       "checks_passed": 0,
+       "checks_total": 0,
+       "cost_usd": "0.92"
+      }
+     },
+     {
+      "id": "5a0000000000000000000000000000c1",
+      "role": "specialist",
+      "kind": "permanent",
+      "name": {
+       "en": "Contracts QS (sample)",
+       "ar": "مهندس العقود - عينة"
+      },
+      "title": {
+       "en": "Contracts quantity surveyor (sample)",
+       "ar": "مهندس كميات للعقود - عينة"
+      },
+      "speciality": {
+       "en": "Contract conditions reading agent (sample)",
+       "ar": "وكيل قراءة شروط العقد - عينة"
+      },
+      "style": {
+       "en": "Quotes the clause, then says what it costs. (sample)",
+       "ar": "بينقل نص البند، وبعدين يقول تأثيره على السعر. - عينة"
+      },
+      "model": {
+       "name": "Claude (sample)",
+       "provider": "Anthropic",
+       "on_device": false
+      },
+      "tools": [
+       {
+        "name": "files_read",
+        "title": {
+         "en": "Read the tender files",
+         "ar": "قراءة ملفات العطاء"
+        }
+       },
+       {
+        "name": "search_records",
+        "title": {
+         "en": "Search the project records",
+         "ar": "البحث في سجلات المشروع"
+        }
+       },
+       {
+        "name": "record_finding",
+        "title": {
+         "en": "Record a Finding",
+         "ar": "تسجيل ملاحظة"
+        }
+       }
+      ],
+      "record": {
+       "tenders": 2,
+       "checks_passed": 3,
+       "checks_total": 3,
+       "cost_usd": "1.37"
+      }
+     },
+     {
+      "id": "5a0000000000000000000000000000c2",
+      "role": "specialist",
+      "kind": "temporary",
+      "name": {
+       "en": "Pricing QS (sample)",
+       "ar": "مهندس التسعير - عينة"
+      },
+      "title": {
+       "en": "Pricing quantity surveyor (sample)",
+       "ar": "مهندس كميات للتسعير - عينة"
+      },
+      "speciality": {
+       "en": "Rate build-up agent (sample)",
+       "ar": "وكيل تحليل الأسعار - عينة"
+      },
+      "style": {
+       "en": "Builds every rate from sourced parts and shows the sum. (sample)",
+       "ar": "بيبني كل سعر من أجزاء ليها مصدر وبيوضّح المجموع. - عينة"
+      },
+      "model": {
+       "name": "Claude (sample)",
+       "provider": "Anthropic",
+       "on_device": false
+      },
+      "tools": [
+       {
+        "name": "files_read",
+        "title": {
+         "en": "Read the tender files",
+         "ar": "قراءة ملفات العطاء"
+        }
+       },
+       {
+        "name": "search_records",
+        "title": {
+         "en": "Search the project records",
+         "ar": "البحث في سجلات المشروع"
+        }
+       },
+       {
+        "name": "prices_lookup",
+        "title": {
+         "en": "Look up market prices",
+         "ar": "البحث عن أسعار السوق"
+        }
+       },
+       {
+        "name": "calculate",
+        "title": {
+         "en": "Calculate with the Calc Engine",
+         "ar": "الحساب بمحرك الحسابات"
+        }
+       },
+       {
+        "name": "record_finding",
+        "title": {
+         "en": "Record a Finding",
+         "ar": "تسجيل ملاحظة"
+        }
+       }
+      ],
+      "record": {
+       "tenders": 1,
+       "checks_passed": 1,
+       "checks_total": 2,
+       "cost_usd": "0.58"
+      }
+     }
+    ],
+    "expected_cost_usd": "3.10",
+    "expected_minutes": 68,
+    "cost_basis": {
+     "en": "measured from 18 past requests in this project",
+     "ar": "محسوب من 18 طلب فات في المشروع ده"
+    },
+    "paid": true
+   }
+  }
+ },
+ "plan:5a000000000000000000000000000003": {
+  "plan": null
+ },
+ "findings:5a000000000000000000000000000002": {
+  "findings": [
+   {
+    "id": "5a000000000000000000000000009001",
+    "title": {
+     "en": "Column concrete grade differs (sample)",
+     "ar": "رتبة خرسانة الأعمدة مختلفة - عينة"
+    },
+    "text": "المواصفات (صفحة 48) بتطلب خرسانة C40 للأعمدة، وبند 3/02 في جدول الكميات مكتوب C35 - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "المواصفات الفنية - عينة (sample)",
+      "file_name": "03 المواصفات.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f2",
+      "locator": {
+       "page": 48,
+       "box": [
+        72,
+        310.5,
+        523,
+        342
+       ]
+      },
+      "url": null,
+      "dated": null,
+      "quote": "خرسانة الأعمدة رتبة C40 - عينة (sample)"
+     },
+     {
+      "kind": "sample",
+      "title": "جدول الكميات - عينة (sample)",
+      "file_name": "04 جدول الكميات.xlsx - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f3",
+      "locator": {
+       "sheet": "BOQ",
+       "row": 41,
+       "item": "3/02"
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "status": "settled",
+    "opinion": "المواصفات هي اللي بتحكم عند التعارض حسب ترتيب أولوية المستندات، فالأسلم نسعّر C40 - عينة (sample)",
+    "options": [
+     {
+      "en": "Price C40 as the specification says (sample)",
+      "ar": "سعّر C40 زي المواصفات - عينة"
+     },
+     {
+      "en": "Price C35 as the BOQ says (sample)",
+      "ar": "سعّر C35 زي جدول الكميات - عينة"
+     }
+    ],
+    "chosen": 0,
+    "item_ids": [
+     "5a00000000000000000000000000e302"
+    ],
+    "note": null,
+    "settled_at": "2026-11-04T11:02:00.000000+00:00"
+   },
+   {
+    "id": "5a000000000000000000000000009005",
+    "title": {
+     "en": "Site visit date not stated (sample)",
+     "ar": "تاريخ زيارة الموقع مش مذكور - عينة"
+    },
+    "text": "تعليمات المتناقصين بتطلب زيارة موقع إلزامية من غير ما تحدد تاريخها - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "تعليمات المتناقصين - عينة (sample)",
+      "file_name": "01 تعليمات المتناقصين.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f1",
+      "locator": {
+       "page": 2
+      },
+      "url": null,
+      "dated": null,
+      "quote": "آخر موعد لتقديم العطاءات 14 نوفمبر 2026 - عينة (sample)"
+     }
+    ],
+    "status": "settled",
+    "opinion": null,
+    "options": null,
+    "chosen": null,
+    "item_ids": [],
+    "note": {
+     "en": "Closed: Addendum 2 gives the date (sample)",
+     "ar": "اتقفلت: ملحق رقم 2 حدّد التاريخ - عينة"
+    },
+    "settled_at": "2026-11-08T09:40:00.000000+00:00"
+   },
+   {
+    "id": "5a000000000000000000000000009004",
+    "title": {
+     "en": "Retention differs between two clauses (sample)",
+     "ar": "نسبة المحتجز مختلفة بين بندين - عينة"
+    },
+    "text": "البند 9 في الشروط الخاصة بيقول المحتجز 5%، والبند 14 بيقول 10% - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "الشروط الخاصة - عينة (sample)",
+      "file_name": "02 الشروط الخاصة.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f4",
+      "locator": {
+       "page": 9
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     },
+     {
+      "kind": "sample",
+      "title": "الشروط الخاصة - عينة (sample)",
+      "file_name": "02 الشروط الخاصة.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f4",
+      "locator": {
+       "page": 12
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "status": "queued",
+    "opinion": "الفرق بيأثر على التدفق النقدي، فلازم قرار قبل الأرقام النهائية - عينة (sample)",
+    "options": [
+     {
+      "en": "Ask the consultant (sample)",
+      "ar": "اسأل الاستشاري - عينة"
+     },
+     {
+      "en": "Price with 10% (sample)",
+      "ar": "سعّر على 10% - عينة"
+     }
+    ],
+    "chosen": null,
+    "item_ids": [],
+    "note": null,
+    "settled_at": null
+   },
+   {
+    "id": "5a000000000000000000000000009003",
+    "title": {
+     "en": "Steel grade not stated for item 3/05 (sample)",
+     "ar": "رتبة الحديد مش مذكورة في بند 3/05 - عينة"
+    },
+    "text": "بند 3/05 ما حددش رتبة حديد التسليح، والاستفسار اتبعت للاستشاري في المرحلة 2 - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "جدول الكميات - عينة (sample)",
+      "file_name": "04 جدول الكميات.xlsx - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f3",
+      "locator": {
+       "sheet": "BOQ",
+       "row": 44,
+       "item": "3/05"
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "status": "open",
+    "opinion": null,
+    "options": null,
+    "chosen": null,
+    "item_ids": [
+     "5a00000000000000000000000000e305"
+    ],
+    "note": {
+     "en": "Waiting for the consultant's reply (sample)",
+     "ar": "في انتظار رد الاستشاري - عينة"
+    },
+    "settled_at": null
+   },
+   {
+    "id": "5a000000000000000000000000009002",
+    "title": {
+     "en": "Roof insulation has no quantity (sample)",
+     "ar": "عزل الأسطح مالوش كمية - عينة"
+    },
+    "text": "بند 7/03 (عزل الأسطح) مكتوب في جدول الكميات من غير كمية - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "جدول الكميات - عينة (sample)",
+      "file_name": "04 جدول الكميات.xlsx - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f3",
+      "locator": {
+       "sheet": "BOQ",
+       "row": 212,
+       "item": "7/03"
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "status": "raised",
+    "opinion": "رأيي نسأل الاستشاري، لأن أي كمية نفترضها ممكن تتحسب علينا - عينة (sample)",
+    "options": [
+     {
+      "en": "Ask the consultant (sample)",
+      "ar": "اسأل الاستشاري - عينة"
+     },
+     {
+      "en": "Price a provisional quantity (sample)",
+      "ar": "سعّر كمية تقديرية - عينة"
+     }
+    ],
+    "chosen": null,
+    "item_ids": [
+     "5a00000000000000000000000000e703"
+    ],
+    "note": {
+     "en": "Waiting for your decision",
+     "ar": "مستني قرارك"
+    },
+    "settled_at": null
+   }
+  ]
+ },
+ "findings:5a000000000000000000000000000001": {
+  "findings": []
+ },
+ "members": {
+  "members": [
+   {
+    "id": "lead-qs",
+    "role": "lead",
+    "kind": "fixed",
+    "name": {
+     "en": "Lead QS",
+     "ar": "Lead QS"
+    },
+    "title": {
+     "en": "Senior quantity surveyor",
+     "ar": "مهندس كميات أول"
+    },
+    "speciality": {
+     "en": "Tender lead and planning agent",
+     "ar": "وكيل قيادة وتخطيط العطاء"
+    },
+    "style": {
+     "en": "Plans first, writes short, raises one decision at a time.",
+     "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "tender_plan_write",
+      "title": {
+       "en": "Write the tender plan",
+       "ar": "كتابة خطة العطاء"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     },
+     {
+      "name": "raise_finding",
+      "title": {
+       "en": "Raise a Finding to the engineer",
+       "ar": "رفع ملاحظة للمهندس"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 5,
+     "checks_passed": 4,
+     "checks_total": 5,
+     "cost_usd": "6.85"
+    }
+   },
+   {
+    "id": "checking-qs",
+    "role": "checker",
+    "kind": "fixed",
+    "name": {
+     "en": "Checking QS",
+     "ar": "Checking QS"
+    },
+    "title": {
+     "en": "Reviewing quantity surveyor",
+     "ar": "مهندس كميات للمراجعة"
+    },
+    "speciality": {
+     "en": "Blind checking agent",
+     "ar": "وكيل المراجعة المستقلة"
+    },
+    "style": {
+     "en": "Reads only, checks every number against its source, answers with a code.",
+     "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+    },
+    "model": {
+     "name": "DeepSeek (sample)",
+     "provider": "DeepSeek",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 0,
+     "checks_total": 0,
+     "cost_usd": "0.92"
+    }
+   },
+   {
+    "id": "5a0000000000000000000000000000c1",
+    "role": "specialist",
+    "kind": "permanent",
+    "name": {
+     "en": "Contracts QS (sample)",
+     "ar": "مهندس العقود - عينة"
+    },
+    "title": {
+     "en": "Contracts quantity surveyor (sample)",
+     "ar": "مهندس كميات للعقود - عينة"
+    },
+    "speciality": {
+     "en": "Contract conditions reading agent (sample)",
+     "ar": "وكيل قراءة شروط العقد - عينة"
+    },
+    "style": {
+     "en": "Quotes the clause, then says what it costs. (sample)",
+     "ar": "بينقل نص البند، وبعدين يقول تأثيره على السعر. - عينة"
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 3,
+     "checks_total": 3,
+     "cost_usd": "1.37"
+    }
+   }
+  ]
+ },
+ "team_members:5a000000000000000000000000000002": {
+  "members": [
+   {
+    "id": "lead-qs",
+    "role": "lead",
+    "kind": "fixed",
+    "name": {
+     "en": "Lead QS",
+     "ar": "Lead QS"
+    },
+    "title": {
+     "en": "Senior quantity surveyor",
+     "ar": "مهندس كميات أول"
+    },
+    "speciality": {
+     "en": "Tender lead and planning agent",
+     "ar": "وكيل قيادة وتخطيط العطاء"
+    },
+    "style": {
+     "en": "Plans first, writes short, raises one decision at a time.",
+     "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "tender_plan_write",
+      "title": {
+       "en": "Write the tender plan",
+       "ar": "كتابة خطة العطاء"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     },
+     {
+      "name": "raise_finding",
+      "title": {
+       "en": "Raise a Finding to the engineer",
+       "ar": "رفع ملاحظة للمهندس"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 5,
+     "checks_passed": 4,
+     "checks_total": 5,
+     "cost_usd": "6.85"
+    },
+    "state": "waiting",
+    "doing": {
+     "en": "Waiting for your decision: Roof insulation has no quantity (sample)",
+     "ar": "مستني قرارك: عزل الأسطح مالوش كمية - عينة"
+    },
+    "proposed": false
+   },
+   {
+    "id": "checking-qs",
+    "role": "checker",
+    "kind": "fixed",
+    "name": {
+     "en": "Checking QS",
+     "ar": "Checking QS"
+    },
+    "title": {
+     "en": "Reviewing quantity surveyor",
+     "ar": "مهندس كميات للمراجعة"
+    },
+    "speciality": {
+     "en": "Blind checking agent",
+     "ar": "وكيل المراجعة المستقلة"
+    },
+    "style": {
+     "en": "Reads only, checks every number against its source, answers with a code.",
+     "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+    },
+    "model": {
+     "name": "DeepSeek (sample)",
+     "provider": "DeepSeek",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 0,
+     "checks_total": 0,
+     "cost_usd": "0.92"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": false
+   },
+   {
+    "id": "5a0000000000000000000000000000c1",
+    "role": "specialist",
+    "kind": "permanent",
+    "name": {
+     "en": "Contracts QS (sample)",
+     "ar": "مهندس العقود - عينة"
+    },
+    "title": {
+     "en": "Contracts quantity surveyor (sample)",
+     "ar": "مهندس كميات للعقود - عينة"
+    },
+    "speciality": {
+     "en": "Contract conditions reading agent (sample)",
+     "ar": "وكيل قراءة شروط العقد - عينة"
+    },
+    "style": {
+     "en": "Quotes the clause, then says what it costs. (sample)",
+     "ar": "بينقل نص البند، وبعدين يقول تأثيره على السعر. - عينة"
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 3,
+     "checks_total": 3,
+     "cost_usd": "1.37"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": false
+   },
+   {
+    "id": "5a0000000000000000000000000000c2",
+    "role": "specialist",
+    "kind": "temporary",
+    "name": {
+     "en": "Pricing QS (sample)",
+     "ar": "مهندس التسعير - عينة"
+    },
+    "title": {
+     "en": "Pricing quantity surveyor (sample)",
+     "ar": "مهندس كميات للتسعير - عينة"
+    },
+    "speciality": {
+     "en": "Rate build-up agent (sample)",
+     "ar": "وكيل تحليل الأسعار - عينة"
+    },
+    "style": {
+     "en": "Builds every rate from sourced parts and shows the sum. (sample)",
+     "ar": "بيبني كل سعر من أجزاء ليها مصدر وبيوضّح المجموع. - عينة"
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "prices_lookup",
+      "title": {
+       "en": "Look up market prices",
+       "ar": "البحث عن أسعار السوق"
+      }
+     },
+     {
+      "name": "calculate",
+      "title": {
+       "en": "Calculate with the Calc Engine",
+       "ar": "الحساب بمحرك الحسابات"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 1,
+     "checks_passed": 1,
+     "checks_total": 2,
+     "cost_usd": "0.58"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": false
+   }
+  ]
+ },
+ "team_members:5a000000000000000000000000000001": {
+  "members": [
+   {
+    "id": "lead-qs",
+    "role": "lead",
+    "kind": "fixed",
+    "name": {
+     "en": "Lead QS",
+     "ar": "Lead QS"
+    },
+    "title": {
+     "en": "Senior quantity surveyor",
+     "ar": "مهندس كميات أول"
+    },
+    "speciality": {
+     "en": "Tender lead and planning agent",
+     "ar": "وكيل قيادة وتخطيط العطاء"
+    },
+    "style": {
+     "en": "Plans first, writes short, raises one decision at a time.",
+     "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "tender_plan_write",
+      "title": {
+       "en": "Write the tender plan",
+       "ar": "كتابة خطة العطاء"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     },
+     {
+      "name": "raise_finding",
+      "title": {
+       "en": "Raise a Finding to the engineer",
+       "ar": "رفع ملاحظة للمهندس"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 5,
+     "checks_passed": 4,
+     "checks_total": 5,
+     "cost_usd": "6.85"
+    },
+    "state": "waiting",
+    "doing": {
+     "en": "Waiting for your approval of the plan",
+     "ar": "مستني اعتمادك للخطة"
+    },
+    "proposed": false
+   },
+   {
+    "id": "checking-qs",
+    "role": "checker",
+    "kind": "fixed",
+    "name": {
+     "en": "Checking QS",
+     "ar": "Checking QS"
+    },
+    "title": {
+     "en": "Reviewing quantity surveyor",
+     "ar": "مهندس كميات للمراجعة"
+    },
+    "speciality": {
+     "en": "Blind checking agent",
+     "ar": "وكيل المراجعة المستقلة"
+    },
+    "style": {
+     "en": "Reads only, checks every number against its source, answers with a code.",
+     "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+    },
+    "model": {
+     "name": "DeepSeek (sample)",
+     "provider": "DeepSeek",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 0,
+     "checks_total": 0,
+     "cost_usd": "0.92"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": false
+   },
+   {
+    "id": "5a0000000000000000000000000000c1",
+    "role": "specialist",
+    "kind": "permanent",
+    "name": {
+     "en": "Contracts QS (sample)",
+     "ar": "مهندس العقود - عينة"
+    },
+    "title": {
+     "en": "Contracts quantity surveyor (sample)",
+     "ar": "مهندس كميات للعقود - عينة"
+    },
+    "speciality": {
+     "en": "Contract conditions reading agent (sample)",
+     "ar": "وكيل قراءة شروط العقد - عينة"
+    },
+    "style": {
+     "en": "Quotes the clause, then says what it costs. (sample)",
+     "ar": "بينقل نص البند، وبعدين يقول تأثيره على السعر. - عينة"
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 3,
+     "checks_total": 3,
+     "cost_usd": "1.37"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": true
+   },
+   {
+    "id": "5a0000000000000000000000000000c3",
+    "role": "specialist",
+    "kind": "temporary",
+    "name": {
+     "en": "Pricing QS (sample)",
+     "ar": "مهندس التسعير - عينة"
+    },
+    "title": {
+     "en": "Pricing quantity surveyor (sample)",
+     "ar": "مهندس كميات للتسعير - عينة"
+    },
+    "speciality": {
+     "en": "Rate build-up agent (sample)",
+     "ar": "وكيل تحليل الأسعار - عينة"
+    },
+    "style": {
+     "en": "Builds every rate from sourced parts and shows the sum. (sample)",
+     "ar": "بيبني كل سعر من أجزاء ليها مصدر وبيوضّح المجموع. - عينة"
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "prices_lookup",
+      "title": {
+       "en": "Look up market prices",
+       "ar": "البحث عن أسعار السوق"
+      }
+     },
+     {
+      "name": "calculate",
+      "title": {
+       "en": "Calculate with the Calc Engine",
+       "ar": "الحساب بمحرك الحسابات"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 0,
+     "checks_passed": 0,
+     "checks_total": 0,
+     "cost_usd": "0"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": true
+   }
+  ]
+ },
+ "team_members:5a000000000000000000000000000003": {
+  "members": [
+   {
+    "id": "lead-qs",
+    "role": "lead",
+    "kind": "fixed",
+    "name": {
+     "en": "Lead QS",
+     "ar": "Lead QS"
+    },
+    "title": {
+     "en": "Senior quantity surveyor",
+     "ar": "مهندس كميات أول"
+    },
+    "speciality": {
+     "en": "Tender lead and planning agent",
+     "ar": "وكيل قيادة وتخطيط العطاء"
+    },
+    "style": {
+     "en": "Plans first, writes short, raises one decision at a time.",
+     "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "tender_plan_write",
+      "title": {
+       "en": "Write the tender plan",
+       "ar": "كتابة خطة العطاء"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     },
+     {
+      "name": "raise_finding",
+      "title": {
+       "en": "Raise a Finding to the engineer",
+       "ar": "رفع ملاحظة للمهندس"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 5,
+     "checks_passed": 4,
+     "checks_total": 5,
+     "cost_usd": "6.85"
+    },
+    "state": "waiting",
+    "doing": {
+     "en": "waiting for your answer: Lead QS asks",
+     "ar": "مستني ردّك: Lead QS بيسأل"
+    },
+    "proposed": false
+   },
+   {
+    "id": "checking-qs",
+    "role": "checker",
+    "kind": "fixed",
+    "name": {
+     "en": "Checking QS",
+     "ar": "Checking QS"
+    },
+    "title": {
+     "en": "Reviewing quantity surveyor",
+     "ar": "مهندس كميات للمراجعة"
+    },
+    "speciality": {
+     "en": "Blind checking agent",
+     "ar": "وكيل المراجعة المستقلة"
+    },
+    "style": {
+     "en": "Reads only, checks every number against its source, answers with a code.",
+     "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+    },
+    "model": {
+     "name": "DeepSeek (sample)",
+     "provider": "DeepSeek",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 0,
+     "checks_total": 0,
+     "cost_usd": "0.92"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": false
+   }
+  ]
+ },
+ "team_members:5a000000000000000000000000000005": {
+  "members": [
+   {
+    "id": "lead-qs",
+    "role": "lead",
+    "kind": "fixed",
+    "name": {
+     "en": "Lead QS",
+     "ar": "Lead QS"
+    },
+    "title": {
+     "en": "Senior quantity surveyor",
+     "ar": "مهندس كميات أول"
+    },
+    "speciality": {
+     "en": "Tender lead and planning agent",
+     "ar": "وكيل قيادة وتخطيط العطاء"
+    },
+    "style": {
+     "en": "Plans first, writes short, raises one decision at a time.",
+     "ar": "بيخطط الأول، كلامه قصير، وبيرفع قرار واحد في المرة."
+    },
+    "model": {
+     "name": "Claude (sample)",
+     "provider": "Anthropic",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     },
+     {
+      "name": "tender_plan_write",
+      "title": {
+       "en": "Write the tender plan",
+       "ar": "كتابة خطة العطاء"
+      }
+     },
+     {
+      "name": "record_finding",
+      "title": {
+       "en": "Record a Finding",
+       "ar": "تسجيل ملاحظة"
+      }
+     },
+     {
+      "name": "raise_finding",
+      "title": {
+       "en": "Raise a Finding to the engineer",
+       "ar": "رفع ملاحظة للمهندس"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 5,
+     "checks_passed": 4,
+     "checks_total": 5,
+     "cost_usd": "6.85"
+    },
+    "state": "working",
+    "doing": {
+     "en": "Read 02 الشروط الخاصة.pdf, page 12 of 64 (sample)",
+     "ar": "يقرا 02 الشروط الخاصة.pdf، صفحة 12 من 64 - عينة"
+    },
+    "proposed": false
+   },
+   {
+    "id": "checking-qs",
+    "role": "checker",
+    "kind": "fixed",
+    "name": {
+     "en": "Checking QS",
+     "ar": "Checking QS"
+    },
+    "title": {
+     "en": "Reviewing quantity surveyor",
+     "ar": "مهندس كميات للمراجعة"
+    },
+    "speciality": {
+     "en": "Blind checking agent",
+     "ar": "وكيل المراجعة المستقلة"
+    },
+    "style": {
+     "en": "Reads only, checks every number against its source, answers with a code.",
+     "ar": "بيقرا بس، بيراجع كل رقم على مصدره، وبيرد بكود."
+    },
+    "model": {
+     "name": "DeepSeek (sample)",
+     "provider": "DeepSeek",
+     "on_device": false
+    },
+    "tools": [
+     {
+      "name": "files_read",
+      "title": {
+       "en": "Read the tender files",
+       "ar": "قراءة ملفات العطاء"
+      }
+     },
+     {
+      "name": "search_records",
+      "title": {
+       "en": "Search the project records",
+       "ar": "البحث في سجلات المشروع"
+      }
+     }
+    ],
+    "record": {
+     "tenders": 2,
+     "checks_passed": 0,
+     "checks_total": 0,
+     "cost_usd": "0.92"
+    },
+    "state": "idle",
+    "doing": null,
+    "proposed": false
+   }
+  ]
+ },
+ "room:5a000000000000000000000000000002": {
+  "messages": [
+   {
+    "id": "5a000000000000000000000000007006",
+    "from_id": "lead-qs",
+    "to_id": "engineer",
+    "text": "بند 7/03 عزل الأسطح مالوش كمية في جدول الكميات، ورفعت القرار للمهندس - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "جدول الكميات - عينة (sample)",
+      "file_name": "04 جدول الكميات.xlsx - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f3",
+      "locator": {
+       "sheet": "BOQ",
+       "row": 212,
+       "item": "7/03"
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "at": "2026-11-09T08:15:00.000000+00:00",
+    "raised": {
+     "id": "5a000000000000000000000000009002",
+     "answered": false
+    }
+   },
+   {
+    "id": "5a000000000000000000000000007005",
+    "from_id": "engineer",
+    "to_id": "team",
+    "text": "استخدموا 5% هالك للحديد في كل البنود - عينة (sample)",
+    "sources": [],
+    "at": "2026-11-09T08:02:00.000000+00:00",
+    "raised": null
+   },
+   {
+    "id": "5a000000000000000000000000007004",
+    "from_id": "lead-qs",
+    "to_id": "engineer",
+    "text": "محتاجين نسبة هالك الحديد: كام في المية؟ - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "المواصفات الفنية - عينة (sample)",
+      "file_name": "03 المواصفات.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f2",
+      "locator": {
+       "page": 52
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "at": "2026-11-09T07:55:00.000000+00:00",
+    "raised": {
+     "id": "5a0000000000000000000000000000b4",
+     "answered": true
+    }
+   },
+   {
+    "id": "5a000000000000000000000000007003",
+    "from_id": "5a0000000000000000000000000000c2",
+    "to_id": "lead-qs",
+    "text": "تحليل سعر بند 3/02 محتاج نسبة هالك للحديد، والمواصفات ما حددتهاش - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "المواصفات الفنية - عينة (sample)",
+      "file_name": "03 المواصفات.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f2",
+      "locator": {
+       "page": 52
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "at": "2026-11-09T07:50:00.000000+00:00",
+    "raised": null
+   },
+   {
+    "id": "5a000000000000000000000000007002",
+    "from_id": "5a0000000000000000000000000000c1",
+    "to_id": "lead-qs",
+    "text": "البند 9 في الشروط الخاصة بيقول المحتجز 5%، والبند 14 بيقول 10% - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "الشروط الخاصة - عينة (sample)",
+      "file_name": "02 الشروط الخاصة.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f4",
+      "locator": {
+       "page": 9
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     },
+     {
+      "kind": "sample",
+      "title": "الشروط الخاصة - عينة (sample)",
+      "file_name": "02 الشروط الخاصة.pdf - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f4",
+      "locator": {
+       "page": 12
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "at": "2026-11-09T07:31:00.000000+00:00",
+    "raised": null
+   },
+   {
+    "id": "5a000000000000000000000000007001",
+    "from_id": "lead-qs",
+    "to_id": "5a0000000000000000000000000000c2",
+    "text": "ابدأ بتسعير القسم 3 (الخرسانة) من جدول الكميات - عينة (sample)",
+    "sources": [
+     {
+      "kind": "sample",
+      "title": "جدول الكميات - عينة (sample)",
+      "file_name": "04 جدول الكميات.xlsx - عينة (sample)",
+      "file_id": "5a0000000000000000000000000000f3",
+      "locator": {
+       "sheet": "BOQ",
+       "row": 41,
+       "item": "3/02"
+      },
+      "url": null,
+      "dated": null,
+      "quote": null
+     }
+    ],
+    "at": "2026-11-09T07:30:00.000000+00:00",
+    "raised": null
+   }
+  ],
+  "next_cursor": null
+ },
+ "room:5a000000000000000000000000000001": {
+  "messages": [],
+  "next_cursor": null
+ },
+ "setup": {
+  "ready": true,
+  "parts": [
+   {
+    "id": "search-model",
+    "title": {
+     "en": "Search model",
+     "ar": "موديل البحث"
+    },
+    "state": "present",
+    "done_bytes": 135390915,
+    "total_bytes": 135390915,
+    "affects": {
+     "en": "Search by meaning in the tender files",
+     "ar": "البحث بالمعنى في ملفات العطاء"
+    },
+    "reason": null
+   },
+   {
+    "id": "sandbox-runtime",
+    "title": {
+     "en": "Sandbox runtime",
+     "ar": "بيئة الـ Sandbox"
+    },
+    "state": "present",
+    "done_bytes": 28400000,
+    "total_bytes": 28400000,
+    "affects": {
+     "en": "Calculations the team runs in the Sandbox",
+     "ar": "الحسابات اللي الفريق بيشغّلها في الـ Sandbox"
+    },
+    "reason": null
+   },
+   {
+    "id": "dwg-reader",
+    "title": {
+     "en": "DWG reader",
+     "ar": "قارئ ملفات DWG"
+    },
+    "state": "present",
+    "done_bytes": 9600000,
+    "total_bytes": 9600000,
+    "affects": {
+     "en": "Reading DWG drawings",
+     "ar": "قراءة رسومات DWG"
+    },
+    "reason": null
+   }
+  ]
+ },
+ "setup:downloading": {
+  "ready": false,
+  "parts": [
+   {
+    "id": "search-model",
+    "title": {
+     "en": "Search model",
+     "ar": "موديل البحث"
+    },
+    "state": "downloading",
+    "done_bytes": 62000000,
+    "total_bytes": 135390915,
+    "affects": {
+     "en": "Search by meaning in the tender files",
+     "ar": "البحث بالمعنى في ملفات العطاء"
+    },
+    "reason": null
+   },
+   {
+    "id": "sandbox-runtime",
+    "title": {
+     "en": "Sandbox runtime",
+     "ar": "بيئة الـ Sandbox"
+    },
+    "state": "present",
+    "done_bytes": 28400000,
+    "total_bytes": 28400000,
+    "affects": {
+     "en": "Calculations the team runs in the Sandbox",
+     "ar": "الحسابات اللي الفريق بيشغّلها في الـ Sandbox"
+    },
+    "reason": null
+   },
+   {
+    "id": "dwg-reader",
+    "title": {
+     "en": "DWG reader",
+     "ar": "قارئ ملفات DWG"
+    },
+    "state": "queued",
+    "done_bytes": 0,
+    "total_bytes": 9600000,
+    "affects": {
+     "en": "Reading DWG drawings",
+     "ar": "قراءة رسومات DWG"
+    },
+    "reason": null
+   }
+  ]
+ },
+ "setup:offline": {
+  "ready": false,
+  "parts": [
+   {
+    "id": "search-model",
+    "title": {
+     "en": "Search model",
+     "ar": "موديل البحث"
+    },
+    "state": "waiting_network",
+    "done_bytes": 62000000,
+    "total_bytes": 135390915,
+    "affects": {
+     "en": "Search by meaning in the tender files",
+     "ar": "البحث بالمعنى في ملفات العطاء"
+    },
+    "reason": null
+   },
+   {
+    "id": "sandbox-runtime",
+    "title": {
+     "en": "Sandbox runtime",
+     "ar": "بيئة الـ Sandbox"
+    },
+    "state": "present",
+    "done_bytes": 28400000,
+    "total_bytes": 28400000,
+    "affects": {
+     "en": "Calculations the team runs in the Sandbox",
+     "ar": "الحسابات اللي الفريق بيشغّلها في الـ Sandbox"
+    },
+    "reason": null
+   },
+   {
+    "id": "dwg-reader",
+    "title": {
+     "en": "DWG reader",
+     "ar": "قارئ ملفات DWG"
+    },
+    "state": "waiting_network",
+    "done_bytes": 0,
+    "total_bytes": 9600000,
+    "affects": {
+     "en": "Reading DWG drawings",
+     "ar": "قراءة رسومات DWG"
+    },
+    "reason": null
+   }
+  ]
+ },
+ "setup:failed": {
+  "ready": false,
+  "parts": [
+   {
+    "id": "search-model",
+    "title": {
+     "en": "Search model",
+     "ar": "موديل البحث"
+    },
+    "state": "present",
+    "done_bytes": 135390915,
+    "total_bytes": 135390915,
+    "affects": {
+     "en": "Search by meaning in the tender files",
+     "ar": "البحث بالمعنى في ملفات العطاء"
+    },
+    "reason": null
+   },
+   {
+    "id": "sandbox-runtime",
+    "title": {
+     "en": "Sandbox runtime",
+     "ar": "بيئة الـ Sandbox"
+    },
+    "state": "present",
+    "done_bytes": 28400000,
+    "total_bytes": 28400000,
+    "affects": {
+     "en": "Calculations the team runs in the Sandbox",
+     "ar": "الحسابات اللي الفريق بيشغّلها في الـ Sandbox"
+    },
+    "reason": null
+   },
+   {
+    "id": "dwg-reader",
+    "title": {
+     "en": "DWG reader",
+     "ar": "قارئ ملفات DWG"
+    },
+    "state": "failed",
+    "done_bytes": 0,
+    "total_bytes": 9600000,
+    "affects": {
+     "en": "Reading DWG drawings",
+     "ar": "قراءة رسومات DWG"
+    },
+    "reason": {
+     "en": "The downloaded file was damaged three times in a row.",
+     "ar": "الملف نزل بايظ 3 مرات ورا بعض."
+    }
+   }
+  ]
+ },
+ "setup:unavailable": {
+  "ready": true,
+  "parts": [
+   {
+    "id": "search-model",
+    "title": {
+     "en": "Search model",
+     "ar": "موديل البحث"
+    },
+    "state": "unavailable",
+    "done_bytes": 0,
+    "total_bytes": 135390915,
+    "affects": {
+     "en": "Search by meaning in the tender files",
+     "ar": "البحث بالمعنى في ملفات العطاء"
+    },
+    "reason": {
+     "en": "Search by meaning cannot run on this computer. Search by words works as usual.",
+     "ar": "البحث بالمعنى مش هينفع يشتغل على الجهاز ده. البحث بالكلمات شغال عادي."
+    }
+   },
+   {
+    "id": "sandbox-runtime",
+    "title": {
+     "en": "Sandbox runtime",
+     "ar": "بيئة الـ Sandbox"
+    },
+    "state": "present",
+    "done_bytes": 28400000,
+    "total_bytes": 28400000,
+    "affects": {
+     "en": "Calculations the team runs in the Sandbox",
+     "ar": "الحسابات اللي الفريق بيشغّلها في الـ Sandbox"
+    },
+    "reason": null
+   },
+   {
+    "id": "dwg-reader",
+    "title": {
+     "en": "DWG reader",
+     "ar": "قارئ ملفات DWG"
+    },
+    "state": "present",
+    "done_bytes": 9600000,
+    "total_bytes": 9600000,
+    "affects": {
+     "en": "Reading DWG drawings",
+     "ar": "قراءة رسومات DWG"
+    },
+    "reason": null
+   }
+  ]
+ },
+ "settings": {
+  "settings": [
+   {
+    "key": "ai.models",
+    "section": "ai",
+    "title": {
+     "en": "Models",
+     "ar": "الموديلات"
+    },
+    "help": {
+     "en": "ONE takes the strongest model for the Lead QS and the check, and the cheapest for quick questions.",
+     "ar": "ONE بياخد أقوى موديل للـ Lead QS والمراجعة، وأرخص موديل للأسئلة السريعة."
+    },
+    "at_recommended": true,
+    "control": "choice",
+    "value": "recommended",
+    "recommended": "recommended",
+    "choices": [
+     {
+      "value": "recommended",
+      "title": {
+       "en": "The recommended choice",
+       "ar": "الاختيار الموصى به"
+      }
+     },
+     {
+      "value": "own",
+      "title": {
+       "en": "I choose a model for each role myself",
+       "ar": "أنا أختار موديل لكل دور"
+      }
+     }
+    ]
+   },
+   {
+    "key": "ai.confidential_on_device",
+    "section": "ai",
+    "title": {
+     "en": "On this computer only",
+     "ar": "على الجهاز ده بس"
+    },
+    "help": {
+     "en": "Confidential Projects run on a model on this computer. Slower and weaker, but no text leaves it.",
+     "ar": "المشاريع السرية بتشتغل على موديل على الجهاز ده. أبطأ وأضعف، بس مفيش نص بيخرج منه."
+    },
+    "at_recommended": true,
+    "control": "toggle",
+    "value": false,
+    "recommended": false
+   },
+   {
+    "key": "caps.brief_usd",
+    "section": "caps",
+    "title": {
+     "en": "One piece of work",
+     "ar": "الشغلانة الواحدة"
+    },
+    "help": {
+     "en": "The most one piece of work may spend.",
+     "ar": "أقصى صرف للشغلانة الواحدة."
+    },
+    "at_recommended": true,
+    "control": "money",
+    "value": "3",
+    "recommended": "3",
+    "currency": "USD"
+   },
+   {
+    "key": "caps.day_usd",
+    "section": "caps",
+    "title": {
+     "en": "One day",
+     "ar": "اليوم"
+    },
+    "help": {
+     "en": "The most ONE may spend in a day.",
+     "ar": "أقصى صرف في اليوم."
+    },
+    "at_recommended": true,
+    "control": "money",
+    "value": "15",
+    "recommended": "15",
+    "currency": "USD"
+   },
+   {
+    "key": "caps.month_usd",
+    "section": "caps",
+    "title": {
+     "en": "One month",
+     "ar": "الشهر"
+    },
+    "help": {
+     "en": "The most ONE may spend in a month.",
+     "ar": "أقصى صرف في الشهر."
+    },
+    "at_recommended": false,
+    "control": "money",
+    "value": "50",
+    "recommended": "150",
+    "currency": "USD"
+   },
+   {
+    "key": "caps.budget_above_usd",
+    "section": "caps",
+    "title": {
+     "en": "Ask me first above",
+     "ar": "اسألني الأول فوق"
+    },
+    "help": {
+     "en": "ONE asks before work expected to cost more than this.",
+     "ar": "ONE بيسأل قبل أي شغل متوقع يكلّف أكتر من كده."
+    },
+    "at_recommended": true,
+    "control": "money",
+    "value": "0.50",
+    "recommended": "0.50",
+    "currency": "USD"
+   },
+   {
+    "key": "caps.map_auto_usd",
+    "section": "caps",
+    "title": {
+     "en": "Reading a new drop",
+     "ar": "قراءة ملفات جديدة"
+    },
+    "help": {
+     "en": "The most ONE may spend reading each new drop of files without asking.",
+     "ar": "أقصى صرف على قراءة كل دفعة ملفات جديدة من غير ما ONE يسأل."
+    },
+    "at_recommended": true,
+    "control": "money",
+    "value": "0.50",
+    "recommended": "0.50",
+    "currency": "USD"
+   },
+   {
+    "key": "caps.subscription_stops",
+    "section": "caps",
+    "title": {
+     "en": "Count my Claude subscription",
+     "ar": "احسب اشتراك Claude"
+    },
+    "help": {
+     "en": "The subscription's equivalent cost counts towards the caps.",
+     "ar": "التكلفة المعادلة للاشتراك بتتحسب على الحدود."
+    },
+    "at_recommended": true,
+    "control": "toggle",
+    "value": false,
+    "recommended": false
+   },
+   {
+    "key": "privacy.usage_stats",
+    "section": "privacy",
+    "title": {
+     "en": "Usage Stats",
+     "ar": "إحصاءات الاستخدام"
+    },
+    "help": {
+     "en": "Counts of what you use, with no file names, no texts and no numbers.",
+     "ar": "أعداد للي بتستخدمه، من غير أسماء ملفات ولا نصوص ولا أرقام."
+    },
+    "at_recommended": true,
+    "control": "toggle",
+    "value": false,
+    "recommended": false
+   },
+   {
+    "key": "look.language",
+    "section": "look",
+    "title": {
+     "en": "Language",
+     "ar": "اللغة"
+    },
+    "help": {
+     "en": "The language of the whole window.",
+     "ar": "لغة الشاشة كلها."
+    },
+    "at_recommended": true,
+    "control": "choice",
+    "value": "ar",
+    "recommended": "ar",
+    "choices": [
+     {
+      "value": "ar",
+      "title": {
+       "en": "العربية",
+       "ar": "العربية"
+      }
+     },
+     {
+      "value": "en",
+      "title": {
+       "en": "English",
+       "ar": "English"
+      }
+     }
+    ]
+   },
+   {
+    "key": "look.theme",
+    "section": "look",
+    "title": {
+     "en": "Theme",
+     "ar": "المظهر"
+    },
+    "help": {
+     "en": "Light, dark, or as your system.",
+     "ar": "فاتح، غامق، أو زي النظام."
+    },
+    "at_recommended": true,
+    "control": "choice",
+    "value": "system",
+    "recommended": "system",
+    "choices": [
+     {
+      "value": "system",
+      "title": {
+       "en": "As the system",
+       "ar": "زي النظام"
+      }
+     },
+     {
+      "value": "light",
+      "title": {
+       "en": "Light",
+       "ar": "فاتح"
+      }
+     },
+     {
+      "value": "dark",
+      "title": {
+       "en": "Dark",
+       "ar": "غامق"
+      }
+     }
+    ]
+   },
+   {
+    "key": "look.zoom",
+    "section": "look",
+    "title": {
+     "en": "Zoom",
+     "ar": "التكبير"
+    },
+    "help": {
+     "en": "The size of everything in the window.",
+     "ar": "حجم كل حاجة في الشاشة."
+    },
+    "at_recommended": true,
+    "control": "number",
+    "value": "1.0",
+    "recommended": "1.0",
+    "min": "0.8",
+    "max": "1.5",
+    "step": "0.1"
+   }
+  ]
+ },
+ "ai_link": {
+  "id": "anthropic",
+  "name": "Claude (sample)",
+  "provider": "Anthropic"
+ }
+}
