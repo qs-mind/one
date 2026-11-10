@@ -1,7 +1,7 @@
 // The Sheet viewer: a Deliverable's priced BOQ as the core's view draws it. Its direction comes from the
 // Deliverable's language, not the screen's. Every edit, typed or pasted, is sent as a Suggested change and
 // shows old → new with ✓ ✗ until the engineer decides; nothing on this screen adds, multiplies or totals.
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
+import { useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
 import { deliverablesApi, type Accepted, type Rejected } from "../../deliverables/api";
 import type { Change, NumberCell, Op, SheetView, Thread, ViewRow } from "../../deliverables/types";
 import type { LocateOptions } from "../../project/types";
@@ -16,6 +16,7 @@ import { Grid, type GridHandle, type SheetColumn } from "./grid";
 import { useSizes } from "../../ui/scale";
 import { COMPACT_PAD, linesHeight, makeMeasure, oneLineWidth, rowHeight, shownWidth, titleColumnOf } from "./heights";
 import { normalised, type Cell, type Range } from "./selection";
+import { NumberTarget } from "./numberTarget";
 import { SourcePopover } from "./SourcePopover";
 import { hideSourceLine, showSourceLine } from "../../sources/line";
 import { sourceKeys } from "../../sources/targets";
@@ -217,6 +218,7 @@ export function SheetViewer(props: SheetViewerProps) {
 
   const [selection, setSelection] = useState<Range | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const numberTarget = useContext(NumberTarget);
   const [popover, setPopover] = useState<{
     cell: NumberCell;
     style: CSSProperties;
@@ -326,6 +328,7 @@ export function SheetViewer(props: SheetViewerProps) {
   }
 
   function openSource(cell: NumberCell, el: HTMLElement, focus: boolean, label: string) {
+    if (numberTarget) return numberTarget({ cell, label, sources: view.sources }); // shown under the sheet instead
     const box = boxOf(el);
     const width = root.current?.offsetWidth ?? 0;
     if (!box) return;

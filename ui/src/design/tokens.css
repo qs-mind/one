@@ -15,6 +15,11 @@
 @source "../settings2";
 @source "../firstlaunch2";
 @source "../conversation";
+/* The kept engines the tender's viewers wrap (U5): their classes, with the old colour names read as tokens below. */
+@source "../{viewers,deliverables,sources,review,records}";
+@source "../workspace/{DocumentView.tsx,docs}";
+@source "../ui";
+@source "../chat/parts";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {
@@ -214,6 +219,13 @@
   --color-disabled: var(--disabled);
   --color-scrim: var(--scrim);
   --color-hold: var(--hold-fill);
+
+  /* The old colour names of the kept engines (U5), read as tokens. Copper is "now" only: the old copper reads as ink. */
+  --color-ink: var(--foreground);
+  --color-paper: var(--card);
+  --color-stone: var(--muted);
+  --color-slate: var(--muted-foreground);
+  --color-copper: var(--foreground);
 }
 
 /* A number, an amount, an item code: left to right, kept in one piece inside Arabic. */
