@@ -5,23 +5,21 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo } from "react";
-import { api } from "@/api";
 import type { Schemas } from "@/api/client";
+import { chatFetch, getChatMessages, steerBrief } from "@/api/existing";
 import type { ComposerMessage, LeadActivity } from "@/conversation/Composer";
 import { briefState, type DataPart, isData, type ThreadMessage } from "@/conversation/parts";
 
 // Only the new message goes to the core: it keeps the history with its Briefs.
 const transport = new DefaultChatTransport<ThreadMessage>({
   api: "/chat",
-  fetch: (input, init) => api(String(input), init),
+  fetch: chatFetch,
   prepareSendMessagesRequest: ({ id, messages, body }) => ({ body: { ...body, id, messages: messages.slice(-1) } }),
 });
 
 async function stored(chatId: string): Promise<ThreadMessage[] | null> {
-  const response = await api(`/chat/${encodeURIComponent(chatId)}/messages`).catch(() => undefined);
-  if (!response?.ok) return null;
-  const body = (await response.json().catch(() => undefined)) as { messages?: ThreadMessage[] } | undefined;
-  return body?.messages ?? null;
+  const got = await getChatMessages(chatId);
+  return (got.data?.messages as ThreadMessage[] | undefined) ?? null;
 }
 
 /** The Brief of the newest reply: the id of its status part. */
@@ -74,12 +72,8 @@ export function useThread(projectId: string, brief: Schemas["BriefEvent"] | null
     async ({ text }: ComposerMessage) => {
       const id = briefOf(messages);
       if (!id) throw new Error("no work runs");
-      const response = await api(`/briefs/${encodeURIComponent(id)}/steer`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      if (!response.ok) throw new Error(String(response.status));
+      const got = await steerBrief(id, text);
+      if (got.error !== undefined) throw new Error("the steer was refused");
     },
     [messages],
   );
