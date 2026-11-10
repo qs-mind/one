@@ -68,6 +68,12 @@ test("trim removes what must not ship and keeps what must", () => {
     `${lib}/site-packages/x/__pycache__/mod.cpython-312.pyc`,
     `${lib}/site-packages/x/libstatic.a`,
     `${lib}/site-packages/x/mod.py`,
+    `${lib}/site-packages/olefile/olefile.py`,
+    `${lib}/site-packages/olefile/olefile2.py`,
+    `${lib}/site-packages/olefile/OleFileIO_PL.py`,
+    `${lib}/site-packages/olefile/olefile.html`,
+    `${lib}/site-packages/olefile/doc/API.html`,
+    `${lib}/site-packages/olefile/LICENSE.txt`,
     `${lib}/site-packages/qsone/app.py`,
     `${lib}/site-packages/qsone/fonts/Zain-Regular.ttf`,
     "include/Python.h",
@@ -87,11 +93,14 @@ test("trim removes what must not ship and keeps what must", () => {
     `${lib}/lib-dynload/readline.cpython-312-x86_64-linux-gnu.so`, `${lib}/lib-dynload/_tkinter.cpython-312-x86_64-linux-gnu.so`,
     `${lib}/site-packages/pip`, `${lib}/site-packages/pip-26.2.2.dist-info`, `${lib}/site-packages/x/tests`,
     `${lib}/site-packages/x/__pycache__`, `${lib}/site-packages/x/libstatic.a`, "include", "lib/libtcl9.0.so",
-    "lib/tk9.0", "bin/pip3", "bin/uvicorn", "bin/python3.12",
+    "lib/tk9.0", "bin/pip3", "bin/uvicorn", "bin/python3.12", `${lib}/site-packages/olefile/olefile2.py`,
+    `${lib}/site-packages/olefile/OleFileIO_PL.py`, `${lib}/site-packages/olefile/olefile.html`,
+    `${lib}/site-packages/olefile/doc`,
   ]) expect(existsSync(path.join(dir, gone)), gone).toBe(false);
   for (const kept of [
     `${lib}/os.py`, `${lib}/lib-dynload/_ssl.cpython-312-x86_64-linux-gnu.so`, `${lib}/site-packages/x/mod.py`,
     `${lib}/site-packages/qsone/app.py`, `${lib}/site-packages/qsone/fonts/Zain-Regular.ttf`, "lib/libpython3.12.so.1.0",
+    `${lib}/site-packages/olefile/olefile.py`, `${lib}/site-packages/olefile/LICENSE.txt`,
   ]) expect(existsSync(path.join(dir, kept)), kept).toBe(true);
   expect(readdirSync(path.join(dir, "bin"))).toEqual(["python3"]); // the interpreter itself, not a link
   expect(layout(dir, "x86_64-unknown-linux-gnu").python).toBe(path.join(dir, "bin", "python3"));

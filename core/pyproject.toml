@@ -37,6 +37,7 @@ dependencies = [
   "asn1crypto",  # MIT; in-memory seal key and certificate encoding
   "openpyxl",
   "xlrd",
+  "olefile",  # BSD-2-Clause; Word 97-2003 (.doc) files, read in memory
   "platformdirs",
   # Search by meaning. onnxruntime ships no Intel Mac wheel: there, search is by words only.
   "onnxruntime ; sys_platform != 'darwin' or platform_machine == 'arm64'",

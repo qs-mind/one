@@ -129,7 +129,7 @@ def test_reader_env_and_timeout(monkeypatch, tmp_path):
         raise subprocess.TimeoutExpired(args[0], 30)
 
     monkeypatch.setattr(drawings.subprocess, "run", timeout)
-    assert drawings.read_drawing("sample.dwg", b"AC1032").note == "FILE_UNREADABLE"
+    assert drawings.read_drawing("sample.dwg", b"AC1032").note == "FILE_DRAWING_TIMEOUT"
 
 
 def test_layer_discipline_and_separate_title_labels():

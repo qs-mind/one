@@ -1449,6 +1449,10 @@ numpy==2.5.4 \
     #   qsone (pyproject.toml)
     #   onnxruntime
     #   shapely
+olefile==0.47 \
+    --hash=sha256:543c7da2a7adadf21214938bb79c83ea12b473a4b6ee4ad4bf854e7715e13d1f \
+    --hash=sha256:599383381a0bf3dfbd932ca0ca6515acd174ed48870cbf7fee123d698c192c1c
+    # via qsone (pyproject.toml)
 onnxruntime==1.31.1 ; platform_machine == 'arm64' or sys_platform != 'darwin' \
     --hash=sha256:0558f29d5f6ac09957390c9c5495931485ee8ae7f0ce781ccee86a0ae5c2348b \
     --hash=sha256:075147c2e2430b4b29c436bffa78537b902a6ed58ed66f99ae3c6795e2081cb5 \

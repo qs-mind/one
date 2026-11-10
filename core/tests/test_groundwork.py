@@ -62,6 +62,7 @@ def test_native_libraries_load(client):
     assert found["sqlcipher"].startswith("4.") and found["sqlite_vec"] and found["keyring_backend"]
     assert found["pdfium"] and found["cryptography"] and found["tokenizers"]
     assert found["wasmtime"] and found["typst"]
+    assert "acadrust" in found["drawings"]
     assert "onnxruntime" in found  # null on an Intel Mac, which has no wheel
 
 

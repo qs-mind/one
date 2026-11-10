@@ -39,6 +39,10 @@ class Drawing:
     hatches: list[dict] = field(default_factory=list)
     closed: list[dict] = field(default_factory=list)
     xrefs: list[dict] = field(default_factory=list)
+    tables: list[dict] = field(default_factory=list)
+    references: list[dict] = field(default_factory=list)  # images and underlays: other files
+    unread_kinds: dict = field(default_factory=dict)  # objects whose inside is not read, by kind
+    stats: dict = field(default_factory=dict)  # the reader's records: decoded, skipped
     problems: list = field(default_factory=list)
     omitted: dict = field(default_factory=dict)
     traversal_limited: bool = False
@@ -95,22 +99,35 @@ def _display_text(row: dict) -> dict:
     return {**row, "text": re.sub(r"%%[uUoOkK]", "", row["text"]).strip()}
 
 
+MIB = 1024 * 1024
+LIMIT = 64 * MIB
+
+
+def timeout_for(data: bytes) -> int:
+    """Seconds the reader may take: 30, and 2 more for each MiB of drawing."""
+    return 30 + 2 * (len(data) // MIB)
+
+
 def read_drawing(name: str, data: bytes) -> Drawing:
+    from qsone.records.readers.dwg import note_of
+
     binary = find_binary()
     if binary is None:
         return Drawing(note="FILE_DRAWINGS_MISSING")
-    if len(data) > 64 * 1024 * 1024:
-        return Drawing(note="FILE_DRAWINGS_LIMIT")
+    if len(data) > LIMIT:
+        return Drawing(note="FILE_DRAWING_TOO_LARGE")
     try:
         result = subprocess.run(
             [str(binary), "--name", name],
             input=data,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            timeout=30,
+            timeout=timeout_for(data),
             check=False,
         )
-        if result.returncode not in (0, 2) or len(result.stdout) > 64 * 1024 * 1024:
+        if result.returncode == 1:
+            return Drawing(note=note_of(json.loads(result.stdout).get("reason")))
+        if result.returncode not in (0, 2) or len(result.stdout) > LIMIT:
             return Drawing(note="FILE_UNREADABLE")
         raw = json.loads(result.stdout)
         allowed = {f.name for f in fields(Drawing)} - {"note", "repaired"}
@@ -131,7 +148,9 @@ def read_drawing(name: str, data: bytes) -> Drawing:
         if drawing.repaired:
             drawing.note = "FILE_DRAWINGS_REPAIRED"
         return drawing
-    except (OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+    except subprocess.TimeoutExpired:
+        return Drawing(note="FILE_DRAWING_TIMEOUT")
+    except (OSError, ValueError, TypeError, AttributeError):
         return Drawing(note="FILE_UNREADABLE")
 
 
@@ -691,7 +710,10 @@ def _embedded_texts(drawing: Drawing):
             _deduplicate_cells(drawing)
             continue
         payload = embedded.get("compound_hex", "")
-        if not payload or len(payload) > 16 * 1024 * 1024:
+        if not payload:
+            continue
+        if len(payload) > 16 * MIB:
+            drawing.problems.append({"code": "embedded-workbook-too-large"})
             continue
         try:
             book = xlrd.open_workbook(file_contents=bytes.fromhex(payload), on_demand=True)
@@ -735,12 +757,14 @@ def _package_texts(drawing: Drawing, embedded: dict):
     import openpyxl
 
     payload = embedded["package_hex"]
-    if len(payload) > 16 * 1024 * 1024:
+    if len(payload) > 16 * MIB:
+        drawing.problems.append({"code": "embedded-workbook-too-large"})
         return
     try:
         data = bytes.fromhex(payload)
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            if sum(i.file_size for i in archive.infolist()) > 64 * 1024 * 1024:
+            if sum(i.file_size for i in archive.infolist()) > 64 * MIB:
+                drawing.problems.append({"code": "embedded-workbook-too-large"})
                 return
         book = openpyxl.load_workbook(
             io.BytesIO(data), read_only=True, data_only=True, keep_links=False

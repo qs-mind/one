@@ -29,6 +29,7 @@ from qsone.copy.lookup import words_for
 from qsone.copy.prices import *
 from qsone.copy.project_map import *
 from qsone.copy.projects import *
+from qsone.copy.reading import *
 from qsone.copy.sandbox import *
 from qsone.copy.search import *
 from qsone.copy.spending import *

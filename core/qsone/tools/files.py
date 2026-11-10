@@ -35,7 +35,7 @@ from qsone.engine.costs import CallRefused, CapReached
 from qsone.engine.oneshot import OneShotFailed
 from qsone.engine.tools import Denied, ModelRetry, Tool, ToolContext, register
 from qsone.engine.types import Card, Progress
-from qsone.records import boq, files, ocr, render
+from qsone.records import boq, files, ocr, render, unread
 from qsone.records.files import FileInfo
 from qsone.records.mapping import drawing_evidence
 from qsone.records.pdfium_guard import PDFIUM, pdfium_locked
@@ -185,6 +185,8 @@ def _list(rec: Records, include_old: bool) -> str:
         lines.append(" | ".join(parts))
         if f.note and hasattr(copy, f.note):
             lines.append(f"  note: {getattr(copy, f.note)['en']}")
+        with rec.read() as c:
+            lines += ["  " + line for line in unread.lines(unread.parts_of(c, f), limit=4)]
         if f.flags:
             lines.append(
                 f"  hidden-text flags: {f.flags} (text a person does not see, or lines that "
@@ -629,6 +631,7 @@ def _render(rec: Records, info: FileInfo, args: ReadArgs, sel: _Selection, notes
         notes=notes,
         defaults_used=sel.defaults or None,
         more=None if more is None else f"call files_read {_json(more)}",
+        last=unread.lines(unread.of(rec, info)),
     )
 
 
