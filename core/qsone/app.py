@@ -25,7 +25,6 @@ from qsone import (
     home_routes,
     keys,
     models,
-    phase1_stubs,
     projects,
     settings,
     settings_routes,
@@ -466,8 +465,4 @@ def create_app(
 
     app.include_router(identity_routes.router(registry, engine))  # the team (Phase 1, C5)
     app.include_router(room.router(registry, engine))  # the team room (Phase 1, C6)
-
-    # The Phase 1 routes that are declared and not built yet (501). Keep this the last route
-    # added: it then never takes a request an older route answers.
-    app.include_router(phase1_stubs.router())
     return app
