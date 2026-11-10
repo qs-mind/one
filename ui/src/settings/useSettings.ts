@@ -1,7 +1,7 @@
 // The settings as the core keeps them (GET /settings), kept current by the `setting` event (the Lead may change one
 // by talking), and the one way to change one: PATCH /settings/{key}, which saves at once and answers the setting as
 // stored. The screen's own change never asks first (contract 21-22): the engineer is the one changing it.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribeGeneral } from "@/activity";
 import { client, type Schemas } from "@/api/client";
 import type { TextPair } from "@/texts/types";
@@ -15,8 +15,11 @@ export type Saved = { setting: Setting } | { words: TextPair | null; example?: s
 
 export function useSettings() {
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
+  // The settings changed while a load is on its way: its answer may be older, so they are laid over it.
+  const during = useRef(new Set<Map<string, Setting>>());
 
   const put = useCallback((setting: Setting) => {
+    for (const changed of during.current) changed.set(setting.key, setting);
     applyLook(setting);
     setLoaded((now) =>
       now.state === "ready" ? { state: "ready", settings: now.settings.map((it) => (it.key === setting.key ? setting : it)) } : now,
@@ -24,11 +27,16 @@ export function useSettings() {
   }, []);
 
   const load = useCallback(async () => {
+    const changed = new Map<string, Setting>();
+    during.current.add(changed);
     try {
       const { data } = await client.GET("/settings");
-      setLoaded(data ? { state: "ready", settings: data.settings } : { state: "failed" });
+      const settings = data?.settings.map((it) => changed.get(it.key) ?? it);
+      setLoaded(settings ? { state: "ready", settings } : { state: "failed" });
     } catch {
       setLoaded({ state: "failed" });
+    } finally {
+      during.current.delete(changed);
     }
   }, []);
 
