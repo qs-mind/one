@@ -131,7 +131,7 @@ describe("a document beside a narrow thread", () => {
     open(paths.room(P2));
     await screen.findByRole("region", { name: "Open document" });
     expect(document.querySelector('[data-place="room"]')).not.toBeNull();
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Team room");
+    expect(await screen.findByRole("heading", { level: 1, name: "Team room" })).toBeTruthy();
     resetPage();
     document.body.innerHTML = "";
     open(paths.member(P2, "lead-qs"));

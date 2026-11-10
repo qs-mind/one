@@ -104,7 +104,7 @@ export function Tender() {
       </p>
     );
   else if (opened) {
-    const host = <DocumentHost projectId={id} opened={opened} members={data.members} sample={row.sample} kept={kept} />;
+    const host = <DocumentHost projectId={id} opened={opened} sample={row.sample} kept={kept} />;
     body = full ? (
       host
     ) : (

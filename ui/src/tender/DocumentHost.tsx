@@ -3,7 +3,6 @@
 // both change the route (Close goes back to the conversation; Full screen, a toggle, adds or drops `?full`).
 import { XIcon } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import type { Schemas } from "@/api/client";
 import { paths } from "@/app/paths";
 import { Pill } from "@/design/Pill";
 import { Button, buttonVariants } from "@/design/ui/button";
@@ -23,24 +22,18 @@ export const FULL = "full";
 type DocumentHostProps = {
   projectId: string;
   opened: Opened;
-  members: readonly Schemas["TeamMember"][];
   sample: boolean;
   kept: KeptDocuments;
 };
 
-export function DocumentHost({ projectId, opened, members, sample, kept }: DocumentHostProps) {
+export function DocumentHost({ projectId, opened, sample, kept }: DocumentHostProps) {
   const t = useText();
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const full = search.has(FULL);
   const docKey = opened.kind === "doc" ? docKeyOf(opened.docId) : null;
 
-  let title: string;
-  if (opened.kind === "room") title = t(texts.roomTitle);
-  else if (opened.kind === "member") {
-    const member = members.find((m) => m.id === opened.memberId);
-    title = member ? t(member.name) : t(texts.memberTitle);
-  } else title = (docKey && keptTitle(kept.docs, docKey)) || t(texts.documentTitle);
+  const title = (docKey && keptTitle(kept.docs, docKey)) || t(texts.documentTitle);
 
   const here =
     opened.kind === "room"
@@ -52,9 +45,14 @@ export function DocumentHost({ projectId, opened, members, sample, kept }: Docum
   return (
     <section aria-label={t(texts.documentLabel)} className="flex h-full min-h-0 flex-col gap-7 px-(--gutter) pt-7 pb-10 lg:px-12">
       <header className="flex flex-wrap items-center gap-5">
-        <h1 className="min-w-0 flex-[1_1_17.5rem] text-2xl font-bold">
-          <bdi dir={textDir(title)}>{title}</bdi>
-        </h1>
+        {/* The room and a member's card carry their own title; a document's title is the host's. */}
+        {opened.kind === "doc" ? (
+          <h1 className="min-w-0 flex-[1_1_17.5rem] text-2xl font-bold">
+            <bdi dir={textDir(title)}>{title}</bdi>
+          </h1>
+        ) : (
+          <span aria-hidden className="flex-1" />
+        )}
         {sample && <Pill>{t(common.sample)}</Pill>}
         <Button variant="outline" aria-pressed={full} onClick={() => navigate(full ? here : `${here}?${FULL}`)}>
           {t(texts.fullScreen)}

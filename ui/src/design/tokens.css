@@ -20,6 +20,7 @@
 @source "../workspace/{DocumentView.tsx,docs}";
 @source "../ui";
 @source "../chat/parts";
+@source "../team";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {

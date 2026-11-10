@@ -47,8 +47,6 @@ export const tender = defineTexts({
   resize: { en: "Width of the conversation and the document", ar: "عرض المحادثة والمستند" },
   projectMap: { en: "Project Map", ar: "خريطة المشروع" },
   projectFiles: { en: "Project files", ar: "ملفات المشروع" },
-  roomTitle: { en: "Team room", ar: "غرفة الفريق" },
-  memberTitle: { en: "Team member", ar: "عضو في الفريق" },
   documentTitle: { en: "Document", ar: "مستند" },
   fileTitle: { en: "File", ar: "ملف" },
   noDocument: { en: "This document cannot be opened here.", ar: "المستند ده مش بيتفتح هنا." },

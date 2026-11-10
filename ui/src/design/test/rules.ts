@@ -2,7 +2,7 @@
 // Each returns a list of problems; rules.test.ts runs them over the files and over bad samples.
 
 /** Folders of the new interface. Later jobs append theirs. */
-export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/next", "ui/src/firstlaunch2", "ui/src/engineer", "ui/src/conversation", "ui/src/tender"] as const;
+export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/next", "ui/src/firstlaunch2", "ui/src/engineer", "ui/src/conversation", "ui/src/tender", "ui/src/team"] as const;
 
 /** Copied code: shadcn's components and CSS, and the ai-elements parts, as the CLIs wrote them. */
 export const isCopied = (path: string) => path.startsWith("ui/src/design/ui/") || path.startsWith("ui/src/conversation/ai/");
