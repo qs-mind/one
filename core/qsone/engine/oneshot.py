@@ -95,6 +95,7 @@ class Models:
     project_id: str | None
     run_id: str  # the tool's own run: its costs are booked there
     work: Path  # <data>/claude-work: the Subscription Link's run folders
+    member_id: str | None = None  # the run's member, recorded with each cost
 
     def card(self, choice: ModelChoice | None) -> ModelCard | None:
         return next((c for c in self.sheet if c.choice == choice), None)
@@ -159,6 +160,7 @@ def _costed(models: Models, card: ModelCard, role: Role) -> CostedModel:
         run_id=models.run_id,
         role=role,
         card=card,
+        member_id=models.member_id,
     )
 
 
@@ -217,6 +219,7 @@ async def _on_subscription(
         input_tokens=sum(n for _, n, _ in outcome.usage),
         output_tokens=sum(n for _, _, n in outcome.usage),
         reported_usd=outcome.reported_usd,
+        member_id=models.member_id,
     )
     if outcome.ended == "signed_out":
         raise OneShotFailed(copy.CLAUDE_CODE_SIGNED_OUT)

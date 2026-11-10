@@ -59,6 +59,7 @@ TOOL_WORDS = {
     "files_read": {"en": "Reading a project file", "ar": "بيقرا ملف من ملفات المشروع"},
     "find_items": {"en": "Looking up items", "ar": "بيدوّر على بنود"},
     "hand_to_project": {"en": "Passing the work to a project", "ar": "بيحوّل الشغل لمشروع"},
+    "keep_member": {"en": "Asking to keep a team member", "ar": "بيسأل نخلّي عضو في الفريق"},
     "ledger_numbers": {"en": "Reading the project's numbers", "ar": "بيقرا أرقام المشروع"},
     "rank_items": {"en": "Sorting the project's items", "ar": "بيرتّب بنود المشروع"},
     "make_deliverable": {"en": "Making a Deliverable", "ar": "بيعمل مُخرج"},

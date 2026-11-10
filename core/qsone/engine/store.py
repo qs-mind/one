@@ -576,11 +576,12 @@ class CostBook:
         effort: str | None = None,
         cache_read: int = 0,
         cache_write: int = 0,
+        member_id: str | None = None,
     ) -> None:
         """`usd` is None when the price is unknown: it is kept as unknown, never as 0. `effort`
         is the one the request was sent with (None: the provider's own). `cache_read` and
         `cache_write` are the input tokens the provider read from or wrote to its prompt cache,
-        counted within `input_tokens`.
+        counted within `input_tokens`. `member_id` is the run's member (`engine/identity.py`).
         Raises `TypeError` for money that is not a `Decimal` and `ValueError` for a naive `at`."""
         if usd is not None and not isinstance(usd, Decimal):
             raise TypeError("money is a Decimal, never a float")
@@ -591,8 +592,8 @@ class CostBook:
             c.execute(
                 "INSERT INTO ai_costs(at, local_day, brief_id, project_id, run_id, role,"
                 " connector, model, input_tokens, output_tokens, usd, equivalent, basis, effort,"
-                " cache_read_tokens, cache_write_tokens)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " cache_read_tokens, cache_write_tokens, member_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     at.astimezone(UTC).isoformat(timespec="microseconds"),
                     local_day,
@@ -610,6 +611,7 @@ class CostBook:
                     effort,
                     cache_read,
                     cache_write,
+                    member_id,
                 ),
             )
 

@@ -89,6 +89,7 @@ class _BriefLink:
             output_tokens=sum(n for _, _, n in outcome.usage),
             reported_usd=outcome.reported_usd,
             effort=effort,
+            member_id=self.member_of(run_id),
         )
         if outcome.ended == "limit":
             raise _Busy()

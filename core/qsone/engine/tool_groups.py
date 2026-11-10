@@ -47,6 +47,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "submit_for_check",
         "save_desk",
         "use_desk",
+        "keep_member",
     ),
     "boq": ("boq_preview", "boq_import", "boq_price_from_sheet", "prices_lookup"),
     "documents": (

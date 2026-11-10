@@ -40,7 +40,7 @@ from qsone.connectors.hub import ConnectorHub
 from qsone.deliverables import api as deliverables_api
 from qsone.deliverables import events as deliverable_events
 from qsone.engine import connectors as engine_connectors
-from qsone.engine import mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
+from qsone.engine import identity_routes, mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
 from qsone.engine.runner import Engine
@@ -201,6 +201,7 @@ def create_app(
         if own_services:
             engine.services = tool_services.services_for(app.state)
         await engine.start()  # never continues a Brief by itself
+        listing = asyncio.create_task(identity_routes.list_models(engine))  # members' models
         backups.start()  # every 30 minutes; closing a project also backs it up
         usage.app_start()  # queued only when the engineer said yes to Usage Stats
         sender.start()  # every 5 minutes
@@ -218,6 +219,7 @@ def create_app(
             backups.stop()  # waits for a running copy
             sender.stop()
             account.close()  # a sign-in under way stops
+            listing.cancel()
         mapping.stop()
         service.stop()
         registry.close_all()
@@ -416,6 +418,8 @@ def create_app(
         except OSError:
             return JSONResponse({"error": copy.MODEL_NOT_SAVED}, status_code=503)
         return JSONResponse({"id": body.id})
+
+    app.include_router(identity_routes.router(registry, engine))  # the team (Phase 1, C5)
 
     # The Phase 1 routes that are declared and not built yet (501). Keep this the last route
     # added: it then never takes a request an older route answers.

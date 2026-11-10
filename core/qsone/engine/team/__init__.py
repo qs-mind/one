@@ -132,3 +132,6 @@ from .stored import (  # noqa: F401
     specialist_run,
     specialists,
 )
+
+# isort: split
+from . import keep  # noqa: E402, F401 - registers keep_member (Phase 1, C5)
