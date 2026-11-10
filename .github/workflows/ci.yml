@@ -1,8 +1,7 @@
 # Checks every push to main, to a check/* branch (scripts/push-checked.sh: main is pushed only after it
 # passes there) and every pull request on Linux, Windows and macOS: types, ruff and
 # clippy (`npm run check`), then the core's and the screen's tests; and the screen end to end in Chromium and
-# WebKit on Linux (`e2e`). Changes to *.md files alone skip it. Run by hand with update-snapshots, it makes the
-# screenshot baselines (the Ubuntu runner is their reference) and uploads them: `gh run download`, then commit.
+# WebKit on Linux (`e2e`). Changes to *.md files alone skip it; it can also be run by hand.
 # Actions are pinned to commit SHAs; the comment names the release.
 name: CI
 
@@ -13,11 +12,6 @@ on:
   pull_request:
     paths-ignore: ["**/*.md"]
   workflow_dispatch:
-    inputs:
-      update-snapshots:
-        description: Make the screenshot baselines again (runs only the e2e job)
-        type: boolean
-        default: false
 
 # A new push to a pull request cancels its older run; runs on main always finish.
 concurrency:
@@ -33,7 +27,6 @@ env:
 jobs:
   check:
     name: check (${{ matrix.os }})
-    if: ${{ !inputs.update-snapshots }}
     strategy:
       fail-fast: false
       matrix:
@@ -97,7 +90,6 @@ jobs:
       - run: npm run test:ui
 
   # The built screen in Chromium and WebKit, every /api call answered by the tests' fixtures: no core, no network.
-  # Screenshots are compared here only (Chromium on Ubuntu is their reference), once their baselines are committed.
   e2e:
     name: e2e (ubuntu-latest)
     runs-on: ubuntu-latest
@@ -114,7 +106,7 @@ jobs:
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e -- ${{ inputs.update-snapshots && '--update-snapshots' || '' }}
+      - run: npm run test:e2e
 
       - name: Test results, when something failed
         if: failure()
@@ -124,12 +116,4 @@ jobs:
           path: |
             test-results/
             playwright-report/
-          retention-days: 7
-
-      - name: Screenshot baselines
-        if: ${{ inputs.update-snapshots }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: screenshot-baselines
-          path: ui/e2e/screens.spec.ts-snapshots/
           retention-days: 7
