@@ -181,7 +181,7 @@ try {
     await app.waitFor({ css: '[data-stage][data-state="waiting"]' }, 180_000);
     await app.shot("stage-waits");
     await app.click(waitingItem("stage"));
-    await app.click({ role: "button", name: /اعتمد|وقّع/ }, { timeout: 15_000 });
+    await hold(button("اعتمد")); // signing off is held, like approving the plan
     await app.waitFor({ css: '[data-stage][data-state="done"]' }, 30_000);
     await app.shot("stage-signed-off");
     note("the stage was signed off with its priced sheet");
