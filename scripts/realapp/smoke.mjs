@@ -99,7 +99,7 @@ try {
 
   await step("English from Settings' Language and look, then Home", async () => {
     await app.click({ role: "link", name: "اللغة والمظهر" });
-    await app.click({ role: "radio", name: /English/ });
+    await app.click({ role: "radio", name: /English|الإنجليزي/ });
     await app.waitState((s) => s.lang === "en", "English");
     await app.shot("settings-look-en");
     await app.click({ role: "link", name: "Home", within: rail });
