@@ -2,7 +2,7 @@
 // Each returns a list of problems; rules.test.ts runs them over the files and over bad samples.
 
 /** Folders of the new interface. Later jobs append theirs. */
-export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/next", "ui/src/firstlaunch2", "ui/src/engineer", "ui/src/conversation"] as const;
+export const NEW_UI_ROOTS = ["ui/src/design", "ui/src/texts", "ui/src/next", "ui/src/firstlaunch2", "ui/src/engineer", "ui/src/conversation", "ui/src/home"] as const;
 
 /** Copied code: shadcn's components and CSS, and the ai-elements parts, as the CLIs wrote them. */
 export const isCopied = (path: string) => path.startsWith("ui/src/design/ui/") || path.startsWith("ui/src/conversation/ai/");
@@ -94,9 +94,9 @@ export function physicalSides(path: string, source: string): string[] {
 
 // 3. No import from the old interface: packages, @/design, @/texts, @/next, or a relative path inside its own root.
 const IMPORT = /(?:^|[^\w$.])(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|(?:^|[^\w$.])import\s*\(?\s*["']([^"']+)["']|@import\s+(?:url\()?["']([^"']+)["']/gm;
-// "@/app/App" alone: ui/src/app also holds the old interface's start screen. The contract's client (@/api/) and the
-// live stream (@/activity) are the kept ways to the core.
-const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/firstlaunch2/", "@/engineer/", "@/conversation/", "@/api/", "@/activity"];
+// "@/app/App" and "@/app/paths" alone: ui/src/app also holds the old interface's start screen. The contract's client
+// (@/api/), the core's own routes through api() (@/api) and the live stream (@/activity) are the kept ways to the core.
+const OWN_ALIASES = ["@/design/", "@/texts/", "@/next/", "@/app/App", "@/app/paths", "@/firstlaunch2/", "@/engineer/", "@/conversation/", "@/home/", "@/api", "@/activity"];
 
 function normalise(path: string): string {
   const out: string[] = [];
