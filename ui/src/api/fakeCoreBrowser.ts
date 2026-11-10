@@ -5,11 +5,11 @@
 //
 // The address chooses the scene: ?first is a clean start (first launch from step 1, an empty profile), ?first=profile
 // has the language chosen, ?first=upgrade is someone upgrading (language and AI passed, the profile still empty);
-// ?scenario=home:empty puts another sample in place.
+// ?scenario=home:empty puts another sample in place. A clean start has no AI linked.
 import { http, HttpResponse } from "msw";
 import { setupWorker } from "msw/browser";
 import { firstLaunchRoutes, older } from "@/firstlaunch/fakeCoreFirstLaunchRoutes";
-import { settingsRoutes } from "@/settings/fakeCoreSettingsRoutes";
+import { kept, settingsRoutes } from "@/settings/fakeCoreSettingsRoutes";
 import { contractRoutes } from "./fakeCoreRoutes";
 import { scenario, type Scenario } from "./fakeCoreSamples";
 
@@ -46,6 +46,7 @@ export async function startFakeCoreInBrowser(): Promise<void> {
   if (first === null || first === "profile" || first === "upgrade") older.steps.language = "done";
   if (first === null || first === "upgrade") older.steps.ai = "done";
   if (first !== null) scenario("profile:incomplete");
+  if (first === "") kept.ai.connectors = []; // a clean start: no AI linked yet, so step 3 offers Later
   const name = ask.get("scenario");
   if (name) scenario(name as Scenario);
   const worker = setupWorker(...contractRoutes, ...firstLaunchRoutes, ...settingsRoutes, ...keptRoutes, notHere);

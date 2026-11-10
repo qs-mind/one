@@ -5,6 +5,7 @@
 // is noted in `older.calls` ("PUT /setup/ai {...}"). Tests use it through fakeCoreFirstLaunch.ts.
 import { http, HttpResponse } from "msw";
 import type { Account, Consent } from "@/api/existing";
+import type { AiConnector } from "@/api/settingsKept";
 
 type Step = "done" | "skipped" | null;
 type Older = {
@@ -14,6 +15,8 @@ type Older = {
   /** What GET /account answers while a sign-in waits, from the second ask on. */
   signsInAs: Account;
   claudeCode: { found: boolean; answers: boolean };
+  /** The AI links the core holds (GET /settings/ai, served to the first-launch tests by fakeCoreFirstLaunch.ts). */
+  links: AiConnector[];
   /** How many of the next POST /settings/ai/standard the core refuses (503, the key store is down). */
   standardRefuses: number;
   calls: string[];
@@ -29,6 +32,7 @@ export function resetFirstLaunch(): void {
     account: { state: "signed_out" },
     signsInAs: { state: "signed_in", email: "engineer@example.com", name: "مهندس تجريبي" },
     claudeCode: { found: true, answers: true },
+    links: [],
     standardRefuses: 0,
     calls: [],
   } satisfies Older);
