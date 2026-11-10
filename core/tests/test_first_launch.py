@@ -187,11 +187,11 @@ def test_card_is_kept_encrypted_and_reaches_the_lead_qs(client, lead, data_dir):
     blob = b"".join(p.read_bytes() for p in data_dir.rglob("*") if p.is_file())
     assert "القاهرة".encode() not in blob and b"contractor" not in blob
 
-    line = engineer.card_line(CARD)
-    assert line == "The engineer is a contractor QS in القاهرة, Egypt; currency EGP."
+    # Since Phase 1 the card fills the profile, whose four fields alone reach the Lead QS.
     send(client, "سؤال - عينة")
     [instructions] = lead.instructions
-    assert line in instructions
+    assert "The engineer: works for a contractor; based in Egypt." in instructions
+    assert "القاهرة" not in instructions and "EGP" not in instructions
 
 
 def test_a_changed_card_is_one_card_audited(client):
@@ -211,27 +211,7 @@ def test_a_changed_card_is_one_card_audited(client):
 
 def test_no_card_adds_nothing_to_the_lead(client, lead):
     send(client, "سؤال - عينة")
-    assert "The engineer is" not in lead.instructions[0]
-    assert engineer.card_line({}) == ""
-
-
-@pytest.mark.parametrize(
-    ("changed", "line"),
-    [
-        ({"city": ""}, "The engineer is a contractor QS in Egypt; currency EGP."),
-        (
-            {"role": "procurement", "country": "other", "city": "Doha", "currency": "QAR"},
-            "The engineer works in procurement in Doha; currency QAR.",
-        ),
-        ({"country": "other", "city": ""}, "The engineer is a contractor QS; currency EGP."),
-        (
-            {"country": "other", "city": "Doha", "currency": None},
-            "The engineer is a contractor QS in Doha.",
-        ),
-    ],
-)
-def test_card_line_says_only_what_is_there(changed, line):
-    assert engineer.card_line(CARD | changed) == line
+    assert "The engineer:" not in lead.instructions[0]
 
 
 def test_a_card_for_another_country_needs_no_currency(client, lead):
@@ -241,8 +221,8 @@ def test_a_card_for_another_country_needs_no_currency(client, lead):
     assert client.get("/engineer/card", headers=AUTH).json() == other  # no currency kept
     send(client, "سؤال - عينة")
     [instructions] = lead.instructions
-    assert "The engineer is a consultant QS in Doha." in instructions
-    assert "currency" not in instructions.split("The engineer is", 1)[1].split("\n", 1)[0]
+    assert "The engineer: works for a consultant." in instructions
+    assert "Doha" not in instructions
 
 
 @pytest.mark.parametrize(

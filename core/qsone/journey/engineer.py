@@ -1,8 +1,9 @@
 """The introduction card (decision 24): the engineer's role, country, city and currency.
 
 It is kept in Engineer Records (`<data>/engineer/`, encrypted) as the one item of kind
-`engineer_card`, written by "engineer" and audited, so the city is never readable on disk. The
-Lead QS's instructions get one line from it (`card_line`); a missing card adds nothing.
+`engineer_card`, written by "engineer" and audited, so the city is never readable on disk. Since
+Phase 1 it only fills a profile that is not saved yet (`journey.profile`), which gives the Lead QS
+its line.
 """
 
 import json
@@ -29,15 +30,6 @@ class Card(BaseModel):
     currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
 
 
-_ROLES = {
-    "contractor": "is a contractor QS",
-    "consultant": "is a consultant QS",
-    "owner": "is a QS for an owner or developer",
-    "procurement": "works in procurement",
-}
-_COUNTRIES = {"EG": "Egypt", "SA": "Saudi Arabia", "AE": "the United Arab Emirates"}
-
-
 def _found(records: Records) -> tuple[str, dict] | None:
     with records.read() as conn:
         row = conn.execute(
@@ -61,17 +53,3 @@ def save_card(records: Records, new: Card) -> dict:
     else:
         ledger.update_item(records, found[0], fields=fields, actor=ENGINEER)
     return fields
-
-
-def card_line(saved: dict) -> str:
-    """One line for the Lead QS's instructions, e.g. "The engineer is a contractor QS in
-    Cairo, Egypt; currency EGP.", without the currency when the card has none. "" when there
-    is no card."""
-    try:
-        valid = Card.model_validate(saved)
-    except ValueError:
-        return ""
-    place = ", ".join(p for p in (valid.city, _COUNTRIES.get(valid.country, "")) if p)
-    where = f" in {place}" if place else ""
-    money = f"; currency {valid.currency}" if valid.currency else ""
-    return f"The engineer {_ROLES[valid.role]}{where}{money}."
