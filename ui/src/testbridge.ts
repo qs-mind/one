@@ -159,6 +159,7 @@ export function answer(op: string, query: Query | undefined): unknown {
       lang: document.documentElement.lang || language(),
       dir: document.documentElement.dir,
       document: doc?.getAttribute("aria-label") ?? null,
+      place: document.querySelector("[data-place]")?.getAttribute("data-place") ?? null,
       zoom: parseFloat(getComputedStyle(document.documentElement).fontSize) / 16,
       rootFontSize: parseFloat(getComputedStyle(document.documentElement).fontSize),
       inner: { width: window.innerWidth, height: window.innerHeight },

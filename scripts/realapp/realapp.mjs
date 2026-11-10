@@ -229,7 +229,7 @@ export class RealApp {
     return { x: out.x, y: out.y, width: out.width, height: out.height };
   }
 
-  /** The bench's settings.json without the first launch's answers (as ui/bench/first-launch.spec.ts). */
+  /** The bench's settings.json without the first launch's answers (first launch opens at step 1). */
   forgetFirstLaunch() {
     const file = path.join(this.dir, "data", "settings.json");
     const saved = JSON.parse(readFileSync(file, "utf8"));

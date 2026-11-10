@@ -59,7 +59,8 @@ export function Frame() {
   return (
     <div className="flex h-dvh bg-background text-foreground">
       <Rail label={t(common.navigation)} items={items} footerItems={[item("settings", t(common.settings), SettingsIcon, paths.settings())]} />
-      <div className="min-w-0 flex-1 overflow-auto">
+      {/* relative: a visually hidden field of a place stays inside this scroller, or the window itself would scroll */}
+      <div className="relative min-w-0 flex-1 overflow-auto">
         <Outlet />
       </div>
     </div>

@@ -3,8 +3,9 @@
 // Service Worker, with the tender's kept routes empty. Every number is sample data. NEVER import this from application
 // code: only ui/src/fake does, and Vite never builds that page.
 //
-// The address chooses the scene: ?first starts first launch from step 1 (and ?first=profile at an incomplete profile,
-// ?first=upgrade as someone upgrading); ?scenario=home:empty puts another sample in place.
+// The address chooses the scene: ?first is a clean start (first launch from step 1, an empty profile), ?first=profile
+// has the language chosen, ?first=upgrade is someone upgrading (language and AI passed, the profile still empty);
+// ?scenario=home:empty puts another sample in place.
 import { http, HttpResponse } from "msw";
 import { setupWorker } from "msw/browser";
 import { firstLaunchRoutes, older } from "@/firstlaunch/fakeCoreFirstLaunchRoutes";
@@ -44,7 +45,7 @@ export async function startFakeCoreInBrowser(): Promise<void> {
   const first = ask.get("first");
   if (first === null || first === "profile" || first === "upgrade") older.steps.language = "done";
   if (first === null || first === "upgrade") older.steps.ai = "done";
-  if (first === "profile" || first === "upgrade") scenario("profile:incomplete");
+  if (first !== null) scenario("profile:incomplete");
   const name = ask.get("scenario");
   if (name) scenario(name as Scenario);
   const worker = setupWorker(...contractRoutes, ...firstLaunchRoutes, ...settingsRoutes, ...keptRoutes, notHere);
