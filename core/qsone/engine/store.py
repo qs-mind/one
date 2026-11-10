@@ -417,6 +417,10 @@ class Store:
                     before={"status": "pending"},
                     after={"status": "withdrawn"},
                 )
+        if ids and self.project_id is not None:
+            from qsone.engine.team import messages  # the team room's raised messages (C6)
+
+            messages.cards_withdrawn(self.rec, ids)
 
     # Writes already made ----------------------------------------------------------------------
 

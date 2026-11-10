@@ -49,6 +49,9 @@ async def _raise_tool(ctx: ToolContext, args: RaiseArgs) -> str:
     found, ahead = await asyncio.to_thread(raise_finding, rec, args, actor=_actor(ctx))
     publish(rec.id, [found])
     ctx.host.emit(Data(ctx.brief_id, PART, found["id"], {"finding_id": found["id"]}))
+    from qsone.engine import room  # the Lead's message to the engineer in the team room (C6)
+
+    room.finding_raised(ctx, found)
     out = {"finding_id": found["id"], "status": found["status"], "queued_ahead": ahead}
     return _json(out | {"next": "Do not wait for the decision; it reaches you as a message."})
 

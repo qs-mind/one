@@ -531,6 +531,22 @@ ALTER TABLE briefs ADD COLUMN started_by TEXT CHECK (started_by IS NULL OR start
 ALTER TABLE briefs ADD COLUMN steers TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(steers));
 """
 
+# Phase 1 (C6): the team room, one conversation per tender. `kind` and `thread` count the rounds
+# of a disagreement; `raised_id` names the Finding or card a message raised. Never deleted.
+ROOM_SQL = """
+CREATE TABLE room_messages (id TEXT PRIMARY KEY, brief_id TEXT, at TEXT NOT NULL,
+ from_id TEXT NOT NULL, to_id TEXT NOT NULL, text TEXT NOT NULL,
+ sources TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(sources)),
+ kind TEXT NOT NULL DEFAULT 'say' CHECK(kind IN ('say','assign','ask','object','resolve')),
+ thread TEXT NOT NULL, raised_id TEXT,
+ raised_answered INTEGER CHECK(raised_answered IS NULL OR raised_answered IN (0,1)));
+CREATE INDEX room_messages_brief ON room_messages(brief_id);
+CREATE INDEX room_messages_thread ON room_messages(thread);
+CREATE INDEX room_messages_raised ON room_messages(raised_id);
+CREATE TRIGGER room_messages_no_delete BEFORE DELETE ON room_messages
+ BEGIN SELECT RAISE(ABORT, 'Room messages are retained'); END;
+"""
+
 MIGRATIONS: list[str] = [
     SCHEMA_1,
     SCHEMA_2,
@@ -565,4 +581,5 @@ MIGRATIONS: list[str] = [
     TENDER_PLANS_SQL,
     FINDINGS_SQL,
     PLAN_DRIVER_SQL,
+    ROOM_SQL,
 ]

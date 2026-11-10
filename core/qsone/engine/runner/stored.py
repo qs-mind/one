@@ -13,6 +13,7 @@ from qsone.engine.runner.histories import _load, _tool_results, lead_text
 from qsone.engine.runner.shared import GENERAL
 from qsone.engine.runner.truth_checks import _no_search_notice
 from qsone.engine.store import Store
+from qsone.engine.team import messages as room_messages
 from qsone.engine.types import (
     Asked,
     Card,
@@ -134,6 +135,8 @@ def _stored_events(
             events += outputs.stored_cards(brief_id, agents.tool_returns(run["history"]))
     for m in store.team(brief_id):
         events.append(TeamMessage(brief_id, m["id"], m["sender"], m["recipient"], m["text"]))
+    if store.project_id is not None:  # Phase 1: data-room, from the team room (C6)
+        events += room_messages.stored_parts(store.rec, brief_id)
     with store.rec.read() as c:
         reviews = c.execute(
             "SELECT r.deliverable_id, r.code, r.comments, r.checker, r.same_provider, r.round"

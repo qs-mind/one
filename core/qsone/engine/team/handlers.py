@@ -221,9 +221,16 @@ async def _send_message(ctx: ToolContext, args: MessageArgs) -> str:
         )
     else:
         recipient = _specialist(ctx, args.to, "send_message").name
+    from qsone.engine import room  # the team room (Phase 1, C6)
+
+    message_id = uuid4().hex
+    to_id = "lead-qs" if args.to in ("lead", "lead-qs") else args.to
+    raised = await room.member_says(ctx, args, message_id, to_id)
+    if raised is not None:  # it went up to the engineer, whose answer this is
+        return _json(raised)
     message = TeamMessage(
         brief_id=ctx.brief_id,
-        id=uuid4().hex,
+        id=message_id,
         sender=ctx.agent.name,
         recipient=recipient,
         text=args.text,

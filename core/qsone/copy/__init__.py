@@ -36,6 +36,7 @@ from qsone.copy.profile import *
 from qsone.copy.project_map import *
 from qsone.copy.projects import *
 from qsone.copy.reading import *
+from qsone.copy.room import *
 from qsone.copy.sandbox import *
 from qsone.copy.search import *
 from qsone.copy.settings import *

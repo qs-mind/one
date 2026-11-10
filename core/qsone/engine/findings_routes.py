@@ -97,6 +97,9 @@ def router(engine) -> APIRouter:
             return c.refusal(e.text, e.status)
         findings.publish(project_id, changed)
         if changed:
+            from qsone.engine import room  # the team room's raised message is answered (C6)
+
+            room.finding_decided(rec, finding_id)
             await _tell_lead(engine, project_id, settled)
         return settled
 
