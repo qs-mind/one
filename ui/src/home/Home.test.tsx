@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -11,6 +11,24 @@ import { common } from "@/texts/common";
 import { home } from "@/texts/home";
 import { plural, text } from "@/texts/useText";
 import { Home } from "./Home";
+
+// The installed app: the shell takes a drop on the window and sends what it found (desktop/src/main.rs).
+const shell = vi.hoisted(() => ({
+  native: false,
+  dropped: [] as ((event: { payload: unknown }) => void)[],
+  invoke: vi.fn(async (_command: string, _args?: unknown) => new Uint8Array([120]).buffer),
+}));
+vi.mock("@tauri-apps/api/core", async (original) => ({
+  ...(await original<typeof import("@tauri-apps/api/core")>()),
+  isTauri: () => shell.native,
+  invoke: shell.invoke,
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: async (name: string, handler: (event: { payload: unknown }) => void) => {
+    if (name === "one-files-dropped") shell.dropped.push(handler);
+    return () => void (shell.dropped = shell.dropped.filter((one) => one !== handler));
+  },
+}));
 
 startFakeCore();
 
@@ -47,6 +65,8 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  shell.native = false;
+  shell.dropped = [];
   vi.useRealTimers();
   resetPage();
 });
@@ -162,6 +182,37 @@ describe.each(DIRS)("Home (%s)", (dir) => {
       ["A-101.pdf", "Tender A/Drawings"],
     ]);
     expect(calls.find((c) => c.path.endsWith("/files/report"))?.body).toEqual({ file_ids: expect.arrayContaining([expect.any(String)]) });
+  });
+
+  it("in the installed app, a folder the shell took makes a tender, each file read through the shell", async () => {
+    shell.native = true;
+    const router = open(dir);
+    await ready();
+    await waitFor(() => expect(shell.dropped).toHaveLength(1));
+    const files = [
+      { path: "/sample/Tender B/01 BOQ.xlsx", name: "01 BOQ.xlsx", folder: "Tender B", size: 1 },
+      { path: "/sample/Tender B/Drawings/A-101.pdf", name: "A-101.pdf", folder: "Tender B/Drawings", size: 1 },
+    ];
+    act(() => shell.dropped[0]!({ payload: { files, errors: [] } }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(paths.tender(NEW)));
+    await waitFor(() => expect(calls.at(-1)?.path).toBe(`/projects/${NEW}/understand`));
+    expect(calls[0]).toMatchObject({ path: "/projects", body: { folder: "Tender B" } });
+    const sent = calls.filter((c) => c.path === `/projects/${NEW}/files`);
+    expect(sent.map((c) => [c.query.get("name"), c.query.get("folder")])).toEqual([
+      ["01 BOQ.xlsx", "Tender B"],
+      ["A-101.pdf", "Tender B/Drawings"],
+    ]);
+    expect(shell.invoke).toHaveBeenCalledWith("folder_read", { path: files[1]!.path });
+  });
+
+  it("in the installed app, loose files the shell took ask for the folder", async () => {
+    shell.native = true;
+    open(dir);
+    await ready();
+    await waitFor(() => expect(shell.dropped).toHaveLength(1));
+    act(() => shell.dropped[0]!({ payload: { files: [{ path: "/sample/BOQ.xlsx", name: "BOQ.xlsx", folder: "", size: 1 }], errors: [] } }));
+    expect(await screen.findByText(t(home.folderOnly))).toBeInTheDocument();
+    expect(calls).toEqual([]);
   });
 
   it("a folder of a tender already here goes into it, with no second reading", async () => {

@@ -4,6 +4,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLanguage, texts } from "../i18n";
+import { setLang } from "../texts/language";
 import { EVERY_MS, UpdateCard, type UpdateInfo } from "./UpdateCard";
 
 const found: UpdateInfo = { version: "0.1.1", notes_en: "Fixes for the import", notes_ar: "إصلاحات في الاستيراد" };
@@ -39,6 +40,17 @@ afterEach(() => {
 });
 
 describe("UpdateCard", () => {
+  it("speaks the language the engineer chose for the screen", async () => {
+    setLang("ar");
+    setLang("en"); // Settings → Look, or step 1 of first launch
+    installed(() => new Promise(() => undefined));
+    render(<UpdateCard />);
+    expect(await screen.findByText("ONE 0.1.1 is ready")).toBeInTheDocument();
+    await userEvent.click(screen.getByText(texts.updateNotes.en));
+    expect(screen.getByText(found.notes_en)).toBeVisible();
+    setLang("ar");
+  });
+
   it("shows the notes in the page language and updates on request", async () => {
     const user = userEvent.setup();
     let progress: Channel<unknown> | undefined;

@@ -7,6 +7,18 @@ import { common } from "./common";
 afterEach(() => setLang("ar"));
 
 describe("language store", () => {
+  it("keeps the kept parts' store (ui/src/i18n.ts) in step, from the first paint on", async () => {
+    vi.resetModules();
+    localStorage.clear();
+    const kept = await import("@/i18n");
+    const fresh = await import("./language");
+    expect(fresh.getLang()).toBe("en"); // the test browser's system language
+    expect(kept.language()).toBe("en");
+    fresh.setLang("ar");
+    expect(kept.language()).toBe("ar");
+    expect(kept.t("close")).toBe("إغلاق");
+  });
+
   it("puts lang and dir on <html> and tells subscribers", () => {
     const { result } = renderHook(() => useLang());
     act(() => setLang("en"));

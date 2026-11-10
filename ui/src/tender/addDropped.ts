@@ -6,14 +6,17 @@ import type { PromptInputAttachment } from "@/conversation/ai/prompt-input";
 import { walk } from "@/home/folderDrop";
 
 export async function addDropped(projectId: string, dropped: readonly PromptInputAttachment[]): Promise<number | null> {
-  const picked: { file: File; folder: string }[] = [];
+  const picked: { folder: string; read: () => Promise<File> }[] = [];
   for (const item of dropped) {
-    if (item.file) picked.push({ file: item.file, folder: "" });
+    const file = item.file;
+    if (file) picked.push({ folder: "", read: async () => file });
     else if (item.entry) await walk(item.entry, "", picked).catch(() => undefined);
   }
   const ids: string[] = [];
   let took = false;
-  for (const { file, folder } of picked) {
+  for (const { read, folder } of picked) {
+    const file = await read().catch(() => null);
+    if (!file) continue;
     const { data } = await addFile(projectId, file, folder);
     if (data) took = true;
     for (const one of data && "files" in data ? data.files : data ? [data] : []) if (!one.duplicate && one.id) ids.push(one.id);

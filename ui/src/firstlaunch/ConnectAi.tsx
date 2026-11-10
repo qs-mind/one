@@ -1,7 +1,9 @@
 // Step 3: connect AI. First the AI consent (contract Q3: inside this step, before any key is checked), then the one
 // key box (KeyBox, shared with Settings). The other way is the engineer's own Claude Code. The step ends "done" with
-// either, or "skipped" with neither (Q2); there is no Check or Save button.
+// either, or "skipped" with neither (Q2); there is no Check or Save button. A link the core holds already (the step
+// seen before, then Back and Next) counts as connected.
 import { useEffect, useState } from "react";
+import { type AiConnector, getAiSettings } from "@/api/settingsKept";
 import { checkClaudeCode, type Consent, findClaudeCode, getConsent, giveConsent, openPage, passStep } from "@/api/existing";
 import { Button } from "@/design/ui/button";
 import { Separator } from "@/design/ui/separator";
@@ -11,6 +13,9 @@ import { useText } from "@/texts/useText";
 import { KeyBox } from "./KeyBox";
 import { StepActions, StepHead } from "./parts";
 
+/** A link the engineer made (as Settings, Providers.tsx, counts them), or Claude Code switched on. */
+const isLink = (it: AiConnector) => it.id === "claude-code" || (it.kind === "model" && (it.key_set || it.id.startsWith("standard:")));
+
 type ClaudeCheck = { state: "idle" } | { state: "checking" } | { state: "works" } | { state: "refused"; words: TextPair };
 
 export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
@@ -18,6 +23,7 @@ export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () =
   const [consent, setConsent] = useState<Consent>();
   const [consentFailed, setConsentFailed] = useState(false);
   const [keyWorks, setKeyWorks] = useState(false); // the key works, or was linked by its provider's address
+  const [linked, setLinked] = useState(false); // the core held a link when the step opened
   const [claude, setClaude] = useState<ClaudeCheck>({ state: "idle" });
   const [ending, setEnding] = useState<"done" | "skipped">();
   const [stepFailed, setStepFailed] = useState(false);
@@ -26,6 +32,7 @@ export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () =
   useEffect(() => {
     let live = true;
     void getConsent().then(({ data }) => live && data && setConsent(data));
+    void getAiSettings().then(({ data }) => live && data && setLinked(data.connectors.some(isLink)));
     return () => {
       live = false;
     };
@@ -56,7 +63,7 @@ export function ConnectAi({ onBack, onDone }: { onBack: () => void; onDone: () =
     else setStepFailed(true);
   }
 
-  const connected = keyWorks || claude.state === "works";
+  const connected = keyWorks || linked || claude.state === "works";
   const note = stepFailed ? t(firstlaunch.stepNotSaved) : connected ? null : t(firstlaunch.laterNote);
 
   return (

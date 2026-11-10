@@ -93,6 +93,20 @@ describe.each(DIRS)("Welcome (%s)", (dir) => {
     await waitFor(() => expect(where(router)).toBe(paths.home));
   });
 
+  it("an AI connected at step 3 stays connected after Back and Next", async () => {
+    older.steps.language = "done";
+    open(dir);
+    await userEvent.click(await screen.findByRole("button", { name: say(firstlaunch.agree) }));
+    await userEvent.click(screen.getByLabelText(say(firstlaunch.keyLabel)));
+    await userEvent.paste("sk-ant-sample-key");
+    await screen.findByRole("button", { name: say(firstlaunch.start) });
+    older.links = [{ id: "anthropic", kind: "model", name: "Claude", provider: "Anthropic", on_device: false, key_set: true, error: null }]; // the core keeps the key
+    await userEvent.click(screen.getByRole("button", { name: say(firstlaunch.back) }));
+    await userEvent.click(await screen.findByRole("button", { name: say(firstlaunch.next) }));
+    expect(await screen.findByRole("button", { name: say(firstlaunch.start) })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: say(firstlaunch.later) })).toBeNull();
+  });
+
   it("the setup strip runs under every step", async () => {
     scenario("setup:downloading");
     open(dir);

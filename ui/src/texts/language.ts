@@ -1,6 +1,7 @@
 // The screen language. The core keeps the engineer's choice (nothing sits in web storage); until a later job wires
 // that in, this store holds it in memory and starts from the system's language.
 import { useSyncExternalStore } from "react";
+import { followLanguage, language } from "@/i18n";
 import type { Dir, Lang } from "./types";
 
 export const dirOf = (lang: Lang): Dir => (lang === "ar" ? "rtl" : "ltr");
@@ -19,11 +20,14 @@ export function systemLang(): Lang {
 let current: Lang = systemLang();
 const listeners = new Set<() => void>();
 
-/** <html> carries lang and dir: portals, Tailwind's rtl: and :lang() fonts all read them there. */
+/** <html> carries lang and dir: portals, Tailwind's rtl: and :lang() fonts all read them there. The parts kept from
+ * the old interface (the update card, the "core restarting" line, the crash screen, the kept viewers) read
+ * ui/src/i18n.ts: it follows, in memory. */
 function apply(): void {
   if (typeof document === "undefined") return;
   document.documentElement.lang = current;
   document.documentElement.dir = dirOf(current);
+  if (language() !== current) followLanguage(current);
 }
 
 export const getLang = (): Lang => current;

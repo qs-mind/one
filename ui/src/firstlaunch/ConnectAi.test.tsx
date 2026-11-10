@@ -121,6 +121,16 @@ describe.each(DIRS)("Connect AI (%s)", (dir) => {
     expect(await screen.findByText(words)).toBeInTheDocument();
   });
 
+  it("an AI the core holds already (the step seen before, then Back) shows Start, not Later", async () => {
+    older.consent = { at: "2026-11-10T09:00:00.000000+00:00", text_version: 3 };
+    older.links = [{ id: "anthropic", kind: "model", name: "Claude", provider: "Anthropic", on_device: false, key_set: true, error: null }];
+    const { onDone } = open();
+    await userEvent.click(await screen.findByRole("button", { name: say(firstlaunch.start) }));
+    await waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+    expect(older.calls).toContain('PUT /setup/ai {"state":"done"}');
+    expect(screen.queryByText(say(firstlaunch.laterNote))).toBeNull();
+  });
+
   it("with no AI the step can be left for later", async () => {
     const { onDone } = open();
     expect(await screen.findByText(say(firstlaunch.laterNote))).toBeInTheDocument();
