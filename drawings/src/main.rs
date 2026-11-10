@@ -745,6 +745,11 @@ fn read(name: &str, data: Vec<u8>) -> Result<(Value, i32), String> {
 }
 fn main() {
     let args: Vec<_> = std::env::args().collect();
+    // Automatic setup checks the bundled helper by this answer.
+    if args.iter().any(|a| a == "--version") {
+        println!("qsone-drawings {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
     let name = args
         .windows(2)
         .find(|a| a[0] == "--name")

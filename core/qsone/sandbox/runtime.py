@@ -152,6 +152,14 @@ def install(
     Raises `meaning.download.DownloadError` (a `copy` pair in `.text`, the Sandbox's own
     words) or `DownloadStopped`."""
     base = base or root()
+    with _INSTALLING:  # automatic setup and a first script may both ask for it
+        return _install(base, client, stop, on_progress, files)
+
+
+_INSTALLING = threading.Lock()
+
+
+def _install(base, client, stop, on_progress, files) -> Path:
     if found := find(base):
         return found
     spec = _spec(files)

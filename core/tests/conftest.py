@@ -127,6 +127,20 @@ def refused_hub(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def quiet_setup(monkeypatch):
+    """Every test: an app made without its own `setup` answers GET /setup/parts but never
+    starts fetching the manifest's parts. A test that wants setup to run passes one."""
+    from qsone import app
+    from qsone.setup.runner import Setup
+
+    class Quiet(Setup):
+        def start(self) -> None:
+            pass
+
+    monkeypatch.setattr(app, "Setup", Quiet)
+
+
+@pytest.fixture(autouse=True)
 def no_internet(monkeypatch):
     """Every test: a connection to anything but this computer is refused, and so is a name
     lookup. Loopback and AF_UNIX work. Covers plain sockets and asyncio's own connect (which
