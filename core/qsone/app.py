@@ -20,6 +20,9 @@ from qsone import (
     activity,
     chat,
     copy,
+    home,
+    home_pulse,
+    home_routes,
     keys,
     models,
     phase1_stubs,
@@ -161,6 +164,7 @@ def create_app(
     mcp = mcp_server.McpGate()
     connector_hub = ConnectorHub()  # the engineer's MCP Connectors (Plan 5)
     trash = undo.Trash()  # Undo instead of "are you sure?": removals wait out their window here
+    pulse = home_pulse.Pulse(lambda project_id: home.tender(registry, engine, project_id))
     engine = Engine(
         projects=registry,
         data_dir=Path(folder),
@@ -197,6 +201,7 @@ def create_app(
         stop_listening = deliverable_events.listen(
             lambda project_id, event: loop.call_soon_threadsafe(activity.publish, project_id, event)
         )
+        pulse.start(loop)  # the `home` and `tender` events
         service.start()
         setup.on_change = lambda state: loop.call_soon_threadsafe(
             activity.publish, "general", {"type": "setup", "setup": state}
@@ -227,6 +232,7 @@ def create_app(
             await connector_hub.close()  # stdio servers stop with the core
             trash.purge_all()  # an Undo window ends with the core
             stop_listening()
+            pulse.stop()
             backups.stop()  # waits for a running copy
             sender.stop()
             account.close()  # a sign-in under way stops
@@ -269,6 +275,7 @@ def create_app(
     app.include_router(profile.router(engine, account))  # the engineer's profile (Phase 1)
     registry.country = lambda: profile.country(engine.engineer_records)  # contract Q14
     app.include_router(settings_routes.router(ai_http, trash, engine))  # Phase 1: C10
+    app.include_router(home_routes.router(registry, engine, trash))  # Home and lessons (C7)
 
     @app.middleware("http")
     async def learn_base_url(request: Request, call_next):

@@ -23,6 +23,7 @@ from qsone.copy.connectors import *
 from qsone.copy.deliverables import *
 from qsone.copy.fixes import *
 from qsone.copy.fixes import _FIX_SHAPES, _shape  # `import *` leaves a `_name` out
+from qsone.copy.home import *
 from qsone.copy.journey import *
 from qsone.copy.ledger import *
 from qsone.copy.lookup import words_for

@@ -8,14 +8,13 @@ from pydantic_ai import ModelRetry
 
 from qsone import copy, usage
 from qsone.deliverables import tools as outputs
-from qsone.engine import agents, checker, general, numbers_guard, roles, team, truth
+from qsone.engine import agents, checker, general, kit, numbers_guard, roles, team, truth
 from qsone.engine import connectors as connectors_mod
 from qsone.engine.runner.histories import _tool_results
 from qsone.engine.runner.shared import utc_now
 from qsone.engine.runner.truth_checks import _marked
 from qsone.engine.team import TeamSetup
 from qsone.engine.types import Data, ModelChoice, Role, TextDelta, Unsourced
-from qsone.journey import profile
 
 
 class _BriefStages:
@@ -60,9 +59,9 @@ class _BriefStages:
         spec = general.lead_spec() if self.place.rec is None else agents.lead_spec()
         if self.mapping_files is not None:
             spec = replace(spec, name=copy.MAP_AI_LABEL, instructions="", tools=())
-        introduced = profile.lead_line(profile.read(self.engine.engineer_records()))
-        if introduced:  # the profile's four fields (Phase 1)
-            spec = replace(spec, instructions=f"{spec.instructions}\n\n{introduced}")
+        if self.mapping_files is None:  # the profile, Lessons Learned and the tenders (C7)
+            found = kit.text(self.engine.projects, self.engine, self.place.project_id)
+            spec = replace(spec, instructions=f"{spec.instructions}\n\n{found}")
         if lead is None:
             self.lead_run_id = self.store.new_run(self.brief_id, spec, picked["lead"], None)
         else:

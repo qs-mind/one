@@ -357,6 +357,31 @@ def test_the_setup_routes_answer_their_model(app, client, row):
     ]
 
 
+def test_lessons_home_and_a_tender_answer_their_shapes(app, client):
+    """Rows 3–7 are built (C7): each answers its model in strict mode, for a real lesson and a
+    real tender, and is never kept on disk by the webview."""
+    from qsone.records import ledger
+
+    engineer = app.state.engine.engineer_records()
+    fields = {"text": "درس - عينة", "kind": "method"}
+    lesson_id = ledger.add_item(engineer, kind="lesson", actor="engineer", fields=fields)
+    pid = client.post("/projects", json={"name": "مناقصة - عينة"}, headers=AUTH).json()["id"]
+    built = ROWS[2:7]
+    assert [row.path.split("/")[-1] for row in built] == [
+        "lessons",
+        "{lesson_id}",
+        "{lesson_id}",
+        "home",
+        "tender",
+    ]
+    for row in built:
+        call = row.call.replace(ID, lesson_id if "lesson" in row.path else pid)
+        answer = client.request(row.method, call, json=row.body, headers=AUTH)
+        assert answer.status_code == row.status, (row.method, row.path)
+        assert answer.headers["cache-control"] == "no-store"
+        row.gives.model_validate_json(answer.text, strict=True)
+
+
 def test_the_not_built_text_is_a_pair_with_no_fix_to_offer():
     assert set(copy.NOT_BUILT) == {"en", "ar"} and all(copy.NOT_BUILT.values())
     assert copy.fix_of(copy.NOT_BUILT) is None
