@@ -1015,6 +1015,38 @@ async def test_steer_reaches_a_lead_on_claude_code(make_engine, project, tmp_pat
     assert users[1] == [{"type": "text", "text": "ركّز على الخرسانة - عينة"}]
 
 
+async def test_a_steer_sent_before_a_claude_code_lead_starts_reaches_it(
+    make_engine, project, tmp_path
+):
+    from qsone.engine.connectors.claude_code import ID
+    from qsone.engine.types import ModelChoice
+    from tests.engine_fakes import read_fake_log
+
+    log = tmp_path / "claude.log"
+    script = ["init", {"text": "تمام، الخرسانة - عينة"}, "result"]
+    roles.choose("lead", ModelChoice(ID, "sonnet"))
+    engine = await started(make_engine([*links(), claude_code_link(script, log)]))
+    engine.base_url = "http://127.0.0.1:9/"  # never reached: the fake calls no tool
+    entered, go = asyncio.Event(), asyncio.Event()
+    before = engine.spending.before_request
+
+    async def held(*args, **kwargs):  # the Lead waits here, before Claude Code starts
+        entered.set()
+        await go.wait()
+        return await before(*args, **kwargs)
+
+    engine.spending.before_request = held
+    brief = await engine.start_brief(project, BRIEF)
+    await asyncio.wait_for(entered.wait(), 5)
+    await engine.steer(brief, "ركّز على الخرسانة - عينة")
+    go.set()
+    events = await finish(engine, brief)
+    assert states(events)[-1] == "done"
+    [run] = read_fake_log(log)
+    [task] = [line for line in run["stdin"] if line["type"] == "user"]
+    assert "ركّز على الخرسانة - عينة" in task["message"]["content"][0]["text"]
+
+
 async def test_stop_ends_a_claude_code_specialist(make_engine, project, tmp_path, data_dir):
     from qsone.engine.connectors.claude_code import ID, ClaudeCodeConnector
     from qsone.engine.types import ModelChoice

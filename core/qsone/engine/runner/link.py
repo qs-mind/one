@@ -40,6 +40,12 @@ class _BriefLink:
             prompt = copy.CONTINUE_AFTER_RESTART if final_text(mirror) is None else task
         if not mirror or final_text(mirror) is not None:
             mirror.append(ModelRequest(parts=[UserPromptPart(task)]))
+        if run_id == self.lead_run_id and self.steering:
+            # steers sent before the Lead started go with its first message, as the
+            # PydanticAI Lead enqueues them (lead.py); no await from here to `claude_lead`
+            steers, self.steering = self.steering, []
+            prompt = "\n\n".join((prompt, *steers))
+            mirror.append(ModelRequest(parts=[UserPromptPart(s) for s in steers]))
 
         def on_result(name: str, args: dict, text: str) -> None:
             call_id = f"mcp-{uuid4().hex[:12]}"
