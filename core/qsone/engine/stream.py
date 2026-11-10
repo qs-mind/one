@@ -10,6 +10,9 @@ Deliverable), `data-unsourced` (the Brief), `data-status` (the Brief), and any `
 with an `error` chunk whose text is its plain {en, ar} words as JSON, as the screen reads it,
 with the `fix` the screen can offer (`copy.fix_of`); a card carries its detail's `fix` too.
 
+The team room's messages are such `Data` events: `data-room` (id: the message; data: the
+contract's `RoomMessage`), written by `engine.room` and rebuilt for a stored reply.
+
 No PydanticAI here: the chunks are written as the protocol defines them."""
 
 import asyncio

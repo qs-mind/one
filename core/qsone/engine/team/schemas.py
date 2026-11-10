@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from qsone.engine import agents, checker, desks
+from qsone.engine.findings import Place
 
 from .common import MAX_SPECIALISTS, _Args, _json
 
@@ -112,13 +113,26 @@ Example:
 class MessageArgs(_Args):
     to: str = Field(min_length=1, max_length=64)
     text: str = Field(min_length=1, max_length=4000)
+    # The team room (Phase 1, C6): what the message does, what it answers, what it rests on.
+    kind: Literal["say", "assign", "ask", "object", "resolve"] = "say"
+    reply_to: str | None = Field(None, min_length=1, max_length=64)
+    sources: list[Place] = Field(default_factory=list, max_length=20)
+    finding_id: str | None = Field(None, min_length=1, max_length=64)
+    money: bool = False
 
 
-_MESSAGE_EXAMPLE = {"to": "lead", "text": "Item 03/02 has no unit in the BOQ; I used m3 as 03/01."}
+_MESSAGE_EXAMPLE = {
+    "to": "lead",
+    "text": "Clause 14 says 10% retention, not 5%.",
+    "kind": "object",
+    "sources": [{"file_id": "<file id>", "locator": {"page": 12}}],
+}
 
-_MESSAGE_DOC = f"""Send a short message to a team member: "lead" for the Lead QS, or a \
-specialist_id. The engineer sees it in the Coordination Room. The Checking QS takes no \
-messages: it sees only the Deliverables sent to it.
+_MESSAGE_DOC = f"""Message a team member in the team room, which the engineer reads: "lead" for \
+the Lead QS, or a specialist_id. reply_to: the message you answer. sources: places you read; \
+finding_id: a Finding it is about. money: true when it spends or prices money: the engineer \
+answers it. An objection not settled in two rounds goes to the engineer. The Checking QS takes \
+no messages.
 Example:
 {_json(_MESSAGE_EXAMPLE)}"""
 

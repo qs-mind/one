@@ -401,6 +401,26 @@ def test_the_findings_routes_answer_the_contracts_shapes(data_dir):
             c.Refusal.model_validate_json(refused.text, strict=True)
 
 
+def test_the_room_routes_answer_the_contracts_shapes(data_dir):
+    """Routes 17 and 18 are built (C6; their behaviour is core/tests/test_room.py)."""
+    with TestClient(create_app(SECRET, data_dir=data_dir)) as client:
+        pid = client.post("/projects", json={"name": "مناقصة - عينة"}, headers=AUTH).json()["id"]
+        listed = client.get(f"/projects/{pid}/room", headers=AUTH)
+        assert (listed.status_code, listed.json()) == (200, {"messages": [], "next_cursor": None})
+        assert listed.headers["cache-control"] == "no-store"
+        c.RoomPage.model_validate_json(listed.text, strict=True)
+        bad = client.get(f"/projects/{pid}/room?cursor=abc", headers=AUTH)
+        assert (bad.status_code, bad.json()["field"]) == (422, "cursor")
+        c.Refusal.model_validate_json(bad.text, strict=True)
+        empty = client.post(f"/projects/{pid}/room", json={"text": " "}, headers=AUTH)
+        assert (empty.status_code, empty.json()["field"]) == (422, "text")
+        c.Refusal.model_validate_json(empty.text, strict=True)
+        for method in ("GET", "POST"):
+            body = {"text": "رسالة - عينة"} if method == "POST" else None
+            gone = client.request(method, f"/projects/{ID}/room", json=body, headers=AUTH)
+            assert (gone.status_code, gone.json()) == (404, {"error": copy.PROJECT_NOT_FOUND})
+
+
 def test_the_not_built_text_is_a_pair_with_no_fix_to_offer():
     assert set(copy.NOT_BUILT) == {"en", "ar"} and all(copy.NOT_BUILT.values())
     assert copy.fix_of(copy.NOT_BUILT) is None

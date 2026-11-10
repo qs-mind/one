@@ -45,7 +45,7 @@ from qsone.deliverables import api as deliverables_api
 from qsone.deliverables import events as deliverable_events
 from qsone.engine import connectors as engine_connectors
 from qsone.engine import findings_routes as findings_api
-from qsone.engine import identity_routes, mcp_server, roles, tools_records  # noqa: F401 - registers the records tools
+from qsone.engine import identity_routes, mcp_server, roles, room, tools_records  # noqa: F401 - registers the records tools
 from qsone.engine import routes as engine_routes
 from qsone.engine.connectors import claude_code
 from qsone.engine.plan import routes as plan_routes
@@ -449,6 +449,7 @@ def create_app(
         return JSONResponse({"id": body.id})
 
     app.include_router(identity_routes.router(registry, engine))  # the team (Phase 1, C5)
+    app.include_router(room.router(registry, engine))  # the team room (Phase 1, C6)
 
     # The Phase 1 routes that are declared and not built yet (501). Keep this the last route
     # added: it then never takes a request an older route answers.

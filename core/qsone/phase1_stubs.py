@@ -16,9 +16,7 @@ To build a route:
    from here, and it fails when the route no longer says what ui/src/api/openapi.json says.
 """
 
-from typing import Annotated
-
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from qsone import copy
@@ -42,26 +40,6 @@ def _stub() -> JSONResponse:
 
 def router() -> APIRouter:
     r = APIRouter()
-
-    # The team room (C6).
-    @r.get(
-        "/projects/{project_id}/room", response_model=c.RoomPage, responses=_refusals(404, 409, 422)
-    )
-    def room(
-        project_id: str,
-        cursor: Annotated[str | None, Query(max_length=200)] = None,
-        limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    ):
-        return _stub()
-
-    @r.post(
-        "/projects/{project_id}/room",
-        status_code=201,
-        response_model=c.RoomMessage,
-        responses=_refusals(404, 409, 422, 423),
-    )
-    def say_in_room(project_id: str, body: c.RoomMessageIn):
-        return _stub()
 
     # Try again (C3).
     @r.post(
