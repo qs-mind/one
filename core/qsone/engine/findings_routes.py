@@ -12,6 +12,7 @@ from fastapi import APIRouter
 from qsone import copy
 from qsone import phase1_contract as c
 from qsone.engine import finding_tools, findings  # noqa: F401 - registers the Finding tools
+from qsone.home_block import project_block
 from qsone.journey import setup_state
 from qsone.records.project import RecordsError
 
@@ -86,6 +87,8 @@ def router(engine) -> APIRouter:
                      if f["id"] == finding_id), None,
                 )  # fmt: skip
                 if current is not None and current["status"] == "raised":
+                    if (blocked := project_block(engine, rec)) is not None:
+                        return c.refusal(blocked["reason"])
                     try:
                         await engine.sheet()  # the Lead's work would start: can it?
                     except NoAI as none:

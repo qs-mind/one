@@ -63,3 +63,9 @@ def tender_block(engine, confidential: bool, blocked: dict | None) -> dict | Non
     if any(getattr(c, "on_device", False) for c in engine.connectors()):
         return None
     return {"reason": copy.CONFIDENTIAL_NO_LOCAL_AI, "fix": "ai"}
+
+
+def project_block(engine, rec) -> dict | None:
+    """`TenderRow.blocked` for `rec` at this moment: what a route that would start the Lead's
+    work in it refuses with (contract section 1), before it stores anything."""
+    return tender_block(engine, rec.meta().get("confidential") == "1", lead_block(engine))

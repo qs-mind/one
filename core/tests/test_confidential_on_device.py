@@ -153,3 +153,37 @@ def test_choosing_the_model_or_finishing_the_ai_step_tells_the_driver(data_dir, 
     client.app.state.driver.on_ai_changed = lambda: heard.append(1)
     assert client.put(path, json=body, headers=AUTH).is_success
     assert heard == [1]
+
+
+# Routes that start the Lead's work refuse as the row says ----------------------------------
+
+
+def test_the_room_refuses_a_blocked_confidential_tender_and_stores_nothing(data_dir):
+    client = TestClient(create_app(SECRET, data_dir=data_dir, connectors=links))
+    pid = new(client, "سري - عينة", secret=True)
+    settings.save(ON_DEVICE, True)
+    said = client.post(f"/projects/{pid}/room", json={"text": "سؤال - عينة"}, headers=AUTH)
+    row = rows(client)[pid]
+    assert said.status_code == 409 and said.json() == {"error": row["reason"], "fix": row["fix"]}
+    assert row == {"reason": copy.CONFIDENTIAL_NO_LOCAL_AI, "fix": "ai"}
+    room = client.get(f"/projects/{pid}/room", headers=AUTH).json()["messages"]
+    assert [m for m in room if m["from_id"] == "engineer"] == []
+
+
+def test_deciding_a_finding_in_a_blocked_confidential_tender_is_refused(data_dir):
+    from tests.fakes_tools import tool_ctx
+    from tests.test_findings import raise_, record, spec_file
+
+    client = TestClient(create_app(SECRET, data_dir=data_dir, connectors=links))
+    pid = new(client, "سري - عينة", secret=True)
+    rec = client.app.state.projects.get(pid)
+    ctx = tool_ctx(rec)
+    first = record(ctx, spec_file(rec))
+    raise_(ctx, first)
+    settings.save(ON_DEVICE, True)
+    path = f"/projects/{pid}/findings/{first}/decide"
+    refused = client.post(path, json={"choice": 0}, headers=AUTH)
+    assert refused.status_code == 409
+    assert refused.json() == {"error": copy.CONFIDENTIAL_NO_LOCAL_AI, "fix": "ai"}
+    found = client.get(f"/projects/{pid}/findings", headers=AUTH).json()["findings"]
+    assert found[0]["status"] == "raised"  # nothing stored
