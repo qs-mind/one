@@ -1,202 +1,6 @@
-@import "tailwindcss";
-/* The new interface (U1 onward) has its own stylesheet; keep its classes out of this one. */
-@source not "./design";
-@source not "./next";
-@source not "./texts";
-
-/* QS Mind colours only. Kumbh Sans for Latin; it has no Arabic, so Arabic letters fall to Zain (open licence;
-   Thmanyah files never go in this public repo). WebKitGTK 2.54, the Linux app's engine, misplaces a mark that ends
-   a word, such as the tanween in «حالياً»: it lifts the whole word by the mark's offset. Zain draws that tanween
-   where it belongs (offset near zero) and its dots are part of each letter; IBM Plex Sans Arabic lifted the word.
-   The type scale (dense, 5 Nov): 13 px for meta, 14 px body (15 px on an Arabic page), 18 px frame titles, 22 px page titles; nothing
-   under 12 px at 100%. The spacing scale is Tailwind's 1, 2, 3, 4, 6, 8 (4, 8, 12, 16, 24, 32 px).
-   Every size is in rem and follows the root font-size, which follows the window and the engineer's zoom
-   (ui/src/ui/scale.ts): 100 % at 1920×1000 and up, 80 % at 1280×650. Text stops shrinking at --ui-text-floor, so body
-   text is never under 12.5 px (English) or 13.5 px (Arabic), and the other text sizes keep their ratio to it; the two
-   smallest have floors of their own: text-xs never under 12 px, and text-sm never under 13 px in Arabic. Borders
-   and hairlines stay in px. */
-:root {
-  --ui-text-floor: 0.892857; /* 12.5 / 14 */
-  --ui-sm-floor: 12.5px;
-}
-html:lang(ar) {
-  --ui-text-floor: 0.9; /* 13.5 / 15 */
-  --ui-sm-floor: 13px;
-}
-@theme {
-  --color-*: initial;
-  --color-ink: #0e0f12;
-  --color-stone: #f2eee7;
-  --color-paper: #f9f8f4;
-  --color-slate: #6e6a64;
-  --color-copper: #a6491b;
-  --font-sans: "Kumbh Sans Variable", "Zain", system-ui, sans-serif;
-  --text-xs: max(12px, 0.8125rem); /* 13 px: meta */
-  --text-xs--line-height: 1.5;
-  --text-sm: max(var(--ui-sm-floor), 0.875rem);
-  --text-sm--line-height: 1.55;
-  --text-base: max(calc(16px * var(--ui-text-floor)), 1rem);
-  --text-lg: max(calc(18px * var(--ui-text-floor)), 1.125rem); /* 18 px: frame titles */
-  --text-lg--line-height: 1.45;
-  --text-2xl: max(calc(22px * var(--ui-text-floor)), 1.375rem); /* 22 px: page titles */
-  --text-2xl--line-height: 1.35;
-}
-
-/* Zain draws Arabic-Indic digit codepoints as Western glyphs. Exclude those ranges so typed digits
-   (including project titles) use the system Arabic font. ONE formats its own figures separately. */
-/* Arabic in Zain, matched to Kumbh Sans beside it. Zain's letters are drawn smaller, so they are set 3% larger; and its
-   strokes are darker than Kumbh's at the same weight, so each weight takes Zain's next lighter cut: body (400) uses
-   Zain 300, semibold (600) uses Zain 400, bold (700) Zain 700. Before (108% and 400 / 700) Arabic read bigger and
-   heavier than the English next to it (Kareem, 5 Nov 2026). Same files as the @fontsource/zain Arabic subsets. */
-@font-face {
-  font-family: "Zain";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 450;
-  size-adjust: 103%;
-  src: url("../../node_modules/@fontsource/zain/files/zain-arabic-300-normal.woff2") format("woff2");
-  unicode-range: U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
-    U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
-}
-@font-face {
-  font-family: "Zain";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 451 650;
-  size-adjust: 103%;
-  src: url("../../node_modules/@fontsource/zain/files/zain-arabic-400-normal.woff2") format("woff2");
-  unicode-range: U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
-    U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
-}
-@font-face {
-  font-family: "Zain";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 651 900;
-  size-adjust: 103%;
-  src: url("../../node_modules/@fontsource/zain/files/zain-arabic-700-normal.woff2") format("woff2");
-  unicode-range: U+0600-065F, U+066A-06EF, U+06FA-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011,
-    U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
-}
-
-@layer base {
-  body {
-    background: var(--color-paper);
-    color: var(--color-ink);
-    font-size: max(calc(14px * var(--ui-text-floor)), 0.875rem); /* 14 px at 100 %, never under 12.5 px */
-    line-height: 1.5;
-  }
-  /* Arabic needs more room between its lines for its dots and marks */
-  html:lang(ar) body {
-    font-size: max(calc(15px * var(--ui-text-floor)), 0.9375rem); /* 15 px at 100 %, never under 13.5 px */
-    line-height: 1.65;
-  }
-  button:not(:disabled) {
-    cursor: pointer;
-  }
-  /* WebKit's own style gives li "text-align: match-parent", which fixes the side from the list's direction and
-     passes it down, so an Arabic reply inside an English page sat on the left. Each block aligns to its own start. */
-  li {
-    text-align: start;
-  }
-}
-
-/* The brand focus ring on every control, never the engine's own `auto 1px` outline: 2 px Ink, 2 px off the edge. A
-   control's own focus-visible: classes refine it (a different offset, an inset ring). */
-@layer base {
-  :focus-visible {
-    outline: 2px solid var(--color-ink);
-    outline-offset: 2px;
-  }
-}
-
-/* Focus rings for the keyboard only: after a click or a touch (html[data-pointer], ui/pointerFocus.ts) no ring shows
-   until a key moves focus, whatever the engine thinks :focus-visible means. A text field keeps its focus look. */
-html[data-pointer] :focus-visible:not(input, textarea, select, [contenteditable="true"]) {
-  outline: none;
-}
-
-/* Brand form controls, still the native inputs underneath (keyboard, screen readers, forms stay as they are). A
-   checkbox or a radio is ticked in Ink, at 16 px. A select drops the engine's blue widget for Paper with a quiet Slate
-   border and a Slate chevron on its inline end (the left in Arabic); the room for the chevron is kept whatever padding
-   the select's own classes give. */
-@layer base {
-  input[type="checkbox"],
-  input[type="radio"] {
-    accent-color: var(--color-ink);
-    width: 1rem;
-    height: 1rem;
-    flex-shrink: 0;
-  }
-  select {
-    appearance: none;
-    -webkit-appearance: none;
-    background-color: var(--color-paper);
-    color: var(--color-ink);
-    border: 1px solid rgb(110 106 100 / 0.4);
-    border-radius: 6px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236e6a64' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-size: 10px 6px;
-    background-position: right 0.75rem center;
-    text-overflow: ellipsis;
-    /* never wider than its box: a long option (a model's name and price) is cut, the panel never scrolls sideways */
-    max-width: 100%;
-    min-width: 0;
-  }
-  [dir="rtl"] select:not([dir="ltr"]),
-  select[dir="rtl"] {
-    background-position: left 0.75rem center;
-  }
-}
-select:not([class*="pe-"]) {
-  padding-inline-end: 2.25rem;
-}
-
-/* A disabled button reads as disabled and stays on-brand: Slate words, a filled one on Stone, an outlined one with a
-   faint Slate edge; never a grey wash of the button it was (the opacity its own classes ask for is dropped). */
-button:disabled {
-  opacity: 1;
-  color: var(--color-slate);
-}
-button:disabled:is(.bg-ink, .bg-copper, [class*="bg-ink/"]) {
-  background-color: var(--color-stone);
-}
-button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-copper) {
-  border-color: rgb(110 106 100 / 0.3);
-}
-
-/* Scrollbars: a 2 px Slate line on a clear track, as thin as a scrollbar goes; under the pointer it grows to 4 px and
-   darkens, so it can still be grabbed (Kareem, 5 Nov 2026).
-   WebKitGTK, WKWebView and WebView2 take ::-webkit-scrollbar (it lets the thumb grow on hover); an engine without it
-   takes the standard properties. */
-@supports not selector(::-webkit-scrollbar) {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(110 106 100 / 0.35) transparent;
-  }
-}
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-  background: transparent;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background-color: rgb(110 106 100 / 0.3);
-  background-clip: content-box;
-  border: 2px solid transparent;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(110 106 100 / 0.55);
-  border-width: 1px;
-}
+/* The kept engines' own classes (the sheet, document and PDF viewers, the kept controls in ui/, the start screen):
+   motion and marks that are plain CSS, not utilities. The new interface's look is design/tokens.css; this file names
+   no colour and reads the tokens (--foreground, --muted, --muted-foreground). Imported after tokens.css. */
 
 :root {
   /* ONE's motion (ui/src/ui/motion.ts): one ease, four lengths. */
@@ -207,48 +11,7 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
   --dur-roll: 400ms;
 }
 
-/* The message box's model card: it rises 4 px into place and fades in, from the chip it belongs to; it leaves
-   quicker than it came. No bounce. With reduced motion nothing in the box moves. */
-@keyframes composer-pop-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
-}
-@keyframes composer-pop-out {
-  to {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
-}
-.composer-pop {
-  transform-origin: var(--radix-popover-content-transform-origin);
-}
-.composer-pop[data-state="open"] {
-  animation: composer-pop-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.composer-pop[data-state="closed"] {
-  animation: composer-pop-out 120ms ease-out;
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-composer],
-  [data-composer] *,
-  .composer-pop {
-    transition-duration: 0ms !important;
-    animation: none !important;
-  }
-}
-
-/* The first launch: soft and calm. A new step slides 16 px in from the side the flow is going to (the reading end
-   going forward, the start going back, so the sides swap on an Arabic page) and fades in; a feedback line, a field
-   or a button that appears rises 4 px and fades in; a busy line waits 300 ms first, so a quick save never flashes.
-   Ease-out, 150 to 240 ms, transform and opacity only, no bounce. With reduced motion nothing moves. */
-@keyframes fl-step-in {
-  from {
-    opacity: 0;
-    transform: translateX(calc(var(--fl-way, 1) * var(--fl-side, 1) * 16px));
-  }
-}
+/* A line that rises into place, a quiet "Saved" that fades, a check that draws itself (ui/Feedback.tsx, InkCheck). */
 @keyframes fl-rise {
   from {
     opacity: 0;
@@ -260,21 +23,6 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
     stroke-dashoffset: 0;
   }
 }
-@keyframes fl-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-/* the step's content slides; its bar of Back, Skip and Next stays still, in the same place on every step */
-.fl-step [data-step] > :not([data-step-bar]) {
-  animation: fl-step-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-.fl-step[data-way="back"] {
-  --fl-way: -1;
-}
-[dir="rtl"] .fl-step {
-  --fl-side: -1;
-}
 .fl-rise {
   animation: fl-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -285,9 +33,6 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
   stroke-dasharray: 14;
   stroke-dashoffset: 14;
   animation: fl-draw 240ms ease-out 120ms forwards;
-}
-.fl-spin {
-  animation: fl-spin 900ms linear infinite;
 }
 /* A quiet "Saved": it rises in, stays a moment, then fades out where it is. */
 @keyframes fl-fade-out {
@@ -301,14 +46,10 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
     fl-fade-out 240ms ease-out 1800ms forwards;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-firstlaunch],
-  [data-firstlaunch] *,
   .fl-rise,
   .fl-rise-late,
   .fl-fade,
-  .fl-spin,
   .fl-check {
-    transition-duration: 0ms !important;
     animation: none !important;
   }
   .fl-check {
@@ -331,7 +72,7 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
 }
 .sheet-review .review-dim > .rdg-cell {
   opacity: 0.5;
-  color: var(--color-slate);
+  color: var(--muted-foreground);
 }
 @media (prefers-reduced-motion: reduce) {
   .sheet-review .rdg-cell {
@@ -350,8 +91,8 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
   font-weight: 700;
   src: url("../../node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-700-normal.woff2") format("woff2");
 }
-@theme {
-  --font-logo: "Instrument Sans", "Kumbh Sans Variable", system-ui, sans-serif;
+.font-logo {
+  font-family: "Instrument Sans", "Kumbh Sans Variable", system-ui, sans-serif;
 }
 /* The gap is longer than the line and the start sits 5 units into it, so a round cap never shows as a dot
    before its line draws. */
@@ -392,43 +133,6 @@ button:disabled:is([class*="border-ink"], [class*="border-slate"], .border-coppe
   [data-mark] * {
     animation: none !important;
   }
-}
-
-/* Motion, group A: the language wipe (ui/src/ui/viewTransition.ts). The new page is revealed by a growing circle
-   over the old one, so neither picture fades on its own. */
-html.lang-wipe::view-transition-old(root),
-html.lang-wipe::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
-/* Thinking, while ONE works: a soft Slate→Ink→Slate sweep over the whole word (never letter by letter), in the
-   reading direction, only while the line is shown. Reduced motion gets plain Slate text from the chat instead. */
-@keyframes shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0 0;
-  }
-}
-.shimmer {
-  background-image: linear-gradient(
-    90deg,
-    var(--color-slate) 0%,
-    var(--color-slate) 35%,
-    var(--color-ink) 50%,
-    var(--color-slate) 65%,
-    var(--color-slate) 100%
-  );
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: shimmer 1.6s ease-in-out infinite;
-}
-[dir="rtl"] .shimmer {
-  animation-direction: reverse;
 }
 
 /* Scroll edges (ui/src/ui/useScrollEdges.ts): a scroll area fades 24 px at its top or bottom only while there is
@@ -499,7 +203,7 @@ html.lang-wipe::view-transition-new(root) {
   width: 3px;
   height: 3px;
   border-radius: 999px;
-  background: var(--color-slate);
+  background: var(--muted-foreground);
   opacity: 0.25;
   animation: work-dot 1.2s ease-in-out infinite;
 }
@@ -537,13 +241,12 @@ html.lang-wipe::view-transition-new(root) {
   transform-origin: right center;
 }
 
-/* Calm interaction details (ui/src/ui/TabUnderline, Segmented, Glide, Tip, ProgressBar, InkCheck): marks that slide
+/* Calm interaction details (ui/src/ui/TabUnderline, Segmented, Tip, InkCheck): marks that slide
    to what is chosen or reached, measured from the real positions and anchored at the physical left, so they land
    right in Arabic too. Transform and opacity only, EASE, 150 to 300 ms; a mark's first place shows at once and it
    glides only once [data-ready]. Reduced motion: every mark jumps, nothing fades. */
 .tab-underline,
-.segment-thumb,
-.glide-mark {
+.segment-thumb {
   position: absolute;
   left: 0;
   top: 0;
@@ -553,7 +256,7 @@ html.lang-wipe::view-transition-new(root) {
 .tab-underline {
   width: 1px;
   height: 2px;
-  background: var(--color-ink);
+  background: var(--foreground);
   transform-origin: 0 0;
   transform: translate(var(--x, 0), var(--y, 0)) scaleX(var(--w, 0));
 }
@@ -563,44 +266,12 @@ html.lang-wipe::view-transition-new(root) {
 .segment-thumb {
   z-index: -1;
   border-radius: 6px;
-  background: var(--color-stone);
+  background: var(--muted);
   transform: translate(var(--x, 0), var(--y, 0));
-}
-.glide-mark {
-  z-index: -1;
-  border-radius: 10px;
-  background: var(--color-stone);
-  opacity: 0;
-  transform: translate(var(--x, 0), var(--y, 0));
-  transition: opacity var(--dur-short) ease-out;
-}
-.glide-mark[data-on] {
-  opacity: 1;
 }
 .tab-underline[data-ready],
 .segment-thumb[data-ready] {
   transition: transform var(--dur-base) var(--ease-calm);
-}
-.glide-mark[data-ready] {
-  transition:
-    transform var(--dur-short) var(--ease-calm),
-    opacity var(--dur-short) ease-out;
-}
-/* cmdk's list holds its rows in a sizer: the palette's glide moves in that */
-[cmdk-list-sizer] {
-  position: relative;
-  isolation: isolate;
-}
-/* a real count's bar grows from the side the words start on */
-.progress-fill {
-  transform-origin: left center;
-  transition: transform var(--dur-long) var(--ease-calm);
-}
-[dir="rtl"] .progress-fill {
-  transform-origin: right center;
-}
-.progress-fill[data-still] {
-  transition: none;
 }
 @keyframes tip-in {
   from {
@@ -617,24 +288,9 @@ html.lang-wipe::view-transition-new(root) {
     fl-rise 200ms var(--ease-calm) both,
     fl-fade-out 240ms ease-out 660ms forwards;
 }
-/* small switches and icon buttons: a 32 px tap area at least, from an invisible layer centred on them */
-.tap {
-  position: relative;
-}
-.tap::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: max(100%, 32px);
-  height: max(100%, 32px);
-  transform: translate(-50%, -50%);
-}
 @media (prefers-reduced-motion: reduce) {
   .tab-underline,
-  .segment-thumb,
-  .glide-mark,
-  .progress-fill {
+  .segment-thumb {
     transition: none !important;
   }
   .tip-in,

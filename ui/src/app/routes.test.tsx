@@ -98,6 +98,22 @@ describe("the first-launch gate", () => {
     expect(where(third)).toBe(paths.welcome("ai"));
   });
 
+  it("pins someone upgrading to step 2, and lets them on to step 2 only", async () => {
+    scenario("profile:incomplete");
+    const router = open(paths.welcome("language"));
+    await place("welcome");
+    expect(where(router)).toBe(paths.welcome("profile"));
+    await router.navigate(paths.welcome("ai"));
+    await waitFor(() => expect(where(router)).toBe(paths.welcome("profile")));
+  });
+
+  it("opens step 1 for a first-launch address it does not know", async () => {
+    steps = { ...PASSED, language: null, ai: null };
+    const router = open("/welcome/nowhere");
+    await place("welcome");
+    expect(where(router)).toBe(paths.welcome("language"));
+  });
+
   it("lets a skipped AI step through", async () => {
     steps = { ...PASSED, ai: "skipped" };
     const router = open(paths.settings("ai"));
@@ -109,21 +125,21 @@ describe("the first-launch gate", () => {
     scenario("profile:incomplete");
     const router = open(paths.home);
     await place("welcome");
-    await waitFor(() => expect(setupCalls).toBe(2)); // the gate's call, then the first-launch screen's own
+    expect(setupCalls).toBe(1); // the gate's call only: the first-launch screen follows the address
     scenario("profile");
     await router.navigate(paths.home);
     await place("home");
     expect(where(router)).toBe(paths.home);
-    expect(setupCalls).toBe(3);
+    expect(setupCalls).toBe(2);
   });
 
   it("asks again on leaving and sends back what is still not done", async () => {
     scenario("profile:incomplete");
     const router = open(paths.home);
     await place("welcome");
-    await waitFor(() => expect(setupCalls).toBe(2)); // the gate's call, then the first-launch screen's own
+    expect(setupCalls).toBe(1);
     await router.navigate(paths.tender(P2));
-    await waitFor(() => expect(setupCalls).toBe(3));
+    await waitFor(() => expect(setupCalls).toBe(2));
     await place("welcome");
     expect(where(router)).toBe(paths.welcome("profile"));
   });

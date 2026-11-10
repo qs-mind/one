@@ -6,21 +6,10 @@
 @import "@fontsource/zain/arabic-700.css";
 @import "./base.css";
 
-/* Only the new interface is scanned: the old screens share this Vite root. Later jobs add their folders here. */
-@source "../design";
-@source "../next";
-@source "../app/{Frame,gates}.tsx"; /* ui/src/app also holds the old start screen */
-@source "../home";
-@source "../tender";
-@source "../settings2";
-@source "../firstlaunch2";
-@source "../conversation";
-/* The kept engines the tender's viewers wrap (U5): their classes, with the old colour names read as tokens below. */
-@source "../{viewers,deliverables,sources,review,records}";
-@source "../workspace/{DocumentView.tsx,docs}";
-@source "../ui";
-@source "../chat/parts";
-@source "../team";
+/* Every folder of the screen is scanned, tests aside. The kept engines (the viewers, ui/, the start screen) write the
+   old colour names, read as tokens below. */
+@source "..";
+@source not "../**/*.test.{ts,tsx}";
 
 /* Dark follows the system until <html data-theme="light|dark"> says otherwise. */
 @custom-variant dark {

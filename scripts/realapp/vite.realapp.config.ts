@@ -20,6 +20,7 @@ function realCore() {
   Object.assign(process.env, ISOLATED_KEYS); // the core inherits it: never the system key store
   return defineConfig({
     root: "ui",
+    resolve: { alias: { "@": path.join(root, "ui", "src") } },
     plugins: [
       react(),
       tailwindcss(),

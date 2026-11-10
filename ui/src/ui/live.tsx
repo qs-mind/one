@@ -3,7 +3,7 @@
 // A choice saves when it is made; a text field after a pause (when what it holds is whole) or on leaving it. A newer
 // value stops the older check or save, so only the latest answer shows. A failure keeps what the engineer typed.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Feedback } from "../firstlaunch/parts";
+import { Feedback } from "./Feedback";
 import { pick, t, type Text, texts, useLanguage } from "../i18n";
 
 /** How long typing must stop before a field is saved or checked. */

@@ -1,7 +1,9 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { realpathSync } from "node:fs";
 import path from "node:path";
-import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
+import { defineConfig, searchForWorkspaceRoot } from "vite";
 import { coreDev } from "./scripts/core-dev.ts";
 import { corePython } from "./scripts/python.mjs";
 
@@ -12,6 +14,7 @@ if (!dir) throw new Error("QSONE_BENCH_DIR is not set: start the bench with `npm
 
 export default defineConfig({
   root: "ui",
+  resolve: { alias: { "@": fileURLToPath(new URL("./ui/src", import.meta.url)) } },
   plugins: [
     react(),
     tailwindcss(),
@@ -21,5 +24,11 @@ export default defineConfig({
     }),
   ],
   // No hot reload: a file saved mid-walk must not swap code under a running page (it takes effect on the next load).
-  server: { host: "127.0.0.1", port: Number(process.env.QSONE_BENCH_PORT || 1442), strictPort: true, hmr: false }, // 1440 is the dev app's
+  server: {
+    host: "127.0.0.1",
+    port: Number(process.env.QSONE_BENCH_PORT || 1442), // 1440 is the dev app's
+    strictPort: true,
+    hmr: false,
+    fs: { allow: [searchForWorkspaceRoot(process.cwd()), realpathSync(fileURLToPath(new URL("./node_modules", import.meta.url)))] },
+  },
 });

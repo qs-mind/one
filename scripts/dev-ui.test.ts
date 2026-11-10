@@ -1,5 +1,6 @@
 // @vitest-environment node
-// `vite --mode ui` (npm run dev:ui) serves the new interface without the core; every other serve mode starts it.
+// `vite --mode ui` (npm run dev:ui) serves the app against the fake core (msw's worker), without the core; every other
+// serve mode starts the core.
 import { readFileSync } from "node:fs";
 import type { ConfigEnv, PluginOption, UserConfig } from "vite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -23,8 +24,11 @@ describe("the dev config", () => {
     if (vitest !== undefined) process.env.VITEST = vitest;
   });
 
-  it("drops the core in mode ui", () => {
+  it("drops the core in mode ui, and serves msw's worker there only", () => {
     expect(pluginNames({ mode: "ui" })).not.toContain("qsone-core-dev");
+    expect(pluginNames({ mode: "ui" })).toContain("msw");
+    expect(pluginNames({ mode: "development" })).not.toContain("msw");
+    expect(pluginNames({ command: "build", mode: "ui" })).not.toContain("msw");
   });
 
   it.each(["development", "production", "test"])("starts the core when serving in mode %s", (mode) => {

@@ -11,8 +11,8 @@ node scripts/realapp/build.mjs [port]           # only the build (the walk build
 ```
 
 Needs: `Xvfb`, `xdotool`, ImageMagick (`import`), `ffmpeg` (video only), `dbus-run-session`, `python3`, the core's
-`core/.venv`, `node_modules`, and Rust for the desktop crate. The smoke walk's BOQ comes from `docs/test-files` (the
-docs repo; a worktree finds it in the main checkout) or `$QSONE_REALAPP_BOQ`.
+`core/.venv`, `node_modules`, and Rust for the desktop crate. The smoke walk goes through first launch (the language, who
+you are typed in Arabic with real keys, AI later) to Home, then Settings, and Home again in English.
 
 ## What it starts, and what it never touches
 

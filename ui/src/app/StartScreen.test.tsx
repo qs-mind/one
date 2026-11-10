@@ -10,13 +10,13 @@ import { INTRO_MS, SLOW_MS } from "./StartScreen";
 const logPath = "/tmp/qs-mind-one/core.log";
 const startScreen = () => document.querySelector("[data-start-screen]");
 
-/** The core answers /health after `ms`; never, when `ms` is Infinity; with an error, when `down`. The zoom it reads once
- * the core is up (ui/scale.ts) is answered at once. */
+/** The core answers /health after `ms`; never, when `ms` is Infinity; with an error, when `down`. The look it reads once
+ * the core is up (GET /settings, settings/look.ts) is answered at once. */
 function coreReadyAfter(ms: number, down = false) {
   const fetch = vi.fn(
     (url: RequestInfo | URL) =>
       new Promise<Response>((resolve, reject) => {
-        if (String(url) === "/api/settings/zoom") return resolve(Response.json({ zoom: 1 }));
+        if (String(url) === "/api/settings") return resolve(Response.json({ settings: [] }));
         if (ms === Infinity) return;
         setTimeout(() => (down ? reject(new TypeError("Failed to fetch")) : resolve(Response.json({ ok: true }))), ms);
       }),
@@ -112,7 +112,7 @@ describe("the start screen", () => {
     const again = coreReadyAfter(0);
     await user.click(screen.getByRole("button", { name: texts.retry.en }));
     expect(await screen.findByText("chat", {}, { timeout: 3000 })).toBeInTheDocument();
-    expect(again.mock.calls.filter(([url]) => url === "/api/health")).toHaveLength(1); // then the zoom
+    expect(again.mock.calls.filter(([url]) => url === "/api/health")).toHaveLength(1); // then the look
   });
 
   it("with reduced motion: the mark whole, no drawing, and ONE at once when the core is ready", async () => {
