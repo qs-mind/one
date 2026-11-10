@@ -21,7 +21,8 @@ import { Button } from "@/design/ui/button";
 import { Textarea } from "@/design/ui/textarea";
 
 /** A dropped file, or a dropped folder (the core reads a folder itself; the screen only knows its name). */
-export type PromptInputAttachment = { id: string; name: string; kind: "file" | "folder"; file?: File };
+/** A dropped file, or a folder with its entry, to read its files from. */
+export type PromptInputAttachment = { id: string; name: string; kind: "file" | "folder"; file?: File; entry?: FileSystemEntry };
 
 export type PromptInputMessage = { text: string; attachments: PromptInputAttachment[] };
 
@@ -48,7 +49,7 @@ export function droppedItems(transfer: DataTransfer): Omit<PromptInputAttachment
   if (items.length === 0) return [...(transfer.files ?? [])].map((file) => ({ name: file.name, kind: "file", file }));
   return items.flatMap((item): Omit<PromptInputAttachment, "id">[] => {
     const entry = item.webkitGetAsEntry?.();
-    if (entry?.isDirectory) return [{ name: entry.name, kind: "folder" }];
+    if (entry?.isDirectory) return [{ name: entry.name, kind: "folder", entry }];
     const file = item.getAsFile();
     return file ? [{ name: file.name, kind: "file", file }] : [];
   });

@@ -23,7 +23,7 @@ export function folderOf(transfer: DataTransfer): Entry[] | null {
 const readBatch = (reader: FileSystemDirectoryReader) => new Promise<Entry[]>((resolve, reject) => reader.readEntries(resolve, reject));
 const fileOf = (entry: FileSystemFileEntry) => new Promise<File>((resolve, reject) => entry.file(resolve, reject));
 
-async function walk(entry: Entry, parent: string, out: Picked[]): Promise<void> {
+export async function walk(entry: Entry, parent: string, out: Picked[]): Promise<void> {
   if (entry.isFile) return void out.push({ file: await fileOf(entry as FileSystemFileEntry), folder: parent });
   if (!entry.isDirectory) return;
   const folder = parent ? `${parent}/${entry.name}` : entry.name;

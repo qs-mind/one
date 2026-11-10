@@ -13,7 +13,48 @@ export type Finding = Schemas["Finding"];
 export type ProgressData = { agent: Text; text: Text };
 /** data-status, id = the Brief. */
 export type BriefState = Schemas["BriefEvent"]["state"];
-export type StatusData = { state: BriefState; step: Text | null };
+/** `fix`: what the screen can offer beside a failed Brief's step. */
+export type StatusData = { state: BriefState; step: Text | null; fix?: Schemas["LeadBlock"]["fix"] };
+/** One tool of a Connector being added, with the hints its server gives (core/qsone/connectors/hub.py). */
+export type ConnectorTool = { name: string; purpose: string | null; read_only: boolean; destructive: boolean; open_world: boolean };
+/** What a card shows beyond its words, as the core sends it today (3.2): questions, a table whose rows may be ticked
+ * or whose columns' meanings are picked, a Connector's tools, a model with no known price. */
+export type CardPayload = {
+  questions?: Schemas["CardQuestion"][];
+  columns?: { key: string; label: Text }[];
+  rows?: Record<string, string>[];
+  /** The column holding each row's number, and that number's source, which opens in ONE's viewer. */
+  number_column?: string;
+  row_sources?: (Source | null)[];
+  tick?: boolean;
+  /** A BOQ import: what a sheet column may hold, the row key holding its meaning as mapped. */
+  meanings?: { key: string; label: Text }[];
+  meaning_column?: string;
+  tools?: ConnectorTool[];
+  model?: { connector: string; model: string; name: string };
+};
+/** data-card, id = the card: what a running Brief waits on (3.2), the two new kinds included. */
+export type CardData = {
+  kind:
+    | "outside" | "online" | "cap" | "price" | "budget" | "fallback" | "desk" | "disagreement" | "question" | "keep"
+    | "rows" | "cost" | "connector" | "keep_member" | "setting";
+  title: Text;
+  detail: Text;
+  options: string[];
+  /** What fixes what the detail says: a place in Settings. */
+  fix?: string;
+  payload?: CardPayload;
+  status?: "pending" | "settled" | "withdrawn";
+  choice?: string | null;
+  /** Once settled: the answers by question id (or column letter), and the rows ticked, by index. */
+  answers?: Record<string, string>;
+  rows_ok?: number[];
+  /** The answers that spend money or cannot be taken back: press-and-hold, never one click. */
+  hold?: { why: "paid" | "irreversible"; options: string[] };
+  settled_at?: string;
+};
+/** What an answer carries beyond the choice (POST /cards/{id}). */
+export type CardAnswer = { answers?: Record<string, string>; rows_ok?: number[] };
 
 export type ThreadData = {
   progress: ProgressData;
@@ -22,6 +63,9 @@ export type ThreadData = {
   finding: Schemas["FindingPart"];
   sources: Schemas["SourcesPart"];
   steer: Schemas["SteerPart"];
+  stage: Schemas["StagePart"];
+  card: CardData;
+  room: Schemas["RoomMessage"];
 };
 
 export type ThreadMessage = UIMessage<Partial<Schemas["StoredMessageMark"]>, ThreadData>;
@@ -43,7 +87,7 @@ export function livePlaces(messages: readonly ThreadMessage[]): Map<string, stri
   const last = new Map<string, string>();
   for (const message of messages)
     message.parts.forEach((part, index) => {
-      if (part.type === "data-plan" || part.type === "data-finding") last.set(keyOf(part), `${message.id}:${index}`);
+      if (part.type === "data-plan" || part.type === "data-finding" || part.type === "data-stage") last.set(keyOf(part), `${message.id}:${index}`);
     });
   return last;
 }
@@ -67,4 +111,31 @@ export function liveProgress(messages: readonly ThreadMessage[]): ProgressData |
   const reply = messages.findLast((message) => message.role === "assistant");
   const progress = reply?.parts.findLast((part) => isData(part, "progress")) as DataPart<"progress"> | undefined;
   return progress?.data ?? null;
+}
+
+/** The newest reply's Brief when it ended `failed`: its status part, for the step and the fix to show. */
+export function failedBrief(messages: readonly ThreadMessage[]): DataPart<"status"> | null {
+  const reply = messages.findLast((message) => message.role === "assistant");
+  const status = reply?.parts.findLast((part) => isData(part, "status")) as DataPart<"status"> | undefined;
+  return status?.data.state === "failed" ? status : null;
+}
+
+/** Every card the thread holds, in order, by its id (the stream replaces a card in place). */
+export const cardsOf = (messages: readonly ThreadMessage[]): { id: string; data: CardData }[] =>
+  messages.flatMap((m) => m.parts.flatMap((p) => (isData(p, "card") && p.id ? [{ id: p.id, data: (p as DataPart<"card">).data }] : [])));
+
+/** The work log of the newest reply, in the order it came: each worker's step (ended once a newer step came, or the
+ * work ended) and what the team said to each other meanwhile. */
+export type WorkEntry = { step: ProgressData & { done: boolean } } | { room: Schemas["RoomMessage"] };
+
+export function workLog(messages: readonly ThreadMessage[]): WorkEntry[] {
+  const reply = messages.findLast((message) => message.role === "assistant");
+  const parts = reply?.parts ?? [];
+  const running = briefState(messages) !== null;
+  const last = parts.findLastIndex((part) => isData(part, "progress"));
+  return parts.flatMap((part, at): WorkEntry[] => {
+    if (isData(part, "progress")) return [{ step: { ...(part as DataPart<"progress">).data, done: !running || at < last } }];
+    if (isData(part, "room")) return [{ room: (part as DataPart<"room">).data }];
+    return [];
+  });
 }

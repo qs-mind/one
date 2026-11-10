@@ -19,6 +19,7 @@ import { type Translate, useText } from "@/texts/useText";
 import type { SourceLocator } from "@/project/types";
 import { openSourceFile } from "@/workspace/reveal";
 import { DocumentHost, FULL, type Opened } from "./DocumentHost";
+import { revealWaiting } from "./revealWaiting";
 import { SideColumn } from "./SideColumn";
 import { TenderThread } from "./TenderThread";
 import { useTender } from "./useTender";
@@ -64,12 +65,6 @@ function Header({ row }: { row: Schemas["TenderRow"] }) {
       {row.confidential && <Pill>{t(texts.confidential)}</Pill>}
     </header>
   );
-}
-
-/** The thread content's newest block, for a waiting item that has its place in the thread (S51). */
-function reveal() {
-  const blocks = document.querySelectorAll('[data-place="tender"] [role="log"] .flex-col > *');
-  blocks[blocks.length - 1]?.scrollIntoView({ block: "end" });
 }
 
 export function Tender() {
@@ -130,7 +125,7 @@ export function Tender() {
           </div>
           <div className="mx-auto min-h-0 w-full max-w-190 flex-1">{conversation}</div>
         </div>
-        <SideColumn projectId={id} waiting={data.view?.waiting ?? []} plan={data.plan} members={data.members} docs={kept.docs} onReveal={reveal} />
+        <SideColumn projectId={id} waiting={data.view?.waiting ?? []} plan={data.plan} members={data.members} docs={kept.docs} onReveal={revealWaiting} />
       </div>
     );
 

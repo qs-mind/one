@@ -118,6 +118,13 @@ export function useTender(projectId: string) {
       });
       return settle(answer, (f) => put((d) => ({ ...d, findings: d.findings.map((x) => (x.id === f.id ? f : x)) })));
     },
+    async signOffStage(stageId: string, version: number) {
+      const answer = await client.POST("/projects/{project_id}/plan/stages/{stage_id}/approve", {
+        params: { path: { project_id: projectId, stage_id: stageId } },
+        body: { version },
+      });
+      return settle(answer, (v) => put((d) => ({ ...d, plan: v.plan })));
+    },
     async requestPlan() {
       const answer = await client.POST("/projects/{project_id}/plan/request", { params: path });
       return settle(answer, () => undefined);
