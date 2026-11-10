@@ -14,6 +14,7 @@ import { common } from "@/texts/common";
 import { home } from "@/texts/home";
 import { textDir } from "@/texts/language";
 import { useText } from "@/texts/useText";
+import { DateSource } from "@/tender/DateSource";
 import { daysUntil } from "./days";
 
 type Row = Schemas["TenderRow"];
@@ -38,7 +39,14 @@ function Days({ row, today, near }: { row: Row; today: Date; near: boolean }) {
           : days === 0
             ? t(home.dueToday)
             : t.plural(common.daysLeft, days);
-  return <span className={cn("text-end md:w-44", near && "font-bold text-foreground")}>{words}</span>;
+  // The date's source under the days (S39), as words: the whole row is the link that opens the tender.
+  const source = row.state !== "finished" && row.submission_date ? row.submission_source : null;
+  return (
+    <span className="flex min-w-0 max-w-44 flex-col items-end text-end md:w-44">
+      <span className={cn(near && "font-bold text-foreground")}>{words}</span>
+      {source && <DateSource compact source={source} />}
+    </span>
+  );
 }
 
 type TenderRowProps = { row: Row; today: Date; near: boolean; samplePill: boolean };

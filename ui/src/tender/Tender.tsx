@@ -9,7 +9,6 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import type { Schemas } from "@/api/client";
 import { paths } from "@/app/paths";
 import type { Source } from "@/conversation/parts";
-import { SourceLinks } from "@/conversation/SourceLinks";
 import { MetaLine } from "@/design/MetaLine";
 import { Pill } from "@/design/Pill";
 import { common } from "@/texts/common";
@@ -19,6 +18,7 @@ import { tender as texts } from "@/texts/tender";
 import { type Translate, useText } from "@/texts/useText";
 import type { SourceLocator } from "@/project/types";
 import { openSourceFile } from "@/workspace/reveal";
+import { DateSource } from "./DateSource";
 import { DocumentHost, FULL, type Opened } from "./DocumentHost";
 import { revealWaiting } from "./revealWaiting";
 import { SideColumn } from "./SideColumn";
@@ -51,21 +51,6 @@ function dateLine(row: Schemas["TenderRow"], t: Translate): string[] {
   const left = Math.round((day.getTime() - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / DAY_MS);
   const date = t(texts.submission, { date: formatDate(day, t.lang, { day: "numeric", month: "long", timeZone: "UTC" }) });
   return [date, left < 0 ? t(texts.submissionPassed) : t.plural(common.daysLeft, left)];
-}
-
-/** Where the submission date comes from (S39): the engineer's own word, or the place it was read, which opens, and
- * the mark of a local OCR read that was not sure. */
-function DateSource({ source, onOpen }: { source: Source; onOpen: (source: Source) => void }) {
-  const t = useText();
-  if (source.kind === "engineer") return <span className="text-xs text-muted-foreground">{t(texts.submissionYours)}</span>;
-  return (
-    <>
-      <span className="text-xs">
-        <SourceLinks sources={[source]} onOpen={onOpen} />
-      </span>
-      {source.locator.ocr_low_confidence === true && <span className="text-xs text-copper">{t(texts.submissionUnsure)}</span>}
-    </>
-  );
 }
 
 function Header({ row, onOpenSource }: { row: Schemas["TenderRow"]; onOpenSource: (source: Source) => void }) {
